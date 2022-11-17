@@ -15,7 +15,9 @@ class MagnitudeComparisonModel(object):
     def build_model(self):
 
         base_numbers = self.data.n1.unique()
-        choices = self.data.choice == 2.
+
+        # True means choose 2
+        choices = self.data.choice
         
         mean_n1 = np.mean(np.log(base_numbers)) # same as np.mean(np.log(d['n1']))
         std_n1 = np.std(np.log(base_numbers))
