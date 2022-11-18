@@ -3,7 +3,8 @@ import pkg_resources
 import numpy as np
 
 def load_garcia2022():
-    """Return a dataframe about the 68 different Roman Emperors.
+    """Return a dataframe containing the behavioral data from the Magnitude task
+    in Baretto Garcia et al., 2022
 
 
     """
