@@ -7,9 +7,9 @@ import numpy as np
 def plot_ppc(df, ppc, exp_type='magnitude', plot_type=1, var_name='p', level='subject', col_wrap=5, n_clusters=13):
 
     if exp_type  == 'magnitude':
-        x = 'log(n1/n2)'
-        ppc['log(n1/n2)'] = np.log(ppc.index.get_level_values('frac'))
-        ppc.set_index('log(n1/n2)', append=True)
+        x = 'log(n2/n1)'
+        ppc['log(n2/n1)'] = np.log(ppc.index.get_level_values('frac'))
+        ppc.set_index('log(n2/n1)', append=True)
 
     assert (var_name in ['p', 'll_bernoulli'])
 
