@@ -61,8 +61,13 @@ class RiskModel(BaseModel):
 
     def __init__(self, data, prior_estimate='objective', fit_seperate_evidence_sd=True):
 
+        assert prior_estimate in ['objective', 'shared', 'different', 'full']
+
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
         self.prior_estimate = prior_estimate
+
+        if 'risky_first' not in data.columns:
+            data['risky_first'] = data['p1'] != 1.0
 
         super().__init__(data)
 
@@ -72,7 +77,7 @@ class RiskModel(BaseModel):
 
         paradigm['p1'] = data['p1'].values
         paradigm['p2'] = data['p2'].values
-        paradigm['risky_first'] = (data['p1'] != 1.0).values.astype(bool)
+        paradigm['risky_first'] = data['risky_first'].values.astype(bool)
 
         return paradigm
 
@@ -97,9 +102,13 @@ class RiskModel(BaseModel):
         elif self.prior_estimate == 'different':
 
             risky_first = model['risky_first'].astype(bool)
+            print(risky_first.shape)
+            print(model['n1'].shape, model['n2'].shape)
 
-            safe_prior_mu = at.mean(at.log(at.stack((model['n1'][~risky_first], model['n2'][risky_first]), 0)))
-            safe_prior_std = at.std(at.log(at.stack((model['n1'][~risky_first], model['n2'][risky_first]), 0)))
+            safe_n = at.where(risky_first, model['n2'], model['n1'])
+            safe_prior_mu = at.mean(at.log(safe_n))
+            safe_prior_std = at.std(at.log(safe_n))
+
             risky_prior_mu = self.get_trialwise_variable('risky_prior_mu', transform='identity')
             risky_prior_std = self.get_trialwise_variable('risky_prior_std', transform='softplus')
 
@@ -109,8 +118,25 @@ class RiskModel(BaseModel):
             model_inputs['n2_prior_mu'] = at.where(risky_first, safe_prior_mu, risky_prior_mu)
             model_inputs['n2_prior_std'] = at.where(risky_first, safe_prior_std, risky_prior_std)
 
-        # Prob of choosing 1 should decrease when risky option comes first
-        model_inputs['threshold'] =  at.log(model['p1'] / model['p2'])
+        elif self.prior_estimate == 'full':
+
+            risky_first = model['risky_first'].astype(bool)
+
+            risky_prior_mu = self.get_trialwise_variable('risky_prior_mu', transform='identity')
+            risky_prior_std = self.get_trialwise_variable('risky_prior_std', transform='softplus')
+
+            safe_prior_mu = self.get_trialwise_variable('safe_prior_mu', transform='identity')
+            safe_prior_std = self.get_trialwise_variable('safe_prior_std', transform='softplus')
+
+            model_inputs['n1_prior_mu'] = at.where(risky_first, risky_prior_mu, safe_prior_mu)
+            model_inputs['n1_prior_std'] = at.where(risky_first, risky_prior_std, safe_prior_std)
+
+            model_inputs['n2_prior_mu'] = at.where(risky_first, safe_prior_mu, risky_prior_mu)
+            model_inputs['n2_prior_std'] = at.where(risky_first, safe_prior_std, risky_prior_std)
+
+
+        # Prob of choosing 2 should increase with p2
+        model_inputs['threshold'] =  at.log(model['p2'] / model['p1'])
 
         if self.fit_seperate_evidence_sd:
             model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd', transform='softplus')
@@ -130,18 +156,37 @@ class RiskModel(BaseModel):
             self.build_hierarchical_nodes('evidence_sd', mu_intercept=-1., transform='softplus')
 
         model = pm.Model.get_context() 
-        ndim = model['n1_evidence_sd'].ndim
-
-        if ndim == 1:
-            pm.Deterministic('evidence_sd', at.stack((model['n1_evidence_sd'], model['n2_evidence_sd']), 1), dims=('subject', 'order'))
 
         if self.prior_estimate == 'shared':
-            self.build_hierarchical_nodes('prior_mu', mu_intercept=.3, transform='identity')
-            self.build_hierarchical_nodes('prior_std', mu_intercept=-1., transform='softplus')
+            prior_mu = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+            prior_std = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+            self.build_hierarchical_nodes('prior_mu', mu_intercept=prior_mu, transform='identity')
+            self.build_hierarchical_nodes('prior_std', mu_intercept=prior_std, transform='softplus')
 
         elif self.prior_estimate == 'different':
-            self.build_hierarchical_nodes('risky_prior_mu', mu_intercept=.3, transform='identity')
-            self.build_hierarchical_nodes('risky_prior_std', mu_intercept=-1., transform='softplus')
+            risky_n = np.where(self.data['risky_first'], self.data['n1'], self.data['n2'])
+
+            risky_prior_mu = np.mean(np.log(risky_n))
+            risky_prior_std = np.std(np.log(risky_n))
+
+            self.build_hierarchical_nodes('risky_prior_mu', mu_intercept=risky_prior_mu, transform='identity')
+            self.build_hierarchical_nodes('risky_prior_std', mu_intercept=risky_prior_std, transform='softplus')
+
+        elif self.prior_estimate == 'full':
+            risky_n = np.where(self.data['risky_first'], self.data['n1'], self.data['n2'])
+            safe_n = np.where(self.data['risky_first'], self.data['n2'], self.data['n1'])
+
+            risky_prior_mu = np.mean(np.log(risky_n))
+            risky_prior_std = np.std(np.log(risky_n))
+
+            self.build_hierarchical_nodes('risky_prior_mu', mu_intercept=risky_prior_mu, transform='identity')
+            self.build_hierarchical_nodes('risky_prior_std', mu_intercept=risky_prior_std, transform='softplus')
+
+            safe_prior_mu = np.mean(np.log(safe_n))
+            safe_prior_std = np.std(np.log(safe_n))
+
+            self.build_hierarchical_nodes('safe_prior_mu', mu_intercept=safe_prior_mu, transform='identity')
+            self.build_hierarchical_nodes('safe_prior_std', mu_intercept=safe_prior_std, transform='softplus')
 
     def create_data(self):
 
