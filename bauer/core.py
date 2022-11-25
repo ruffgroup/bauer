@@ -165,18 +165,18 @@ class BaseModel(object):
 
         return trialwise_pars
 
-    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma=.5, transform='identity'):
+    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=.5, transform='identity'):
 
         self.free_parameters.append(name)
 
         if transform == 'identity':
             group_mu = pm.Normal(f"{name}_mu", 
                                             mu=mu_intercept, 
-                                            sigma=sigma)
+                                            sigma=sigma_intercept)
         else:
             group_mu = pm.Normal(f"{name}_mu_untransformed", 
                                             mu=mu_intercept, 
-                                            sigma=sigma)
+                                            sigma=sigma_intercept)
 
             pm.Deterministic(name=f'{name}_mu', var=at.softplus(group_mu))
             
@@ -265,16 +265,18 @@ class RegressionModel(BaseModel):
             self.build_likelihood()
 
 
-    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma=.5, transform='identity'):
+    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=1., transform='identity'):
 
         self.free_parameters.append(name)
         self.design_matrices[name] = self.build_design_matrix(self.data, name)
         
         mu = np.zeros(self.design_matrices[name].shape[1])
+        sigma = np.ones(self.design_matrices[name].shape[1])
 
         if self.design_matrices[name].design_info.column_names[0] == 'Intercept':
             if transform == 'identity':
                 mu[0] = mu_intercept
+                sigma[0] = sigma_intercept
             # Possibly use inverse of softplus
 
         group_mu = pm.Normal(f"{name}_mu", 
