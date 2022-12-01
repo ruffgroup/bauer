@@ -26,6 +26,9 @@ class MagnitudeComparisonModel(BaseModel):
         model_inputs['n2_prior_std'] = at.std(at.log(model['n2']))
         model_inputs['threshold'] =  0.0
 
+        model_inputs['n1_evidence_mu'] = at.log(model['n1'])
+        model_inputs['n2_evidence_mu'] = at.log(model['n2'])
+
         if self.fit_n2_prior_mu:
             model_inputs['n2_prior_mu'] = self.get_trialwise_variable('n2_prior_mu', transform='identity')
         else:
@@ -87,6 +90,9 @@ class RiskModel(BaseModel):
 
         model_inputs = {}
         
+        model_inputs['n1_evidence_mu'] = at.log(model['n1'])
+        model_inputs['n2_evidence_mu'] = at.log(model['n2'])
+
         if self.prior_estimate == 'objective':
             model_inputs['n1_prior_mu'] = at.mean(at.log(at.stack((model['n1'], model['n2']), 0)))
             model_inputs['n1_prior_std'] = at.std(at.log(at.stack((model['n1'], model['n2']), 0)))
@@ -99,11 +105,21 @@ class RiskModel(BaseModel):
             model_inputs['n2_prior_mu'] = model_inputs['n1_prior_mu']
             model_inputs['n2_prior_std'] = model_inputs['n1_prior_std']
 
+        elif self.prior_estimate == 'two_mus':
+
+            risky_first = model['risky_first'].astype(bool)
+            safe_n = at.where(risky_first, model['n2'], model['n1'])
+            safe_prior_std = at.std(at.log(safe_n))
+            risky_prior_std = self.get_trialwise_variable('risky_prior_std', transform='softplus')
+
+            model_inputs['n1_prior_mu'] = self.get_trialwise_variable('n1_prior_mu', transform='identity')
+            model_inputs['n1_prior_std'] = at.where(risky_first, risky_prior_std, safe_prior_std)
+            model_inputs['n2_prior_mu'] = self.get_trialwise_variable('n2_prior_mu', transform='identity')
+            model_inputs['n2_prior_std'] = at.where(risky_first, safe_prior_std, risky_prior_std)
+
         elif self.prior_estimate == 'different':
 
             risky_first = model['risky_first'].astype(bool)
-            print(risky_first.shape)
-            print(model['n1'].shape, model['n2'].shape)
 
             safe_n = at.where(risky_first, model['n2'], model['n1'])
             safe_prior_mu = at.mean(at.log(safe_n))

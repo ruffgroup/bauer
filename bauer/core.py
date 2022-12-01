@@ -46,13 +46,13 @@ class BaseModel(object):
         print(model_inputs)
         post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'], 
                                                model_inputs['n1_prior_std'], 
-                                               at.log(model['n1']),
+                                               model_inputs['n1_evidence_mu'], 
                                                model_inputs['n1_evidence_sd']
                                                )
 
         post_n2_mu, post_n2_sd = get_posterior(model_inputs['n2_prior_mu'],
                                                model_inputs['n2_prior_std'],
-                                               at.log(model['n2']),
+                                               model_inputs['n2_evidence_mu'], 
                                                model_inputs['n2_evidence_sd'])
 
         diff_mu, diff_sd = get_diff_dist(post_n2_mu, post_n2_sd, post_n1_mu, post_n1_sd)
