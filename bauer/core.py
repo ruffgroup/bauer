@@ -254,9 +254,6 @@ class RegressionModel(BaseModel):
             self.free_parameters = []
             self.build_priors()
 
-            for key in self.free_parameters:
-                self.estimation_model.coords[key+'_regressors'] = self.design_matrices[key].design_info.column_names
-
             paradigm = self._get_paradigm(data=data)
 
             for key, value in paradigm.items():
@@ -269,6 +266,9 @@ class RegressionModel(BaseModel):
 
         self.free_parameters.append(name)
         self.design_matrices[name] = self.build_design_matrix(self.data, name)
+
+        model = pm.Model.get_context()
+        model.add_coord(f'{name}_regressors', self.design_matrices[name].design_info.column_names)
         
         mu = np.zeros(self.design_matrices[name].shape[1])
         sigma = np.ones(self.design_matrices[name].shape[1])
