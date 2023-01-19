@@ -4,7 +4,7 @@ import numpy as np
 from .utils import cumulative_normal, get_diff_dist, get_posterior
 import aesara.tensor as at
 from patsy import dmatrix
-from .core import BaseModel, RegressionModel
+from .core import BaseModel, RegressionModel, LapseModel
 
 
 class MagnitudeComparisonModel(BaseModel):
@@ -55,9 +55,10 @@ class MagnitudeComparisonModel(BaseModel):
         if self.fit_n2_prior_mu:
             self.build_hierarchical_nodes('n2_prior_mu', mu_intercept=0.0, transform='identity')
         
+class MagnitudeComparisonLapseModel(LapseModel, MagnitudeComparisonModel):
+    ...
 
 class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonModel):
-
     ...
 
 class RiskModel(BaseModel):
@@ -225,3 +226,19 @@ class RiskRegressionModel(RegressionModel, RiskModel):
     def __init__(self,  data, regressors, prior_estimate='objective', fit_seperate_evidence_sd=True):
         RegressionModel.__init__(self, data, regressors)
         RiskModel.__init__(self, data, prior_estimate, fit_seperate_evidence_sd)
+
+class RiskLapseModel(RiskModel, LapseModel):
+
+    def build_priors(self):
+        RiskModel.build_priors(self)
+        self.build_hierarchical_nodes('p_lapse', mu_intercept=-4, transform='logistic')
+
+    def get_model_inputs(self):
+        model_inputs = RiskModel.get_model_inputs(self)
+        model_inputs['p_lapse'] = self.get_trialwise_variable('p_lapse', transform='logistic')
+        return model_inputs
+
+class RiskLapseRegressionModel(RegressionModel, RiskLapseModel):
+    def __init__(self,  data, regressors, prior_estimate='objective', fit_seperate_evidence_sd=True):
+        RegressionModel.__init__(self, data, regressors)
+        RiskLapseModel.__init__(self, data, prior_estimate, fit_seperate_evidence_sd)

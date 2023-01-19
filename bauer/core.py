@@ -1,7 +1,7 @@
 import pandas as pd
 import pymc as pm
 import numpy as np
-from .utils import cumulative_normal, get_diff_dist, get_posterior
+from .utils import cumulative_normal, get_diff_dist, get_posterior, logistic
 import aesara.tensor as at
 from patsy import dmatrix
 
@@ -39,11 +39,7 @@ class BaseModel(object):
     def set_paradigm(self, paradigm):
         pm.set_data(paradigm)
 
-    def build_likelihood(self):
-
-        model = pm.Model.get_context()
-        model_inputs = self.get_model_inputs()
-        print(model_inputs)
+    def _get_choice_predictions(self, model_inputs):
         post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'], 
                                                model_inputs['n1_prior_std'], 
                                                model_inputs['n1_evidence_mu'], 
@@ -57,7 +53,15 @@ class BaseModel(object):
 
         diff_mu, diff_sd = get_diff_dist(post_n2_mu, post_n2_sd, post_n1_mu, post_n1_sd)
         p = pm.Deterministic('p', var=cumulative_normal(model_inputs['threshold'], diff_mu, diff_sd))
-        pm.Bernoulli('ll_bernoulli', p=p, observed=model['choice'])
+
+    def build_likelihood(self):
+        model = pm.Model.get_context()
+        model_inputs = self.get_model_inputs()
+
+        self._get_choice_predictions(model_inputs)
+
+        model = pm.Model.get_context()
+        pm.Bernoulli('ll_bernoulli', p=model['p'], observed=model['choice'])
 
     def build_estimation_model(self, data=None):
 
@@ -163,6 +167,9 @@ class BaseModel(object):
         elif transform == 'softplus':
             trialwise_pars = at.softplus(model[f'{key}_untransformed'][model['subject_ix']])
 
+        elif transform == 'logistic':
+            trialwise_pars = logistic(model[f'{key}_untransformed'][model['subject_ix']])
+
         return trialwise_pars
 
     def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=.5, transform='identity'):
@@ -173,12 +180,21 @@ class BaseModel(object):
             group_mu = pm.Normal(f"{name}_mu", 
                                             mu=mu_intercept, 
                                             sigma=sigma_intercept)
-        else:
+        elif transform == 'softplus':
             group_mu = pm.Normal(f"{name}_mu_untransformed", 
                                             mu=mu_intercept, 
                                             sigma=sigma_intercept)
 
             pm.Deterministic(name=f'{name}_mu', var=at.softplus(group_mu))
+        elif transform == 'logistic':
+            group_mu = pm.Normal(f"{name}_mu_untransformed", 
+                                            mu=mu_intercept, 
+                                            sigma=sigma_intercept)
+
+            pm.Deterministic(name=f'{name}_mu', var=logistic(group_mu))
+        else:
+            raise NotImplementedError
+
             
         group_sd = pm.HalfCauchy(f'{name}_sd', .25)
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject',))
@@ -190,6 +206,8 @@ class BaseModel(object):
         
             if transform == 'softplus':
                 pm.Deterministic(name=name, var=at.softplus(subjectwise_untrans), dims=('subject',))
+            elif transform == 'logistic':
+                pm.Deterministic(name=name, var=logistic(subjectwise_untrans), dims=('subject',))
             else:
                 raise Exception
 
@@ -229,7 +247,7 @@ class RegressionModel(BaseModel):
 
         model = pm.Model.get_context()
 
-        if transform not in ['identy', 'softplus']:
+        if transform not in ['identy', 'softplus', 'logistic']:
             Exception()
 
         dm = model[f'_dm_{key}']
@@ -238,6 +256,8 @@ class RegressionModel(BaseModel):
             trialwise_pars = at.sum(model[key][model['subject_ix']] * dm, 1)
         elif transform == 'softplus':
             trialwise_pars = at.softplus(at.sum(model[key][model['subject_ix']] * dm, 1))
+        elif transform == 'logistic':
+            trialwise_pars = logistic(at.sum(model[key][model['subject_ix']] * dm, 1))
 
         return trialwise_pars
 
@@ -277,6 +297,9 @@ class RegressionModel(BaseModel):
             if transform == 'identity':
                 mu[0] = mu_intercept
                 sigma[0] = sigma_intercept
+            elif transform == 'logistic':
+                mu[0] = mu_intercept
+                sigma[0] = sigma_intercept
             # Possibly use inverse of softplus
 
         group_mu = pm.Normal(f"{name}_mu", 
@@ -290,3 +313,21 @@ class RegressionModel(BaseModel):
 
         pm.Deterministic(name, group_mu + group_sd * subject_offset, dims=('subject', f'{name}_regressors'))
 
+class LapseModel(BaseModel):
+
+    def build_priors(self):
+        super().build_priors()
+        self.build_hierarchical_nodes('p_lapse', mu_intercept=-4, transform='logistic')
+
+    def build_likelihood(self):
+        model = pm.Model.get_context()
+        model_inputs = self.get_model_inputs()
+        self._get_choice_predictions(model_inputs)
+
+        p = (1-model_inputs['p_lapse']) * model['p'] + (model_inputs['p_lapse'] * 0.5)
+        pm.Bernoulli('ll_bernoulli', p=p, observed=model['choice'])
+
+    def get_model_inputs(self):
+        model_inputs = super().get_model_inputs()
+        model_inputs['p_lapse'] = self.get_trialwise_variable('p_lapse', transform='logistic')
+        return model_inputs
