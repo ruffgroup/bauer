@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import aesara.tensor as at
 import arviz as az
+from scipy.special import expit
 
 def get_posterior(mu1, sd1, mu2, sd2):
     var1, var2 = sd1**2, sd2**2
@@ -18,7 +19,8 @@ def cumulative_normal(x, mu, sd, s=at.sqrt(2.)):
 def softplus(x): 
     return np.log(1 + np.exp(-np.abs(x))) + np.maximum(x,0) 
 
-
+def logistic(x): 
+    return expit(x)
 
 def summarize_ppc(ppc, groupby=None):
 
