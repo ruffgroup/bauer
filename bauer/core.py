@@ -52,16 +52,16 @@ class BaseModel(object):
                                                model_inputs['n2_evidence_sd'])
 
         diff_mu, diff_sd = get_diff_dist(post_n2_mu, post_n2_sd, post_n1_mu, post_n1_sd)
-        p = pm.Deterministic('p', var=cumulative_normal(model_inputs['threshold'], diff_mu, diff_sd))
+
+        return cumulative_normal(model_inputs['threshold'], diff_mu, diff_sd)
 
     def build_likelihood(self):
         model = pm.Model.get_context()
         model_inputs = self.get_model_inputs()
 
-        self._get_choice_predictions(model_inputs)
+        p = pm.Deterministic('p', var=self._get_choice_predictions(model_inputs))
 
-        model = pm.Model.get_context()
-        pm.Bernoulli('ll_bernoulli', p=model['p'], observed=model['choice'])
+        pm.Bernoulli('ll_bernoulli', p=p, observed=model['choice'])
 
     def build_estimation_model(self, data=None):
 
@@ -322,9 +322,10 @@ class LapseModel(BaseModel):
     def build_likelihood(self):
         model = pm.Model.get_context()
         model_inputs = self.get_model_inputs()
-        self._get_choice_predictions(model_inputs)
 
-        p = (1-model_inputs['p_lapse']) * model['p'] + (model_inputs['p_lapse'] * 0.5)
+        p_choice = self._get_choice_predictions(model_inputs)
+        p = pm.Deterministic('p', var=(1-model_inputs['p_lapse']) * p_choice + (model_inputs['p_lapse'] * 0.5))
+
         pm.Bernoulli('ll_bernoulli', p=p, observed=model['choice'])
 
     def get_model_inputs(self):
