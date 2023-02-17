@@ -1,3 +1,4 @@
+import warnings
 import pandas as pd
 import pymc as pm
 import numpy as np
@@ -27,6 +28,8 @@ class BaseModel(object):
         paradigm = {}
         paradigm['n1'] = data['n1'].values
         paradigm['n2'] = data['n2'].values
+        paradigm['log(n1)'] = np.log(data['n1'].values)
+        paradigm['log(n2)'] = np.log(data['n2'].values)
         paradigm['subject_ix'], _ = pd.factorize(data.index.get_level_values('subject'))
 
         if 'choice' in data.columns:
@@ -158,6 +161,12 @@ class BaseModel(object):
 
         model = pm.Model.get_context()
 
+        if key == 'n1_evidence_mu':
+            return model['log(n1)']
+
+        if key == 'n2_evidence_mu':
+            return model['log(n2)']
+
         if transform not in ['identy', 'softplus']:
             Exception()
 
@@ -250,14 +259,27 @@ class RegressionModel(BaseModel):
         if transform not in ['identy', 'softplus', 'logistic']:
             Exception()
 
-        dm = model[f'_dm_{key}']
 
-        if transform == 'identity':
-            trialwise_pars = at.sum(model[key][model['subject_ix']] * dm, 1)
-        elif transform == 'softplus':
-            trialwise_pars = at.softplus(at.sum(model[key][model['subject_ix']] * dm, 1))
-        elif transform == 'logistic':
-            trialwise_pars = logistic(at.sum(model[key][model['subject_ix']] * dm, 1))
+        if key in ['n1_evidence_mu', 'n2_evidence_mu']:
+            if key in self.design_matrices.keys():
+                dm = model[f'_dm_{key}']
+                trialwise_pars = model[f'log({key[:2]})'] + at.sum(model[key][model['subject_ix']] * dm, 1)
+            else:
+                if key == 'n1_evidence_mu':
+                    return model['log(n1)']
+
+                if key == 'n2_evidence_mu':
+                    return model['log(n2)']
+
+
+        else:
+            dm = model[f'_dm_{key}']
+            if transform == 'identity':
+                trialwise_pars = at.sum(model[key][model['subject_ix']] * dm, 1)
+            elif transform == 'softplus':
+                trialwise_pars = at.softplus(at.sum(model[key][model['subject_ix']] * dm, 1))
+            elif transform == 'logistic':
+                trialwise_pars = logistic(at.sum(model[key][model['subject_ix']] * dm, 1))
 
         return trialwise_pars
 
@@ -294,6 +316,10 @@ class RegressionModel(BaseModel):
         sigma = np.ones(self.design_matrices[name].shape[1])
 
         if self.design_matrices[name].design_info.column_names[0] == 'Intercept':
+
+            if name in ['n1_evidence_mu', 'n2_evidence_mu']:
+                warnings.warn(f'{name} has an Intercept-regressors. This is most likely NOT a good idea.')
+
             if transform == 'identity':
                 mu[0] = mu_intercept
                 sigma[0] = sigma_intercept

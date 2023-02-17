@@ -26,8 +26,8 @@ class MagnitudeComparisonModel(BaseModel):
         model_inputs['n2_prior_std'] = at.std(at.log(model['n2']))
         model_inputs['threshold'] =  0.0
 
-        model_inputs['n1_evidence_mu'] = at.log(model['n1'])
-        model_inputs['n2_evidence_mu'] = at.log(model['n2'])
+        model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu', transform='identity') #model['n1'])
+        model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu', transform='identity')
 
         if self.fit_n2_prior_mu:
             model_inputs['n2_prior_mu'] = self.get_trialwise_variable('n2_prior_mu', transform='identity')
@@ -59,7 +59,14 @@ class MagnitudeComparisonLapseModel(LapseModel, MagnitudeComparisonModel):
     ...
 
 class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonModel):
-    ...
+    def build_priors(self):
+
+        super().build_priors()
+
+        for key in ['n1_evidence_mu', 'n2_evidence_mu']:
+            if key in self.regressors:
+                self.build_hierarchical_nodes(key, mu_intercept=0.0, transform='identity')
+
 
 class RiskModel(BaseModel):
 
@@ -91,8 +98,8 @@ class RiskModel(BaseModel):
 
         model_inputs = {}
         
-        model_inputs['n1_evidence_mu'] = at.log(model['n1'])
-        model_inputs['n2_evidence_mu'] = at.log(model['n2'])
+        model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu', transform='identity') #at.log(model['n1'])
+        model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu', transform='identity') #at.log(model['n2'])
 
         if self.prior_estimate == 'objective':
             model_inputs['n1_prior_mu'] = at.mean(at.log(at.stack((model['n1'], model['n2']), 0)))
@@ -226,6 +233,14 @@ class RiskRegressionModel(RegressionModel, RiskModel):
     def __init__(self,  data, regressors, prior_estimate='objective', fit_seperate_evidence_sd=True):
         RegressionModel.__init__(self, data, regressors)
         RiskModel.__init__(self, data, prior_estimate, fit_seperate_evidence_sd)
+
+    def build_priors(self):
+
+        super().build_priors()
+
+        for key in ['n1_evidence_mu', 'n2_evidence_mu']:
+            if key in self.regressors:
+                self.build_hierarchical_nodes(key, mu_intercept=0.0, transform='identity')
 
 class RiskLapseModel(RiskModel, LapseModel):
 
