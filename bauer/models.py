@@ -257,3 +257,59 @@ class RiskLapseRegressionModel(RegressionModel, RiskLapseModel):
     def __init__(self,  data, regressors, prior_estimate='objective', fit_seperate_evidence_sd=True):
         RegressionModel.__init__(self, data, regressors)
         RiskLapseModel.__init__(self, data, prior_estimate, fit_seperate_evidence_sd)
+
+
+class RNPModel(BaseModel):
+
+    def __init__(self, data, risk_neutral_p=0.55):
+        self.risk_neutral_p = risk_neutral_p
+
+        super().__init__(data)
+
+    def get_model_inputs(self):
+
+        model = pm.Model.get_context()
+
+        model_inputs = {}
+        model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu', transform='identity') #model['n1'])
+        model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu', transform='identity')
+        model_inputs['rnp'] = self.get_trialwise_variable('rnp', transform='logistic')
+        model_inputs['gamma'] = self.get_trialwise_variable('gamma', transform='identity')
+
+        return model_inputs
+
+    def _get_paradigm(self, data=None):
+
+        paradigm = super()._get_paradigm(data)
+
+        paradigm['p1'] = data['p1'].values
+        paradigm['p2'] = data['p2'].values
+        paradigm['risky_first'] = data['risky_first'].values.astype(bool)
+
+        return paradigm
+
+    def _get_choice_predictions(self, model_inputs):
+
+        model = pm.Model.get_context()
+
+        rnp = model_inputs['rnp']
+        slope = model_inputs['gamma']
+        risky_first = model['risky_first'].astype(bool)
+
+        intercept = -at.log(rnp) * slope # More risk-seeking -> higher rnp, smaller intercept, more likely to choose option 2
+        intercept = at.where(risky_first, intercept, -intercept)
+        n1 = model_inputs['n1_evidence_mu']
+        n2 = model_inputs['n2_evidence_mu']
+
+        p1, p2 =  model['p1'], model['p2']
+
+        return cumulative_normal(intercept + slope*(n2-n1), 0.0, 1.0)
+
+    def build_priors(self):
+        self.build_hierarchical_nodes('gamma', mu_intercept=1.0, sigma_intercept=0.5, transform='identity')
+        self.build_hierarchical_nodes('rnp', mu_intercept=0.0, sigma_intercept=1.0, transform='logistic')
+
+class RNPRegressionModel(RegressionModel, RNPModel):
+    def __init__(self,  data, regressors, risk_neutral_p=0.55):
+        RegressionModel.__init__(self, data, regressors=regressors)
+        RNPModel.__init__(self, data, risk_neutral_p)
