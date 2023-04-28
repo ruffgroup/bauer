@@ -8,7 +8,7 @@ from patsy import dmatrix
 
 class BaseModel(object):
 
-    def __init__(self, data):
+    def __init__(self, data, save_trialwise_n_estimates=False):
         """
         data should contain ['n1', 'n2'] and 'choice'.
         The latter should be a boolean that indicates whether the *second*
@@ -19,6 +19,7 @@ class BaseModel(object):
         self.unique_subjects = self.data.index.unique(level='subject')
         self.n_subjects = len(self.unique_subjects) 
         self.base_numbers = self.data['n1'].unique()
+        self.save_trialwise_n_estimates = save_trialwise_n_estimates
 
     def _get_paradigm(self, data=None):
 
@@ -55,6 +56,10 @@ class BaseModel(object):
                                                model_inputs['n2_evidence_sd'])
 
         diff_mu, diff_sd = get_diff_dist(post_n2_mu, post_n2_sd, post_n1_mu, post_n1_sd)
+
+        if self.save_trialwise_n_estimates:
+            pm.Deterministic('n1_hat', post_n1_mu)
+            pm.Deterministic('n2_hat', post_n2_mu)
 
         return cumulative_normal(model_inputs['threshold'], diff_mu, diff_sd)
 
