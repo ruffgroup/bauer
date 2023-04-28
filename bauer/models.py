@@ -9,12 +9,12 @@ from .core import BaseModel, RegressionModel, LapseModel
 
 class MagnitudeComparisonModel(BaseModel):
 
-    def __init__(self, data, fit_n2_prior_mu=True, fit_seperate_evidence_sd=True):
+    def __init__(self, data, fit_n2_prior_mu=True, fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False):
         self.fit_n2_prior_mu = fit_n2_prior_mu
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
 
 
-        super().__init__(data)
+        super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
     def get_model_inputs(self):
 
@@ -70,17 +70,19 @@ class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonMod
 
 class RiskModel(BaseModel):
 
-    def __init__(self, data, prior_estimate='objective', fit_seperate_evidence_sd=True):
+    def __init__(self, data, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
+                 save_trialwise_n_estimates=False):
 
         assert prior_estimate in ['objective', 'shared', 'different', 'full']
 
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
         self.prior_estimate = prior_estimate
+        self.incorporate_probability = incorporate_probability
 
         if 'risky_first' not in data.columns:
             data['risky_first'] = data['p1'] != 1.0
 
-        super().__init__(data)
+        super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
     def _get_paradigm(self, data=None):
 
@@ -230,9 +232,11 @@ class RiskModel(BaseModel):
 
 class RiskRegressionModel(RegressionModel, RiskModel):
 
-    def __init__(self,  data, regressors, prior_estimate='objective', fit_seperate_evidence_sd=True):
+    def __init__(self,  data, regressors, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
+                 save_trialwise_n_estimates=False):
         RegressionModel.__init__(self, data, regressors)
-        RiskModel.__init__(self, data, prior_estimate, fit_seperate_evidence_sd)
+        RiskModel.__init__(self, data, prior_estimate, fit_seperate_evidence_sd, incorporate_probability=incorporate_probability,
+                           save_trialwise_n_estimates=save_trialwise_n_estimates)
 
     def build_priors(self):
 
