@@ -171,8 +171,6 @@ class RiskModel(BaseModel):
             model_inputs['n2_prior_std'] = at.where(risky_first, safe_prior_std, risky_prior_std)
 
 
-        # Prob of choosing 2 should increase with p2
-        model_inputs['threshold'] =  at.log(model['p2'] / model['p1'])
 
         if self.fit_seperate_evidence_sd:
             model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd', transform='softplus')
@@ -327,3 +325,182 @@ class RNPRegressionModel(RegressionModel, RNPModel):
     def __init__(self,  data, regressors, risk_neutral_p=0.55):
         RegressionModel.__init__(self, data, regressors=regressors)
         RNPModel.__init__(self, data, risk_neutral_p)
+
+
+class FlexibleSDComparisonModel(BaseModel):
+
+
+    def __init__(self, data, fit_seperate_evidence_sd=True,
+                 fit_n2_prior_mu=False,
+                 polynomial_order=2):
+        self.fit_n2_prior_mu = fit_n2_prior_mu
+        self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
+        self.polynomial_order = polynomial_order
+
+        super().__init__(data)
+
+
+    def build_estimation_model(self, data=None, coords=None):
+        coords = {'subject': self.unique_subjects, 'order':['first', 'second']}
+        coords['poly_order'] = np.arange(self.polynomial_order)
+
+        return super().build_estimation_model(data=data, coords=coords)
+
+    def get_model_inputs(self):
+
+        model = pm.Model.get_context()
+
+        model_inputs = {}
+
+        model_inputs['n1_prior_mu'] = at.mean(model['n1'])
+        model_inputs['n1_prior_std'] = at.std(model['n1'])
+        model_inputs['n2_prior_std'] = at.std(model['n2'])
+        model_inputs['threshold'] =  0.0
+
+        model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu')
+        model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu')
+
+        if self.fit_n2_prior_mu:
+            model_inputs['n2_prior_mu'] = self.get_trialwise_variable('n2_prior_mu', transform='identity')
+        else:
+            model_inputs['n2_prior_mu'] = at.mean(model['n2'])
+
+        model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd')
+        model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('n2_evidence_sd')
+
+        return model_inputs
+
+
+    def build_priors(self):
+
+        if self.fit_seperate_evidence_sd:
+            n1_evidence_sd_polypars = []
+            n2_evidence_sd_polypars = []
+
+            for n in range(self.polynomial_order):
+                if n == 0:
+                    mu_intercept, sigma_intercept = 10, 10
+                else:
+                    mu_intercept, sigma_intercept = 0, 10**(-n+1)
+
+                e1 = self.build_hierarchical_nodes(f'n1_evidence_sd_poly{n}', mu_intercept=mu_intercept, sigma_intercept=sigma_intercept, transform='identity')
+                e2 = self.build_hierarchical_nodes(f'n2_evidence_sd_poly{n}', mu_intercept=mu_intercept, sigma_intercept=sigma_intercept, transform='identity')
+
+                n1_evidence_sd_polypars.append(e1)
+                n2_evidence_sd_polypars.append(e2)
+
+            pm.Deterministic('n1_evidence_sd_poly', var=at.stack(n1_evidence_sd_polypars, axis=1),
+                             dims=('subject', 'poly_order'))
+            pm.Deterministic('n2_evidence_sd_poly', var=at.stack(n2_evidence_sd_polypars, axis=1),
+                             dims=('subject', 'poly_order'))
+
+        else:
+
+            n_evidence_sd_polypars = []
+
+            for n in range(self.polynomial_order):
+                if n == 0:
+                    mu_intercept, sigma_intercept = 10, 10
+                else:
+                    mu_intercept, sigma_intercept = 0, 1
+
+                e = self.build_hierarchical_nodes(f'n_evidence_sd_poly{n}', mu_intercept=mu_intercept, sigma_intercept=sigma_intercept, transform='identity')
+                n_evidence_sd_polypars.append(e)
+
+            n_evidence_sd_polypars = pm.Deterministic('evidence_sd_poly', var=at.stack(n_evidence_sd_polypars, axis=1),
+                             dims=('subject', 'poly_order'))
+            pm.Deterministic('n1_evidence_sd_poly', var=n_evidence_sd_polypars,
+                             dims=('subject', 'poly_order'))
+            pm.Deterministic('n2_evidence_sd_poly', var=n_evidence_sd_polypars,
+                             dims=('subject', 'poly_order'))
+
+        if self.fit_n2_prior_mu:
+            self.build_hierarchical_nodes('n2_prior_mu', mu_intercept=0.0, transform='identity')
+
+    def get_trialwise_variable(self, key, transform='identity'):
+        
+        if key in ['n1_evidence_mu', 'n2_evidence_mu', 'n1_evidence_sd', 'n2_evidence_sd']:
+            return self._get_trialwise_variable(key)
+        else:
+            super().get_trialwise_variable(key, transform)
+
+
+    def _get_trialwise_variable(self, key):
+
+        model = pm.Model.get_context()
+
+        exponents = np.arange(self.polynomial_order)
+
+        if key == 'n1_evidence_mu':
+            return model['n1']
+
+        elif key == 'n2_evidence_mu':
+            return model['n2']
+
+        elif key == 'n1_evidence_sd':
+            n1_evidence_sd = at.sum(model['n1_evidence_sd_poly'][model['subject_ix'], :] *\
+                                          model['n1'][:, np.newaxis]**exponents[np.newaxis, :], 1)
+            return at.softplus(n1_evidence_sd)
+
+
+        elif key == 'n2_evidence_sd':
+            n2_evidence_sd = at.sum(model['n2_evidence_sd_poly'][model['subject_ix'], :] *\
+                                          model['n2'][:, np.newaxis]**exponents[np.newaxis, :], 1)
+            return at.softplus(n2_evidence_sd)
+        else:
+            raise ValueError()
+
+
+
+class ExpectedUtilityRiskModel(BaseModel):
+
+    def __init__(self, data, save_trialwise_eu=False):
+        self.save_trialwise_eu = save_trialwise_eu
+
+        super().__init__(data)
+
+    def _get_paradigm(self, data=None):
+
+        paradigm = super()._get_paradigm(data)
+
+        paradigm['p1'] = data['p1'].values
+        paradigm['p2'] = data['p2'].values
+        paradigm['risky_first'] = data['risky_first'].values.astype(bool)
+
+        return paradigm
+
+    def build_priors(self):
+        self.build_hierarchical_nodes('alpha', mu_intercept=1., sigma_intercept=0.1, transform='softplus')
+        self.build_hierarchical_nodes('sigma', mu_intercept=10., sigma_intercept=10,  transform='softplus')
+
+    def _get_choice_predictions(self, model_inputs):
+
+        eu1 = model_inputs['p1'] * model_inputs['n1']**model_inputs['alpha']
+        eu2 = model_inputs['p2'] * model_inputs['n2']**model_inputs['alpha']
+
+        if self.save_trialwise_eu:
+            pm.Deterministic('eu1', eu1)
+            pm.Deterministic('eu2', eu2)
+
+        return cumulative_normal(eu2 - eu1, 0.0, model_inputs['sigma'])
+
+    def get_model_inputs(self):
+
+        model = pm.Model.get_context()
+
+        model_inputs = {}
+
+        model_inputs['n1'] = model['n1']
+        model_inputs['n2'] = model['n2']
+        model_inputs['p1'] = model['p1']
+        model_inputs['p2'] = model['p2']
+
+        model_inputs['alpha'] = self.get_trialwise_variable('alpha', transform='softplus')
+        model_inputs['sigma'] = self.get_trialwise_variable('sigma', transform='softplus')
+
+        return model_inputs
+
+class ExpectedUtilityRiskRegressionModel(RegressionModel, ExpectedUtilityRiskModel):
+    def __init__(self,  data, save_trialwise_eu, regressors):
+        RegressionModel.__init__(self, data, regressors=regressors)
+        ExpectedUtilityRiskModel.__init__(self, data, save_trialwise_eu)
