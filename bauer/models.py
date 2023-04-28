@@ -103,6 +103,16 @@ class RiskModel(BaseModel):
         model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu', transform='identity') #at.log(model['n1'])
         model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu', transform='identity') #at.log(model['n2'])
 
+        # Prob of choosing 2 should increase with p2
+        if self.incorporate_probability == 'after_inference':
+            model_inputs['threshold'] =  at.log(model['p2'] / model['p1'])
+        elif self.incorporate_probability == 'before_inference':
+            model_inputs['threshold'] =  0.0
+            model_inputs['n1_evidence_mu'] += at.log(model['p1'])
+            model_inputs['n2_evidence_mu'] += at.log(model['p2'])
+        else:
+            raise ValueError('incorporate_probability should be either "after_inference" (default) or "before_inference"')
+
         if self.prior_estimate == 'objective':
             model_inputs['n1_prior_mu'] = at.mean(at.log(at.stack((model['n1'], model['n2']), 0)))
             model_inputs['n1_prior_std'] = at.std(at.log(at.stack((model['n1'], model['n2']), 0)))
