@@ -209,14 +209,14 @@ class BaseModel(object):
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject',))
 
         if transform == 'identity':
-             pm.Deterministic(f'{name}', group_mu + group_sd * subject_offset, dims=('subject',))
+             return pm.Deterministic(f'{name}', group_mu + group_sd * subject_offset, dims=('subject',))
         else:
             subjectwise_untrans = pm.Deterministic(f'{name}_untransformed', group_mu + group_sd * subject_offset, dims=('subject',))
         
             if transform == 'softplus':
-                pm.Deterministic(name=name, var=at.softplus(subjectwise_untrans), dims=('subject',))
+                return pm.Deterministic(name=name, var=at.softplus(subjectwise_untrans), dims=('subject',))
             elif transform == 'logistic':
-                pm.Deterministic(name=name, var=logistic(subjectwise_untrans), dims=('subject',))
+                return pm.Deterministic(name=name, var=logistic(subjectwise_untrans), dims=('subject',))
             else:
                 raise Exception
 
