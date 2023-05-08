@@ -2,6 +2,7 @@ import pandas as pd
 import pymc as pm
 import numpy as np
 from .utils import cumulative_normal, get_diff_dist, get_posterior
+from .utils.math import inverse_softplus
 import aesara.tensor as at
 from patsy import dmatrix
 from .core import BaseModel, RegressionModel, LapseModel
@@ -454,8 +455,9 @@ class FlexibleSDComparisonModel(BaseModel):
 
 class ExpectedUtilityRiskModel(BaseModel):
 
-    def __init__(self, data, save_trialwise_eu=False):
+    def __init__(self, data, save_trialwise_eu=False, probability_distortion=False):
         self.save_trialwise_eu = save_trialwise_eu
+        self.probability_distortion = probability_distortion
 
         super().__init__(data)
 
@@ -473,10 +475,25 @@ class ExpectedUtilityRiskModel(BaseModel):
         self.build_hierarchical_nodes('alpha', mu_intercept=1., sigma_intercept=0.1, transform='softplus')
         self.build_hierarchical_nodes('sigma', mu_intercept=10., sigma_intercept=10,  transform='softplus')
 
+        if self.probability_distortion:
+            self.build_hierarchical_nodes('phi', mu_intercept=inverse_softplus(0.61), sigma_intercept=1.,  transform='softplus')
+
     def _get_choice_predictions(self, model_inputs):
 
-        eu1 = model_inputs['p1'] * model_inputs['n1']**model_inputs['alpha']
-        eu2 = model_inputs['p2'] * model_inputs['n2']**model_inputs['alpha']
+        if self.probability_distortion:
+
+            def prob_distortion(p, phi):
+                return (p**phi) / ((p**phi + (1-p)**phi)**(1/phi))
+
+            p1 = prob_distortion(model_inputs['p1'], model_inputs['phi'])
+            p2 = prob_distortion(model_inputs['p2'], model_inputs['phi'])
+
+        else:
+            p1 =  model_inputs['p1']
+            p2 =  model_inputs['p2']
+
+        eu1 = p1 * model_inputs['n1']**model_inputs['alpha']
+        eu2 = p2 * model_inputs['n2']**model_inputs['alpha']
 
         if self.save_trialwise_eu:
             pm.Deterministic('eu1', eu1)
@@ -498,9 +515,12 @@ class ExpectedUtilityRiskModel(BaseModel):
         model_inputs['alpha'] = self.get_trialwise_variable('alpha', transform='softplus')
         model_inputs['sigma'] = self.get_trialwise_variable('sigma', transform='softplus')
 
+        if self.probability_distortion:
+            model_inputs['phi'] = self.get_trialwise_variable('phi', transform='softplus')
+
         return model_inputs
 
 class ExpectedUtilityRiskRegressionModel(RegressionModel, ExpectedUtilityRiskModel):
-    def __init__(self,  data, save_trialwise_eu, regressors):
+    def __init__(self,  data, save_trialwise_eu, probability_distortion, regressors):
         RegressionModel.__init__(self, data, regressors=regressors)
-        ExpectedUtilityRiskModel.__init__(self, data, save_trialwise_eu)
+        ExpectedUtilityRiskModel.__init__(self, data, save_trialwise_eu, probability_distortion=probability_distortion)
