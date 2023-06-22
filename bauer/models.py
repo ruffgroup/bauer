@@ -72,11 +72,12 @@ class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonMod
 class RiskModel(BaseModel):
 
     def __init__(self, data, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
-                 save_trialwise_n_estimates=False):
+                 save_trialwise_n_estimates=False, memory_model='independent'):
 
         assert prior_estimate in ['objective', 'shared', 'different', 'full']
 
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
+        self.memory_model = memory_model
         self.prior_estimate = prior_estimate
         self.incorporate_probability = incorporate_probability
 
@@ -171,11 +172,20 @@ class RiskModel(BaseModel):
             model_inputs['n2_prior_mu'] = at.where(risky_first, safe_prior_mu, risky_prior_mu)
             model_inputs['n2_prior_std'] = at.where(risky_first, safe_prior_std, risky_prior_std)
 
-
-
         if self.fit_seperate_evidence_sd:
-            model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd', transform='softplus')
-            model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('n2_evidence_sd', transform='softplus')
+
+            if self.memory_model == 'independent':
+                model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd', transform='softplus')
+                model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('n2_evidence_sd', transform='softplus')
+            elif self.memory_model == 'shared_perceptual_noise':
+                perceptual_sd = self.get_trialwise_variable('perceptual_noise_sd', transform='softplus')
+                memory_sd = self.get_trialwise_variable('memory_noise_sd', transform='softplus')
+
+                model_inputs['n1_evidence_sd'] = perceptual_sd + memory_sd
+                model_inputs['n2_evidence_sd'] = perceptual_sd
+            else:
+                raise ValueError('Unknown memory model: {}'.format(self.memory_model))
+
         else:
             model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('evidence_sd', transform='softplus')
             model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('evidence_sd', transform='softplus')
@@ -185,8 +195,7 @@ class RiskModel(BaseModel):
     def build_priors(self):
 
         if self.fit_seperate_evidence_sd:
-            self.build_hierarchical_nodes('n1_evidence_sd', mu_intercept=-1., transform='softplus')
-            self.build_hierarchical_nodes('n2_evidence_sd', mu_intercept=-1., transform='softplus')
+                self.build_hierarchical_nodes('n1_evidence_sd', mu_intercept=-1., transform='softplus')
         else:
             self.build_hierarchical_nodes('evidence_sd', mu_intercept=-1., transform='softplus')
 
@@ -242,10 +251,10 @@ class RiskModel(BaseModel):
 class RiskRegressionModel(RegressionModel, RiskModel):
 
     def __init__(self,  data, regressors, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
-                 save_trialwise_n_estimates=False):
+                 save_trialwise_n_estimates=False, memory_model='independent'):
         RegressionModel.__init__(self, data, regressors)
         RiskModel.__init__(self, data, prior_estimate, fit_seperate_evidence_sd, incorporate_probability=incorporate_probability,
-                           save_trialwise_n_estimates=save_trialwise_n_estimates)
+                           save_trialwise_n_estimates=save_trialwise_n_estimates, memory_model=memory_model)
 
     def build_priors(self):
 
