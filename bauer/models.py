@@ -74,7 +74,7 @@ class RiskModel(BaseModel):
     def __init__(self, data, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
                  save_trialwise_n_estimates=False, memory_model='independent'):
 
-        assert prior_estimate in ['objective', 'shared', 'different', 'full']
+        assert prior_estimate in ['objective', 'shared', 'different', 'full', 'full_normed']
 
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
         self.memory_model = memory_model
@@ -156,7 +156,7 @@ class RiskModel(BaseModel):
             model_inputs['n2_prior_mu'] = at.where(risky_first, safe_prior_mu, risky_prior_mu)
             model_inputs['n2_prior_std'] = at.where(risky_first, safe_prior_std, risky_prior_std)
 
-        elif self.prior_estimate == 'full':
+        elif self.prior_estimate in ['full', 'full_normed']:
 
             risky_first = model['risky_first'].astype(bool)
 
@@ -164,7 +164,11 @@ class RiskModel(BaseModel):
             risky_prior_std = self.get_trialwise_variable('risky_prior_std', transform='softplus')
 
             safe_prior_mu = self.get_trialwise_variable('safe_prior_mu', transform='identity')
-            safe_prior_std = self.get_trialwise_variable('safe_prior_std', transform='softplus')
+            
+            if self.prior_estimate == 'full_normed':
+                safe_prior_std = 1.
+            else:
+                safe_prior_std = self.get_trialwise_variable('safe_prior_std', transform='softplus')
 
             model_inputs['n1_prior_mu'] = at.where(risky_first, risky_prior_mu, safe_prior_mu)
             model_inputs['n1_prior_std'] = at.where(risky_first, risky_prior_std, safe_prior_std)
@@ -195,7 +199,14 @@ class RiskModel(BaseModel):
     def build_priors(self):
 
         if self.fit_seperate_evidence_sd:
+            if self.memory_model == 'independent':
                 self.build_hierarchical_nodes('n1_evidence_sd', mu_intercept=-1., transform='softplus')
+                self.build_hierarchical_nodes('n2_evidence_sd', mu_intercept=-1., transform='softplus')
+            elif self.memory_model == 'shared_perceptual_noise':
+                self.build_hierarchical_nodes('perceptual_noise_sd', mu_intercept=-1., transform='softplus')
+                self.build_hierarchical_nodes('memory_noise_sd', mu_intercept=-1., transform='softplus')
+            else:
+                raise ValueError('Unknown memory model: {}'.format(self.memory_model))
         else:
             self.build_hierarchical_nodes('evidence_sd', mu_intercept=-1., transform='softplus')
 
@@ -216,7 +227,7 @@ class RiskModel(BaseModel):
             self.build_hierarchical_nodes('risky_prior_mu', mu_intercept=risky_prior_mu, transform='identity')
             self.build_hierarchical_nodes('risky_prior_std', mu_intercept=risky_prior_std, transform='softplus')
 
-        elif self.prior_estimate == 'full':
+        elif self.prior_estimate in ['full', 'full_normed']:
             risky_n = np.where(self.data['risky_first'], self.data['n1'], self.data['n2'])
             safe_n = np.where(self.data['risky_first'], self.data['n2'], self.data['n1'])
 
@@ -227,10 +238,12 @@ class RiskModel(BaseModel):
             self.build_hierarchical_nodes('risky_prior_std', mu_intercept=risky_prior_std, transform='softplus')
 
             safe_prior_mu = np.mean(np.log(safe_n))
-            safe_prior_std = np.std(np.log(safe_n))
 
             self.build_hierarchical_nodes('safe_prior_mu', mu_intercept=safe_prior_mu, transform='identity')
-            self.build_hierarchical_nodes('safe_prior_std', mu_intercept=safe_prior_std, transform='softplus')
+
+            if self.prior_estimate == 'full':
+                safe_prior_std = np.std(np.log(safe_n))
+                self.build_hierarchical_nodes('safe_prior_std', mu_intercept=safe_prior_std, transform='softplus')
 
     def create_data(self):
 
