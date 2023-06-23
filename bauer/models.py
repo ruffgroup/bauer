@@ -277,6 +277,34 @@ class RiskRegressionModel(RegressionModel, RiskModel):
             if key in self.regressors:
                 self.build_hierarchical_nodes(key, mu_intercept=0.0, transform='identity')
 
+        if (self.prior_estimate in ['full', 'full_normed']) and ('prior_mu' in self.regressors):
+            print("***Warning, estimating both risky and safe priors, but (some) regressors affect both equally (via `prior_mu`)***")
+            self.build_hierarchical_nodes('prior_mu', mu_intercept=0.0, transform='identity')
+
+        if (self.fit_seperate_evidence_sd) and ('evidence_sd' in self.regressors):
+            print("***Warning, estimating evidence_sd for both first and second option, but (some) regressors affect both equally (via `evidence_sd`)***")
+            self.build_hierarchical_nodes('evidence_sd', mu_intercept=0.0, transform='identity')
+
+
+    def get_trialwise_variable(self, key, transform='identity'):
+
+        # Prior mean
+        if (key == 'risky_prior_mu') and ('prior_mu' in self.regressors):
+            return super().get_trialwise_variable('risky_prior_mu', transform='identity') + super().get_trialwise_variable('prior_mu', transform='identity')
+
+        if (key == 'safe_prior_mu') and ('prior_mu' in self.regressors):
+            return super().get_trialwise_variable('safe_prior_mu', transform='identity') + super().get_trialwise_variable('prior_mu', transform='identity')
+
+        # Evidence SD
+        if (key == 'n1_evidence_sd') and ('evidence_sd' in self.regressors):
+            return at.softplus(super().get_trialwise_variable('n1_evidence_sd', transform='identity') + super().get_trialwise_variable('evidence_sd', transform='identity'))
+
+        if (key == 'n2_evidence_sd') and ('evidence_sd' in self.regressors):
+            return at.softplus(super().get_trialwise_variable('n2_evidence_sd', transform='identity') + super().get_trialwise_variable('evidence_sd', transform='identity'))
+
+        return super().get_trialwise_variable(key=key, transform=transform)
+
+
 class RiskLapseModel(RiskModel, LapseModel):
 
     def build_priors(self):
