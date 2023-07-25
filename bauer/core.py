@@ -71,12 +71,13 @@ class BaseModel(object):
 
         pm.Bernoulli('ll_bernoulli', p=p, observed=model['choice'])
 
-    def build_estimation_model(self, data=None):
+    def build_estimation_model(self, data=None, coords=None):
 
         if data is None:
             data = self.data
 
-        coords = {'subject': self.unique_subjects, 'order':['first', 'second']}
+        if coords is None:
+            coords = {'subject': self.unique_subjects, 'order':['first', 'second']}
                                               
         with pm.Model(coords=coords) as self.estimation_model:
             paradigm = self._get_paradigm(data=data)
