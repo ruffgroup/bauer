@@ -1,11 +1,14 @@
 import pandas as pd
 import pymc as pm
 import numpy as np
-from .utils import cumulative_normal, get_diff_dist, get_posterior
-from .utils.math import inverse_softplus
+from .utils import cumulative_normal, get_posterior, get_diff_dist
+from .utils.math import inverse_softplus, softplus_np
 import aesara.tensor as at
 from patsy import dmatrix
 from .core import BaseModel, RegressionModel, LapseModel
+from .utils.plotting import plot_prediction
+from arviz import hdi
+import seaborn as sns
 
 
 class MagnitudeComparisonModel(BaseModel):
@@ -605,6 +608,109 @@ class FlexibleSDComparisonModel(BaseModel):
 
         return g
 
+class FlexibleSDRiskModel(FlexibleSDComparisonModel, RiskModel):
+
+    def __init__(self, data, prior_estimate='objective', fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, polynomial_order=2, bspline=False,
+                 memory_model='independent'):
+
+        if prior_estimate != 'full':
+            raise NotImplementedError('For now only with full prior estimate')
+
+        self.polynomial_order = polynomial_order
+        self.bspline = bspline
+
+        RiskModel.__init__(self, data, save_trialwise_n_estimates=save_trialwise_n_estimates, fit_seperate_evidence_sd=fit_seperate_evidence_sd, prior_estimate=prior_estimate,
+        memory_model=memory_model)
+
+
+    def build_priors(self):
+        
+        # Risky/safe prior
+        risky_n = np.where(self.data['risky_first'], self.data['n1'], self.data['n2'])
+        safe_n = np.where(self.data['risky_first'], self.data['n2'], self.data['n1'])
+
+        risky_prior_mu = np.mean(risky_n)
+        risky_prior_std = np.std(risky_n)
+
+        self.build_hierarchical_nodes('risky_prior_mu', mu_intercept=risky_prior_mu, sigma_intercept=100, cauchy_sigma=1., transform='identity')
+        self.build_hierarchical_nodes('risky_prior_std', mu_intercept=risky_prior_std, sigma_intercept=100, cauchy_sigma=1., transform='softplus')
+
+        safe_prior_mu = np.mean(safe_n)
+
+        self.build_hierarchical_nodes('safe_prior_mu', mu_intercept=safe_prior_mu, sigma_intercept=100, cauchy_sigma=1., transform='identity')
+
+        safe_prior_std = np.std(safe_n)
+        self.build_hierarchical_nodes('safe_prior_std', mu_intercept=safe_prior_std, sigma_intercept=100, cauchy_sigma=1., transform='softplus')
+
+        FlexibleSDComparisonModel.build_priors(self)
+
+
+    def _get_paradigm(self, data=None):
+        return RiskModel._get_paradigm(self, data)
+
+    def get_model_inputs(self):
+        model = pm.Model.get_context()
+
+        model_inputs = {}
+        
+        model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu', transform='identity') #at.log(model['n1'])
+        model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu', transform='identity') #at.log(model['n2'])
+
+        # model_inputs['n1_evidence_mu'] *= model['p1']
+        # model_inputs['n2_evidence_mu'] *= model['p2']
+
+        risky_first = model['risky_first'].astype(bool)
+
+        risky_prior_mu = self.get_trialwise_variable('risky_prior_mu', transform='identity')
+        risky_prior_std = self.get_trialwise_variable('risky_prior_std', transform='softplus')
+
+        safe_prior_mu = self.get_trialwise_variable('safe_prior_mu', transform='identity')
+        
+        if self.prior_estimate == 'full_normed':
+            safe_prior_std = 1.
+        else:
+            safe_prior_std = self.get_trialwise_variable('safe_prior_std', transform='softplus')
+
+        model_inputs['n1_prior_mu'] = at.where(risky_first, risky_prior_mu, safe_prior_mu)
+        model_inputs['n1_prior_std'] = at.where(risky_first, risky_prior_std, safe_prior_std)
+
+        model_inputs['n2_prior_mu'] = at.where(risky_first, safe_prior_mu, risky_prior_mu)
+        model_inputs['n2_prior_std'] = at.where(risky_first, safe_prior_std, risky_prior_std)
+
+        if self.fit_seperate_evidence_sd:
+            model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd', transform='softplus')
+            model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('n2_evidence_sd', transform='softplus')
+        else:
+            model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('evidence_sd', transform='softplus')
+            model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('evidence_sd', transform='softplus')
+
+        model_inputs['p1'], model_inputs['p2'] = model['p1'], model['p2']
+
+        return model_inputs
+
+    def _get_choice_predictions(self, model_inputs):
+        post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'], 
+                                               model_inputs['n1_prior_std'], 
+                                               model_inputs['n1_evidence_mu'], 
+                                               model_inputs['n1_evidence_sd']
+                                               )
+
+        post_n2_mu, post_n2_sd = get_posterior(model_inputs['n2_prior_mu'],
+                                               model_inputs['n2_prior_std'],
+                                               model_inputs['n2_evidence_mu'], 
+                                               model_inputs['n2_evidence_sd'])
+
+        diff_mu, diff_sd = get_diff_dist(post_n2_mu * model_inputs['p2'], post_n2_sd * model_inputs['p2'],
+                                         post_n1_mu * model_inputs['p1'], post_n1_sd * model_inputs['p1'])
+
+        if self.save_trialwise_n_estimates:
+            pm.Deterministic('n1_hat', post_n1_mu)
+            pm.Deterministic('n2_hat', post_n2_mu)
+
+        return cumulative_normal(0.0, diff_mu, diff_sd)
+
+    def create_data(self):
+        return RiskModel.create_data(self)
 
 class ExpectedUtilityRiskModel(BaseModel):
 
