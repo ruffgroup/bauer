@@ -9,12 +9,13 @@ def plot_ppc(df, ppc, exp_type='magnitude', plot_type=1, var_name='p', level='su
     if exp_type  == 'magnitude':
         x = 'log(n2/n1)'
 
-        if 'frac'  in ppc.index.levels:
-            ppc['log(n2/n1)'] = np.log(ppc.index.get_level_values('frac'))
-        else:
-            ppc['log(n2/n1)'] = np.log(ppc.index.get_level_values('n2')) - np.log(ppc.index.get_level_values('n1'))
+        if 'log(n2/n1)' not in ppc.index.names:
+            if 'frac'  in ppc.index.names:
+                ppc['log(n2/n1)'] = np.log(ppc.index.get_level_values('frac'))
+            else:
+                ppc['log(n2/n1)'] = np.log(ppc.index.get_level_values('n2')) - np.log(ppc.index.get_level_values('n1'))
 
-        ppc.set_index('log(n2/n1)', append=True)
+            ppc.set_index('log(n2/n1)', append=True)
 
     assert (var_name in ['p', 'll_bernoulli'])
 
