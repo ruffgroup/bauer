@@ -540,6 +540,70 @@ class FlexibleSDComparisonModel(BaseModel):
 
         return dm
 
+    @staticmethod
+    def get_sd_curve(model, idata, x=None, variable='both', group=True):
+
+        if x is None:
+            x_min, x_max = model.data[['n1', 'n2']].min().min(), model.data[['n1', 'n2']].max().max()
+            x = np.linspace(x_min, x_max, 100)
+
+        dm = np.asarray(model.make_dm(x))
+
+        if group:
+            key = 'evidence_sd_poly{}_mu'
+        else:
+            key = 'evidence_sd_poly{}'
+
+        if variable in ['n1', 'both']:
+            n1_sd = idata.posterior[[f'n1_{key.format(ix)}' for ix in range(0, model.polynomial_order)]].to_dataframe()
+            n1_sd = softplus_np(n1_sd.dot(dm.T))
+            n1_sd.columns = x
+            n1_sd.columns.name = 'x'
+
+        if variable in ['n2', 'both']:
+            n2_sd = idata.posterior[[f'n2_{key.format(ix)}' for ix in range(0, model.polynomial_order)]].to_dataframe()
+            n2_sd = softplus_np(n2_sd.dot(dm.T))
+            n2_sd.columns = x
+            n2_sd.columns.name = 'x'
+
+        if variable == 'n1':
+            output = n1_sd
+        elif variable == 'n2':
+            output = n2_sd.stack().to_frame('sd')
+        else:
+            output = pd.concat((n1_sd, n2_sd), axis=0, keys=['n1', 'n2'], names=['variable'])
+
+        return output.stack().to_frame('sd')
+
+    @staticmethod
+    def get_sd_curve_stats(n_sd):
+        keys = ['x']
+        if 'subject' in n_sd.index.names:
+            keys.append('subject')
+
+        if 'variable' in n_sd.index.names:
+            keys.append('variable')
+
+        sd_ci = n_sd.groupby(keys).apply(lambda d: pd.Series(hdi(d.values.ravel())))#, index=pd.Index(['hdi025', 'hdi975']))))
+        sd_ci.columns = ['hdi025', 'hdi975']
+        sd_mean = n_sd.groupby(keys).mean()
+
+        return sd_mean.join(sd_ci)
+
+    @staticmethod
+    def plot_sd_curve_stats(n_sd_stats, ylim=(0, 20)):
+
+        hue = 'variable' if 'variable' in n_sd_stats.index.names else None
+        col = 'subject' if 'subject' in n_sd_stats.index.names else None
+
+        g = sns.FacetGrid(n_sd_stats.reset_index(), hue=hue, col=col, col_wrap=3 if col is not None else None, sharex=False, sharey=False)
+
+        g.map_dataframe(plot_prediction, x='x', y='sd')
+
+        g.set(ylim=ylim)
+        g.fig.set_size_inches(6, 6)
+
+        return g
 
 
 class ExpectedUtilityRiskModel(BaseModel):
