@@ -383,10 +383,15 @@ class FlexibleSDComparisonModel(BaseModel):
 
     def __init__(self, data, fit_seperate_evidence_sd=True,
                  fit_n2_prior_mu=False,
-                 polynomial_order=2):
+                 polynomial_order=4,
+                 bspline=False,
+                 memory_model='independent'):
+
         self.fit_n2_prior_mu = fit_n2_prior_mu
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
         self.polynomial_order = polynomial_order
+        self.bspline = bspline
+        self.memory_model = memory_model
 
         super().__init__(data)
 
@@ -395,7 +400,7 @@ class FlexibleSDComparisonModel(BaseModel):
         coords = {'subject': self.unique_subjects, 'order':['first', 'second']}
         coords['poly_order'] = np.arange(self.polynomial_order)
 
-        return super().build_estimation_model(data=data, coords=coords)
+        return BaseModel.build_estimation_model(self, data=data, coords=coords)
 
     def get_model_inputs(self):
 
@@ -411,7 +416,7 @@ class FlexibleSDComparisonModel(BaseModel):
         model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu')
         model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu')
 
-        if self.fit_n2_prior_mu:
+        if hasattr('self', 'fit_n2_prior_mu') and self.fit_n2_prior_mu:
             model_inputs['n2_prior_mu'] = self.get_trialwise_variable('n2_prior_mu', transform='identity')
         else:
             model_inputs['n2_prior_mu'] = at.mean(model['n2'])
@@ -424,25 +429,38 @@ class FlexibleSDComparisonModel(BaseModel):
 
     def build_priors(self):
 
+        model = pm.Model.get_context()
+
+        if self.bspline:
+            mu_prior = np.zeros(self.polynomial_order)
+            std_prior = np.ones(self.polynomial_order)*100
+            cauchy_sigma= 1
+        else:
+            mu_prior = np.concatenate([[10], np.zeros(self.polynomial_order-1)])
+            std_prior = np.concatenate([[10], 10**(-np.arange(1, self.polynomial_order) - 1)])
+            cauchy_sigma = 0.25
+
         if self.fit_seperate_evidence_sd:
-            n1_evidence_sd_polypars = []
-            n2_evidence_sd_polypars = []
+            evidence_sd1_polypars = []
+            evidence_sd2_polypars = []
+
+            if self.memory_model == 'independent':
+                key1 = 'n1_evidence_sd'
+                key2 = 'n2_evidence_sd'
+            elif self.memory_model == 'shared_perceptual_noise':
+                key1 = 'perceptual_noise_sd'
+                key2 = 'memory_noise_sd'
 
             for n in range(self.polynomial_order):
-                if n == 0:
-                    mu_intercept, sigma_intercept = 10, 10
-                else:
-                    mu_intercept, sigma_intercept = 0, 10**(-n+1)
+                e1 = self.build_hierarchical_nodes(f'{key1}_poly{n}', mu_intercept=mu_prior[n], sigma_intercept=std_prior[n], cauchy_sigma=cauchy_sigma, transform='identity')
+                e2 = self.build_hierarchical_nodes(f'{key2}_poly{n}', mu_intercept=mu_prior[n], sigma_intercept=std_prior[n], cauchy_sigma=cauchy_sigma, transform='identity')
 
-                e1 = self.build_hierarchical_nodes(f'n1_evidence_sd_poly{n}', mu_intercept=mu_intercept, sigma_intercept=sigma_intercept, transform='identity')
-                e2 = self.build_hierarchical_nodes(f'n2_evidence_sd_poly{n}', mu_intercept=mu_intercept, sigma_intercept=sigma_intercept, transform='identity')
+                evidence_sd1_polypars.append(e1)
+                evidence_sd2_polypars.append(e2)
 
-                n1_evidence_sd_polypars.append(e1)
-                n2_evidence_sd_polypars.append(e2)
-
-            pm.Deterministic('n1_evidence_sd_poly', var=at.stack(n1_evidence_sd_polypars, axis=1),
+            pm.Deterministic(f'{key1}_poly', var=at.stack(evidence_sd1_polypars, axis=1),
                              dims=('subject', 'poly_order'))
-            pm.Deterministic('n2_evidence_sd_poly', var=at.stack(n2_evidence_sd_polypars, axis=1),
+            pm.Deterministic(f'{key2}_poly', var=at.stack(evidence_sd2_polypars, axis=1),
                              dims=('subject', 'poly_order'))
 
         else:
@@ -450,12 +468,7 @@ class FlexibleSDComparisonModel(BaseModel):
             n_evidence_sd_polypars = []
 
             for n in range(self.polynomial_order):
-                if n == 0:
-                    mu_intercept, sigma_intercept = 10, 10
-                else:
-                    mu_intercept, sigma_intercept = 0, 1
-
-                e = self.build_hierarchical_nodes(f'n_evidence_sd_poly{n}', mu_intercept=mu_intercept, sigma_intercept=sigma_intercept, transform='identity')
+                e = self.build_hierarchical_nodes(f'n_evidence_sd_poly{n}', mu_intercept=mu_prior[n], sigma_intercept=sigma_prior[n], transform='identity')
                 n_evidence_sd_polypars.append(e)
 
             n_evidence_sd_polypars = pm.Deterministic('evidence_sd_poly', var=at.stack(n_evidence_sd_polypars, axis=1),
@@ -465,15 +478,15 @@ class FlexibleSDComparisonModel(BaseModel):
             pm.Deterministic('n2_evidence_sd_poly', var=n_evidence_sd_polypars,
                              dims=('subject', 'poly_order'))
 
-        if self.fit_n2_prior_mu:
-            self.build_hierarchical_nodes('n2_prior_mu', mu_intercept=0.0, transform='identity')
+        if hasattr(self, 'fit_n2_prior_mu') and self.fit_n2_prior_mu:
+            self.build_hierarchical_nodes('n2_prior_mu', mu_intercept=at.mean(model['n2']), sigma_intercept=100., cauchy_sigma=1., transform='identity')
 
     def get_trialwise_variable(self, key, transform='identity'):
         
-        if key in ['n1_evidence_mu', 'n2_evidence_mu', 'n1_evidence_sd', 'n2_evidence_sd']:
+        if key in ['n1_evidence_mu', 'n2_evidence_mu', 'n1_evidence_sd', 'n2_evidence_sd', 'perceptual_noise_sd', 'memory_noise_sd']:
             return self._get_trialwise_variable(key)
         else:
-            super().get_trialwise_variable(key, transform)
+            return super().get_trialwise_variable(key, transform)
 
 
     def _get_trialwise_variable(self, key):
@@ -489,17 +502,43 @@ class FlexibleSDComparisonModel(BaseModel):
             return model['n2']
 
         elif key == 'n1_evidence_sd':
-            n1_evidence_sd = at.sum(model['n1_evidence_sd_poly'][model['subject_ix'], :] *\
-                                          model['n1'][:, np.newaxis]**exponents[np.newaxis, :], 1)
-            return at.softplus(n1_evidence_sd)
 
+            dm = self.make_dm(var=self.data['n1'])
+
+            if self.memory_model == 'independent':
+                n1_evidence_sd = at.softplus(at.sum(model['n1_evidence_sd_poly'][model['subject_ix'], :] * dm, 1))
+
+            elif self.memory_model == 'shared_perceptual_noise':
+                perceptual_noise_sd = at.softplus(at.sum(model['perceptual_noise_sd_poly'][model['subject_ix'], :] * dm, 1))
+                memory_noise_sd = at.softplus(at.sum(model['memory_noise_sd_poly'][model['subject_ix'], :] * dm, 1))
+                n1_evidence_sd = perceptual_noise_sd + memory_noise_sd
+
+            return n1_evidence_sd
 
         elif key == 'n2_evidence_sd':
-            n2_evidence_sd = at.sum(model['n2_evidence_sd_poly'][model['subject_ix'], :] *\
-                                          model['n2'][:, np.newaxis]**exponents[np.newaxis, :], 1)
-            return at.softplus(n2_evidence_sd)
+            dm = self.make_dm(var=self.data['n2'])
+
+            if self.memory_model == 'independent':
+                n2_evidence_sd = at.softplus(at.sum(model['n2_evidence_sd_poly'][model['subject_ix'], :] * dm, 1))
+
+            elif self.memory_model == 'shared_perceptual_noise':
+                perceptual_noise_sd = at.softplus(at.sum(model['perceptual_noise_sd_poly'][model['subject_ix'], :] * dm, 1))
+                n2_evidence_sd = perceptual_noise_sd
+
+            return n2_evidence_sd
+
         else:
             raise ValueError()
+
+    def make_dm(self, var):
+        if self.bspline:
+            min_n, max_n = self.data[['n1', 'n2']].min().min(), self.data[['n1', 'n2']].max().max()
+            dm = np.asarray(dmatrix(f"bs(x, degree=3, df={self.polynomial_order-1}, include_intercept=True, lower_bound={min_n}, upper_bound={max_n})",
+                            {"x": var}))
+        else:
+            dm = model[var][:, np.newaxis]**exponents[np.newaxis, :]
+
+        return dm
 
 
 
