@@ -186,7 +186,7 @@ class BaseModel(object):
 
         return trialwise_pars
 
-    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=.5, transform='identity'):
+    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=.5, cauchy_sigma=0.25, transform='identity'):
 
         self.free_parameters.append(name)
 
@@ -210,7 +210,7 @@ class BaseModel(object):
             raise NotImplementedError
 
             
-        group_sd = pm.HalfCauchy(f'{name}_sd', .25)
+        group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma)
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject',))
 
         if transform == 'identity':
