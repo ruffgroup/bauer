@@ -74,5 +74,5 @@ def plot_prediction(data, x, color, y='p_predicted', alpha=.25, **kwargs):
 
     plt.fill_between(data[x], data['hdi025'],
                      data['hdi975'], color=color, alpha=alpha)
-    plt.plot(data[x], data[y], color=color)
+    return plt.plot(data[x], data[y], color=color)
 
