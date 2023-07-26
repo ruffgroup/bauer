@@ -9,6 +9,7 @@ from .core import BaseModel, RegressionModel, LapseModel
 from .utils.plotting import plot_prediction
 from arviz import hdi
 import seaborn as sns
+import matplotlib.pyplot as plt
 
 
 class MagnitudeComparisonModel(BaseModel):
@@ -808,6 +809,21 @@ class ExpectedUtilityRiskModel(BaseModel):
             model_inputs['phi'] = self.get_trialwise_variable('phi', transform='softplus')
 
         return model_inputs
+
+class FlexibleSDRiskRegressionModel(RegressionModel, FlexibleSDRiskModel):
+    def __init__(self,  data, regressors, prior_estimate='full', fit_seperate_evidence_sd=True, 
+                    save_trialwise_n_estimates=False, polynomial_order=5, bspline=False, memory_model='independent'):
+        RegressionModel.__init__(self, data, regressors)
+        FlexibleSDRiskModel.__init__(self, data, prior_estimate, fit_seperate_evidence_sd, 
+                            save_trialwise_n_estimates=save_trialwise_n_estimates, polynomial_order=polynomial_order,
+                             bspline=bspline, memory_model=memory_model)
+
+    def get_trialwise_variable(self, key, transform='identity'):
+        
+        if key in ['n1_evidence_mu', 'n2_evidence_mu', 'n1_evidence_sd', 'n2_evidence_sd', 'perceptual_noise_sd', 'memory_noise_sd']:
+            return self._get_trialwise_variable(key)
+        else:
+            return super().get_trialwise_variable(key, transform)
 
 class ExpectedUtilityRiskRegressionModel(RegressionModel, ExpectedUtilityRiskModel):
     def __init__(self,  data, save_trialwise_eu, probability_distortion, regressors):
