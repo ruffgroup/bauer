@@ -633,6 +633,7 @@ class FlexibleSDComparisonModel(BaseModel):
         g = sns.FacetGrid(n_sd_stats.reset_index(), hue=hue, col=col, col_wrap=3 if col is not None else None, sharex=False, sharey=False)
 
         g.map_dataframe(plot_prediction, x='x', y='sd')
+        g.map_dataframe(plt.plot, 'x', 'sd')
 
         g.set(ylim=ylim)
         g.fig.set_size_inches(6, 6)
