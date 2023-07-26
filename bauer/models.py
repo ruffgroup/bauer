@@ -541,6 +541,8 @@ class FlexibleSDComparisonModel(BaseModel):
             dm = np.asarray(dmatrix(f"bs(x, degree=3, df={self.polynomial_order-1}, include_intercept=True, lower_bound={min_n}, upper_bound={max_n})",
                             {"x": var}))
         else:
+            model = pm.Model.get_context()
+            exponents = np.arange(self.polynomial_order)
             dm = model[var][:, np.newaxis]**exponents[np.newaxis, :]
 
         return dm
