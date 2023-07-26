@@ -187,7 +187,7 @@ class BaseModel(object):
 
         return trialwise_pars
 
-    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=.5, cauchy_sigma=0.25, transform='identity'):
+    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=.5, cauchy_sigma_intercept=0.25, transform='identity', **kwargs):
 
         self.free_parameters.append(name)
 
@@ -211,7 +211,7 @@ class BaseModel(object):
             raise NotImplementedError
 
             
-        group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma)
+        group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma_intercept)
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject',))
 
         if transform == 'identity':
@@ -230,7 +230,7 @@ class RegressionModel(BaseModel):
 
     def __init__(self, data, regressors=None):
 
-        super().__init__(data)
+        BaseModel.__init__(self, data)
 
         if regressors is None:
             self.regressors = {}
@@ -310,7 +310,7 @@ class RegressionModel(BaseModel):
             self.build_likelihood()
 
 
-    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=1., transform='identity'):
+    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=1., cauchy_sigma_intercept=0.25, sigma_regressors=1., cauchy_sigma_regressors=0.25, transform='identity'):
 
         self.free_parameters.append(name)
         self.design_matrices[name] = self.build_design_matrix(self.data, name)
@@ -319,7 +319,9 @@ class RegressionModel(BaseModel):
         model.add_coord(f'{name}_regressors', self.design_matrices[name].design_info.column_names)
         
         mu = np.zeros(self.design_matrices[name].shape[1])
-        sigma = np.ones(self.design_matrices[name].shape[1])
+        sigma = np.ones(self.design_matrices[name].shape[1]) * sigma_regressors
+        cauchy_sigma = np.ones(self.design_matrices[name].shape[1]) * cauchy_sigma_regressors
+        cauchy_sigma[0] = cauchy_sigma_intercept
 
         if self.design_matrices[name].design_info.column_names[0] == 'Intercept':
 
@@ -340,10 +342,10 @@ class RegressionModel(BaseModel):
                                         dims=(f'{name}_regressors',))
 
         
-        group_sd = pm.HalfCauchy(f'{name}_sd', .25, dims=(f'{name}_regressors',))
+        group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma, dims=(f'{name}_regressors',))
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject', f'{name}_regressors'))
 
-        pm.Deterministic(name, group_mu + group_sd * subject_offset, dims=('subject', f'{name}_regressors'))
+        return pm.Deterministic(name, group_mu + group_sd * subject_offset, dims=('subject', f'{name}_regressors'))
 
 class LapseModel(BaseModel):
 

@@ -455,8 +455,8 @@ class FlexibleSDComparisonModel(BaseModel):
                 key2 = 'memory_noise_sd'
 
             for n in range(self.polynomial_order):
-                e1 = self.build_hierarchical_nodes(f'{key1}_poly{n}', mu_intercept=mu_prior[n], sigma_intercept=std_prior[n], cauchy_sigma=cauchy_sigma, transform='identity')
-                e2 = self.build_hierarchical_nodes(f'{key2}_poly{n}', mu_intercept=mu_prior[n], sigma_intercept=std_prior[n], cauchy_sigma=cauchy_sigma, transform='identity')
+                e1 = self.build_hierarchical_nodes(f'{key1}_poly{n}', mu_intercept=mu_prior[n], sigma_intercept=std_prior[n], cauchy_sigma_intercept=cauchy_sigma, transform='identity')
+                e2 = self.build_hierarchical_nodes(f'{key2}_poly{n}', mu_intercept=mu_prior[n], sigma_intercept=std_prior[n], cauchy_sigma_intercept=cauchy_sigma, transform='identity')
 
                 evidence_sd1_polypars.append(e1)
                 evidence_sd2_polypars.append(e2)
@@ -471,7 +471,7 @@ class FlexibleSDComparisonModel(BaseModel):
             n_evidence_sd_polypars = []
 
             for n in range(self.polynomial_order):
-                e = self.build_hierarchical_nodes(f'n_evidence_sd_poly{n}', mu_intercept=mu_prior[n], sigma_intercept=sigma_prior[n], transform='identity')
+                e = self.build_hierarchical_nodes(f'n_evidence_sd_poly{n}', mu_intercept=mu_prior[n], sigma_intercept=std_prior[n], transform='identity')
                 n_evidence_sd_polypars.append(e)
 
             n_evidence_sd_polypars = pm.Deterministic('evidence_sd_poly', var=at.stack(n_evidence_sd_polypars, axis=1),
@@ -482,7 +482,7 @@ class FlexibleSDComparisonModel(BaseModel):
                              dims=('subject', 'poly_order'))
 
         if hasattr(self, 'fit_n2_prior_mu') and self.fit_n2_prior_mu:
-            self.build_hierarchical_nodes('n2_prior_mu', mu_intercept=at.mean(model['n2']), sigma_intercept=100., cauchy_sigma=1., transform='identity')
+            self.build_hierarchical_nodes('n2_prior_mu', mu_intercept=at.mean(model['n2']), sigma_intercept=100., cauchy_sigma_intercept=1., transform='identity')
 
     def get_trialwise_variable(self, key, transform='identity'):
         
@@ -495,8 +495,6 @@ class FlexibleSDComparisonModel(BaseModel):
     def _get_trialwise_variable(self, key):
 
         model = pm.Model.get_context()
-
-        exponents = np.arange(self.polynomial_order)
 
         if key == 'n1_evidence_mu':
             return model['n1']
@@ -534,6 +532,10 @@ class FlexibleSDComparisonModel(BaseModel):
             raise ValueError()
 
     def make_dm(self, var):
+
+        model = pm.Model.get_context()
+        exponents = np.arange(self.polynomial_order)
+
         if self.bspline:
             min_n, max_n = self.data[['n1', 'n2']].min().min(), self.data[['n1', 'n2']].max().max()
             dm = np.asarray(dmatrix(f"bs(x, degree=3, df={self.polynomial_order-1}, include_intercept=True, lower_bound={min_n}, upper_bound={max_n})",
@@ -553,19 +555,44 @@ class FlexibleSDComparisonModel(BaseModel):
         dm = np.asarray(model.make_dm(x))
 
         if group:
-            key = 'evidence_sd_poly{}_mu'
+            key = 'sd_poly{}_mu'
         else:
-            key = 'evidence_sd_poly{}'
+            key = 'sd_poly{}'
 
-        if variable in ['n1', 'both']:
-            n1_sd = idata.posterior[[f'n1_{key.format(ix)}' for ix in range(0, model.polynomial_order)]].to_dataframe()
-            n1_sd = softplus_np(n1_sd.dot(dm.T))
+        if variable in ['n1', 'memory_noise_sd', 'perceptual_noise_sd', 'both']:
+            print('yo1')
+            if model.memory_model == 'independent':
+                n1_sd = idata.posterior[[f'n1_evidence_{key.format(ix)}' for ix in range(0, model.polynomial_order)]].to_dataframe()
+                n1_sd = softplus_np(n1_sd.dot(dm.T))
+            elif model.memory_model == 'shared_perceptual_noise':
+                print('yo2')
+                perceptual_noise_sd = idata.posterior[[f'perceptual_noise_{key.format(ix)}' for ix in range(0, model.polynomial_order)]].to_dataframe()
+                memory_noise_sd = idata.posterior[[f'memory_noise_{key.format(ix)}' for ix in range(0, model.polynomial_order)]].to_dataframe()
+
+                perceptual_noise_sd = softplus_np(perceptual_noise_sd.dot(dm.T))
+                memory_noise_sd = softplus_np(memory_noise_sd.dot(dm.T))
+                n1_sd = memory_noise_sd + perceptual_noise_sd
+
+                memory_noise_sd.columns = x
+                memory_noise_sd.columns.name = 'x'
+                perceptual_noise_sd.columns = x
+                perceptual_noise_sd.columns.name = 'x'
+
+
             n1_sd.columns = x
             n1_sd.columns.name = 'x'
 
-        if variable in ['n2', 'both']:
-            n2_sd = idata.posterior[[f'n2_{key.format(ix)}' for ix in range(0, model.polynomial_order)]].to_dataframe()
-            n2_sd = softplus_np(n2_sd.dot(dm.T))
+        if (variable == 'n2') or ((variable == 'both') & (model.memory_model == 'independent')):
+            if model.memory_model == 'independent':
+                n2_sd = idata.posterior[[f'n2_evidence_{key.format(ix)}' for ix in range(0, model.polynomial_order)]].to_dataframe()
+                n2_sd = softplus_np(n2_sd.dot(dm.T))
+            elif model.memory_model == 'shared_perceptual_noise':
+                perceptual_noise_sd = idata.posterior[[f'perceptual_noise_{key.format(ix)}' for ix in range(0, model.polynomial_order)]].to_dataframe()
+                perceptual_noise_sd = softplus_np(perceptual_noise_sd.dot(dm.T))
+                n2_sd = perceptual_noise_sd.dot(dm.T)
+                perceptual_noise_sd.columns = x
+                perceptual_noise_sd.columns.name = 'x'
+
             n2_sd.columns = x
             n2_sd.columns.name = 'x'
 
@@ -573,10 +600,18 @@ class FlexibleSDComparisonModel(BaseModel):
             output = n1_sd
         elif variable == 'n2':
             output = n2_sd.stack().to_frame('sd')
+        elif variable == 'perceptual_noise_sd':
+            output = perceptual_noise_sd.stack().to_frame('sd')
+        elif variable == 'memory_noise_sd':
+            output = perceptual_noise_sd.stack().to_frame('sd')
         else:
-            output = pd.concat((n1_sd, n2_sd), axis=0, keys=['n1', 'n2'], names=['variable'])
+            if model.memory_model == 'independent':
+                output = pd.concat((n1_sd, n2_sd), axis=0, keys=['n1', 'n2'], names=['variable'])
+            elif model.memory_model == 'shared_perceptual_noise':
+                output = pd.concat((perceptual_noise_sd, memory_noise_sd), axis=0, keys=['perceptual_noise_sd', 'memory_noise_sd'], names=['variable'])
 
         return output.stack().to_frame('sd')
+
 
     @staticmethod
     def get_sd_curve_stats(n_sd):
@@ -632,15 +667,15 @@ class FlexibleSDRiskModel(FlexibleSDComparisonModel, RiskModel):
         risky_prior_mu = np.mean(risky_n)
         risky_prior_std = np.std(risky_n)
 
-        self.build_hierarchical_nodes('risky_prior_mu', mu_intercept=risky_prior_mu, sigma_intercept=100, cauchy_sigma=1., transform='identity')
-        self.build_hierarchical_nodes('risky_prior_std', mu_intercept=risky_prior_std, sigma_intercept=100, cauchy_sigma=1., transform='softplus')
+        self.build_hierarchical_nodes('risky_prior_mu', mu_intercept=risky_prior_mu, sigma_intercept=100, cauchy_sigma_intercept=1.0, cauchy_sigma_regressors=1.0, transform='identity')
+        self.build_hierarchical_nodes('risky_prior_std', mu_intercept=risky_prior_std, sigma_intercept=100, cauchy_sigma_intercept=1.0, cauchy_sigma_regressors=1.0, transform='softplus')
 
         safe_prior_mu = np.mean(safe_n)
 
-        self.build_hierarchical_nodes('safe_prior_mu', mu_intercept=safe_prior_mu, sigma_intercept=100, cauchy_sigma=1., transform='identity')
+        self.build_hierarchical_nodes('safe_prior_mu', mu_intercept=safe_prior_mu, sigma_intercept=100, cauchy_sigma_intercept=1.0, cauchy_sigma_regressors=1.0, transform='identity')
 
         safe_prior_std = np.std(safe_n)
-        self.build_hierarchical_nodes('safe_prior_std', mu_intercept=safe_prior_std, sigma_intercept=100, cauchy_sigma=1., transform='softplus')
+        self.build_hierarchical_nodes('safe_prior_std', mu_intercept=safe_prior_std, sigma_intercept=100, cauchy_sigma_intercept=1.0, cauchy_sigma_regressors=1.0, transform='softplus')
 
         FlexibleSDComparisonModel.build_priors(self)
 
@@ -653,11 +688,9 @@ class FlexibleSDRiskModel(FlexibleSDComparisonModel, RiskModel):
 
         model_inputs = {}
         
-        model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu', transform='identity') #at.log(model['n1'])
-        model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu', transform='identity') #at.log(model['n2'])
+        model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu', transform='identity')
+        model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu', transform='identity')
 
-        # model_inputs['n1_evidence_mu'] *= model['p1']
-        # model_inputs['n2_evidence_mu'] *= model['p2']
 
         risky_first = model['risky_first'].astype(bool)
 
