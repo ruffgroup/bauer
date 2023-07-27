@@ -611,13 +611,16 @@ class FlexibleSDComparisonModel(BaseModel):
 
 
     @staticmethod
-    def get_sd_curve_stats(n_sd):
+    def get_sd_curve_stats(n_sd, groupby=[]):
         keys = ['x']
+
         if 'subject' in n_sd.index.names:
             keys.append('subject')
 
         if 'variable' in n_sd.index.names:
             keys.append('variable')
+
+        keys += groupby
 
         sd_ci = n_sd.groupby(keys).apply(lambda d: pd.Series(hdi(d.values.ravel())))#, index=pd.Index(['hdi025', 'hdi975']))))
         sd_ci.columns = ['hdi025', 'hdi975']
