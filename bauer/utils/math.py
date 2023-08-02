@@ -1,11 +1,11 @@
 import numpy as np
-import aesara.tensor as at
+import pytensor.tensor as pt
 
 def logistic(x):
-    return 1. / (1. + at.exp(-x))
+    return 1. / (1. + pt.exp(-x))
 
 def inverse_softplus(x):
-    return at.log(at.exp(x) - 1.)
+    return pt.log(pt.exp(x) - 1.)
 
 
 def softplus_np(x): return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0)

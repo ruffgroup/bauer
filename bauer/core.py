@@ -3,7 +3,7 @@ import pandas as pd
 import pymc as pm
 import numpy as np
 from .utils import cumulative_normal, get_diff_dist, get_posterior, logistic
-import aesara.tensor as at
+import pytensor.tensor as pt
 from patsy import dmatrix
 
 class BaseModel(object):
@@ -180,7 +180,7 @@ class BaseModel(object):
             trialwise_pars = model[f'{key}'][model['subject_ix']]
 
         elif transform == 'softplus':
-            trialwise_pars = at.softplus(model[f'{key}_untransformed'][model['subject_ix']])
+            trialwise_pars = pt.softplus(model[f'{key}_untransformed'][model['subject_ix']])
 
         elif transform == 'logistic':
             trialwise_pars = logistic(model[f'{key}_untransformed'][model['subject_ix']])
@@ -200,7 +200,7 @@ class BaseModel(object):
                                             mu=mu_intercept, 
                                             sigma=sigma_intercept)
 
-            pm.Deterministic(name=f'{name}_mu', var=at.softplus(group_mu))
+            pm.Deterministic(name=f'{name}_mu', var=pt.softplus(group_mu))
         elif transform == 'logistic':
             group_mu = pm.Normal(f"{name}_mu_untransformed", 
                                             mu=mu_intercept, 
@@ -220,7 +220,7 @@ class BaseModel(object):
             subjectwise_untrans = pm.Deterministic(f'{name}_untransformed', group_mu + group_sd * subject_offset, dims=('subject',))
         
             if transform == 'softplus':
-                return pm.Deterministic(name=name, var=at.softplus(subjectwise_untrans), dims=('subject',))
+                return pm.Deterministic(name=name, var=pt.softplus(subjectwise_untrans), dims=('subject',))
             elif transform == 'logistic':
                 return pm.Deterministic(name=name, var=logistic(subjectwise_untrans), dims=('subject',))
             else:
@@ -269,7 +269,7 @@ class RegressionModel(BaseModel):
         if key in ['n1_evidence_mu', 'n2_evidence_mu']:
             if key in self.design_matrices.keys():
                 dm = model[f'_dm_{key}']
-                trialwise_pars = model[f'log({key[:2]})'] + at.sum(model[key][model['subject_ix']] * dm, 1)
+                trialwise_pars = model[f'log({key[:2]})'] + pt.sum(model[key][model['subject_ix']] * dm, 1)
             else:
                 if key == 'n1_evidence_mu':
                     return model['log(n1)']
@@ -281,11 +281,11 @@ class RegressionModel(BaseModel):
         else:
             dm = model[f'_dm_{key}']
             if transform == 'identity':
-                trialwise_pars = at.sum(model[key][model['subject_ix']] * dm, 1)
+                trialwise_pars = pt.sum(model[key][model['subject_ix']] * dm, 1)
             elif transform == 'softplus':
-                trialwise_pars = at.softplus(at.sum(model[key][model['subject_ix']] * dm, 1))
+                trialwise_pars = pt.softplus(pt.sum(model[key][model['subject_ix']] * dm, 1))
             elif transform == 'logistic':
-                trialwise_pars = logistic(at.sum(model[key][model['subject_ix']] * dm, 1))
+                trialwise_pars = logistic(pt.sum(model[key][model['subject_ix']] * dm, 1))
 
         return trialwise_pars
 

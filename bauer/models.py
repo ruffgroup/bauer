@@ -3,7 +3,7 @@ import pymc as pm
 import numpy as np
 from .utils import cumulative_normal, get_posterior, get_diff_dist
 from .utils.math import inverse_softplus, softplus_np
-import aesara.tensor as at
+import pytensor.tensor as pt
 from patsy import dmatrix
 from .core import BaseModel, RegressionModel, LapseModel
 from .utils.plotting import plot_prediction
@@ -26,9 +26,9 @@ class MagnitudeComparisonModel(BaseModel):
         model = pm.Model.get_context()
 
         model_inputs = {}
-        model_inputs['n1_prior_mu'] = at.mean(at.log(model['n1']))
-        model_inputs['n1_prior_std'] = at.std(at.log(model['n1']))
-        model_inputs['n2_prior_std'] = at.std(at.log(model['n2']))
+        model_inputs['n1_prior_mu'] = pt.mean(pt.log(model['n1']))
+        model_inputs['n1_prior_std'] = pt.std(pt.log(model['n1']))
+        model_inputs['n2_prior_std'] = pt.std(pt.log(model['n2']))
         model_inputs['threshold'] =  0.0
 
         model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu', transform='identity') #model['n1'])
@@ -37,7 +37,7 @@ class MagnitudeComparisonModel(BaseModel):
         if self.fit_n2_prior_mu:
             model_inputs['n2_prior_mu'] = self.get_trialwise_variable('n2_prior_mu', transform='identity')
         else:
-            model_inputs['n2_prior_mu'] = at.mean(at.log(model['n2']))
+            model_inputs['n2_prior_mu'] = pt.mean(pt.log(model['n2']))
 
         if self.fit_seperate_evidence_sd:
             model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd', transform='softplus')
@@ -111,17 +111,17 @@ class RiskModel(BaseModel):
 
         # Prob of choosing 2 should increase with p2
         if self.incorporate_probability == 'after_inference':
-            model_inputs['threshold'] =  at.log(model['p2'] / model['p1'])
+            model_inputs['threshold'] =  pt.log(model['p2'] / model['p1'])
         elif self.incorporate_probability == 'before_inference':
             model_inputs['threshold'] =  0.0
-            model_inputs['n1_evidence_mu'] += at.log(model['p1'])
-            model_inputs['n2_evidence_mu'] += at.log(model['p2'])
+            model_inputs['n1_evidence_mu'] += pt.log(model['p1'])
+            model_inputs['n2_evidence_mu'] += pt.log(model['p2'])
         else:
             raise ValueError('incorporate_probability should be either "after_inference" (default) or "before_inference"')
 
         if self.prior_estimate == 'objective':
-            model_inputs['n1_prior_mu'] = at.mean(at.log(at.stack((model['n1'], model['n2']), 0)))
-            model_inputs['n1_prior_std'] = at.std(at.log(at.stack((model['n1'], model['n2']), 0)))
+            model_inputs['n1_prior_mu'] = pt.mean(pt.log(pt.stack((model['n1'], model['n2']), 0)))
+            model_inputs['n1_prior_std'] = pt.std(pt.log(pt.stack((model['n1'], model['n2']), 0)))
             model_inputs['n2_prior_mu'] = model_inputs['n1_prior_mu']
             model_inputs['n2_prior_std'] = model_inputs['n1_prior_std']
 
@@ -134,31 +134,31 @@ class RiskModel(BaseModel):
         elif self.prior_estimate == 'two_mus':
 
             risky_first = model['risky_first'].astype(bool)
-            safe_n = at.where(risky_first, model['n2'], model['n1'])
-            safe_prior_std = at.std(at.log(safe_n))
+            safe_n = pt.where(risky_first, model['n2'], model['n1'])
+            safe_prior_std = pt.std(pt.log(safe_n))
             risky_prior_std = self.get_trialwise_variable('risky_prior_std', transform='softplus')
 
             model_inputs['n1_prior_mu'] = self.get_trialwise_variable('n1_prior_mu', transform='identity')
-            model_inputs['n1_prior_std'] = at.where(risky_first, risky_prior_std, safe_prior_std)
+            model_inputs['n1_prior_std'] = pt.where(risky_first, risky_prior_std, safe_prior_std)
             model_inputs['n2_prior_mu'] = self.get_trialwise_variable('n2_prior_mu', transform='identity')
-            model_inputs['n2_prior_std'] = at.where(risky_first, safe_prior_std, risky_prior_std)
+            model_inputs['n2_prior_std'] = pt.where(risky_first, safe_prior_std, risky_prior_std)
 
         elif self.prior_estimate == 'different':
 
             risky_first = model['risky_first'].astype(bool)
 
-            safe_n = at.where(risky_first, model['n2'], model['n1'])
-            safe_prior_mu = at.mean(at.log(safe_n))
-            safe_prior_std = at.std(at.log(safe_n))
+            safe_n = pt.where(risky_first, model['n2'], model['n1'])
+            safe_prior_mu = pt.mean(pt.log(safe_n))
+            safe_prior_std = pt.std(pt.log(safe_n))
 
             risky_prior_mu = self.get_trialwise_variable('risky_prior_mu', transform='identity')
             risky_prior_std = self.get_trialwise_variable('risky_prior_std', transform='softplus')
 
-            model_inputs['n1_prior_mu'] = at.where(risky_first, risky_prior_mu, safe_prior_mu)
-            model_inputs['n1_prior_std'] = at.where(risky_first, risky_prior_std, safe_prior_std)
+            model_inputs['n1_prior_mu'] = pt.where(risky_first, risky_prior_mu, safe_prior_mu)
+            model_inputs['n1_prior_std'] = pt.where(risky_first, risky_prior_std, safe_prior_std)
 
-            model_inputs['n2_prior_mu'] = at.where(risky_first, safe_prior_mu, risky_prior_mu)
-            model_inputs['n2_prior_std'] = at.where(risky_first, safe_prior_std, risky_prior_std)
+            model_inputs['n2_prior_mu'] = pt.where(risky_first, safe_prior_mu, risky_prior_mu)
+            model_inputs['n2_prior_std'] = pt.where(risky_first, safe_prior_std, risky_prior_std)
 
         elif self.prior_estimate in ['full', 'full_normed']:
 
@@ -174,11 +174,11 @@ class RiskModel(BaseModel):
             else:
                 safe_prior_std = self.get_trialwise_variable('safe_prior_std', transform='softplus')
 
-            model_inputs['n1_prior_mu'] = at.where(risky_first, risky_prior_mu, safe_prior_mu)
-            model_inputs['n1_prior_std'] = at.where(risky_first, risky_prior_std, safe_prior_std)
+            model_inputs['n1_prior_mu'] = pt.where(risky_first, risky_prior_mu, safe_prior_mu)
+            model_inputs['n1_prior_std'] = pt.where(risky_first, risky_prior_std, safe_prior_std)
 
-            model_inputs['n2_prior_mu'] = at.where(risky_first, safe_prior_mu, risky_prior_mu)
-            model_inputs['n2_prior_std'] = at.where(risky_first, safe_prior_std, risky_prior_std)
+            model_inputs['n2_prior_mu'] = pt.where(risky_first, safe_prior_mu, risky_prior_mu)
+            model_inputs['n2_prior_std'] = pt.where(risky_first, safe_prior_std, risky_prior_std)
 
         if self.fit_seperate_evidence_sd:
 
@@ -301,10 +301,10 @@ class RiskRegressionModel(RegressionModel, RiskModel):
 
         # Evidence SD
         if (key == 'n1_evidence_sd') and ('evidence_sd' in self.regressors):
-            return at.softplus(super().get_trialwise_variable('n1_evidence_sd', transform='identity') + super().get_trialwise_variable('evidence_sd', transform='identity'))
+            return pt.softplus(super().get_trialwise_variable('n1_evidence_sd', transform='identity') + super().get_trialwise_variable('evidence_sd', transform='identity'))
 
         if (key == 'n2_evidence_sd') and ('evidence_sd' in self.regressors):
-            return at.softplus(super().get_trialwise_variable('n2_evidence_sd', transform='identity') + super().get_trialwise_variable('evidence_sd', transform='identity'))
+            return pt.softplus(super().get_trialwise_variable('n2_evidence_sd', transform='identity') + super().get_trialwise_variable('evidence_sd', transform='identity'))
 
         return super().get_trialwise_variable(key=key, transform=transform)
 
@@ -363,8 +363,8 @@ class RNPModel(BaseModel):
         slope = model_inputs['gamma']
         risky_first = model['risky_first'].astype(bool)
 
-        intercept = -at.log(rnp) * slope # More risk-seeking -> higher rnp, smaller intercept, more likely to choose option 2
-        intercept = at.where(risky_first, intercept, -intercept)
+        intercept = -pt.log(rnp) * slope # More risk-seeking -> higher rnp, smaller intercept, more likely to choose option 2
+        intercept = pt.where(risky_first, intercept, -intercept)
         n1 = model_inputs['n1_evidence_mu']
         n2 = model_inputs['n2_evidence_mu']
 
@@ -417,9 +417,9 @@ class FlexibleSDComparisonModel(BaseModel):
 
         model_inputs = {}
 
-        model_inputs['n1_prior_mu'] = at.mean(model['n1'])
-        model_inputs['n1_prior_std'] = at.std(model['n1'])
-        model_inputs['n2_prior_std'] = at.std(model['n2'])
+        model_inputs['n1_prior_mu'] = pt.mean(model['n1'])
+        model_inputs['n1_prior_std'] = pt.std(model['n1'])
+        model_inputs['n2_prior_std'] = pt.std(model['n2'])
         model_inputs['threshold'] =  0.0
 
         model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu')
@@ -428,7 +428,7 @@ class FlexibleSDComparisonModel(BaseModel):
         if hasattr('self', 'fit_n2_prior_mu') and self.fit_n2_prior_mu:
             model_inputs['n2_prior_mu'] = self.get_trialwise_variable('n2_prior_mu', transform='identity')
         else:
-            model_inputs['n2_prior_mu'] = at.mean(model['n2'])
+            model_inputs['n2_prior_mu'] = pt.mean(model['n2'])
 
         model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd')
         model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('n2_evidence_sd')
@@ -468,7 +468,7 @@ class FlexibleSDComparisonModel(BaseModel):
                 n_evidence_sd_polypars.append(e)
 
         if hasattr(self, 'fit_n2_prior_mu') and self.fit_n2_prior_mu:
-            self.build_hierarchical_nodes('n2_prior_mu', mu_intercept=at.mean(model['n2']), sigma_intercept=100., cauchy_sigma_intercept=1., transform='identity')
+            self.build_hierarchical_nodes('n2_prior_mu', mu_intercept=pt.mean(model['n2']), sigma_intercept=100., cauchy_sigma_intercept=1., transform='identity')
 
     def _get_evidence_sd_labels(self):
         if self.memory_model == 'independent':
@@ -503,18 +503,18 @@ class FlexibleSDComparisonModel(BaseModel):
 
             if self.memory_model == 'independent':
                 dm = self.make_dm(x=self.data['n1'], variable='n1_evidence_sd')
-                n1_evidence_sd_poly_pars = at.stack([self.get_trialwise_variable(f'n1_evidence_sd_poly{n}') for n in range(self.polynomial_order[0])], axis=1)
-                n1_evidence_sd = at.softplus(at.sum(n1_evidence_sd_poly_pars * dm, 1))
+                n1_evidence_sd_poly_pars = pt.stack([self.get_trialwise_variable(f'n1_evidence_sd_poly{n}') for n in range(self.polynomial_order[0])], axis=1)
+                n1_evidence_sd = pt.softplus(pt.sum(n1_evidence_sd_poly_pars * dm, 1))
 
             elif self.memory_model == 'shared_perceptual_noise':
 
                 dm = self.make_dm(x=self.data['n1'], variable='perceptual_noise_sd')
-                perceptual_noise_poly_pars = at.stack([self.get_trialwise_variable(f'perceptual_noise_sd_poly{n}') for n in range(self.polynomial_order[0])], axis=1)
-                perceptual_noise_sd = at.softplus(at.sum(perceptual_noise_poly_pars * dm, 1))
+                perceptual_noise_poly_pars = pt.stack([self.get_trialwise_variable(f'perceptual_noise_sd_poly{n}') for n in range(self.polynomial_order[0])], axis=1)
+                perceptual_noise_sd = pt.softplus(pt.sum(perceptual_noise_poly_pars * dm, 1))
 
                 dm = self.make_dm(x=self.data['n1'], variable='memory_noise_sd')
-                memory_noise_poly_pars = at.stack([self.get_trialwise_variable(f'memory_noise_sd_poly{n}') for n in range(self.polynomial_order[1])], axis=1)
-                memory_noise_sd = at.softplus(at.sum(memory_noise_poly_pars * dm, 1))
+                memory_noise_poly_pars = pt.stack([self.get_trialwise_variable(f'memory_noise_sd_poly{n}') for n in range(self.polynomial_order[1])], axis=1)
+                memory_noise_sd = pt.softplus(pt.sum(memory_noise_poly_pars * dm, 1))
 
                 n1_evidence_sd = perceptual_noise_sd + memory_noise_sd
 
@@ -524,14 +524,14 @@ class FlexibleSDComparisonModel(BaseModel):
 
             if self.memory_model == 'independent':
                 dm = self.make_dm(x=self.data['n2'], variable='n2_evidence_sd')
-                n2_evidence_sd_poly_pars = at.stack([self.get_trialwise_variable(f'n2_evidence_sd_poly{n}') for n in range(self.polynomial_order[1])], axis=1)
-                n2_evidence_sd = at.softplus(at.sum(n2_evidence_sd_poly_pars * dm, 1))
+                n2_evidence_sd_poly_pars = pt.stack([self.get_trialwise_variable(f'n2_evidence_sd_poly{n}') for n in range(self.polynomial_order[1])], axis=1)
+                n2_evidence_sd = pt.softplus(pt.sum(n2_evidence_sd_poly_pars * dm, 1))
 
             elif self.memory_model == 'shared_perceptual_noise':
 
                 dm = self.make_dm(x=self.data['n1'], variable='perceptual_noise_sd')
-                perceptual_noise_poly_pars = at.stack([self.get_trialwise_variable(f'perceptual_noise_sd_poly{n}') for n in range(self.polynomial_order[0])], axis=1)
-                perceptual_noise_sd = at.softplus(at.sum(perceptual_noise_poly_pars * dm, 1))
+                perceptual_noise_poly_pars = pt.stack([self.get_trialwise_variable(f'perceptual_noise_sd_poly{n}') for n in range(self.polynomial_order[0])], axis=1)
+                perceptual_noise_sd = pt.softplus(pt.sum(perceptual_noise_poly_pars * dm, 1))
 
                 n2_evidence_sd = perceptual_noise_sd
 
@@ -740,11 +740,11 @@ class FlexibleSDRiskModel(FlexibleSDComparisonModel, RiskModel):
         else:
             safe_prior_std = self.get_trialwise_variable('safe_prior_std', transform='softplus')
 
-        model_inputs['n1_prior_mu'] = at.where(risky_first, risky_prior_mu, safe_prior_mu)
-        model_inputs['n1_prior_std'] = at.where(risky_first, risky_prior_std, safe_prior_std)
+        model_inputs['n1_prior_mu'] = pt.where(risky_first, risky_prior_mu, safe_prior_mu)
+        model_inputs['n1_prior_std'] = pt.where(risky_first, risky_prior_std, safe_prior_std)
 
-        model_inputs['n2_prior_mu'] = at.where(risky_first, safe_prior_mu, risky_prior_mu)
-        model_inputs['n2_prior_std'] = at.where(risky_first, safe_prior_std, risky_prior_std)
+        model_inputs['n2_prior_mu'] = pt.where(risky_first, safe_prior_mu, risky_prior_mu)
+        model_inputs['n2_prior_std'] = pt.where(risky_first, safe_prior_std, risky_prior_std)
 
         if self.fit_seperate_evidence_sd:
             model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd', transform='softplus')
