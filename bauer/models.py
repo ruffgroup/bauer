@@ -574,7 +574,6 @@ class FlexibleSDComparisonModel(BaseModel):
             x_min, x_max = model.data[['n1', 'n2']].min().min(), model.data[['n1', 'n2']].max().max()
             x = np.linspace(x_min, x_max, 100)
 
-        dm = np.asarray(model.make_dm(x=x, variable='variable'))
 
         if group:
             key = 'sd_poly{}_mu'
@@ -584,6 +583,7 @@ class FlexibleSDComparisonModel(BaseModel):
         if variable in ['n1', 'memory_noise_sd', 'perceptual_noise_sd', 'both']:
             print('yo1')
             if model.memory_model == 'independent':
+                dm = np.asarray(model.make_dm(x=x, variable='n1_evidence_sd'))
                 n1_sd = idata.posterior[[f'n1_evidence_{key.format(ix)}' for ix in range(0, model.polynomial_order[0])]].to_dataframe()
                 n1_sd = softplus_np(n1_sd.dot(dm.T))
             elif model.memory_model == 'shared_perceptual_noise':
@@ -591,7 +591,10 @@ class FlexibleSDComparisonModel(BaseModel):
                 perceptual_noise_sd = idata.posterior[[f'perceptual_noise_{key.format(ix)}' for ix in range(0, model.polynomial_order[0])]].to_dataframe()
                 memory_noise_sd = idata.posterior[[f'memory_noise_{key.format(ix)}' for ix in range(0, model.polynomial_order[1])]].to_dataframe()
 
+                dm = np.asarray(model.make_dm(x=x, variable='perceptual_noise_sd'))
                 perceptual_noise_sd = softplus_np(perceptual_noise_sd.dot(dm.T))
+
+                dm = np.asarray(model.make_dm(x=x, variable='memory_noise_sd'))
                 memory_noise_sd = softplus_np(memory_noise_sd.dot(dm.T))
                 n1_sd = memory_noise_sd + perceptual_noise_sd
 
@@ -606,9 +609,11 @@ class FlexibleSDComparisonModel(BaseModel):
 
         if (variable == 'n2') or ((variable == 'both') & (model.memory_model == 'independent')):
             if model.memory_model == 'independent':
+                dm = np.asarray(model.make_dm(x=x, variable='n2_evidence_sd'))
                 n2_sd = idata.posterior[[f'n2_evidence_{key.format(ix)}' for ix in range(0, model.polynomial_order[1])]].to_dataframe()
                 n2_sd = softplus_np(n2_sd.dot(dm.T))
             elif model.memory_model == 'shared_perceptual_noise':
+                dm = np.asarray(model.make_dm(x=x, variable='perceptual_noise_sd'))
                 perceptual_noise_sd = idata.posterior[[f'perceptual_noise_{key.format(ix)}' for ix in range(0, model.polynomial_order[0])]].to_dataframe()
                 perceptual_noise_sd = softplus_np(perceptual_noise_sd.dot(dm.T))
                 n2_sd = perceptual_noise_sd.dot(dm.T)
@@ -625,7 +630,7 @@ class FlexibleSDComparisonModel(BaseModel):
         elif variable == 'perceptual_noise_sd':
             output = perceptual_noise_sd.stack().to_frame('sd')
         elif variable == 'memory_noise_sd':
-            output = perceptual_noise_sd.stack().to_frame('sd')
+            output = memory_noise_sd.stack().to_frame('sd')
         else:
             if model.memory_model == 'independent':
                 output = pd.concat((n1_sd, n2_sd), axis=0, keys=['n1', 'n2'], names=['variable'])
