@@ -14,8 +14,9 @@ import matplotlib.pyplot as plt
 
 class MagnitudeComparisonModel(BaseModel):
 
-    def __init__(self, data, fit_n2_prior_mu=True, fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False):
-        self.fit_n2_prior_mu = fit_n2_prior_mu
+    def __init__(self, data, fit_prior=False, fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False):
+
+        self.fit_prior = fit_prior
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
 
 
@@ -26,18 +27,28 @@ class MagnitudeComparisonModel(BaseModel):
         model = pm.Model.get_context()
 
         model_inputs = {}
-        model_inputs['n1_prior_mu'] = pt.mean(pt.log(model['n1']))
-        model_inputs['n1_prior_std'] = pt.std(pt.log(model['n1']))
-        model_inputs['n2_prior_std'] = pt.std(pt.log(model['n2']))
+
+        if self.fit_prior:
+            model_inputs['n1_prior_mu'] = self.get_trialwise_variable('prior_mu', transform='identity')
+            model_inputs['n2_prior_mu'] = self.get_trialwise_variable('prior_mu', transform='identity')
+
+            model_inputs['n1_prior_std'] = self.get_trialwise_variable('prior_sd', transform='softplus')
+            model_inputs['n2_prior_std'] = self.get_trialwise_variable('prior_sd', transform='softplus')
+
+        else:
+            mean_prior = (pt.mean(pt.log(model['n1'])) + pt.mean(pt.log(model['n2']))) / 2.
+            mean_std = (pt.std(pt.log(model['n1'])) + pt.std(pt.log(model['n2']))) / 2.
+
+            model_inputs['n1_prior_mu'] = mean_prior
+            model_inputs['n2_prior_mu'] = mean_prior
+
+            model_inputs['n1_prior_std'] = mean_std
+            model_inputs['n2_prior_std'] = mean_std
+
         model_inputs['threshold'] =  0.0
 
         model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu', transform='identity') #model['n1'])
         model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu', transform='identity')
-
-        if self.fit_n2_prior_mu:
-            model_inputs['n2_prior_mu'] = self.get_trialwise_variable('n2_prior_mu', transform='identity')
-        else:
-            model_inputs['n2_prior_mu'] = pt.mean(pt.log(model['n2']))
 
         if self.fit_seperate_evidence_sd:
             model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd', transform='softplus')
@@ -57,8 +68,12 @@ class MagnitudeComparisonModel(BaseModel):
         else:
             self.build_hierarchical_nodes('evidence_sd', mu_intercept=-1., transform='softplus')
 
-        if self.fit_n2_prior_mu:
-            self.build_hierarchical_nodes('n2_prior_mu', mu_intercept=0.0, transform='identity')
+        if self.fit_prior:
+            objective_mu = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+            objective_sd = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+
+            self.build_hierarchical_nodes('prior_mu', mu_intercept=objective_mu, transform='identity')
+            self.build_hierarchical_nodes('prior_sd', mu_intercept=objective_sd, transform='softplus')
         
 class MagnitudeComparisonLapseModel(LapseModel, MagnitudeComparisonModel):
     ...
