@@ -600,7 +600,7 @@ class FlexibleSDComparisonModel(BaseModel):
                 polynomial_order = self.polynomial_order
 
             if polynomial_order > 1:
-                dm = np.asarray(dmatrix(f"bs(x, degree=3, df={polynomial_order-1}, include_intercept=True, lower_bound={min_n}, upper_bound={max_n})",
+                dm = np.asarray(dmatrix(f"bs(x, degree=3, df={polynomial_order}, include_intercept=True, lower_bound={min_n}, upper_bound={max_n}) - 1",
                                 {"x": x}))
             else:
                 dm = np.asarray(dmatrix(f"bs(x, degree=0, df=0, include_intercept=False, lower_bound={min_n}, upper_bound={max_n})",
