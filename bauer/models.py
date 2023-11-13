@@ -2,7 +2,7 @@ import pandas as pd
 import pymc as pm
 import numpy as np
 from .utils import cumulative_normal, get_posterior, get_diff_dist
-from .utils.math import inverse_softplus, softplus_np
+from .utils.math import inverse_softplus, softplus_np, inverse_softplus_np
 import pytensor.tensor as pt
 from patsy import dmatrix
 from .core import BaseModel, RegressionModel, LapseModel
@@ -470,13 +470,13 @@ class FlexibleSDComparisonModel(BaseModel):
         if self.bspline:
 
             if self.fit_seperate_evidence_sd:
-                mu_prior = [np.zeros(po) for po in self.polynomial_order]
-                std_prior = [np.ones(po) * 100 for po in self.polynomial_order]
+                mu_prior = [np.ones(po) * inverse_softplus_np(5.) for po in self.polynomial_order]
+                std_prior = [np.ones(po) * 5 for po in self.polynomial_order]
             else:
-                mu_prior = np.zeros(self.polynomial_order)
-                std_prior = np.ones(self.polynomial_order) * 100
+                mu_prior = np.ones(self.polynomial_order) * inverse_softplus_np(5.)
+                std_prior = np.ones(self.polynomial_order) * 5
 
-            cauchy_sigma= 1
+            cauchy_sigma= .5
         else:
             mu_prior = np.concatenate([[10], np.zeros(self.polynomial_order-1)])
             std_prior = np.concatenate([[10], 10**(-np.arange(1, self.polynomial_order) - 1)])
@@ -501,7 +501,7 @@ class FlexibleSDComparisonModel(BaseModel):
                 n_evidence_sd_polypars.append(e)
 
         if hasattr(self, 'fit_n2_prior_mu') and self.fit_n2_prior_mu:
-            self.build_hierarchical_nodes('n2_prior_mu', mu_intercept=pt.mean(model['n2']), sigma_intercept=100., cauchy_sigma_intercept=1., transform='identity')
+            self.build_hierarchical_nodes('n2_prior_mu', mu_intercept=pt.mean(model['n2']), sigma_intercept=15., cauchy_sigma_intercept=.5, transform='identity')
 
     def _get_evidence_sd_labels(self):
         if self.memory_model == 'independent':
@@ -750,23 +750,23 @@ class FlexibleSDRiskModel(FlexibleSDComparisonModel, RiskModel):
             risky_prior_mu = np.mean(risky_n)
             risky_prior_std = np.std(risky_n)
 
-            self.build_hierarchical_nodes('risky_prior_mu', mu_intercept=risky_prior_mu, sigma_intercept=100, cauchy_sigma_intercept=1.0, cauchy_sigma_regressors=1.0, transform='identity')
-            self.build_hierarchical_nodes('risky_prior_std', mu_intercept=risky_prior_std, sigma_intercept=100, cauchy_sigma_intercept=1.0, cauchy_sigma_regressors=1.0, transform='softplus')
+            self.build_hierarchical_nodes('risky_prior_mu', mu_intercept=risky_prior_mu, sigma_intercept=15, cauchy_sigma_intercept=.5, cauchy_sigma_regressors=.5, transform='identity')
+            self.build_hierarchical_nodes('risky_prior_std', mu_intercept=risky_prior_std, sigma_intercept=15, cauchy_sigma_intercept=.5, cauchy_sigma_regressors=.5, transform='softplus')
 
             safe_prior_mu = np.mean(safe_n)
 
-            self.build_hierarchical_nodes('safe_prior_mu', mu_intercept=safe_prior_mu, sigma_intercept=100, cauchy_sigma_intercept=1.0, cauchy_sigma_regressors=1.0, transform='identity')
+            self.build_hierarchical_nodes('safe_prior_mu', mu_intercept=safe_prior_mu, sigma_intercept=15, cauchy_sigma_intercept=.5, cauchy_sigma_regressors=.5, transform='identity')
 
             safe_prior_std = np.std(safe_n)
-            self.build_hierarchical_nodes('safe_prior_std', mu_intercept=safe_prior_std, sigma_intercept=100, cauchy_sigma_intercept=1.0, cauchy_sigma_regressors=1.0, transform='softplus')
+            self.build_hierarchical_nodes('safe_prior_std', mu_intercept=safe_prior_std, sigma_intercept=15, cauchy_sigma_intercept=.5, cauchy_sigma_regressors=.5, transform='softplus')
 
             FlexibleSDComparisonModel.build_priors(self)
         else:
             prior_mu = (np.mean(self.data['n1']) + np.mean(self.data['n2']))/2.
             prior_std = (np.std(self.data['n1']) + np.std(self.data['n2']))/2.
 
-            self.build_hierarchical_nodes('prior_mu', mu_intercept=prior_mu, sigma_intercept=100, cauchy_sigma_intercept=1.0, cauchy_sigma_regressors=1.0, transform='identity')
-            self.build_hierarchical_nodes('prior_std', mu_intercept=prior_std, sigma_intercept=100, cauchy_sigma_intercept=1.0, cauchy_sigma_regressors=1.0, transform='softplus')
+            self.build_hierarchical_nodes('prior_mu', mu_intercept=prior_mu, sigma_intercept=15, cauchy_sigma_intercept=0.5, cauchy_sigma_regressors=0.5, transform='identity')
+            self.build_hierarchical_nodes('prior_std', mu_intercept=prior_std, sigma_intercept=15, cauchy_sigma_intercept=0.5, cauchy_sigma_regressors=0.5, transform='softplus')
 
             FlexibleSDComparisonModel.build_priors(self)
 
