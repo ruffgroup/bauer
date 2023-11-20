@@ -18,7 +18,6 @@ class BaseModel(object):
         self.data = data
         self.unique_subjects = self.data.index.unique(level='subject')
         self.n_subjects = len(self.unique_subjects) 
-        self.base_numbers = self.data['n1'].unique()
         self.save_trialwise_n_estimates = save_trialwise_n_estimates
 
     def _get_paradigm(self, data=None):

@@ -1,8 +1,9 @@
+import re
 import pandas as pd
 import pymc as pm
 import numpy as np
 from .utils import cumulative_normal, get_posterior, get_diff_dist
-from .utils.math import inverse_softplus, softplus_np, inverse_softplus_np
+from .utils.math import inverse_softplus, softplus_np, inverse_softplus_np, logit, logit_derivative, gaussian_pdf
 import pytensor.tensor as pt
 from patsy import dmatrix
 from .core import BaseModel, RegressionModel, LapseModel
@@ -87,11 +88,178 @@ class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonMod
             if key in self.regressors:
                 self.build_hierarchical_nodes(key, mu_intercept=0.0, transform='identity')
 
+class RiskModelProbabilityDistortion(BaseModel):
+
+    def __init__(self, data, magnitude_prior_estimate='objective', save_trialwise_n_estimates=False, n_prospects=2,
+                 p_grid_size=20, lapse_rate=0.01):
+
+        assert magnitude_prior_estimate in ['objective'], 'Only objective prior is currently supported'
+        assert(n_prospects == 2), 'Only two prospects are currently supported'
+
+        self.magnitude_prior_estimate = magnitude_prior_estimate
+        self.n_prospects = n_prospects
+
+        self.p_grid = np.linspace(1e-6, 1-1e-6, p_grid_size)
+        self.lapse_rate = lapse_rate
+
+        for ix in range(self.n_prospects):
+            assert(f'n{ix+1}' in data.columns), f'Data should contain columns n1, n2, ... n{self.n_prospects}'
+            assert(f'p{ix+1}' in data.columns), f'Data should contain columns p1, p2, ... p{self.n_prospects}'
+
+        super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
+
+
+    def _get_paradigm(self, data=None):
+
+        if data is None:
+            data = self.data
+
+        paradigm = {}
+
+        for ix in range(self.n_prospects):
+            paradigm[f'n{ix+1}'] = data[f'n{ix+1}'].values
+            paradigm[f'p{ix+1}'] = data[f'p{ix+1}'].values
+            paradigm[f'log(n{ix+1})'] = np.log(data[f'n{ix+1}'].values)
+
+        paradigm['subject_ix'], _ = pd.factorize(data.index.get_level_values('subject'))
+
+        if 'choice' in data.columns:
+            paradigm['choice'] = data['choice'].values
+        else:
+            # paradigm['choice'] = np.zeros_like(paradigm['n1']).astype(bool)
+            raise Exception('No choice data!')
+
+        return paradigm
+
+    def _get_choice_predictions(self, model_inputs):
+
+        def logodds_dist_in_p(mu_logodds, sd_logodds, p_grid=self.p_grid):
+
+            logodds_grid = logit(p_grid)[np.newaxis, :]
+            p_logodds = gaussian_pdf(logodds_grid, mu_logodds[:, np.newaxis], sd_logodds[:, np.newaxis])
+
+            return p_logodds * logit_derivative(p_grid)
+
+        posteriors = {}
+
+        print(model_inputs)
+
+        for ix in range(self.n_prospects):
+            posteriors[f'p{ix+1}_posterior_mu'], posteriors[f'p{ix+1}_posterior_sd'] = get_posterior(model_inputs[f'p{ix+1}_evidence_mu'], model_inputs[f'p{ix+1}_evidence_sd'], model_inputs[f'p{ix+1}_prior_mu'], model_inputs[f'p{ix+1}_prior_sd'])
+
+            print(f'p{ix+1}_posterior_mu', posteriors[f'p{ix+1}_posterior_mu'].shape.eval())
+            print(f'p{ix+1}_posterior_sd', posteriors[f'p{ix+1}_posterior_sd'].shape.eval())
+
+
+        ix = 0
+        p_posterior1 = logodds_dist_in_p(posteriors[f'p{ix+1}_posterior_mu'], posteriors[f'p{ix+1}_posterior_sd'])
+        ix = 1
+        p_posterior2 = logodds_dist_in_p(posteriors[f'p{ix+1}_posterior_mu'], posteriors[f'p{ix+1}_posterior_sd'])
+
+        p_posterior1 = p_posterior1
+        p_posterior2 = p_posterior2
+
+        # n x p1 x p2
+        p_posterior_joint = p_posterior1[:, :,np.newaxis] * p_posterior2[:, np.newaxis, :]
+        p_posterior_joint = p_posterior_joint / pt.sum(p_posterior_joint, (1, 2), keepdims=True)
+
+
+        print('p_posterior1', p_posterior1.shape.eval())
+        print('p_posterior2', p_posterior2.shape.eval())
+        print('p_posterior_joint', p_posterior_joint.shape.eval())
+
+        ix = 0
+        n1_hat_mean, n1_hat_sd = get_posterior(model_inputs[f'n{ix+1}_evidence_mu'], model_inputs[f'n{ix+1}_evidence_sd'], model_inputs[f'n{ix+1}_prior_mu'], model_inputs[f'n{ix+1}_prior_sd'])
+
+        ix = 1
+        n2_hat_mean, n2_hat_sd = get_posterior(model_inputs[f'n{ix+1}_evidence_mu'], model_inputs[f'n{ix+1}_evidence_sd'], model_inputs[f'n{ix+1}_prior_mu'], model_inputs[f'n{ix+1}_prior_sd']) 
+
+        # n x p1
+        ev1_hat_mean = n1_hat_mean[:, np.newaxis] + pt.log(self.p_grid)[np.newaxis, :]
+
+        # n x p2
+        ev2_hat_mean = n2_hat_mean[:, np.newaxis] + pt.log(self.p_grid)[np.newaxis, :]
+
+        print('ev1_hat_mean', ev1_hat_mean.shape.eval())
+        # n_trials x p1 x p2
+        ev_diff_mean = ev2_hat_mean[:, np.newaxis, :] - ev1_hat_mean[:, :, np.newaxis]
+
+        print('ev_diff_mean', ev_diff_mean.shape.eval())
+
+        ev_diff_sd = pt.sqrt(n1_hat_sd**2 + n2_hat_sd**2)
+        print('ev_diff_sd', ev_diff_sd.shape.eval())
+
+        # return pt.tensor([.5])
+
+        # # n_trials x p1 x p2
+        p_choice = cumulative_normal(ev_diff_mean, 0.0, ev_diff_sd[:, np.newaxis, np.newaxis])
+
+        print('p_choice', p_choice.shape.eval())
+
+        clip_range = self.lapse_rate / 2., 1 - self.lapse_rate / 2.
+        p_choice = pt.clip(pt.sum(pt.sum(p_posterior_joint * p_choice, 1), 1), clip_range[0], clip_range[1])
+
+        print('p_choice', p_choice.shape.eval())
+
+        return p_choice
+
+    def get_model_inputs(self):
+
+        model = pm.Model.get_context()
+
+        model_inputs = {}
+
+        for ix in range(self.n_prospects):
+            # Evidence mu
+            model_inputs[f'n{ix+1}_evidence_mu'] = self.get_trialwise_variable(f'n{ix+1}_evidence_mu', transform='identity')
+            model_inputs[f'p{ix+1}_evidence_mu'] = self.get_trialwise_variable(f'p{ix+1}_evidence_mu', transform='identity')
+
+            # Evidence sd
+            model_inputs[f'n{ix+1}_evidence_sd'] = self.get_trialwise_variable(f'magnitude_evidence_sd', transform='softplus')
+            model_inputs[f'p{ix+1}_evidence_sd'] = self.get_trialwise_variable(f'probability_evidence_sd', transform='softplus')
+
+            # Prior mu
+            model_inputs[f'n{ix+1}_prior_mu'] = pt.mean(pt.log(pt.stack((model['n1'], model['n2']), 0)))
+            model_inputs[f'p{ix+1}_prior_mu'] = self.get_trialwise_variable(f'probability_prior_mu', transform='identity')
+
+            # Prior sd
+            model_inputs[f'n{ix+1}_prior_sd'] = self.get_trialwise_variable('magnitude_prior_sd', transform='softplus')
+            model_inputs[f'p{ix+1}_prior_sd'] = self.get_trialwise_variable('probability_prior_sd', transform='softplus')
+
+        return model_inputs
+
+    def build_priors(self):
+
+        self.build_hierarchical_nodes('probability_evidence_sd', mu_intercept=-1., transform='softplus')
+        self.build_hierarchical_nodes('magnitude_evidence_sd', mu_intercept=-1., transform='softplus')
+
+        self.build_hierarchical_nodes('probability_prior_mu', mu_intercept=0.0, transform='identity')
+
+        self.build_hierarchical_nodes('magnitude_prior_sd', mu_intercept=-1., transform='softplus')
+        self.build_hierarchical_nodes('probability_prior_sd', mu_intercept=-1., transform='softplus')
+
+    def get_trialwise_variable(self, key, transform='identity'):
+
+        model = pm.Model.get_context()
+
+        reg = re.compile('n([0-9])+_evidence_mu')
+        magnitude_match = reg.match(key)
+        if magnitude_match:
+            n = int(magnitude_match.group(1))
+            return model[f'log(n{n})']
+
+        reg = re.compile('p([0-9])+_evidence_mu')
+        probability_match = reg.match(key)
+        if probability_match:
+            n = int(probability_match.group(1))
+            return model[f'p{n}']
+
+        return super().get_trialwise_variable(key, transform=transform)
 
 class RiskModel(BaseModel):
 
     def __init__(self, data, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
-                 save_trialwise_n_estimates=False, memory_model='independent'):
+                 save_trialwise_n_estimates=False, memory_model='independent', n_prospects=2):
 
         assert prior_estimate in ['objective', 'shared', 'different', 'full', 'full_normed']
 
@@ -842,19 +1010,39 @@ class FlexibleSDRiskModel(FlexibleSDComparisonModel, RiskModel):
 
 class ExpectedUtilityRiskModel(BaseModel):
 
-    def __init__(self, data, save_trialwise_eu=False, probability_distortion=False):
+    def __init__(self, data, save_trialwise_eu=False, probability_distortion=False, n_outcomes=1):
         self.save_trialwise_eu = save_trialwise_eu
         self.probability_distortion = probability_distortion
+        self.n_outcomes = n_outcomes
 
         super().__init__(data)
 
     def _get_paradigm(self, data=None):
 
-        paradigm = super()._get_paradigm(data)
+        if self.n_outcomes == 1:
+            paradigm = super()._get_paradigm(data)
 
-        paradigm['p1'] = data['p1'].values
-        paradigm['p2'] = data['p2'].values
-        paradigm['risky_first'] = data['risky_first'].values.astype(bool)
+            paradigm['p1'] = data['p1'].values
+            paradigm['p2'] = data['p2'].values
+            paradigm['risky_first'] = data['risky_first'].values.astype(bool)
+
+        else:
+            paradigm = {}
+            paradigm['subject_ix'], _ = pd.factorize(data.index.get_level_values('subject'))
+
+            if 'choice' in data.columns:
+                paradigm['choice'] = data.choice.values
+            else:
+                print('*** Warning: did not find choice column, assuming all choices are False ***')
+                paradigm['choice'] = np.zeros_like(paradigm['n1']).astype(bool)
+
+            for ix in range(1, self.n_outcomes+1):
+                paradigm[f'n1.{ix}'] = data[f'n1.{ix}'].values
+                paradigm[f'n2.{ix}'] = data[f'n2.{ix}'].values
+                paradigm[f'p1.{ix}'] = data[f'p1.{ix}'].values
+                paradigm[f'p2.{ix}'] = data[f'p2.{ix}'].values
+                paradigm[f'log(n1.{ix})'] = np.log(data[f'n1.{ix}'].values)
+                paradigm[f'log(n2.{ix})'] = np.log(data[f'n2.{ix}'].values)
 
         return paradigm
 
@@ -867,20 +1055,31 @@ class ExpectedUtilityRiskModel(BaseModel):
 
     def _get_choice_predictions(self, model_inputs):
 
-        if self.probability_distortion:
+        def prob_distortion(p, phi):
+            return (p**phi) / ((p**phi + (1-p)**phi)**(1/phi))
 
-            def prob_distortion(p, phi):
-                return (p**phi) / ((p**phi + (1-p)**phi)**(1/phi))
+        if self.n_outcomes == 1:
+            if self.probability_distortion:
+                p1 = prob_distortion(model_inputs['p1'], model_inputs['phi'])
+                p2 = prob_distortion(model_inputs['p2'], model_inputs['phi'])
 
-            p1 = prob_distortion(model_inputs['p1'], model_inputs['phi'])
-            p2 = prob_distortion(model_inputs['p2'], model_inputs['phi'])
+            else:
+                p1 =  model_inputs['p1']
+                p2 =  model_inputs['p2']
+
+            eu1 = p1 * model_inputs['n1']**model_inputs['alpha']
+            eu2 = p2 * model_inputs['n2']**model_inputs['alpha']
 
         else:
-            p1 =  model_inputs['p1']
-            p2 =  model_inputs['p2']
+            eu1, eu2 = 0.0, 0.0
 
-        eu1 = p1 * model_inputs['n1']**model_inputs['alpha']
-        eu2 = p2 * model_inputs['n2']**model_inputs['alpha']
+            for ix in range(1, self.n_outcomes+1):
+                if self.probability_distortion:
+                    eu1 += model_inputs[f'n1.{ix}']**model_inputs['alpha'] * prob_distortion(model_inputs[f'p1.{ix}'])
+                    eu2 += model_inputs[f'n2.{ix}']**model_inputs['alpha'] * prob_distortion(model_inputs[f'p2.{ix}'])
+                else:
+                    eu1 += model_inputs[f'n1.{ix}']**model_inputs['alpha'] * model_inputs[f'p1.{ix}']
+                    eu2 += model_inputs[f'n2.{ix}']**model_inputs['alpha'] * model_inputs[f'p2.{ix}']
 
         if self.save_trialwise_eu:
             pm.Deterministic('eu1', eu1)
@@ -894,10 +1093,18 @@ class ExpectedUtilityRiskModel(BaseModel):
 
         model_inputs = {}
 
-        model_inputs['n1'] = model['n1']
-        model_inputs['n2'] = model['n2']
-        model_inputs['p1'] = model['p1']
-        model_inputs['p2'] = model['p2']
+        if self.n_outcomes == 1:
+
+            model_inputs['n1'] = model['n1']
+            model_inputs['n2'] = model['n2']
+            model_inputs['p1'] = model['p1']
+            model_inputs['p2'] = model['p2']
+        else:
+            for ix in range(1, self.n_outcomes+1):
+                model_inputs[f'n1.{ix}'] = model[f'n1.{ix}']
+                model_inputs[f'n2.{ix}'] = model[f'n2.{ix}']
+                model_inputs[f'p1.{ix}'] = model[f'p1.{ix}']
+                model_inputs[f'p2.{ix}'] = model[f'p2.{ix}']
 
         model_inputs['alpha'] = self.get_trialwise_variable('alpha', transform='softplus')
         model_inputs['sigma'] = self.get_trialwise_variable('sigma', transform='softplus')
