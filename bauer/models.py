@@ -91,7 +91,7 @@ class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonMod
 class RiskModelProbabilityDistortion(BaseModel):
 
     def __init__(self, data, magnitude_prior_estimate='objective', save_trialwise_n_estimates=False, n_prospects=2,
-                 p_grid_size=20, lapse_rate=0.01):
+                 p_grid_size=20, lapse_rate=0.01, distort_magnitudes=True, distort_probabilities=True):
 
         assert magnitude_prior_estimate in ['objective'], 'Only objective prior is currently supported'
         assert(n_prospects == 2), 'Only two prospects are currently supported'
@@ -101,6 +101,9 @@ class RiskModelProbabilityDistortion(BaseModel):
 
         self.p_grid = np.linspace(1e-6, 1-1e-6, p_grid_size)
         self.lapse_rate = lapse_rate
+
+        self.distort_magnitudes = distort_magnitudes
+        self.distort_probabilities = distort_probabilities
 
         for ix in range(self.n_prospects):
             assert(f'n{ix+1}' in data.columns), f'Data should contain columns n1, n2, ... n{self.n_prospects}'
@@ -140,66 +143,69 @@ class RiskModelProbabilityDistortion(BaseModel):
 
             return p_logodds * logit_derivative(p_grid)
 
-        posteriors = {}
 
-        print(model_inputs)
+        if self.distort_probabilities:
+            posteriors = {}
+            for ix in range(self.n_prospects):
+                posteriors[f'p{ix+1}_posterior_mu'], posteriors[f'p{ix+1}_posterior_sd'] = get_posterior(model_inputs[f'p{ix+1}_evidence_mu'], model_inputs[f'p{ix+1}_evidence_sd'], model_inputs[f'p{ix+1}_prior_mu'], model_inputs[f'p{ix+1}_prior_sd'])
 
-        for ix in range(self.n_prospects):
-            posteriors[f'p{ix+1}_posterior_mu'], posteriors[f'p{ix+1}_posterior_sd'] = get_posterior(model_inputs[f'p{ix+1}_evidence_mu'], model_inputs[f'p{ix+1}_evidence_sd'], model_inputs[f'p{ix+1}_prior_mu'], model_inputs[f'p{ix+1}_prior_sd'])
+            ix = 0
+            p_posterior1 = logodds_dist_in_p(posteriors[f'p{ix+1}_posterior_mu'], posteriors[f'p{ix+1}_posterior_sd'])
+            ix = 1
+            p_posterior2 = logodds_dist_in_p(posteriors[f'p{ix+1}_posterior_mu'], posteriors[f'p{ix+1}_posterior_sd'])
 
-            print(f'p{ix+1}_posterior_mu', posteriors[f'p{ix+1}_posterior_mu'].shape.eval())
-            print(f'p{ix+1}_posterior_sd', posteriors[f'p{ix+1}_posterior_sd'].shape.eval())
+            # n x p1 x p2
+            p_posterior_joint = p_posterior1[:, :,np.newaxis] * p_posterior2[:, np.newaxis, :]
+            p_posterior_joint = p_posterior_joint / pt.sum(p_posterior_joint, (1, 2), keepdims=True)
 
+        if self.distort_magnitudes:
+            ix = 0
+            n1_hat_mean, n1_hat_sd = get_posterior(model_inputs[f'n{ix+1}_evidence_mu'], model_inputs[f'n{ix+1}_evidence_sd'], model_inputs[f'n{ix+1}_prior_mu'], model_inputs[f'n{ix+1}_prior_sd'])
 
-        ix = 0
-        p_posterior1 = logodds_dist_in_p(posteriors[f'p{ix+1}_posterior_mu'], posteriors[f'p{ix+1}_posterior_sd'])
-        ix = 1
-        p_posterior2 = logodds_dist_in_p(posteriors[f'p{ix+1}_posterior_mu'], posteriors[f'p{ix+1}_posterior_sd'])
+            ix = 1
+            n2_hat_mean, n2_hat_sd = get_posterior(model_inputs[f'n{ix+1}_evidence_mu'], model_inputs[f'n{ix+1}_evidence_sd'], model_inputs[f'n{ix+1}_prior_mu'], model_inputs[f'n{ix+1}_prior_sd']) 
 
-        p_posterior1 = p_posterior1
-        p_posterior2 = p_posterior2
+        if self.distort_magnitudes & self.distort_probabilities:
 
-        # n x p1 x p2
-        p_posterior_joint = p_posterior1[:, :,np.newaxis] * p_posterior2[:, np.newaxis, :]
-        p_posterior_joint = p_posterior_joint / pt.sum(p_posterior_joint, (1, 2), keepdims=True)
+            ev1_hat_mean = n1_hat_mean[:, np.newaxis] + pt.log(self.p_grid)[np.newaxis, :]
+            ev2_hat_mean = n2_hat_mean[:, np.newaxis] + pt.log(self.p_grid)[np.newaxis, :]
 
+            ev_diff_mean = ev2_hat_mean[:, np.newaxis, :] - ev1_hat_mean[:, :, np.newaxis]
 
-        print('p_posterior1', p_posterior1.shape.eval())
-        print('p_posterior2', p_posterior2.shape.eval())
-        print('p_posterior_joint', p_posterior_joint.shape.eval())
+            ev_diff_sd = pt.sqrt(n1_hat_sd**2 + n2_hat_sd**2)
 
-        ix = 0
-        n1_hat_mean, n1_hat_sd = get_posterior(model_inputs[f'n{ix+1}_evidence_mu'], model_inputs[f'n{ix+1}_evidence_sd'], model_inputs[f'n{ix+1}_prior_mu'], model_inputs[f'n{ix+1}_prior_sd'])
+            p_choice = cumulative_normal(ev_diff_mean, 0.0, ev_diff_sd[:, np.newaxis, np.newaxis])
+            p_choice = pt.sum(pt.sum(p_posterior_joint * p_choice, 1), 1)
 
-        ix = 1
-        n2_hat_mean, n2_hat_sd = get_posterior(model_inputs[f'n{ix+1}_evidence_mu'], model_inputs[f'n{ix+1}_evidence_sd'], model_inputs[f'n{ix+1}_prior_mu'], model_inputs[f'n{ix+1}_prior_sd']) 
+        elif self.distort_magnitudes & (~self.distort_probabilities):
+            p1 = model_inputs[f'p1_evidence_mu']
+            p2 = model_inputs[f'p2_evidence_mu']
 
-        # n x p1
-        ev1_hat_mean = n1_hat_mean[:, np.newaxis] + pt.log(self.p_grid)[np.newaxis, :]
+            ev1_hat_mean = n1_hat_mean + pt.log(p1)
+            ev2_hat_mean = n2_hat_mean + pt.log(p2)
 
-        # n x p2
-        ev2_hat_mean = n2_hat_mean[:, np.newaxis] + pt.log(self.p_grid)[np.newaxis, :]
+            ev_diff_mean = ev2_hat_mean - ev1_hat_mean
 
-        print('ev1_hat_mean', ev1_hat_mean.shape.eval())
-        # n_trials x p1 x p2
-        ev_diff_mean = ev2_hat_mean[:, np.newaxis, :] - ev1_hat_mean[:, :, np.newaxis]
+            ev_diff_sd = pt.sqrt(n1_hat_sd**2 + n2_hat_sd**2)
 
-        print('ev_diff_mean', ev_diff_mean.shape.eval())
+            p_choice = cumulative_normal(ev_diff_mean, 0.0, ev_diff_sd)
 
-        ev_diff_sd = pt.sqrt(n1_hat_sd**2 + n2_hat_sd**2)
-        print('ev_diff_sd', ev_diff_sd.shape.eval())
+        elif (~self.distort_magnitudes) & self.distort_probabilities:
 
-        # return pt.tensor([.5])
+            n1 = model_inputs[f'n1_evidence_mu']
+            n2 = model_inputs[f'n2_evidence_mu']
 
-        # # n_trials x p1 x p2
-        p_choice = cumulative_normal(ev_diff_mean, 0.0, ev_diff_sd[:, np.newaxis, np.newaxis])
+            ev1 = n1[:, np.newaxis, np.newaxis] + pt.log(self.p_grid)[np.newaxis, :, np.newaxis]
+            ev2 = n2[:, np.newaxis, np.newaxis] + pt.log(self.p_grid)[np.newaxis, np.newaxis, :]
 
-        print('p_choice', p_choice.shape.eval())
+            p_choice = pt.sum((ev2 > ev1) * p_posterior_joint, (1,2))
+
+        else:
+            raise NotImplementedError('At least probabilities or magnitudes should be distorted.')
+
 
         clip_range = self.lapse_rate / 2., 1 - self.lapse_rate / 2.
-        p_choice = pt.clip(pt.sum(pt.sum(p_posterior_joint * p_choice, 1), 1), clip_range[0], clip_range[1])
-
-        print('p_choice', p_choice.shape.eval())
+        p_choice = pt.clip(p_choice, clip_range[0], clip_range[1])
 
         return p_choice
 
@@ -210,33 +216,32 @@ class RiskModelProbabilityDistortion(BaseModel):
         model_inputs = {}
 
         for ix in range(self.n_prospects):
-            # Evidence mu
+            # Magnitudes
             model_inputs[f'n{ix+1}_evidence_mu'] = self.get_trialwise_variable(f'n{ix+1}_evidence_mu', transform='identity')
             model_inputs[f'p{ix+1}_evidence_mu'] = self.get_trialwise_variable(f'p{ix+1}_evidence_mu', transform='identity')
 
-            # Evidence sd
-            model_inputs[f'n{ix+1}_evidence_sd'] = self.get_trialwise_variable(f'magnitude_evidence_sd', transform='softplus')
-            model_inputs[f'p{ix+1}_evidence_sd'] = self.get_trialwise_variable(f'probability_evidence_sd', transform='softplus')
+            if self.distort_magnitudes:
+                model_inputs[f'n{ix+1}_prior_sd'] = self.get_trialwise_variable('magnitude_prior_sd', transform='softplus')
+                model_inputs[f'n{ix+1}_evidence_sd'] = self.get_trialwise_variable(f'magnitude_evidence_sd', transform='softplus')
+                model_inputs[f'n{ix+1}_prior_mu'] = pt.mean(pt.log(pt.stack((model['n1'], model['n2']), 0)))
 
-            # Prior mu
-            model_inputs[f'n{ix+1}_prior_mu'] = pt.mean(pt.log(pt.stack((model['n1'], model['n2']), 0)))
-            model_inputs[f'p{ix+1}_prior_mu'] = self.get_trialwise_variable(f'probability_prior_mu', transform='identity')
-
-            # Prior sd
-            model_inputs[f'n{ix+1}_prior_sd'] = self.get_trialwise_variable('magnitude_prior_sd', transform='softplus')
-            model_inputs[f'p{ix+1}_prior_sd'] = self.get_trialwise_variable('probability_prior_sd', transform='softplus')
+            if self.distort_probabilities:
+                model_inputs[f'p{ix+1}_evidence_sd'] = self.get_trialwise_variable(f'probability_evidence_sd', transform='softplus')
+                model_inputs[f'p{ix+1}_prior_mu'] = self.get_trialwise_variable(f'probability_prior_mu', transform='identity')
+                model_inputs[f'p{ix+1}_prior_sd'] = self.get_trialwise_variable('probability_prior_sd', transform='softplus')
 
         return model_inputs
 
     def build_priors(self):
 
-        self.build_hierarchical_nodes('probability_evidence_sd', mu_intercept=-1., transform='softplus')
-        self.build_hierarchical_nodes('magnitude_evidence_sd', mu_intercept=-1., transform='softplus')
+        if self.distort_magnitudes:
+            self.build_hierarchical_nodes('magnitude_evidence_sd', mu_intercept=-1., transform='softplus')
+            self.build_hierarchical_nodes('magnitude_prior_sd', mu_intercept=-1., transform='softplus')
 
-        self.build_hierarchical_nodes('probability_prior_mu', mu_intercept=0.0, transform='identity')
-
-        self.build_hierarchical_nodes('magnitude_prior_sd', mu_intercept=-1., transform='softplus')
-        self.build_hierarchical_nodes('probability_prior_sd', mu_intercept=-1., transform='softplus')
+        if self.distort_probabilities:
+            self.build_hierarchical_nodes('probability_evidence_sd', mu_intercept=-1., transform='softplus')
+            self.build_hierarchical_nodes('probability_prior_sd', mu_intercept=-1., transform='softplus')
+            self.build_hierarchical_nodes('probability_prior_mu', mu_intercept=0.0, transform='identity')
 
     def get_trialwise_variable(self, key, transform='identity'):
 
