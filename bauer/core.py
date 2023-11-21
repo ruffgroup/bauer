@@ -118,10 +118,10 @@ class BaseModel(object):
 
         return data
 
-    def sample(self, draws=1000, tune=1000, target_accept=0.8):
+    def sample(self, draws=1000, tune=1000, target_accept=0.8, **kwargs):
         
         with self.estimation_model:
-            self.trace = pm.sample(draws, tune=tune, target_accept=target_accept, return_inferencedata=True)
+            self.trace = pm.sample(draws, tune=tune, target_accept=target_accept, return_inferencedata=True, **kwargs)
         
         return self.trace            
 
