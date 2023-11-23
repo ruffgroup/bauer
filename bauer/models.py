@@ -138,10 +138,13 @@ class RiskModelProbabilityDistortion(BaseModel):
 
     def _get_choice_predictions(self, model_inputs):
 
-        def logodds_dist_in_p(mu_logodds, sd_logodds, p_grid=self.p_grid):
+        def logodds_dist_in_p(mu_logodds, sd_logodds, p_grid=self.p_grid, normalize=True):
 
             logodds_grid = logit(p_grid)[np.newaxis, :]
-            p_logodds = gaussian_pdf(logodds_grid, mu_logodds[:, np.newaxis], sd_logodds[:, np.newaxis])
+            p_logodds = gaussian_pdf(logodds_grid, mu_logodds[:, np.newaxis], sd_logodds[:, np.newaxis]) * logit_derivative(p_grid)
+
+            if normalize:
+                p_logodds = p_logodds / pt.sum(p_logodds, 1, keepdims=True)
 
             return p_logodds * logit_derivative(p_grid)
 
