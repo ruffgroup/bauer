@@ -91,7 +91,8 @@ class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonMod
 class RiskModelProbabilityDistortion(BaseModel):
 
     def __init__(self, data, magnitude_prior_estimate='objective', save_trialwise_n_estimates=False, n_prospects=2,
-                 p_grid_size=20, lapse_rate=0.01, distort_magnitudes=True, distort_probabilities=True):
+                 p_grid_size=20, lapse_rate=0.01, distort_magnitudes=True, distort_probabilities=True,
+                 estimate_magnitude_prior_mu=False):
 
         assert magnitude_prior_estimate in ['objective'], 'Only objective prior is currently supported'
         assert(n_prospects == 2), 'Only two prospects are currently supported'
@@ -104,6 +105,7 @@ class RiskModelProbabilityDistortion(BaseModel):
 
         self.distort_magnitudes = distort_magnitudes
         self.distort_probabilities = distort_probabilities
+        self.estimate_magnitude_prior_mu = estimate_magnitude_prior_mu
 
         for ix in range(self.n_prospects):
             assert(f'n{ix+1}' in data.columns), f'Data should contain columns n1, n2, ... n{self.n_prospects}'
@@ -223,7 +225,11 @@ class RiskModelProbabilityDistortion(BaseModel):
             if self.distort_magnitudes:
                 model_inputs[f'n{ix+1}_prior_sd'] = self.get_trialwise_variable('magnitude_prior_sd', transform='softplus')
                 model_inputs[f'n{ix+1}_evidence_sd'] = self.get_trialwise_variable(f'magnitude_evidence_sd', transform='softplus')
-                model_inputs[f'n{ix+1}_prior_mu'] = pt.mean(pt.log(pt.stack((model['n1'], model['n2']), 0)))
+                
+                if self.estimate_magnitude_prior_mu:
+                    model_inputs[f'n{ix+1}_prior_mu'] = self.get_trialwise_variable(f'magnitude_prior_mu', transform='identity')
+                else:
+                    model_inputs[f'n{ix+1}_prior_mu'] = pt.mean(pt.log(pt.stack((model['n1'], model['n2']), 0)))
 
             if self.distort_probabilities:
                 model_inputs[f'p{ix+1}_evidence_sd'] = self.get_trialwise_variable(f'probability_evidence_sd', transform='softplus')
@@ -236,9 +242,18 @@ class RiskModelProbabilityDistortion(BaseModel):
 
         if self.distort_magnitudes:
             self.build_hierarchical_nodes('magnitude_evidence_sd', mu_intercept=-1., transform='softplus')
-            self.build_hierarchical_nodes('magnitude_prior_sd', mu_intercept=-1., transform='softplus')
+
+            prior_mu = np.log(np.stack([self.data[f'n{ix+1}'].values for ix in range(self.n_prospects)])).mean()
+            prior_std = np.log(np.stack([self.data[f'n{ix+1}'].values for ix in range(self.n_prospects)])).std()
+
+            print(f'Prior mu: {prior_mu}, prior std: {prior_std}')
+            if self.estimate_magnitude_prior_mu:
+                self.build_hierarchical_nodes('magnitude_prior_mu', mu_intercept=prior_mu, transform='softplus')
+            self.build_hierarchical_nodes('magnitude_prior_sd', mu_intercept=prior_std, transform='softplus')
 
         if self.distort_probabilities:
+            
+
             self.build_hierarchical_nodes('probability_evidence_sd', mu_intercept=-1., transform='softplus')
             self.build_hierarchical_nodes('probability_prior_sd', mu_intercept=-1., transform='softplus')
             self.build_hierarchical_nodes('probability_prior_mu', mu_intercept=0.0, transform='identity')
