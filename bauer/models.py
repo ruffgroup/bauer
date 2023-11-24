@@ -764,7 +764,7 @@ class FlexibleSDComparisonModel(BaseModel):
 
             elif self.memory_model == 'shared_perceptual_noise':
 
-                dm = self.make_dm(x=self.data['n1'], variable='perceptual_noise_sd')
+                dm = self.make_dm(x=self.data['n2'], variable='perceptual_noise_sd')
                 perceptual_noise_poly_pars = pt.stack([self.get_trialwise_variable(f'perceptual_noise_sd_poly{n}') for n in range(self.polynomial_order[0])], axis=1)
                 perceptual_noise_sd = pt.softplus(pt.sum(perceptual_noise_poly_pars * dm, 1))
 
