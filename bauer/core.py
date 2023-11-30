@@ -225,6 +225,53 @@ class BaseModel(object):
             else:
                 raise Exception
 
+    def get_subjectwise_parameter_estimates(self, idata=None, parameters=None):
+
+        idata = self._get_idata(idata)
+        parameters = self._get_parameters(parameters)
+
+        pars = idata.posterior[parameters].to_dataframe()
+        pars.columns.name = 'parameter'
+
+        # pars = pd.concat([idata.posterior[par].to_dataframe() for par in self.free_parameters], axis=1)
+
+        return pars
+
+    def get_groupwise_parameter_estimates(self, idata=None, parameters=None, include_sd=True):
+
+        idata = self._get_idata(idata)
+        parameters = self._get_parameters(parameters)
+
+        mu_pars = pd.concat([idata.posterior[par+'_mu'].to_dataframe() for par in self.free_parameters], axis=1, keys=parameters, names=['parameter']).droplevel(1, axis=1)
+
+        if include_sd:
+            sd_pars = pd.concat([idata.posterior[par+'_sd'].to_dataframe() for par in self.free_parameters], axis=1, keys=self.free_parameters, names=['parameter']).droplevel(1, axis=1)
+            pars = pd.concat((mu_pars, sd_pars), keys=['mu', 'sd'], names=['type'], axis=1)
+
+        else:
+            pars = pd.concat((mu_pars,), keys=['mu'], names=['type'], axis=1)
+
+        pars.columns.name = 'parameter'
+
+        return pars
+
+    def _get_idata(self, idata):
+        if idata is None:
+            idata = self.idata
+            if idata is None:
+                raise ValueError('No idata found. Please run sample() first.')
+
+        return idata
+
+    def _get_parameters(self, parameters):
+        if parameters is None:
+            parameters = self.free_parameters
+
+        return parameters
+
+
+
+
 class RegressionModel(BaseModel):
 
     def __init__(self, data, regressors=None):
