@@ -15,6 +15,8 @@ def inverse_softplus_np(x):
 
 def logistic_np(x): return 1 / (1 + np.exp(-x))
 
+def logit_np(p): return np.log(p / (1 - p))
+
 def logit(p):
     return pt.log(p / (1 - p))
 

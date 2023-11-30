@@ -16,31 +16,31 @@ class BaseModel(object):
         
         """
         self.data = data
-        self.unique_subjects = self.data.index.unique(level='subject')
-        self.n_subjects = len(self.unique_subjects) 
         self.save_trialwise_n_estimates = save_trialwise_n_estimates
+        self.free_parameters = self.get_free_parameters()
 
-    def _get_paradigm(self, data=None):
+    def _get_paradigm(self, paradigm=None):
 
-        if data is None:
-            data = self.data
+        if paradigm is None:
+            paradigm = self.data
 
-        paradigm = {}
-        paradigm['n1'] = data['n1'].values
-        paradigm['n2'] = data['n2'].values
-        paradigm['log(n1)'] = np.log(data['n1'].values)
-        paradigm['log(n2)'] = np.log(data['n2'].values)
-        paradigm['subject_ix'], _ = pd.factorize(data.index.get_level_values('subject'))
+        paradigm_ = {}
+        paradigm_['n1'] = paradigm['n1'].values
+        paradigm_['n2'] = paradigm['n2'].values
+        paradigm_['log(n1)'] = np.log(paradigm['n1'].values)
+        paradigm_['log(n2)'] = np.log(paradigm['n2'].values)
+        
+        if 'subject' in paradigm.index.names:
+            paradigm_['subject_ix'], _ = pd.factorize(paradigm.index.get_level_values('subject'))
+        elif 'subject' in paradigm.columns:
+            paradigm_['subject_ix'], _ = pd.factorize(paradigm.subject.values)
 
-        if 'choice' in data.columns:
-            paradigm['choice'] = data.choice.values
+        if 'choice' in paradigm.columns:
+            paradigm_['choice'] = paradigm.choice.values
         else:
-            paradigm['choice'] = np.zeros_like(paradigm['n1']).astype(bool)
+            paradigm_['choice'] = np.zeros_like(paradigm['n1']).astype(bool)
 
-        return paradigm
-
-    def set_paradigm(self, paradigm):
-        pm.set_data(paradigm)
+        return paradigm_
 
     def _get_choice_predictions(self, model_inputs):
         post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'], 
@@ -62,82 +62,148 @@ class BaseModel(object):
 
         return cumulative_normal(model_inputs['threshold'], diff_mu, diff_sd)
 
-    def build_likelihood(self):
+    def build_likelihood(self, parameters, save_p_choice=False):
         model = pm.Model.get_context()
-        model_inputs = self.get_model_inputs()
-
-        p = pm.Deterministic('p', var=self._get_choice_predictions(model_inputs))
+        model_inputs = self.get_model_inputs(parameters)
+        
+        if save_p_choice:
+            p = pm.Deterministic('p', var=self._get_choice_predictions(model_inputs))
+        else:
+            p = self._get_choice_predictions(model_inputs)
 
         pm.Bernoulli('ll_bernoulli', p=p, observed=model['choice'])
 
-    def build_estimation_model(self, data=None, coords=None):
+    def get_parameter_values(self, n_trials=None):
+
+        parameters = {}
+
+        for key, info in self.free_parameters.items():
+            parameters[key] = self.get_trialwise_variable(key, transform=info['transform'], n_trials=n_trials)
+
+        return parameters
+
+    def build_estimation_model(self, data=None, coords=None, hierarchical=True):
 
         if data is None:
             data = self.data
 
-        if coords is None:
-            coords = {'subject': self.unique_subjects, 'order':['first', 'second']}
+        if hierarchical and (coords is None):
+            assert('subject' in data.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
+            coords = {'subject': data.index.unique(level='subject')}
                                               
         with pm.Model(coords=coords) as self.estimation_model:
-            paradigm = self._get_paradigm(data=data)
+            self.set_paradigm(data)
+            self.build_priors(hierarchical=hierarchical)
+            parameters = self.get_parameter_values(n_trials=len(data))
+            self.build_likelihood(parameters, save_p_choice=False)
 
-            for key, value in paradigm.items():
+    def build_priors(self, hierarchical=True):
+
+        if hierarchical:
+            for key, info in self.free_parameters.items():
+                self.build_hierarchical_nodes(key, **info)
+        else:
+            for key, info in self.free_parameters.items():
+                self.build_prior(key, **info)
+
+    def build_prior(self, name, mu_intercept=None, sigma_intercept=None, transform='identity'):
+
+        model = pm.Model.get_context()
+
+        if mu_intercept is None:
+            mu_intercept = 0.0
+
+        if sigma_intercept is None:
+            sigma_intercept = .5
+
+        if transform == 'identity':
+            pm.Normal(name, mu=mu_intercept, sigma=sigma_intercept)
+        elif transform == 'softplus':
+            pm.Normal(name+'_untransformed', mu=mu_intercept, sigma=sigma_intercept)
+            pm.Deterministic(name, var=pt.softplus(model[name+'_untransformed']))
+        elif transform == 'logistic':
+            pm.Normal(name+'_untransformed', mu=mu_intercept, sigma=sigma_intercept)
+            pm.Deterministic(name, var=logistic(model[name+'_untransformed']))
+        else:
+            raise NotImplementedError
+
+
+    def set_paradigm(self, paradigm=None):
+        if paradigm is None:
+            paradigm = self.data
+
+        paradigm = self._get_paradigm(paradigm=paradigm)
+
+        for key, value in paradigm.items():
+            pm.Data(key, value, mutable=True)
+
+    def build_prediction_model(self, paradigm, parameters):
+
+        assert(isinstance(parameters, dict))
+
+        if paradigm is None:
+            paradigm = self.data
+                                              
+        with pm.Model() as self.prediction_model:
+            self.set_paradigm(paradigm)
+
+            # Make parameters flexible
+            for key, value in parameters.items():
                 pm.Data(key, value, mutable=True)
 
-            self.free_parameters = []
-            self.build_priors()
-            self.build_likelihood()
+            self.build_likelihood(parameters=parameters, save_p_choice=True)
 
-    def build_prediction_model(self, parameters):
-        parameters = parameters.reset_index()
-        coords = {'subject': self.unique_subjects}
+    def predict(self, paradigm, parameters):
 
-        data = self.create_data()
+        self.build_prediction_model(paradigm, parameters)
+        data = self.prediction_model['p'].eval()
+        data = pd.DataFrame(data, index=paradigm.index, columns=['p_choice'])
+        data = data.join(paradigm)
 
-        with pm.Model(coords=coords) as self.pred_model:
+        return data
 
-            paradigm = self._get_paradigm(data)
+    def simulate(self, paradigm, parameters, n_samples=1):
 
-            for key in self.free_parameters.keys():
-                pm.MutableData(key, parameters[key], dims='subject')
+        self.build_prediction_model(paradigm, parameters)
 
-        self.build_likelihood()
+        with self.prediction_model:
+            data = pm.draw(self.prediction_model['ll_bernoulli'], draws=n_samples)
 
-    def predict(self, parameters):
+        if n_samples == 1:
+            data = data[np.newaxis, :]
 
-        if ('subject' not in parameters.columns) & (parameters.index.name != 'subject'):
-            parameters['subject'] = range(1, len(parameters)+1)
+        if not paradigm.index.name:
+            paradigm.index.name = 'trial'
 
-        if not hasattr(self, 'pred_model'):
-            self.build_prediction_model(parameters)
-
-        for key in self.free_parameters.keys():
-            self.pred_model.set_data(key, parameters[key].values)
-
-        data = self.pred_model['p'].eval()
+        data = pd.DataFrame(data.T, index=paradigm.index, columns=pd.Index(np.arange(n_samples)+1, name='sample'))
+        data = data.stack().to_frame('simulated_choice').astype(bool)
+        data = data.join(paradigm)
 
         return data
 
     def sample(self, draws=1000, tune=1000, target_accept=0.8, **kwargs):
         
         with self.estimation_model:
-            self.trace = pm.sample(draws, tune=tune, target_accept=target_accept, return_inferencedata=True, **kwargs)
+            self.idata = pm.sample(draws, tune=tune, target_accept=target_accept, return_inferencedata=True, **kwargs)
         
-        return self.trace            
+        return self.idata            
 
-    def ppc(self, data=None, trace=None, var_names=['p', 'll_bernoulli']):
+    def ppc(self, data=None, idata=None, var_names=['p', 'll_bernoulli']):
 
         if data is None:
-            data = self.create_data()
+            if self.data is None:
+                data = self.create_data()
+            else:
+                data = self.data
 
-        if trace is None:
-            trace = self.trace
+        if idata is None:
+            idata = self.idata
 
         paradigm = self._get_paradigm(data)
 
         with self.estimation_model:
             self.set_paradigm(paradigm)
-            idata = pm.sample_posterior_predictive(trace, var_names=var_names)
+            idata = pm.sample_posterior_predictive(idata, var_names=var_names)
 
         pred = [idata['posterior_predictive'][key].to_dataframe() for key in var_names]
         pred = pd.concat(pred, axis=1, keys=var_names, names=['variable'])
@@ -149,20 +215,7 @@ class BaseModel(object):
 
         return pred
 
-    def create_data(self):
-
-        data = pd.MultiIndex.from_product([self.unique_subjects,
-                                           np.exp(np.linspace(-1.5, 1.5, 25)),
-                                           self.base_numbers],
-                                               names=['subject', 'frac', 'n1']).to_frame().reset_index(drop=True)
-
-        data['n1'] = data['n1'].values.astype(int)
-        data['n2'] = (data['frac'] * data['n1']).round().values.astype(int)
-        data['trial_nr'] = data.groupby('subject').cumcount() + 1
-
-        return data.set_index(['subject', 'trial_nr'])
-
-    def get_trialwise_variable(self, key, transform='identity'):
+    def get_trialwise_variable(self, key, transform, n_trials=None):
 
         model = pm.Model.get_context()
 
@@ -172,23 +225,31 @@ class BaseModel(object):
         if key == 'n2_evidence_mu':
             return model['log(n2)']
 
-        if transform not in ['identy', 'softplus']:
+        if transform not in ['identy', 'softplus', 'logistic']:
             Exception()
 
         if transform == 'identity':
-            trialwise_pars = model[f'{key}'][model['subject_ix']]
-
+            transform_ = lambda x: x
         elif transform == 'softplus':
-            trialwise_pars = pt.softplus(model[f'{key}_untransformed'][model['subject_ix']])
-
+            transform_ = pt.softplus
         elif transform == 'logistic':
-            trialwise_pars = logistic(model[f'{key}_untransformed'][model['subject_ix']])
+            transform_ = logistic
 
-        return trialwise_pars
+        if model[f'{key}'].ndim == 1:
+            return transform_(model[f'{key}'][model['subject_ix']])
+        elif model[f'{key}'].ndim == 0:
+            return pt.tile(transform_(model[f'{key}']), n_trials)
 
-    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=.5, cauchy_sigma_intercept=0.25, transform='identity', **kwargs):
+    def build_hierarchical_nodes(self, name, mu_intercept=None, sigma_intercept=None, cauchy_sigma_intercept=None, transform='identity', **kwargs):
 
-        self.free_parameters.append(name)
+        if mu_intercept is None:
+            mu_intercept = 0.0
+
+        if sigma_intercept is None:
+            sigma_intercept = .5
+        
+        if cauchy_sigma_intercept is None:
+            cauchy_sigma_intercept = 0.25
 
         if transform == 'identity':
             group_mu = pm.Normal(f"{name}_mu", 
@@ -228,12 +289,10 @@ class BaseModel(object):
     def get_subjectwise_parameter_estimates(self, idata=None, parameters=None):
 
         idata = self._get_idata(idata)
-        parameters = self._get_parameters(parameters)
+        parameters = self._get_parameters(parameters).keys()
 
         pars = idata.posterior[parameters].to_dataframe()
         pars.columns.name = 'parameter'
-
-        # pars = pd.concat([idata.posterior[par].to_dataframe() for par in self.free_parameters], axis=1)
 
         return pars
 
@@ -340,8 +399,7 @@ class RegressionModel(BaseModel):
         if data is None:
             data = self.data
 
-        coords = {'subject': self.unique_subjects,
-        'order':['first', 'second']}
+        coords = {'subject': self.unique_subjects }
 
         with pm.Model(coords=coords) as self.estimation_model:
 
@@ -358,7 +416,6 @@ class RegressionModel(BaseModel):
 
     def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=1., cauchy_sigma_intercept=0.25, sigma_regressors=1., cauchy_sigma_regressors=0.25, transform='identity'):
 
-        self.free_parameters.append(name)
         self.design_matrices[name] = self.build_design_matrix(self.data, name)
 
         model = pm.Model.get_context()

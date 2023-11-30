@@ -15,27 +15,22 @@ import matplotlib.pyplot as plt
 
 class MagnitudeComparisonModel(BaseModel):
 
-    def __init__(self, data, fit_prior=False, fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False):
+    def __init__(self, data=None, fit_prior=False, fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False):
 
         self.fit_prior = fit_prior
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
 
-
         super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
-    def get_model_inputs(self):
+    def get_model_inputs(self, parameters):
 
         model = pm.Model.get_context()
 
         model_inputs = {}
 
         if self.fit_prior:
-            model_inputs['n1_prior_mu'] = self.get_trialwise_variable('prior_mu', transform='identity')
-            model_inputs['n2_prior_mu'] = self.get_trialwise_variable('prior_mu', transform='identity')
-
-            model_inputs['n1_prior_std'] = self.get_trialwise_variable('prior_sd', transform='softplus')
-            model_inputs['n2_prior_std'] = self.get_trialwise_variable('prior_sd', transform='softplus')
-
+            model_inputs['n1_prior_mu'] = parameters['prior_mu']
+            model_inputs['n2_prior_mu'] = parameters['prior_mu']
         else:
             mean_prior = (pt.mean(pt.log(model['n1'])) + pt.mean(pt.log(model['n2']))) / 2.
             mean_std = (pt.std(pt.log(model['n1'])) + pt.std(pt.log(model['n2']))) / 2.
@@ -46,35 +41,40 @@ class MagnitudeComparisonModel(BaseModel):
             model_inputs['n1_prior_std'] = mean_std
             model_inputs['n2_prior_std'] = mean_std
 
+        model_inputs['n1_evidence_mu'] = model['log(n1)']
+        model_inputs['n2_evidence_mu'] = model['log(n2)']
+
         model_inputs['threshold'] =  0.0
 
-        model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu', transform='identity') #model['n1'])
-        model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu', transform='identity')
-
         if self.fit_seperate_evidence_sd:
-            model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd', transform='softplus')
-            model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('n2_evidence_sd', transform='softplus')
+            model_inputs['n1_evidence_sd'] = parameters['n1_evidence_sd']
+            model_inputs['n2_evidence_sd'] = parameters['n2_evidence_sd']
         else:
-            model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('evidence_sd', transform='softplus')
-            model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('evidence_sd', transform='softplus')
+            model_inputs['n1_evidence_sd'] = parameters['evidence_sd']
+            model_inputs['n2_evidence_sd'] = parameters['evidence_sd']
 
         return model_inputs
 
+    def get_free_parameters(self):
 
-    def build_priors(self):
+        free_parameters = {}
 
         if self.fit_seperate_evidence_sd:
-            self.build_hierarchical_nodes('n1_evidence_sd', mu_intercept=-1., transform='softplus')
-            self.build_hierarchical_nodes('n2_evidence_sd', mu_intercept=-1., transform='softplus')
+            free_parameters['n1_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+            free_parameters['n2_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
         else:
-            self.build_hierarchical_nodes('evidence_sd', mu_intercept=-1., transform='softplus')
+            free_parameters['evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
 
         if self.fit_prior:
             objective_mu = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
             objective_sd = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
 
-            self.build_hierarchical_nodes('prior_mu', mu_intercept=objective_mu, transform='identity')
-            self.build_hierarchical_nodes('prior_sd', mu_intercept=objective_sd, transform='softplus')
+            free_parameters['prior_mu'] = {'mu_intercept': objective_mu, 'transform': 'identity'}
+            free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
+
+
+        return free_parameters
+
         
 class MagnitudeComparisonLapseModel(LapseModel, MagnitudeComparisonModel):
     ...
@@ -90,7 +90,7 @@ class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonMod
 
 class RiskModelProbabilityDistortion(BaseModel):
 
-    def __init__(self, data, magnitude_prior_estimate='objective', save_trialwise_n_estimates=False, n_prospects=2,
+    def __init__(self, data=None, magnitude_prior_estimate='objective', save_trialwise_n_estimates=False, n_prospects=2,
                  p_grid_size=20, lapse_rate=0.01, distort_magnitudes=True, distort_probabilities=True,
                  estimate_magnitude_prior_mu=False):
 
@@ -107,40 +107,44 @@ class RiskModelProbabilityDistortion(BaseModel):
         self.distort_probabilities = distort_probabilities
         self.estimate_magnitude_prior_mu = estimate_magnitude_prior_mu
 
-        for ix in range(self.n_prospects):
-            assert(f'n{ix+1}' in data.columns), f'Data should contain columns n1, n2, ... n{self.n_prospects}'
-            assert(f'p{ix+1}' in data.columns), f'Data should contain columns p1, p2, ... p{self.n_prospects}'
+        if data is not None:
+            for ix in range(self.n_prospects):
+                assert(f'n{ix+1}' in data.columns), f'Data should contain columns n1, n2, ... n{self.n_prospects}'
+                assert(f'p{ix+1}' in data.columns), f'Data should contain columns p1, p2, ... p{self.n_prospects}'
 
         super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
 
-    def _get_paradigm(self, data=None):
+    def _get_paradigm(self, paradigm=None):
 
-        if data is None:
-            data = self.data
+        if paradigm is None:
+            paradigm = self.data
 
-        paradigm = {}
+        paradigm_ = {}
 
         for ix in range(self.n_prospects):
-            paradigm[f'n{ix+1}'] = data[f'n{ix+1}'].values
-            paradigm[f'p{ix+1}'] = data[f'p{ix+1}'].values
-            paradigm[f'log(n{ix+1})'] = np.log(data[f'n{ix+1}'].values)
+            paradigm_[f'n{ix+1}'] = paradigm[f'n{ix+1}'].values
+            paradigm_[f'p{ix+1}'] = paradigm[f'p{ix+1}'].values
+            paradigm_[f'log(n{ix+1})'] = np.log(paradigm[f'n{ix+1}'].values)
 
-        paradigm['subject_ix'], _ = pd.factorize(data.index.get_level_values('subject'))
+        if 'subject' in paradigm.index.names:
+            paradigm_['subject_ix'], _ = pd.factorize(paradigm.index.get_level_values('subject'))
+        elif 'subject_ix' in paradigm.columns:
+            paradigm_['subject_ix'], _ = pd.factorize(paradigm['subject_ix'])
 
-        if 'choice' in data.columns:
-            paradigm['choice'] = data['choice'].values
+        if 'choice' in paradigm.columns:
+            paradigm_['choice'] = paradigm['choice'].values
         else:
-            # paradigm['choice'] = np.zeros_like(paradigm['n1']).astype(bool)
-            raise Exception('No choice data!')
+            pass
 
-        return paradigm
+        return paradigm_
 
     def _get_choice_predictions(self, model_inputs):
 
         def logodds_dist_in_p(mu_logodds, sd_logodds, p_grid=self.p_grid, normalize=True):
 
             logodds_grid = logit(p_grid)[np.newaxis, :]
+
             p_logodds = gaussian_pdf(logodds_grid, mu_logodds[:, np.newaxis], sd_logodds[:, np.newaxis]) * logit_derivative(p_grid)
 
             if normalize:
@@ -153,6 +157,11 @@ class RiskModelProbabilityDistortion(BaseModel):
             posteriors = {}
             for ix in range(self.n_prospects):
                 posteriors[f'p{ix+1}_posterior_mu'], posteriors[f'p{ix+1}_posterior_sd'] = get_posterior(model_inputs[f'p{ix+1}_evidence_mu'], model_inputs[f'p{ix+1}_evidence_sd'], model_inputs[f'p{ix+1}_prior_mu'], model_inputs[f'p{ix+1}_prior_sd'])
+
+                if posteriors[f'p{ix+1}_posterior_sd'].ndim == 0:
+                    posteriors[f'p{ix+1}_posterior_sd'] = posteriors[f'p{ix+1}_posterior_sd'][np.newaxis]
+
+            print(posteriors[f'p{ix+1}_posterior_mu'].shape.eval())
 
             ix = 0
             p_posterior1 = logodds_dist_in_p(posteriors[f'p{ix+1}_posterior_mu'], posteriors[f'p{ix+1}_posterior_sd'])
@@ -178,6 +187,9 @@ class RiskModelProbabilityDistortion(BaseModel):
             ev_diff_mean = ev2_hat_mean[:, np.newaxis, :] - ev1_hat_mean[:, :, np.newaxis]
 
             ev_diff_sd = pt.sqrt(n1_hat_sd**2 + n2_hat_sd**2)
+
+            if ev_diff_sd.ndim == 0:
+                ev_diff_sd = ev_diff_sd[np.newaxis]
 
             p_choice = cumulative_normal(ev_diff_mean, 0.0, ev_diff_sd[:, np.newaxis, np.newaxis])
             p_choice = pt.sum(pt.sum(p_posterior_joint * p_choice, 1), 1)
@@ -214,7 +226,7 @@ class RiskModelProbabilityDistortion(BaseModel):
 
         return p_choice
 
-    def get_model_inputs(self):
+    def get_model_inputs(self, parameters):
 
         model = pm.Model.get_context()
 
@@ -222,62 +234,50 @@ class RiskModelProbabilityDistortion(BaseModel):
 
         for ix in range(self.n_prospects):
             # Magnitudes
-            model_inputs[f'n{ix+1}_evidence_mu'] = self.get_trialwise_variable(f'n{ix+1}_evidence_mu', transform='identity')
-            model_inputs[f'p{ix+1}_evidence_mu'] = self.get_trialwise_variable(f'p{ix+1}_evidence_mu', transform='identity')
+            model_inputs[f'n{ix+1}_evidence_mu'] = model[f'log(n{ix+1})']
+            model_inputs[f'p{ix+1}_evidence_mu'] = model[f'p{ix+1}']
 
             if self.distort_magnitudes:
-                model_inputs[f'n{ix+1}_prior_sd'] = self.get_trialwise_variable('magnitude_prior_sd', transform='softplus')
-                model_inputs[f'n{ix+1}_evidence_sd'] = self.get_trialwise_variable(f'magnitude_evidence_sd', transform='softplus')
-                
+                model_inputs[f'n{ix+1}_prior_sd'] = parameters['magnitude_prior_sd']
+                model_inputs[f'n{ix+1}_evidence_sd'] = parameters['magnitude_evidence_sd']
+
                 if self.estimate_magnitude_prior_mu:
-                    model_inputs[f'n{ix+1}_prior_mu'] = self.get_trialwise_variable(f'magnitude_prior_mu', transform='identity')
+                    model_inputs[f'n{ix+1}_prior_mu'] = parameters['magnitude_prior_mu']
                 else:
                     model_inputs[f'n{ix+1}_prior_mu'] = pt.mean(pt.log(pt.stack((model['n1'], model['n2']), 0)))
 
             if self.distort_probabilities:
-                model_inputs[f'p{ix+1}_evidence_sd'] = self.get_trialwise_variable(f'probability_evidence_sd', transform='softplus')
-                model_inputs[f'p{ix+1}_prior_mu'] = self.get_trialwise_variable(f'probability_prior_mu', transform='identity')
-                model_inputs[f'p{ix+1}_prior_sd'] = self.get_trialwise_variable('probability_prior_sd', transform='softplus')
+                model_inputs[f'p{ix+1}_evidence_sd'] = parameters['probability_evidence_sd']
+                model_inputs[f'p{ix+1}_prior_mu'] = parameters['probability_prior_mu']
+                model_inputs[f'p{ix+1}_prior_sd'] = parameters['probability_prior_sd']
 
         return model_inputs
 
-    def build_priors(self):
+    def get_free_parameters(self):
+
+        free_parameters = {}
 
         if self.distort_magnitudes:
-            self.build_hierarchical_nodes('magnitude_evidence_sd', mu_intercept=-1., transform='softplus')
+            free_parameters['magnitude_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
 
-            prior_mu = np.log(np.stack([self.data[f'n{ix+1}'].values for ix in range(self.n_prospects)])).mean()
-            prior_std = np.log(np.stack([self.data[f'n{ix+1}'].values for ix in range(self.n_prospects)])).std()
+            if self.data is not None:
+                prior_mu = np.log(np.stack([self.data[f'n{ix+1}'].values for ix in range(self.n_prospects)])).mean()
+                prior_std = np.log(np.stack([self.data[f'n{ix+1}'].values for ix in range(self.n_prospects)])).std()
+            else:
+                prior_mu = np.log(10)
+                prior_std = np.log(30)
 
-            print(f'Prior mu: {prior_mu}, prior std: {prior_std}')
             if self.estimate_magnitude_prior_mu:
-                self.build_hierarchical_nodes('magnitude_prior_mu', mu_intercept=prior_mu, transform='softplus')
-            self.build_hierarchical_nodes('magnitude_prior_sd', mu_intercept=prior_std, transform='softplus')
+                free_parameters['magnitude_prior_mu'] = {'mu_intercept': prior_mu, 'transform': 'softplus'}
+
+            free_parameters['magnitude_prior_sd'] = {'mu_intercept': prior_std, 'transform': 'softplus'}
 
         if self.distort_probabilities:
-            
+            free_parameters['probability_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+            free_parameters['probability_prior_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+            free_parameters['probability_prior_mu'] = {'mu_intercept': 0.0, 'transform': 'identity'}
 
-            self.build_hierarchical_nodes('probability_evidence_sd', mu_intercept=-1., transform='softplus')
-            self.build_hierarchical_nodes('probability_prior_sd', mu_intercept=-1., transform='softplus')
-            self.build_hierarchical_nodes('probability_prior_mu', mu_intercept=0.0, transform='identity')
-
-    def get_trialwise_variable(self, key, transform='identity'):
-
-        model = pm.Model.get_context()
-
-        reg = re.compile('n([0-9])+_evidence_mu')
-        magnitude_match = reg.match(key)
-        if magnitude_match:
-            n = int(magnitude_match.group(1))
-            return model[f'log(n{n})']
-
-        reg = re.compile('p([0-9])+_evidence_mu')
-        probability_match = reg.match(key)
-        if probability_match:
-            n = int(probability_match.group(1))
-            return model[f'p{n}']
-
-        return super().get_trialwise_variable(key, transform=transform)
+        return free_parameters
 
 class RiskModel(BaseModel):
 
@@ -454,22 +454,6 @@ class RiskModel(BaseModel):
             if self.prior_estimate == 'full':
                 safe_prior_std = np.std(np.log(safe_n))
                 self.build_hierarchical_nodes('safe_prior_std', mu_intercept=safe_prior_std, transform='softplus')
-
-    def create_data(self):
-
-        data = pd.MultiIndex.from_product([self.unique_subjects,
-                                           np.exp(np.linspace(-1.5, 1.5, 25)),
-                                           self.base_numbers, 
-                                           [False, True]],
-                                               names=['subject', 'frac', 'n1', 'risky_first']).to_frame().reset_index(drop=True)
-
-        data['n1'] = data['n1'].values.astype(int)
-        data['n2'] = (data['frac'] * data['n1']).round().values.astype(int)
-        data['trial_nr'] = data.groupby('subject').cumcount() + 1
-        data['p1'] = data['risky_first'].map({True:0.55, False:1.0})
-        data['p2'] = data['risky_first'].map({True:1.0, False:0.55})
-
-        return data.set_index(['subject', 'trial_nr'])
 
 class RiskRegressionModel(RegressionModel, RiskModel):
 
@@ -1028,8 +1012,6 @@ class FlexibleSDRiskModel(FlexibleSDComparisonModel, RiskModel):
 
         return cumulative_normal(0.0, diff_mu, diff_sd)
 
-    def create_data(self):
-        return RiskModel.create_data(self)
 
 class ExpectedUtilityRiskModel(BaseModel):
 

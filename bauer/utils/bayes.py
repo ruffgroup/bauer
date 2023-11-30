@@ -8,6 +8,10 @@ def get_posterior(mu1, sd1, mu2, sd2):
     var1, var2 = sd1**2, sd2**2
     return mu1 + (var1/(var1+var2))*(mu2 - mu1), pt.sqrt((var1*var2)/(var1+var2))
 
+def get_posterior_np(mu1, sd1, mu2, sd2):
+    var1, var2 = sd1**2, sd2**2
+    return mu1 + (var1/(var1+var2))*(mu2 - mu1), np.sqrt((var1*var2)/(var1+var2))
+
 def get_diff_dist(mu1, sd1, mu2, sd2):
     return mu2 - mu1, pt.sqrt(sd1**2+sd2**2)
 
