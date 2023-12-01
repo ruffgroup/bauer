@@ -161,8 +161,6 @@ class RiskModelProbabilityDistortion(BaseModel):
                 if posteriors[f'p{ix+1}_posterior_sd'].ndim == 0:
                     posteriors[f'p{ix+1}_posterior_sd'] = posteriors[f'p{ix+1}_posterior_sd'][np.newaxis]
 
-            print(posteriors[f'p{ix+1}_posterior_mu'].shape.eval())
-
             ix = 0
             p_posterior1 = logodds_dist_in_p(posteriors[f'p{ix+1}_posterior_mu'], posteriors[f'p{ix+1}_posterior_sd'])
             ix = 1
@@ -235,7 +233,7 @@ class RiskModelProbabilityDistortion(BaseModel):
         for ix in range(self.n_prospects):
             # Magnitudes
             model_inputs[f'n{ix+1}_evidence_mu'] = model[f'log(n{ix+1})']
-            model_inputs[f'p{ix+1}_evidence_mu'] = model[f'p{ix+1}']
+            model_inputs[f'p{ix+1}_evidence_mu'] = logit(model[f'p{ix+1}'])
 
             if self.distort_magnitudes:
                 model_inputs[f'n{ix+1}_prior_sd'] = parameters['magnitude_prior_sd']
