@@ -82,20 +82,22 @@ class BaseModel(object):
 
         return parameters
 
-    def build_estimation_model(self, data=None, coords=None, hierarchical=True):
+    def build_estimation_model(self, data=None, coords=None, hierarchical=True, save_p_choice=False):
 
         if data is None:
             data = self.data
+
+        paradigm = self._get_paradigm(paradigm=data)
 
         if hierarchical and (coords is None):
             assert('subject' in data.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
             coords = {'subject': data.index.unique(level='subject')}
                                               
         with pm.Model(coords=coords) as self.estimation_model:
-            self.set_paradigm(data)
+            self.set_paradigm(paradigm)
             self.build_priors(hierarchical=hierarchical)
             parameters = self.get_parameter_values(n_trials=len(data))
-            self.build_likelihood(parameters, save_p_choice=False)
+            self.build_likelihood(parameters, save_p_choice=save_p_choice)
 
     def build_priors(self, hierarchical=True):
 
@@ -129,13 +131,14 @@ class BaseModel(object):
 
 
     def set_paradigm(self, paradigm=None):
-        if paradigm is None:
-            paradigm = self.data
-
-        paradigm = self._get_paradigm(paradigm=paradigm)
-
         for key, value in paradigm.items():
             pm.Data(key, value, mutable=True)
+
+    def update_paradigm(self, paradigm):
+        raise NotImplementedError
+        # if 'subject' in paradigm.index.names:
+        #     paradigm['subject_ix'], _ = pd.factorize(paradigm.index.get_level_values('subject'))
+        # pm.set_data(paradigm)
 
     def build_prediction_model(self, paradigm, parameters):
 
@@ -143,6 +146,8 @@ class BaseModel(object):
 
         if paradigm is None:
             paradigm = self.data
+
+        paradigm = self._get_paradigm(paradigm=paradigm)
                                               
         with pm.Model() as self.prediction_model:
             self.set_paradigm(paradigm)
@@ -188,28 +193,24 @@ class BaseModel(object):
         
         return self.idata            
 
-    def ppc(self, data=None, idata=None, var_names=['p', 'll_bernoulli']):
+    def ppc(self, paradigm=None, idata=None, var_names=['ll_bernoulli'], hierarchical=True):
 
-        if data is None:
-            if self.data is None:
-                data = self.create_data()
-            else:
-                data = self.data
+        if paradigm is None:
+            paradigm = self.data
 
         if idata is None:
             idata = self.idata
 
-        paradigm = self._get_paradigm(data)
+        self.build_estimation_model(paradigm, hierarchical=hierarchical, save_p_choice=False)
 
         with self.estimation_model:
-            self.set_paradigm(paradigm)
             idata = pm.sample_posterior_predictive(idata, var_names=var_names)
 
         pred = [idata['posterior_predictive'][key].to_dataframe() for key in var_names]
         pred = pd.concat(pred, axis=1, keys=var_names, names=['variable'])
         pred = pred.unstack(['chain', 'draw']).droplevel(1, axis=1)
-        pred.index = data.index
-        pred = pred.set_index(pd.MultiIndex.from_frame(data), append=True)
+        pred.index = paradigm.index
+        pred = pred.set_index(pd.MultiIndex.from_frame(paradigm), append=True)
         pred = pred.stack('variable')
         pred = pred.reorder_levels(np.roll(pred.index.names, 1)).sort_index()
 
@@ -406,7 +407,7 @@ class RegressionModel(BaseModel):
             self.free_parameters = []
             self.build_priors()
 
-            paradigm = self._get_paradigm(data=data)
+            paradigm = self._get_paradigm(paradigm=data)
 
             for key, value in paradigm.items():
                 pm.Data(key, value, mutable=True)

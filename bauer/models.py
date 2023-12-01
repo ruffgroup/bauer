@@ -135,7 +135,7 @@ class RiskModelProbabilityDistortion(BaseModel):
         if 'choice' in paradigm.columns:
             paradigm_['choice'] = paradigm['choice'].values
         else:
-            pass
+            paradigm_['choice'] = np.zeros_like(paradigm['n1'].astype(bool))
 
         return paradigm_
 
