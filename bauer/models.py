@@ -3,7 +3,8 @@ import pandas as pd
 import pymc as pm
 import numpy as np
 from .utils import cumulative_normal, get_posterior, get_diff_dist
-from .utils.math import inverse_softplus, softplus_np, inverse_softplus_np, logit, logit_derivative, gaussian_pdf
+from .utils.math import inverse_softplus, softplus_np, inverse_softplus_np, logit_derivative, gaussian_pdf
+from pymc.math import logit, invlogit
 import pytensor.tensor as pt
 from patsy import dmatrix
 from .core import BaseModel, RegressionModel, LapseModel
@@ -193,8 +194,8 @@ class RiskModelProbabilityDistortion(BaseModel):
             p_choice = pt.sum(pt.sum(p_posterior_joint * p_choice, 1), 1)
 
         elif self.distort_magnitudes & (~self.distort_probabilities):
-            p1 = model_inputs[f'p1_evidence_mu']
-            p2 = model_inputs[f'p2_evidence_mu']
+            p1 = invlogit(model_inputs[f'p1_evidence_mu'])
+            p2 = invlogit(model_inputs[f'p2_evidence_mu'])
 
             ev1_hat_mean = n1_hat_mean + pt.log(p1)
             ev2_hat_mean = n2_hat_mean + pt.log(p2)
@@ -213,7 +214,7 @@ class RiskModelProbabilityDistortion(BaseModel):
             ev1 = n1[:, np.newaxis, np.newaxis] + pt.log(self.p_grid)[np.newaxis, :, np.newaxis]
             ev2 = n2[:, np.newaxis, np.newaxis] + pt.log(self.p_grid)[np.newaxis, np.newaxis, :]
 
-            p_choice = pt.sum((ev2 > ev1) * p_posterior_joint, (1,2))
+            p_choice = pt.clip(pt.sum((ev2 > ev1) * p_posterior_joint, (1,2)), 1e-6, 1-1e-6)
 
         else:
             raise NotImplementedError('At least probabilities or magnitudes should be distorted.')
