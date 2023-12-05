@@ -12,6 +12,7 @@ from .utils.plotting import plot_prediction
 from arviz import hdi
 import seaborn as sns
 import matplotlib.pyplot as plt
+import warnings
 
 
 class MagnitudeComparisonModel(BaseModel):
@@ -122,6 +123,13 @@ class RiskModelProbabilityDistortion(BaseModel):
             paradigm = self.data
 
         paradigm_ = {}
+
+
+        if np.in1d(paradigm['p1'], [0.0, 1.0]).any():
+            raise ValueError('p1 contains 0 or 1, this is not supported by the current model (logodds(0) = -inf)\nHINT: You probably want to replace 0 by 1e-5 and 1 by 1-1e-5')
+
+        if np.in1d(paradigm['p2'], [0.0, 1.0]).any():
+            raise ValueError('p2 contains 0 or 1, this is not supported by the current model (logodds(0) = -inf)\nHINT: You probably want to replace 0 by 1e-5 and 1 by 1-1e-5')
 
         for ix in range(self.n_prospects):
             paradigm_[f'n{ix+1}'] = paradigm[f'n{ix+1}'].values
@@ -296,6 +304,7 @@ class RiskModel(BaseModel):
         super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
     def _get_paradigm(self, data=None):
+
 
         paradigm = super()._get_paradigm(data)
 
