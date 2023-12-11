@@ -94,6 +94,7 @@ class RiskModelProbabilityDistortion(BaseModel):
 
     def __init__(self, data=None, magnitude_prior_estimate='objective', save_trialwise_n_estimates=False, n_prospects=2,
                  p_grid_size=20, lapse_rate=0.01, distort_magnitudes=True, distort_probabilities=True,
+                 fix_magnitude_prior_sd=False, fix_probabiliy_prior_sd=False,
                  estimate_magnitude_prior_mu=False):
 
         assert magnitude_prior_estimate in ['objective'], 'Only objective prior is currently supported'
@@ -108,6 +109,9 @@ class RiskModelProbabilityDistortion(BaseModel):
         self.distort_magnitudes = distort_magnitudes
         self.distort_probabilities = distort_probabilities
         self.estimate_magnitude_prior_mu = estimate_magnitude_prior_mu
+
+        self.fix_magnitude_prior_sd = fix_magnitude_prior_sd
+        self.fix_probabiliy_prior_sd = fix_probabiliy_prior_sd
 
         if data is not None:
             for ix in range(self.n_prospects):
@@ -245,7 +249,11 @@ class RiskModelProbabilityDistortion(BaseModel):
             model_inputs[f'p{ix+1}_evidence_mu'] = logit(model[f'p{ix+1}'])
 
             if self.distort_magnitudes:
-                model_inputs[f'n{ix+1}_prior_sd'] = parameters['magnitude_prior_sd']
+                if self.fix_magnitude_prior_sd:
+                    model_inputs[f'n{ix+1}_prior_sd'] = pt.std(model[f'log(n{ix+1})'])
+                else:
+                    model_inputs[f'n{ix+1}_prior_sd'] = parameters['magnitude_prior_sd']
+
                 model_inputs[f'n{ix+1}_evidence_sd'] = parameters['magnitude_evidence_sd']
 
                 if self.estimate_magnitude_prior_mu:
@@ -254,9 +262,13 @@ class RiskModelProbabilityDistortion(BaseModel):
                     model_inputs[f'n{ix+1}_prior_mu'] = pt.mean(pt.log(pt.stack((model['n1'], model['n2']), 0)))
 
             if self.distort_probabilities:
-                model_inputs[f'p{ix+1}_evidence_sd'] = parameters['probability_evidence_sd']
+                if self.fix_probabiliy_prior_sd:
+                    model_inputs[f'p{ix+1}_prior_sd'] = pt.std(logit(model[f'p{ix+1}']))
+                else:
+                    model_inputs[f'p{ix+1}_prior_sd'] = parameters['probability_prior_sd']
+
                 model_inputs[f'p{ix+1}_prior_mu'] = parameters['probability_prior_mu']
-                model_inputs[f'p{ix+1}_prior_sd'] = parameters['probability_prior_sd']
+                model_inputs[f'p{ix+1}_evidence_sd'] = parameters['probability_evidence_sd']
 
         return model_inputs
 
@@ -277,11 +289,14 @@ class RiskModelProbabilityDistortion(BaseModel):
             if self.estimate_magnitude_prior_mu:
                 free_parameters['magnitude_prior_mu'] = {'mu_intercept': prior_mu, 'transform': 'softplus'}
 
-            free_parameters['magnitude_prior_sd'] = {'mu_intercept': prior_std, 'transform': 'softplus'}
+            if not self.fix_magnitude_prior_sd:
+                free_parameters['magnitude_prior_sd'] = {'mu_intercept': prior_std, 'transform': 'softplus'}
 
         if self.distort_probabilities:
+            if not self.fix_probabiliy_prior_sd:
+                free_parameters['probability_prior_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+
             free_parameters['probability_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
-            free_parameters['probability_prior_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
             free_parameters['probability_prior_mu'] = {'mu_intercept': 0.0, 'transform': 'identity'}
 
         return free_parameters
