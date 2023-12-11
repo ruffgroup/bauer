@@ -15,6 +15,9 @@ def get_posterior_np(mu1, sd1, mu2, sd2):
 def get_diff_dist(mu1, sd1, mu2, sd2):
     return mu2 - mu1, pt.sqrt(sd1**2+sd2**2)
 
+def get_diff_dist_np(mu1, sd1, mu2, sd2):
+    return mu2 - mu1, np.sqrt(sd1**2+sd2**2)
+
 def cumulative_normal(x, mu, sd, s=pt.sqrt(2.)):
 #     Cumulative distribution function for the standard normal distribution
     return pt.clip(0.5 + 0.5 *
