@@ -14,9 +14,11 @@ import matplotlib.pyplot as plt
 
 class MagnitudeComparisonModel(BaseModel):
 
-    def __init__(self, data, fit_prior=False, fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False):
+    def __init__(self, data, fit_prior=False, fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False,
+                 memory_model='independent'):
 
         self.fit_prior = fit_prior
+        self.memory_model = memory_model
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
 
 
@@ -51,8 +53,17 @@ class MagnitudeComparisonModel(BaseModel):
         model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu', transform='identity')
 
         if self.fit_seperate_evidence_sd:
-            model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd', transform='softplus')
-            model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('n2_evidence_sd', transform='softplus')
+            if self.memory_model == 'independent':
+                model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd', transform='softplus')
+                model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('n2_evidence_sd', transform='softplus')
+            elif self.memory_model == 'shared_perceptual_noise':
+                perceptual_sd = self.get_trialwise_variable('perceptual_noise_sd', transform='softplus')
+                memory_sd = self.get_trialwise_variable('memory_noise_sd', transform='softplus')
+
+                model_inputs['n1_evidence_sd'] = perceptual_sd + memory_sd
+                model_inputs['n2_evidence_sd'] = perceptual_sd
+            else:
+                raise ValueError('Unknown memory model: {}'.format(self.memory_model))
         else:
             model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('evidence_sd', transform='softplus')
             model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('evidence_sd', transform='softplus')
@@ -63,8 +74,14 @@ class MagnitudeComparisonModel(BaseModel):
     def build_priors(self):
 
         if self.fit_seperate_evidence_sd:
-            self.build_hierarchical_nodes('n1_evidence_sd', mu_intercept=-1., transform='softplus')
-            self.build_hierarchical_nodes('n2_evidence_sd', mu_intercept=-1., transform='softplus')
+            if self.memory_model == 'independent':
+                self.build_hierarchical_nodes('n1_evidence_sd', mu_intercept=-1., transform='softplus')
+                self.build_hierarchical_nodes('n2_evidence_sd', mu_intercept=-1., transform='softplus')
+            elif self.memory_model == 'shared_perceptual_noise':
+                self.build_hierarchical_nodes('perceptual_noise_sd', mu_intercept=-1., transform='softplus')
+                self.build_hierarchical_nodes('memory_noise_sd', mu_intercept=-1., transform='softplus')
+            else:
+                raise ValueError('Unknown memory model: {}'.format(self.memory_model))
         else:
             self.build_hierarchical_nodes('evidence_sd', mu_intercept=-1., transform='softplus')
 
