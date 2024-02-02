@@ -6,6 +6,7 @@ from .utils import cumulative_normal, get_posterior, get_diff_dist
 from .utils.math import inverse_softplus, softplus_np, inverse_softplus_np, logit_derivative, gaussian_pdf
 from pymc.math import logit, invlogit
 import pytensor.tensor as pt
+from pytensor import scan    
 from patsy import dmatrix
 from .core import BaseModel, RegressionModel, LapseModel
 from .utils.plotting import plot_prediction
@@ -300,6 +301,198 @@ class RiskModelProbabilityDistortion(BaseModel):
             free_parameters['probability_prior_mu'] = {'mu_intercept': 0.0, 'transform': 'identity'}
 
         return free_parameters
+
+class LossAversionModel(BaseModel):
+
+    paradigm_keys = ['p1', 'p2', 'gain1', 'gain2', 'loss1', 'loss2']
+    base_parameters = ['prior_mu_gains', 'prior_mu_losses', 'evidence_sd_gains', 'evidence_sd_losses', 'prior_sd_gains', 'prior_sd_losses']
+
+    def __init__(self, data=None, save_trialwise_n_estimates=False, 
+                 magnitude_grid=None,
+                 ev_diff_grid=None,
+                 lapse_rate=0.01, 
+                 normalize_likelihoods=True,
+                 fix_prior_sds=True):
+
+        if magnitude_grid is None:
+            self.magnitude_grid = np.linspace(1, 100, 50) 
+        else:
+            self.magnitude_grid = magnitude_grid
+
+        if ev_diff_grid is None:
+            self.ev_diff_grid = np.linspace(-50, 50, 50)
+        else:
+            self.ev_diff_grid = ev_diff_grid
+
+        self.lapse_rate = lapse_rate
+        self.fix_prior_sds = fix_prior_sds
+
+        self.normalize_likelihoods = normalize_likelihoods
+
+        super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
+
+
+    def _get_paradigm(self, paradigm=None):
+
+        if paradigm is None:
+            paradigm = self.data
+
+        paradigm_ = {}
+
+        for key in self.paradigm_keys:
+            paradigm_[key] = paradigm[key].values
+
+        if 'subject' in paradigm.index.names:
+            paradigm_['subject_ix'], _ = pd.factorize(paradigm.index.get_level_values('subject'))
+        elif 'subject_ix' in paradigm.columns:
+            paradigm_['subject_ix'], _ = pd.factorize(paradigm['subject_ix'])
+
+        if 'choice' in paradigm.columns:
+            paradigm_['choice'] = paradigm['choice'].values
+        else:
+            paradigm_['choice'] = np.zeros_like(paradigm['gain1'].astype(bool))
+
+        return paradigm_
+
+    def get_free_parameters(self):
+
+        free_parameters = {}
+
+        free_parameters['prior_mu_gains'] = {'mu_intercept': np.log(10.), 'sigma_intercept':3., 'transform': 'identity'}
+        free_parameters['prior_mu_losses'] = {'mu_intercept': np.log(10.), 'sigma_intercept':3., 'transform': 'identity'}
+
+        free_parameters['evidence_sd_gains'] = {'mu_intercept': -1., 'transform': 'softplus'}
+        free_parameters['evidence_sd_losses'] = {'mu_intercept': -1., 'transform': 'softplus'}
+
+        if not self.fix_prior_sds:
+            free_parameters['prior_sd_gains'] = {'mu_intercept': 1., 'sigma_intercept':1., 'transform': 'softplus'}
+            free_parameters['prior_sd_losses'] = {'mu_intercept': 1., 'sigma_intercept':1., 'transform': 'softplus'}
+
+        return free_parameters
+
+
+    def _get_choice_predictions(self, model_inputs):
+
+        n_grid = pt.constant(self.magnitude_grid)
+        n_grid_dx = n_grid[1] - n_grid[0]
+        n_grid_log = pt.log(n_grid)
+
+        ev_diff_grid = pt.constant(self.ev_diff_grid)
+        ev_diff_grid_dx = ev_diff_grid[1] - ev_diff_grid[0]
+
+        p1 = model_inputs['p1']
+        p2 = model_inputs['p2']
+
+        gains1 = model_inputs['gain1']
+        losses1 = model_inputs['loss1']
+        gains2 = model_inputs['gain2']
+        losses2 = model_inputs['loss2']
+
+        # Calculate the distributions of expectations in log space
+        expectations_gains1_mu_log, expectations_gains1_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains1), model_inputs['evidence_sd_gains'])
+        expectations_losses1_mu_log, expectations_losses1_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses1), model_inputs['evidence_sd_losses'])
+
+        expectations_gains2_mu_log, expectations_gains2_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains2), model_inputs['evidence_sd_gains'])
+        expectations_losses2_mu_log, expectations_losses2_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses2), model_inputs['evidence_sd_losses'])
+
+        expectations_gains1_sd_log = pt.atleast_1d(expectations_gains1_sd_log)
+        expectations_losses1_sd_log = pt.atleast_1d(expectations_losses1_sd_log)
+        expectations_gains2_sd_log = pt.atleast_1d(expectations_gains2_sd_log)
+        expectations_losses2_sd_log = pt.atleast_1d(expectations_losses2_sd_log)
+
+        # Calculate the distributions of gains in natural space (n trials x n grid)
+        # NOTE: These PDFs are normalized, they SUM to 1, not integrate to 1
+        gains1_pdf = gaussian_pdf(n_grid_log[np.newaxis, :], expectations_gains1_mu_log[:, np.newaxis], expectations_gains1_sd_log[:, np.newaxis]) / n_grid * n_grid_dx
+        losses1_pdf = gaussian_pdf(n_grid_log[np.newaxis, :], expectations_losses1_mu_log[:, np.newaxis], expectations_losses1_sd_log[:, np.newaxis]) / n_grid * n_grid_dx
+
+        gains2_pdf = gaussian_pdf(n_grid_log[np.newaxis, :], expectations_gains2_mu_log[:, np.newaxis], expectations_gains2_sd_log[:, np.newaxis]) / n_grid * n_grid_dx
+        losses2_pdf = gaussian_pdf(n_grid_log[np.newaxis, :], expectations_losses2_mu_log[:, np.newaxis], expectations_losses2_sd_log[:, np.newaxis]) / n_grid * n_grid_dx
+
+        if self.normalize_likelihoods:
+            gains1_pdf = gains1_pdf / pt.sum(gains1_pdf, 1, keepdims=True)
+            losses1_pdf = losses1_pdf / pt.sum(losses1_pdf, 1, keepdims=True)
+            gains2_pdf = gains2_pdf / pt.sum(gains2_pdf, 1, keepdims=True)
+            losses2_pdf = losses2_pdf / pt.sum(losses2_pdf, 1, keepdims=True)
+
+        # joint gain/loss distribution n_trials x n_grid (gains) x n_grid (losses)
+        joint_pdf1 = gains1_pdf[:, :, np.newaxis] * losses1_pdf[:, np.newaxis, :]
+        joint_pdf2 = gains2_pdf[:, :, np.newaxis] * losses2_pdf[:, np.newaxis, :]
+
+        # ev_grids: n_trials x n_grid
+        gains1_ev_grid = p1[:, np.newaxis]*n_grid[np.newaxis, :]
+        losses1_ev_grid = (1-p1)[:, np.newaxis]*n_grid[np.newaxis, :]
+        gains2_ev_grid = p2[:, np.newaxis]*n_grid[np.newaxis, :]
+        losses2_ev_grid = (1-p2)[:, np.newaxis]*n_grid[np.newaxis, :]
+
+        # ev_grids: n_trials x n_grid (gains) x n_grid (losses)
+        evs1 = gains1_ev_grid[:, :, np.newaxis] - losses1_ev_grid[:, np.newaxis, :]
+        evs2 = gains2_ev_grid[:, :, np.newaxis] - losses2_ev_grid[:, np.newaxis, :]
+
+        # Discretize the joint_pdf1, it *SUMS* to one (not integral)
+        # joint_pdf1 /= n_grid_dx**2
+        # joint_pdf2 /= n_grid_dx**2
+
+        # n_ev_diff_grid x n_trials x n_grid (gains) x n_grid (losses)
+        ev1_diff_mapping, _ = scan(lambda bin_index, evs1, ev_diff_grid: (evs1 >= ev_diff_grid[bin_index]) & (evs1 < ev_diff_grid[bin_index+1]),
+                                    sequences=[pt.arange(ev_diff_grid.shape[0]-1, dtype=int)],
+                                    non_sequences=[evs1, ev_diff_grid])
+
+        # Distribution o er expecrtations of the expected value of first option (n_trials x n_diff_grid)
+        # ev1_pdf, _ = scan(lambda bin_index, evs1, ev_diff_grid, joint_pdf1: pt.sum(joint_pdf1 * ((evs1 >= ev_diff_grid[bin_index]) & (evs1 < ev_diff_grid[bin_index+1]) ), axis=[-2, -1]),
+        #                 sequences=[pt.arange(len(ev_diff_grid)-1, dtype=int)], 
+        #                 non_sequences=[evs1, ev_diff_grid, joint_pdf1])
+        
+        ev1_pdf, _ = scan(lambda ev_diff_mapping_, joint_pdf1: pt.sum(joint_pdf1 * ev_diff_mapping_, axis=[-2, -1]),
+                        sequences=[ev1_diff_mapping],
+                        non_sequences=[joint_pdf1])
+        ev1_pdf = pt.transpose(ev1_pdf)
+
+        # Distribution o er expecrtations of the expected value of first option (n_trials x n_diff_grid)
+        ev2_diff_mapping, _ = scan(lambda bin_index, evs2, ev_diff_grid: (evs2 >= ev_diff_grid[bin_index]) & (evs2 < ev_diff_grid[bin_index+1]),
+                                sequences=[pt.arange(ev_diff_grid.shape[0]-1, dtype=int)],
+                                non_sequences=[evs2, ev_diff_grid])
+
+        # ev2_pdf, _ = scan(lambda bin_index, evs2, ev_diff_grid, joint_pdf2: pt.sum(joint_pdf2 * ((evs2 >= ev_diff_grid[bin_index]) & (evs2 < ev_diff_grid[bin_index+1]) ), axis=[-2, -1]),
+        #                 sequences=[pt.arange(len(ev_diff_grid)-1, dtype=int)], 
+        #                 non_sequences=[evs2, ev_diff_grid, joint_pdf2])
+
+        ev2_pdf, _ = scan(lambda ev_diff_mapping_, joint_pdf2: pt.sum(joint_pdf2 * ev_diff_mapping_, axis=[-2, -1]),
+                        sequences=[ev2_diff_mapping],
+                        non_sequences=[joint_pdf2])
+
+        ev2_pdf = pt.transpose(ev2_pdf)
+
+        # Joint distribution over ev1 and ev2 (n_trials x n_diff_grid x n_diff_grid)
+        joint_ev_pdf = ev1_pdf[:, :, np.newaxis] * ev2_pdf[:, np.newaxis, :]
+
+        # Calculate the probability of choosing the second option
+        centers_of_ev_diff_bins = ev_diff_grid[:-1] + ev_diff_grid_dx/2
+        choose2 = centers_of_ev_diff_bins[np.newaxis, :, np.newaxis] < centers_of_ev_diff_bins[np.newaxis, np.newaxis, :]
+
+        # Integrate over unique_evs1
+        p_choose2 = pt.clip(pt.sum(joint_ev_pdf * choose2, axis=[-2, -1]), 1e-6, 1-1e-6)
+
+        return p_choose2
+
+    def get_model_inputs(self, parameters):
+        model = pm.Model.get_context()
+
+        model_inputs = {}
+
+        for key in self.base_parameters:
+            if key in parameters:
+                model_inputs[key] = parameters[key]
+            
+        if self.fix_prior_sds:
+            for key in ['prior_sd_gains', 'prior_sd_losses']:
+                if key not in parameters:
+                    model_inputs['prior_sd_gains'] = 1.
+                    model_inputs['prior_sd_losses'] = 1.
+        
+        for key in self.paradigm_keys:
+            model_inputs[key] = model[key]
+
+        return model_inputs
 
 class RiskModel(BaseModel):
 
