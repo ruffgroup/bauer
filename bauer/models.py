@@ -304,7 +304,6 @@ class RiskModelProbabilityDistortion(BaseModel):
 
 class LossAversionModel(BaseModel):
 
-    paradigm_keys = ['p1', 'p2', 'gain1', 'gain2', 'loss1', 'loss2']
     base_parameters = ['prior_mu_gains', 'prior_mu_losses', 'evidence_sd_gains', 'evidence_sd_losses', 'prior_sd_gains', 'prior_sd_losses']
 
     def __init__(self, data=None, save_trialwise_n_estimates=False, 
@@ -312,6 +311,7 @@ class LossAversionModel(BaseModel):
                  ev_diff_grid=None,
                  lapse_rate=0.01, 
                  normalize_likelihoods=True,
+                 paradigm_type='mixed_vs_mixed',# mixed_vs_mixed or mixed_vs_0
                  fix_prior_sds=True):
 
         if magnitude_grid is None:
@@ -328,6 +328,15 @@ class LossAversionModel(BaseModel):
         self.fix_prior_sds = fix_prior_sds
 
         self.normalize_likelihoods = normalize_likelihoods
+
+        if paradigm_type == 'mixed_vs_mixed':
+            self.paradigm_keys = ['p1', 'p2', 'gain1', 'gain2', 'loss1', 'loss2']
+        elif paradigm_type == 'mixed_vs_0':
+            self.paradigm_keys = ['gain', 'loss']
+        else:
+            raise ValueError('paradigm_type should be either "mixed_vs_mixed" or "mixed_vs_0"')
+
+        self.paradigm_type = paradigm_type
 
         super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
@@ -349,8 +358,8 @@ class LossAversionModel(BaseModel):
 
         if 'choice' in paradigm.columns:
             paradigm_['choice'] = paradigm['choice'].values
-        else:
-            paradigm_['choice'] = np.zeros_like(paradigm['gain1'].astype(bool))
+        # else:
+        #     paradigm_['choice'] = np.zeros_like(paradigm['gain1'].astype(bool))
 
         return paradigm_
 
@@ -370,7 +379,6 @@ class LossAversionModel(BaseModel):
 
         return free_parameters
 
-
     def _get_choice_predictions(self, model_inputs):
 
         n_grid = pt.constant(self.magnitude_grid)
@@ -380,97 +388,151 @@ class LossAversionModel(BaseModel):
         ev_diff_grid = pt.constant(self.ev_diff_grid)
         ev_diff_grid_dx = ev_diff_grid[1] - ev_diff_grid[0]
 
-        p1 = model_inputs['p1']
-        p2 = model_inputs['p2']
+        if self.paradigm_type == 'mixed_vs_mixed':
+            p1 = model_inputs['p1']
+            p2 = model_inputs['p2']
 
-        gains1 = model_inputs['gain1']
-        losses1 = model_inputs['loss1']
-        gains2 = model_inputs['gain2']
-        losses2 = model_inputs['loss2']
+            gains1 = model_inputs['gain1']
+            losses1 = model_inputs['loss1']
+            gains2 = model_inputs['gain2']
+            losses2 = model_inputs['loss2']
 
-        # Calculate the distributions of expectations in log space
-        expectations_gains1_mu_log, expectations_gains1_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains1), model_inputs['evidence_sd_gains'])
-        expectations_losses1_mu_log, expectations_losses1_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses1), model_inputs['evidence_sd_losses'])
+            # Calculate the distributions of expectations in log space
+            expectations_gains1_mu_log, expectations_gains1_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains1), model_inputs['evidence_sd_gains'])
+            expectations_losses1_mu_log, expectations_losses1_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses1), model_inputs['evidence_sd_losses'])
 
-        expectations_gains2_mu_log, expectations_gains2_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains2), model_inputs['evidence_sd_gains'])
-        expectations_losses2_mu_log, expectations_losses2_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses2), model_inputs['evidence_sd_losses'])
+            expectations_gains2_mu_log, expectations_gains2_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains2), model_inputs['evidence_sd_gains'])
+            expectations_losses2_mu_log, expectations_losses2_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses2), model_inputs['evidence_sd_losses'])
 
-        expectations_gains1_sd_log = pt.atleast_1d(expectations_gains1_sd_log)
-        expectations_losses1_sd_log = pt.atleast_1d(expectations_losses1_sd_log)
-        expectations_gains2_sd_log = pt.atleast_1d(expectations_gains2_sd_log)
-        expectations_losses2_sd_log = pt.atleast_1d(expectations_losses2_sd_log)
+            expectations_gains1_sd_log = pt.atleast_1d(expectations_gains1_sd_log)
+            expectations_losses1_sd_log = pt.atleast_1d(expectations_losses1_sd_log)
+            expectations_gains2_sd_log = pt.atleast_1d(expectations_gains2_sd_log)
+            expectations_losses2_sd_log = pt.atleast_1d(expectations_losses2_sd_log)
 
-        # Calculate the distributions of gains in natural space (n trials x n grid)
-        # NOTE: These PDFs are normalized, they SUM to 1, not integrate to 1
-        gains1_pdf = gaussian_pdf(n_grid_log[np.newaxis, :], expectations_gains1_mu_log[:, np.newaxis], expectations_gains1_sd_log[:, np.newaxis]) / n_grid * n_grid_dx
-        losses1_pdf = gaussian_pdf(n_grid_log[np.newaxis, :], expectations_losses1_mu_log[:, np.newaxis], expectations_losses1_sd_log[:, np.newaxis]) / n_grid * n_grid_dx
+            # Calculate the distributions of gains in natural space (n trials x n grid)
+            # NOTE: These PDFs are normalized, they SUM to 1, not integrate to 1
+            gains1_pdf = gaussian_pdf(n_grid_log[np.newaxis, :], expectations_gains1_mu_log[:, np.newaxis], expectations_gains1_sd_log[:, np.newaxis]) / n_grid * n_grid_dx
+            losses1_pdf = gaussian_pdf(n_grid_log[np.newaxis, :], expectations_losses1_mu_log[:, np.newaxis], expectations_losses1_sd_log[:, np.newaxis]) / n_grid * n_grid_dx
 
-        gains2_pdf = gaussian_pdf(n_grid_log[np.newaxis, :], expectations_gains2_mu_log[:, np.newaxis], expectations_gains2_sd_log[:, np.newaxis]) / n_grid * n_grid_dx
-        losses2_pdf = gaussian_pdf(n_grid_log[np.newaxis, :], expectations_losses2_mu_log[:, np.newaxis], expectations_losses2_sd_log[:, np.newaxis]) / n_grid * n_grid_dx
+            gains2_pdf = gaussian_pdf(n_grid_log[np.newaxis, :], expectations_gains2_mu_log[:, np.newaxis], expectations_gains2_sd_log[:, np.newaxis]) / n_grid * n_grid_dx
+            losses2_pdf = gaussian_pdf(n_grid_log[np.newaxis, :], expectations_losses2_mu_log[:, np.newaxis], expectations_losses2_sd_log[:, np.newaxis]) / n_grid * n_grid_dx
 
-        if self.normalize_likelihoods:
-            gains1_pdf = gains1_pdf / pt.sum(gains1_pdf, 1, keepdims=True)
-            losses1_pdf = losses1_pdf / pt.sum(losses1_pdf, 1, keepdims=True)
-            gains2_pdf = gains2_pdf / pt.sum(gains2_pdf, 1, keepdims=True)
-            losses2_pdf = losses2_pdf / pt.sum(losses2_pdf, 1, keepdims=True)
+            if self.normalize_likelihoods:
+                gains1_pdf = gains1_pdf / pt.sum(gains1_pdf, 1, keepdims=True)
+                losses1_pdf = losses1_pdf / pt.sum(losses1_pdf, 1, keepdims=True)
+                gains2_pdf = gains2_pdf / pt.sum(gains2_pdf, 1, keepdims=True)
+                losses2_pdf = losses2_pdf / pt.sum(losses2_pdf, 1, keepdims=True)
 
-        # joint gain/loss distribution n_trials x n_grid (gains) x n_grid (losses)
-        joint_pdf1 = gains1_pdf[:, :, np.newaxis] * losses1_pdf[:, np.newaxis, :]
-        joint_pdf2 = gains2_pdf[:, :, np.newaxis] * losses2_pdf[:, np.newaxis, :]
+            # joint gain/loss distribution n_trials x n_grid (gains) x n_grid (losses)
+            joint_pdf1 = gains1_pdf[:, :, np.newaxis] * losses1_pdf[:, np.newaxis, :]
+            joint_pdf2 = gains2_pdf[:, :, np.newaxis] * losses2_pdf[:, np.newaxis, :]
 
-        # ev_grids: n_trials x n_grid
-        gains1_ev_grid = p1[:, np.newaxis]*n_grid[np.newaxis, :]
-        losses1_ev_grid = (1-p1)[:, np.newaxis]*n_grid[np.newaxis, :]
-        gains2_ev_grid = p2[:, np.newaxis]*n_grid[np.newaxis, :]
-        losses2_ev_grid = (1-p2)[:, np.newaxis]*n_grid[np.newaxis, :]
+            # ev_grids: n_trials x n_grid
+            gains1_ev_grid = p1[:, np.newaxis]*n_grid[np.newaxis, :]
+            losses1_ev_grid = (1-p1)[:, np.newaxis]*n_grid[np.newaxis, :]
+            gains2_ev_grid = p2[:, np.newaxis]*n_grid[np.newaxis, :]
+            losses2_ev_grid = (1-p2)[:, np.newaxis]*n_grid[np.newaxis, :]
 
-        # ev_grids: n_trials x n_grid (gains) x n_grid (losses)
-        evs1 = gains1_ev_grid[:, :, np.newaxis] - losses1_ev_grid[:, np.newaxis, :]
-        evs2 = gains2_ev_grid[:, :, np.newaxis] - losses2_ev_grid[:, np.newaxis, :]
+            # ev_grids: n_trials x n_grid (gains) x n_grid (losses)
+            evs1 = gains1_ev_grid[:, :, np.newaxis] - losses1_ev_grid[:, np.newaxis, :]
+            evs2 = gains2_ev_grid[:, :, np.newaxis] - losses2_ev_grid[:, np.newaxis, :]
 
-        # Discretize the joint_pdf1, it *SUMS* to one (not integral)
-        # joint_pdf1 /= n_grid_dx**2
-        # joint_pdf2 /= n_grid_dx**2
+            # Discretize the joint_pdf1, it *SUMS* to one (not integral)
+            # joint_pdf1 /= n_grid_dx**2
+            # joint_pdf2 /= n_grid_dx**2
 
-        # n_ev_diff_grid x n_trials x n_grid (gains) x n_grid (losses)
-        ev1_diff_mapping, _ = scan(lambda bin_index, evs1, ev_diff_grid: (evs1 >= ev_diff_grid[bin_index]) & (evs1 < ev_diff_grid[bin_index+1]),
+            # n_ev_diff_grid x n_trials x n_grid (gains) x n_grid (losses)
+            ev1_diff_mapping, _ = scan(lambda bin_index, evs1, ev_diff_grid: (evs1 >= ev_diff_grid[bin_index]) & (evs1 < ev_diff_grid[bin_index+1]),
+                                        sequences=[pt.arange(ev_diff_grid.shape[0]-1, dtype=int)],
+                                        non_sequences=[evs1, ev_diff_grid])
+
+            # Distribution o er expecrtations of the expected value of first option (n_trials x n_diff_grid)
+            # ev1_pdf, _ = scan(lambda bin_index, evs1, ev_diff_grid, joint_pdf1: pt.sum(joint_pdf1 * ((evs1 >= ev_diff_grid[bin_index]) & (evs1 < ev_diff_grid[bin_index+1]) ), axis=[-2, -1]),
+            #                 sequences=[pt.arange(len(ev_diff_grid)-1, dtype=int)], 
+            #                 non_sequences=[evs1, ev_diff_grid, joint_pdf1])
+            
+            ev1_pdf, _ = scan(lambda ev_diff_mapping_, joint_pdf1: pt.sum(joint_pdf1 * ev_diff_mapping_, axis=[-2, -1]),
+                            sequences=[ev1_diff_mapping],
+                            non_sequences=[joint_pdf1])
+            ev1_pdf = pt.transpose(ev1_pdf)
+
+            # Distribution o er expecrtations of the expected value of first option (n_trials x n_diff_grid)
+            ev2_diff_mapping, _ = scan(lambda bin_index, evs2, ev_diff_grid: (evs2 >= ev_diff_grid[bin_index]) & (evs2 < ev_diff_grid[bin_index+1]),
                                     sequences=[pt.arange(ev_diff_grid.shape[0]-1, dtype=int)],
-                                    non_sequences=[evs1, ev_diff_grid])
+                                    non_sequences=[evs2, ev_diff_grid])
 
-        # Distribution o er expecrtations of the expected value of first option (n_trials x n_diff_grid)
-        # ev1_pdf, _ = scan(lambda bin_index, evs1, ev_diff_grid, joint_pdf1: pt.sum(joint_pdf1 * ((evs1 >= ev_diff_grid[bin_index]) & (evs1 < ev_diff_grid[bin_index+1]) ), axis=[-2, -1]),
-        #                 sequences=[pt.arange(len(ev_diff_grid)-1, dtype=int)], 
-        #                 non_sequences=[evs1, ev_diff_grid, joint_pdf1])
-        
-        ev1_pdf, _ = scan(lambda ev_diff_mapping_, joint_pdf1: pt.sum(joint_pdf1 * ev_diff_mapping_, axis=[-2, -1]),
-                        sequences=[ev1_diff_mapping],
-                        non_sequences=[joint_pdf1])
-        ev1_pdf = pt.transpose(ev1_pdf)
+            # ev2_pdf, _ = scan(lambda bin_index, evs2, ev_diff_grid, joint_pdf2: pt.sum(joint_pdf2 * ((evs2 >= ev_diff_grid[bin_index]) & (evs2 < ev_diff_grid[bin_index+1]) ), axis=[-2, -1]),
+            #                 sequences=[pt.arange(len(ev_diff_grid)-1, dtype=int)], 
+            #                 non_sequences=[evs2, ev_diff_grid, joint_pdf2])
 
-        # Distribution o er expecrtations of the expected value of first option (n_trials x n_diff_grid)
-        ev2_diff_mapping, _ = scan(lambda bin_index, evs2, ev_diff_grid: (evs2 >= ev_diff_grid[bin_index]) & (evs2 < ev_diff_grid[bin_index+1]),
-                                sequences=[pt.arange(ev_diff_grid.shape[0]-1, dtype=int)],
-                                non_sequences=[evs2, ev_diff_grid])
+            ev2_pdf, _ = scan(lambda ev_diff_mapping_, joint_pdf2: pt.sum(joint_pdf2 * ev_diff_mapping_, axis=[-2, -1]),
+                            sequences=[ev2_diff_mapping],
+                            non_sequences=[joint_pdf2])
 
-        # ev2_pdf, _ = scan(lambda bin_index, evs2, ev_diff_grid, joint_pdf2: pt.sum(joint_pdf2 * ((evs2 >= ev_diff_grid[bin_index]) & (evs2 < ev_diff_grid[bin_index+1]) ), axis=[-2, -1]),
-        #                 sequences=[pt.arange(len(ev_diff_grid)-1, dtype=int)], 
-        #                 non_sequences=[evs2, ev_diff_grid, joint_pdf2])
+            ev2_pdf = pt.transpose(ev2_pdf)
 
-        ev2_pdf, _ = scan(lambda ev_diff_mapping_, joint_pdf2: pt.sum(joint_pdf2 * ev_diff_mapping_, axis=[-2, -1]),
-                        sequences=[ev2_diff_mapping],
-                        non_sequences=[joint_pdf2])
+            # Joint distribution over ev1 and ev2 (n_trials x n_diff_grid x n_diff_grid)
+            joint_ev_pdf = ev1_pdf[:, :, np.newaxis] * ev2_pdf[:, np.newaxis, :]
 
-        ev2_pdf = pt.transpose(ev2_pdf)
+            # Calculate the probability of choosing the second option
+            centers_of_ev_diff_bins = ev_diff_grid[:-1] + ev_diff_grid_dx/2
+            choose2 = centers_of_ev_diff_bins[np.newaxis, :, np.newaxis] < centers_of_ev_diff_bins[np.newaxis, np.newaxis, :]
 
-        # Joint distribution over ev1 and ev2 (n_trials x n_diff_grid x n_diff_grid)
-        joint_ev_pdf = ev1_pdf[:, :, np.newaxis] * ev2_pdf[:, np.newaxis, :]
+            # Integrate over unique_evs1
+            p_choose2 = pt.clip(pt.sum(joint_ev_pdf * choose2, axis=[-2, -1]), 1e-6, 1-1e-6)
 
-        # Calculate the probability of choosing the second option
-        centers_of_ev_diff_bins = ev_diff_grid[:-1] + ev_diff_grid_dx/2
-        choose2 = centers_of_ev_diff_bins[np.newaxis, :, np.newaxis] < centers_of_ev_diff_bins[np.newaxis, np.newaxis, :]
+        elif self.paradigm_type == 'mixed_vs_0':
 
-        # Integrate over unique_evs1
-        p_choose2 = pt.clip(pt.sum(joint_ev_pdf * choose2, axis=[-2, -1]), 1e-6, 1-1e-6)
+            p = 0.5
+
+            gains = model_inputs['gain']
+            losses = model_inputs['loss']
+
+            expectations_gains_mu_log, expectations_gains_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains), model_inputs['evidence_sd_gains'])
+            expectations_losses_mu_log, expectations_losses_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses), model_inputs['evidence_sd_losses'])
+
+            diff_mu, diff_sd = get_diff_dist(p * expectations_gains_mu_log, p * expectations_gains_sd_log,
+                                             (1-p) * expectations_losses_mu_log, (1-p) * expectations_losses_sd_log)
+
+            p_choose2 = cumulative_normal(0.0, diff_mu, diff_sd)
+
+        elif self.paradigm_type == 'mixed_vs_0_approx':
+
+            p = 0.5
+
+            gains = model_inputs['gain']
+            losses = model_inputs['loss']
+
+            expectations_gains_mu_log, expectations_gains_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains), model_inputs['evidence_sd_gains'])
+            expectations_losses_mu_log, expectations_losses_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses), model_inputs['evidence_sd_losses'])
+
+
+            expectations_gains_sd_log = pt.atleast_1d(expectations_gains_sd_log)
+            expectations_losses_sd_log = pt.atleast_1d(expectations_losses_sd_log)
+
+            # Calculate the distributions of gains in natural space (n trials x n grid)
+            # NOTE: These PDFs are normalized, they SUM to 1, not integrate to 1
+            gains_pdf = gaussian_pdf(n_grid_log[np.newaxis, :], expectations_gains_mu_log[:, np.newaxis], expectations_gains_sd_log[:, np.newaxis]) / n_grid * n_grid_dx
+            losses_pdf = gaussian_pdf(n_grid_log[np.newaxis, :], expectations_losses_mu_log[:, np.newaxis], expectations_losses_sd_log[:, np.newaxis]) / n_grid * n_grid_dx
+
+            if self.normalize_likelihoods:
+                gains_pdf = gains_pdf / pt.sum(gains_pdf, 1, keepdims=True)
+                losses_pdf = losses_pdf / pt.sum(losses_pdf, 1, keepdims=True)
+
+            # joint gain/loss distribution n_trials x n_grid (gains) x n_grid (losses)
+            joint_pdf = gains_pdf[:, :, np.newaxis] * losses_pdf[:, np.newaxis, :]
+
+            # ev_grids: n_grid
+            gains_ev_grid = p*n_grid
+            losses_ev_grid = (1-p)*n_grid
+            
+            # evs: n_grid (gains) x n_grid (losses)
+            evs = gains_ev_grid[:, np.newaxis] - losses_ev_grid[np.newaxis, :]
+
+            # Choose is boolean, True mean accept the gamble ('second option')
+            choose = evs > 0.0
+
+            p_choose2 = pt.sum(joint_pdf * choose[np.newaxis, :, :], axis=[-2, -1])
 
         return p_choose2
 
