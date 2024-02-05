@@ -156,7 +156,10 @@ class BaseModel(object):
             for key, value in parameters.items():
                 pm.Data(key, value, mutable=True)
 
-            self.build_likelihood(parameters=parameters, save_p_choice=True)
+            model_inputs = self.get_model_inputs(parameters)
+        
+            p = pm.Deterministic('p', var=self._get_choice_predictions(model_inputs))
+            pm.Bernoulli('ll_bernoulli', p=p)
 
     def predict(self, paradigm, parameters):
 
