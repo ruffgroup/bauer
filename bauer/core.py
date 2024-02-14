@@ -241,17 +241,11 @@ class BaseModel(object):
         if transform not in ['identy', 'softplus', 'logistic']:
             Exception()
 
-        if transform == 'identity':
-            transform_ = lambda x: x
-        elif transform == 'softplus':
-            transform_ = pt.softplus
-        elif transform == 'logistic':
-            transform_ = logistic
 
         if model[f'{key}'].ndim == 1:
-            return transform_(model[f'{key}'][model['subject_ix']])
+            return model[f'{key}'][model['subject_ix']]
         elif model[f'{key}'].ndim == 0:
-            return pt.tile(transform_(model[f'{key}']), n_trials)
+            return pt.tile(model[f'{key}'], n_trials)
 
     def build_hierarchical_nodes(self, name, mu_intercept=None, sigma_intercept=None, cauchy_sigma_intercept=None, transform='identity', **kwargs):
 
