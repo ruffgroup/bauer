@@ -2,7 +2,8 @@ import warnings
 import pandas as pd
 import pymc as pm
 import numpy as np
-from .utils import cumulative_normal, get_diff_dist, get_posterior, logistic
+from .utils import cumulative_normal, get_diff_dist, get_posterior
+from .utils.math import logistic, softplus_np, logistic_np
 import pytensor.tensor as pt
 from patsy import dmatrix
 
@@ -147,21 +148,23 @@ class BaseModel(object):
         if paradigm is None:
             paradigm = self.data
 
+        parameter_subjects = parameters['subject'] if 'subject' in parameters else parameters.index.get_level_values('subject')
+
+        # Make sure that the unique levels in 'subject' (either index or column) of the paradigm align with the subjects in the parameters
+        if 'subject' in paradigm.index.names:
+            assert(np.array_equal(paradigm.index.unique(level='subject'), parameter_subjects)), "The unique subjects in the paradigm do not match the subjects in the parameters."
+        elif 'subject' in paradigm.columns:
+            assert(np.array_equal(paradigm.subject.unique(), parameter_subjects)), "The unique subjects in the paradigm do not match the subjects in the parameters."
+
+        if isinstance(parameters, pd.DataFrame):
+            parameters = parameters.to_dict(orient='list')
+
         paradigm = self._get_paradigm(paradigm=paradigm)
                                               
         with pm.Model() as self.prediction_model:
             self.set_paradigm(paradigm)
 
             # Make parameters flexible
-            if isinstance(parameters, pd.DataFrame):
-                parameters = parameters.to_dict(orient='list')
-
-                # Make sure that the unique levels in 'subject' (either index or column) of the paradigm align with the subjects in the parameters
-                if 'subject' in paradigm.index.names:
-                    assert(np.array_equal(paradigm.index.unique(level='subject'), parameters['subject']))
-                elif 'subject' in paradigm.columns:
-                    assert(np.array_equal(paradigm.subject.unique(), parameters['subject']))
-
             for key, value in parameters.items():
                 pm.Data(key, value, mutable=True)
 
@@ -215,9 +218,13 @@ class BaseModel(object):
             pars = pm.find_MAP(**kwargs)
 
         if filter_pars:
-            return {key: pars[key] for key in self.free_parameters}
-        else:
-            return pars
+            pars = {key: pars[key] for key in self.free_parameters}
+
+        if 'subject' in self.estimation_model.coords:
+            pars = pd.DataFrame(pars, index=self.estimation_model.coords['subject'])
+            pars.columns.name = 'parameter'
+        
+        return pars
 
     def ppc(self, paradigm=None, idata=None, var_names=['ll_bernoulli'], hierarchical=True):
 
