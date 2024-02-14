@@ -349,6 +349,26 @@ class BaseModel(object):
 
         return parameters
 
+    def sample_parameters_from_prior(self, n_subjects=None):
+        samples_pars = {}
+        for key, pars in self.free_parameters.items():
+
+            if 'sigma_intercept' not in pars.keys():
+                pars['sigma_intercept'] = 1.
+            if 'transform' not in pars.keys():
+                pars['transform'] = 'identity'
+
+            samples_pars[key] = np.random.normal(pars['mu_intercept'], pars['sigma_intercept'], n_subjects)
+            if pars['transform'] == 'softplus':
+                samples_pars[key] = softplus_np(samples_pars[key])
+            elif pars['transform'] == 'logistic':
+                samples_pars[key] = logistic_np(samples_pars[key])
+
+        if n_subjects:
+            return pd.DataFrame(samples_pars, index=pd.Index(np.arange(1, n_subjects+1), name='subject'))
+        else:
+            return samples_pars
+
 
 
 
