@@ -353,8 +353,8 @@ class LossAversionModel(BaseModel):
 
         if 'subject' in paradigm.index.names:
             paradigm_['subject_ix'], _ = pd.factorize(paradigm.index.get_level_values('subject'))
-        elif 'subject_ix' in paradigm.columns:
-            paradigm_['subject_ix'], _ = pd.factorize(paradigm['subject_ix'])
+        elif 'subject' in paradigm.columns:
+            paradigm_['subject_ix'], _ = pd.factorize(paradigm['subject'])
 
         if 'choice' in paradigm.columns:
             paradigm_['choice'] = paradigm['choice'].values
