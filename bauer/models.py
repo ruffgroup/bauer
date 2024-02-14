@@ -365,8 +365,8 @@ class LossAversionModel(BaseModel):
 
         free_parameters = {}
 
-        free_parameters['prior_mu_gains'] = {'mu_intercept': np.log(10.), 'sigma_intercept':3., 'transform': 'identity'}
-        free_parameters['prior_mu_losses'] = {'mu_intercept': np.log(10.), 'sigma_intercept':3., 'transform': 'identity'}
+        free_parameters['prior_mu_gains'] = {'mu_intercept': np.log(10.), 'sigma_intercept':np.log(10)/2., 'transform': 'identity'}
+        free_parameters['prior_mu_losses'] = {'mu_intercept': np.log(10.), 'sigma_intercept':np.log(10)/2., 'transform': 'identity'}
 
         free_parameters['evidence_sd_gains'] = {'mu_intercept': -1., 'transform': 'softplus'}
         free_parameters['evidence_sd_losses'] = {'mu_intercept': -1., 'transform': 'softplus'}
