@@ -142,7 +142,7 @@ class BaseModel(object):
 
     def build_prediction_model(self, paradigm, parameters):
 
-        assert(isinstance(parameters, dict))
+        assert(isinstance(parameters, dict) or isinstance(parameters, pd.DataFrame)), "Parameters should be a dictionary or a DataFrame."
 
         if paradigm is None:
             paradigm = self.data
@@ -153,9 +153,19 @@ class BaseModel(object):
             self.set_paradigm(paradigm)
 
             # Make parameters flexible
+            if isinstance(parameters, pd.DataFrame):
+                parameters = parameters.to_dict(orient='list')
+
+                # Make sure that the unique levels in 'subject' (either index or column) of the paradigm align with the subjects in the parameters
+                if 'subject' in paradigm.index.names:
+                    assert(np.array_equal(paradigm.index.unique(level='subject'), parameters['subject']))
+                elif 'subject' in paradigm.columns:
+                    assert(np.array_equal(paradigm.subject.unique(), parameters['subject']))
+
             for key, value in parameters.items():
                 pm.Data(key, value, mutable=True)
 
+            parameters = self.get_parameter_values(n_trials=len(paradigm))
             model_inputs = self.get_model_inputs(parameters)
         
             p = pm.Deterministic('p', var=self._get_choice_predictions(model_inputs))
@@ -186,6 +196,10 @@ class BaseModel(object):
         data = pd.DataFrame(data.T, index=paradigm.index, columns=pd.Index(np.arange(n_samples)+1, name='sample'))
         data = data.stack().to_frame('simulated_choice').astype(bool)
         data = data.join(paradigm)
+
+        if ('subject' in paradigm.index.names) or ('subject' in paradigm.columns):
+            data = data.set_index('subject', append=True)
+            data = data.reorder_levels(['subject'] + list(data.index.names)[:-1])
 
         return data
 
