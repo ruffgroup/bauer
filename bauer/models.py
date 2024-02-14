@@ -358,8 +358,6 @@ class LossAversionModel(BaseModel):
 
         if 'choice' in paradigm.columns:
             paradigm_['choice'] = paradigm['choice'].values
-        # else:
-        #     paradigm_['choice'] = np.zeros_like(paradigm['gain1'].astype(bool))
 
         return paradigm_
 
