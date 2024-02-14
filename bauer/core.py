@@ -148,17 +148,19 @@ class BaseModel(object):
         if paradigm is None:
             paradigm = self.data
 
-        parameter_subjects = parameters['subject'] if 'subject' in parameters else parameters.index.get_level_values('subject')
+        if isinstance(parameters, pd.DataFrame):
+            parameter_subjects = parameters['subject'] if 'subject' in parameters else parameters.index.get_level_values('subject')
 
-        # Make sure that the unique levels in 'subject' (either index or column) of the paradigm align with the subjects in the parameters
-        if 'subject' in paradigm.index.names:
-            assert(np.array_equal(paradigm.index.unique(level='subject'), parameter_subjects)), "The unique subjects in the paradigm do not match the subjects in the parameters."
-        elif 'subject' in paradigm.columns:
-            assert(np.array_equal(paradigm.subject.unique(), parameter_subjects)), "The unique subjects in the paradigm do not match the subjects in the parameters."
+            # Make sure that the unique levels in 'subject' (either index or column) of the paradigm align with the subjects in the parameters
+            if 'subject' in paradigm.index.names:
+                assert(np.array_equal(paradigm.index.unique(level='subject'), parameter_subjects)), "The unique subjects in the paradigm do not match the subjects in the parameters."
+            elif 'subject' in paradigm.columns:
+                assert(np.array_equal(paradigm.subject.unique(), parameter_subjects)), "The unique subjects in the paradigm do not match the subjects in the parameters."
 
         if isinstance(parameters, pd.DataFrame):
             parameters = parameters.to_dict(orient='list')
 
+        n_trials = len(paradigm)
         paradigm = self._get_paradigm(paradigm=paradigm)
                                               
         with pm.Model() as self.prediction_model:
@@ -168,7 +170,7 @@ class BaseModel(object):
             for key, value in parameters.items():
                 pm.Data(key, value, mutable=True)
 
-            parameters = self.get_parameter_values(n_trials=len(paradigm))
+            parameters = self.get_parameter_values(n_trials=n_trials)
             model_inputs = self.get_model_inputs(parameters)
         
             p = pm.Deterministic('p', var=self._get_choice_predictions(model_inputs))
