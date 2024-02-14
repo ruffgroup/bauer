@@ -196,11 +196,14 @@ class BaseModel(object):
         
         return self.idata            
 
-    def fit_map(self, **kwargs):
+    def fit_map(self, filter_pars=True, **kwargs):
         with self.estimation_model:
             pars = pm.find_MAP(**kwargs)
 
-        return {key: pars[key] for key in self.free_parameters}
+        if filter_pars:
+            return {key: pars[key] for key in self.free_parameters}
+        else:
+            return pars
 
     def ppc(self, paradigm=None, idata=None, var_names=['ll_bernoulli'], hierarchical=True):
 
