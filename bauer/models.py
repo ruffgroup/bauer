@@ -8,7 +8,7 @@ from pymc.math import logit, invlogit
 import pytensor.tensor as pt
 from pytensor import scan    
 from patsy import dmatrix
-from .core import BaseModel, RegressionModel, LapseModel
+from .core import BaseModel, RegressionModel
 from .utils.plotting import plot_prediction
 from arviz import hdi
 import seaborn as sns
@@ -78,10 +78,18 @@ class MagnitudeComparisonModel(BaseModel):
 
         return free_parameters
 
-        
-class MagnitudeComparisonLapseModel(LapseModel, MagnitudeComparisonModel):
-    ...
+    def _get_paradigm(self, paradigm=None):
 
+        paradigm_ = super()._get_paradigm(paradigm)
+
+        paradigm_['n1'] = paradigm['n1'].values
+        paradigm_['n2'] = paradigm['n2'].values
+        paradigm_['log(n1)'] = np.log(paradigm['n1'].values)
+        paradigm_['log(n2)'] = np.log(paradigm['n2'].values)
+
+        return paradigm_
+
+        
 class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonModel):
     def build_priors(self):
 
@@ -341,26 +349,6 @@ class LossAversionModel(BaseModel):
         super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
 
-    def _get_paradigm(self, paradigm=None):
-
-        if paradigm is None:
-            paradigm = self.data
-
-        paradigm_ = {}
-
-        for key in self.paradigm_keys:
-            paradigm_[key] = paradigm[key].values
-
-        if 'subject' in paradigm.index.names:
-            paradigm_['subject_ix'], _ = pd.factorize(paradigm.index.get_level_values('subject'))
-        elif 'subject' in paradigm.columns:
-            paradigm_['subject_ix'], _ = pd.factorize(paradigm['subject'])
-
-        if 'choice' in paradigm.columns:
-            paradigm_['choice'] = paradigm['choice'].values
-
-        return paradigm_
-
     def get_free_parameters(self):
 
         free_parameters = {}
@@ -554,9 +542,17 @@ class LossAversionModel(BaseModel):
 
         return model_inputs
 
+class LossAversionRegressionModel(RegressionModel, LossAversionModel):
+
+    def __init__(self, data=None, save_trialwise_n_estimates=False, magnitude_grid=None, ev_diff_grid=None, lapse_rate=0.01, normalize_likelihoods=True, paradigm_type='mixed_vs_mixed', fix_prior_sds=True, regressors=None):
+        LossAversionModel.__init__(self, data=data, save_trialwise_n_estimates=save_trialwise_n_estimates, magnitude_grid=magnitude_grid, ev_diff_grid=ev_diff_grid, lapse_rate=lapse_rate, normalize_likelihoods=normalize_likelihoods, paradigm_type=paradigm_type, fix_prior_sds=fix_prior_sds)
+        RegressionModel.__init__(self, regressors=regressors)
+
 class RiskModel(BaseModel):
 
-    def __init__(self, data, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
+    paradigm_keys = ['p1', 'p2']
+
+    def __init__(self, data=None, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
                  save_trialwise_n_estimates=False, memory_model='independent', n_prospects=2):
 
         assert prior_estimate in ['objective', 'shared', 'different', 'full', 'full_normed']
@@ -566,21 +562,7 @@ class RiskModel(BaseModel):
         self.prior_estimate = prior_estimate
         self.incorporate_probability = incorporate_probability
 
-        if 'risky_first' not in data.columns:
-            data['risky_first'] = data['p1'] != 1.0
-
         super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
-
-    def _get_paradigm(self, data=None):
-
-
-        paradigm = super()._get_paradigm(data)
-
-        paradigm['p1'] = data['p1'].values
-        paradigm['p2'] = data['p2'].values
-        paradigm['risky_first'] = data['risky_first'].values.astype(bool)
-
-        return paradigm
 
     def get_model_inputs(self):
 
@@ -682,54 +664,54 @@ class RiskModel(BaseModel):
 
         return model_inputs
 
-    def build_priors(self):
+    def get_free_parameters(self):
+
+        free_parameters = {}
 
         if self.fit_seperate_evidence_sd:
             if self.memory_model == 'independent':
-                self.build_hierarchical_nodes('n1_evidence_sd', mu_intercept=-1., transform='softplus')
-                self.build_hierarchical_nodes('n2_evidence_sd', mu_intercept=-1., transform='softplus')
+                free_parameters['n1_evidence_sd'] = {'mu_intercept':-1., 'transform':'softplus'}
+                free_parameters['n2_evidence_sd'] = {'mu_intercept':-1., 'transform':'softplus'}
             elif self.memory_model == 'shared_perceptual_noise':
-                self.build_hierarchical_nodes('perceptual_noise_sd', mu_intercept=-1., transform='softplus')
-                self.build_hierarchical_nodes('memory_noise_sd', mu_intercept=-1., transform='softplus')
+                free_parameters['perceptual_noise_sd'] = {'mu_intercept':-1., 'transform':'softplus'}
+                free_parameters['memory_noise_sd'] = {'mu_intercept':-1., 'transform':'softplus'}
             else:
                 raise ValueError('Unknown memory model: {}'.format(self.memory_model))
         else:
-            self.build_hierarchical_nodes('evidence_sd', mu_intercept=-1., transform='softplus')
-
-        model = pm.Model.get_context() 
+            free_parameters['evidence_sd'] = {'mu_intercept':-1., 'transform':'softplus'}
 
         if self.prior_estimate == 'shared':
             prior_mu = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
             prior_std = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
-            self.build_hierarchical_nodes('prior_mu', mu_intercept=prior_mu, transform='identity')
-            self.build_hierarchical_nodes('prior_std', mu_intercept=prior_std, transform='softplus')
+            free_parameters['prior_mu'] = {'mu_intercept':prior_mu, 'transform':'identity'}
+            free_parameters['prior_std'] = {'mu_intercept':prior_std, 'transform':'identity'}
 
         elif self.prior_estimate == 'different':
-            risky_n = np.where(self.data['risky_first'], self.data['n1'], self.data['n2'])
+            risky_n = np.where(self.data['p1'] != 1.0, self.data['n1'], self.data['n2'])
 
             risky_prior_mu = np.mean(np.log(risky_n))
             risky_prior_std = np.std(np.log(risky_n))
 
-            self.build_hierarchical_nodes('risky_prior_mu', mu_intercept=risky_prior_mu, transform='identity')
-            self.build_hierarchical_nodes('risky_prior_std', mu_intercept=risky_prior_std, transform='softplus')
+            free_parameters['risky_prior_mu'] = {'mu_intercept':risky_prior_mu, 'transform':'identity'}
+            free_parameters['risky_prior_std'] = {'mu_intercept':risky_prior_std, 'transform':'identity'}
 
         elif self.prior_estimate in ['full', 'full_normed']:
-            risky_n = np.where(self.data['risky_first'], self.data['n1'], self.data['n2'])
-            safe_n = np.where(self.data['risky_first'], self.data['n2'], self.data['n1'])
+            risky_n = np.where(self.data != 1.0, self.data['n1'], self.data['n2'])
+            safe_n = np.where(self.data != 1.0, self.data['n2'], self.data['n1'])
 
             risky_prior_mu = np.mean(np.log(risky_n))
             risky_prior_std = np.std(np.log(risky_n))
 
-            self.build_hierarchical_nodes('risky_prior_mu', mu_intercept=risky_prior_mu, transform='identity')
-            self.build_hierarchical_nodes('risky_prior_std', mu_intercept=risky_prior_std, transform='softplus')
+            free_parameters['risky_prior_mu'] = {'mu_intercept':risky_prior_mu, 'transform':'identity'}
+            free_parameters['risky_prior_std'] = {'mu_intercept':risky_prior_std, 'transform':'softplus'}
 
             safe_prior_mu = np.mean(np.log(safe_n))
 
-            self.build_hierarchical_nodes('safe_prior_mu', mu_intercept=safe_prior_mu, transform='identity')
+            free_parameters['safe_prior_mu'] = {'mu_intercept':safe_prior_mu, 'transform':'identity'}
 
             if self.prior_estimate == 'full':
                 safe_prior_std = np.std(np.log(safe_n))
-                self.build_hierarchical_nodes('safe_prior_std', mu_intercept=safe_prior_std, transform='softplus')
+                free_parameters['safe_prior_std'] = {'mu_intercept':safe_prior_std, 'transform':'softplus'}
 
 class RiskRegressionModel(RegressionModel, RiskModel):
 
@@ -785,23 +767,6 @@ class RiskRegressionModel(RegressionModel, RiskModel):
             return super().get_trialwise_variable('n2_evidence_mu', transform='identity') - super().get_trialwise_variable('evidence_mu_diff', transform='identity')
 
         return super().get_trialwise_variable(key=key, transform=transform)
-
-
-class RiskLapseModel(RiskModel, LapseModel):
-
-    def build_priors(self):
-        RiskModel.build_priors(self)
-        self.build_hierarchical_nodes('p_lapse', mu_intercept=-4, transform='logistic')
-
-    def get_model_inputs(self):
-        model_inputs = RiskModel.get_model_inputs(self)
-        model_inputs['p_lapse'] = self.get_trialwise_variable('p_lapse', transform='logistic')
-        return model_inputs
-
-class RiskLapseRegressionModel(RegressionModel, RiskLapseModel):
-    def __init__(self,  data, regressors, prior_estimate='objective', fit_seperate_evidence_sd=True):
-        RegressionModel.__init__(self, data, regressors)
-        RiskLapseModel.__init__(self, data, prior_estimate, fit_seperate_evidence_sd)
 
 
 class RNPModel(BaseModel):
