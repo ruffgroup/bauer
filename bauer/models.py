@@ -2,7 +2,7 @@ import re
 import pandas as pd
 import pymc as pm
 import numpy as np
-from .utils import cumulative_normal, get_posterior, get_diff_dist
+from .utils.bayes import cumulative_normal, get_posterior, get_diff_dist
 from .utils.math import inverse_softplus, softplus_np, inverse_softplus_np, logit_derivative, gaussian_pdf
 from pymc.math import logit, invlogit
 import pytensor.tensor as pt
@@ -309,6 +309,48 @@ class RiskModelProbabilityDistortion(BaseModel):
             free_parameters['probability_prior_mu'] = {'mu_intercept': 0.0, 'transform': 'identity'}
 
         return free_parameters
+
+class ProspectTheoryModel(BaseModel):
+
+    paradigm_keys = ['gain', 'loss', 'prob_gain']
+    base_parameters = ['alpha', 'beta', 'lambda']
+
+    def __init__(self, data, save_trialwise_n_estimates=False):
+        super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
+
+    def get_free_parameters(self):
+
+        free_parameters = {}
+        free_parameters['lambda'] = {'mu_intercept': 1, 'sigma_intercept':.5, 'transform': 'identity'}
+        free_parameters['alpha'] = {'mu_intercept': 0.5, 'sigma_intercept':.5, 'transform': 'identity'}
+        free_parameters['beta'] = {'mu_intercept': 0.5, 'sigma_intercept':.5, 'transform': 'identity'}
+
+        return free_parameters
+
+    def _get_choice_predictions(self, model_inputs):
+
+        p = model_inputs['prob_gain']
+        gain = model_inputs['gain']
+        loss = model_inputs['loss']
+        
+        utility = p * gain ** model_inputs['alpha'] - (1-p) * model_inputs['lambda'] * loss ** model_inputs['beta']
+        
+        p_choose = cumulative_normal(utility, 0.0, 1.0)
+
+        return p_choose
+    
+    def get_model_inputs(self, parameters):
+        model = pm.Model.get_context()
+
+        model_inputs = {}
+
+        for key in self.base_parameters:
+            model_inputs[key] = parameters[key]
+        
+        for key in self.paradigm_keys:
+            model_inputs[key] = model[key]
+
+        return model_inputs
 
 class LossAversionModel(BaseModel):
 
