@@ -592,7 +592,7 @@ class LossAversionRegressionModel(RegressionModel, LossAversionModel):
 
 class RiskModel(BaseModel):
 
-    paradigm_keys = ['p1', 'p2']
+    paradigm_keys = ['n1', 'n2', 'p1', 'p2']
 
     def __init__(self, data=None, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
                  save_trialwise_n_estimates=False, memory_model='independent', n_prospects=2):
@@ -606,14 +606,14 @@ class RiskModel(BaseModel):
 
         super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
-    def get_model_inputs(self):
+    def get_model_inputs(self, parameters):
 
         model = pm.Model.get_context()
 
         model_inputs = {}
         
-        model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu', transform='identity') #at.log(model['n1'])
-        model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu', transform='identity') #at.log(model['n2'])
+        model_inputs['n1_evidence_mu'] = pt.log(model['n1']) #self.get_trialwise_variable('n1_evidence_mu', transform='identity') #at.log(model['n1'])
+        model_inputs['n2_evidence_mu'] = pt.log(model['n2'])
 
         # Prob of choosing 2 should increase with p2
         if self.incorporate_probability == 'after_inference':
@@ -632,33 +632,34 @@ class RiskModel(BaseModel):
             model_inputs['n2_prior_std'] = model_inputs['n1_prior_std']
 
         elif self.prior_estimate == 'shared':
-            model_inputs['n1_prior_mu'] = self.get_trialwise_variable('prior_mu', transform='identity')
-            model_inputs['n1_prior_std'] = self.get_trialwise_variable('prior_std', transform='softplus')
+            model_inputs['n1_prior_mu'] = parameters['prior_mu']
+            model_inputs['n1_prior_std'] = parameters['prior_std']
             model_inputs['n2_prior_mu'] = model_inputs['n1_prior_mu']
             model_inputs['n2_prior_std'] = model_inputs['n1_prior_std']
 
         elif self.prior_estimate == 'two_mus':
 
-            risky_first = model['risky_first'].astype(bool)
+            risky_first = pt.where(model['p1'] < model['p2'], True, False)
+
             safe_n = pt.where(risky_first, model['n2'], model['n1'])
             safe_prior_std = pt.std(pt.log(safe_n))
-            risky_prior_std = self.get_trialwise_variable('risky_prior_std', transform='softplus')
+            risky_prior_std = parameters['risky_prior_std']
 
-            model_inputs['n1_prior_mu'] = self.get_trialwise_variable('n1_prior_mu', transform='identity')
+            model_inputs['n1_prior_mu'] = parameters['n1_prior_mu']
             model_inputs['n1_prior_std'] = pt.where(risky_first, risky_prior_std, safe_prior_std)
-            model_inputs['n2_prior_mu'] = self.get_trialwise_variable('n2_prior_mu', transform='identity')
+            model_inputs['n2_prior_mu'] = parameters['n2_prior_mu']
             model_inputs['n2_prior_std'] = pt.where(risky_first, safe_prior_std, risky_prior_std)
 
         elif self.prior_estimate == 'different':
 
-            risky_first = model['risky_first'].astype(bool)
+            risky_first = model['p1'] < model['p2']
 
             safe_n = pt.where(risky_first, model['n2'], model['n1'])
             safe_prior_mu = pt.mean(pt.log(safe_n))
             safe_prior_std = pt.std(pt.log(safe_n))
 
-            risky_prior_mu = self.get_trialwise_variable('risky_prior_mu', transform='identity')
-            risky_prior_std = self.get_trialwise_variable('risky_prior_std', transform='softplus')
+            risky_prior_mu = parameters['risky_prior_mu']
+            risky_prior_std = parameters['risky_prior_std']
 
             model_inputs['n1_prior_mu'] = pt.where(risky_first, risky_prior_mu, safe_prior_mu)
             model_inputs['n1_prior_std'] = pt.where(risky_first, risky_prior_std, safe_prior_std)
@@ -668,17 +669,17 @@ class RiskModel(BaseModel):
 
         elif self.prior_estimate in ['full', 'full_normed']:
 
-            risky_first = model['risky_first'].astype(bool)
+            risky_first = model['p1'] < model['p2']
 
-            risky_prior_mu = self.get_trialwise_variable('risky_prior_mu', transform='identity')
-            risky_prior_std = self.get_trialwise_variable('risky_prior_std', transform='softplus')
+            risky_prior_mu = parameters['risky_prior_mu']
+            risky_prior_std = parameters['risky_prior_std']
 
-            safe_prior_mu = self.get_trialwise_variable('safe_prior_mu', transform='identity')
+            safe_prior_mu = parameters['safe_prior_mu']
             
             if self.prior_estimate == 'full_normed':
                 safe_prior_std = 1.
             else:
-                safe_prior_std = self.get_trialwise_variable('safe_prior_std', transform='softplus')
+                safe_prior_std = parameters['safe_prior_std']
 
             model_inputs['n1_prior_mu'] = pt.where(risky_first, risky_prior_mu, safe_prior_mu)
             model_inputs['n1_prior_std'] = pt.where(risky_first, risky_prior_std, safe_prior_std)
@@ -689,11 +690,11 @@ class RiskModel(BaseModel):
         if self.fit_seperate_evidence_sd:
 
             if self.memory_model == 'independent':
-                model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd', transform='softplus')
-                model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('n2_evidence_sd', transform='softplus')
+                model_inputs['n1_evidence_sd'] = parameters['n1_evidence_sd']
+                model_inputs['n2_evidence_sd'] = parameters['n2_evidence_sd']
             elif self.memory_model == 'shared_perceptual_noise':
-                perceptual_sd = self.get_trialwise_variable('perceptual_noise_sd', transform='softplus')
-                memory_sd = self.get_trialwise_variable('memory_noise_sd', transform='softplus')
+                perceptual_sd = parameters['perceptual_noise_sd']
+                memory_sd = parameters['memory_noise_sd']
 
                 model_inputs['n1_evidence_sd'] = perceptual_sd + memory_sd
                 model_inputs['n2_evidence_sd'] = perceptual_sd
@@ -701,8 +702,8 @@ class RiskModel(BaseModel):
                 raise ValueError('Unknown memory model: {}'.format(self.memory_model))
 
         else:
-            model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('evidence_sd', transform='softplus')
-            model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('evidence_sd', transform='softplus')
+            model_inputs['n1_evidence_sd'] = parameters['evidence_sd']
+            model_inputs['n2_evidence_sd'] = parameters['evidence_sd']
 
         return model_inputs
 
@@ -723,37 +724,79 @@ class RiskModel(BaseModel):
             free_parameters['evidence_sd'] = {'mu_intercept':-1., 'transform':'softplus'}
 
         if self.prior_estimate == 'shared':
-            prior_mu = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
-            prior_std = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+            if self.data is not None:
+                prior_mu = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+                prior_std = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+            else:
+                prior_mu = np.log(25)
+                prior_std = 2
+
             free_parameters['prior_mu'] = {'mu_intercept':prior_mu, 'transform':'identity'}
             free_parameters['prior_std'] = {'mu_intercept':prior_std, 'transform':'identity'}
 
         elif self.prior_estimate == 'different':
-            risky_n = np.where(self.data['p1'] != 1.0, self.data['n1'], self.data['n2'])
 
-            risky_prior_mu = np.mean(np.log(risky_n))
-            risky_prior_std = np.std(np.log(risky_n))
+            if self.data is not None:
+                risky_n = np.where(self.data['p1'] != 1.0, self.data['n1'], self.data['n2'])
+                risky_prior_mu = np.mean(np.log(risky_n))
+                risky_prior_std = np.std(np.log(risky_n))
+            else:
+                risky_prior_mu = np.log(25)
+                risky_prior_std = 2
 
             free_parameters['risky_prior_mu'] = {'mu_intercept':risky_prior_mu, 'transform':'identity'}
             free_parameters['risky_prior_std'] = {'mu_intercept':risky_prior_std, 'transform':'identity'}
 
         elif self.prior_estimate in ['full', 'full_normed']:
-            risky_n = np.where(self.data != 1.0, self.data['n1'], self.data['n2'])
-            safe_n = np.where(self.data != 1.0, self.data['n2'], self.data['n1'])
+            if self.data is not None:
+                risky_n = np.where(self.data != 1.0, self.data['n1'], self.data['n2'])
+                safe_n = np.where(self.data != 1.0, self.data['n2'], self.data['n1'])
 
-            risky_prior_mu = np.mean(np.log(risky_n))
-            risky_prior_std = np.std(np.log(risky_n))
+                risky_prior_mu = np.mean(np.log(risky_n))
+                risky_prior_std = np.std(np.log(risky_n))
+
+                safe_prior_mu = np.mean(np.log(safe_n))
+                safe_prior_std = np.std(np.log(safe_n))
+
+            else:
+                risky_prior_mu = np.log(25)
+                safe_prior_mu = np.log(25)
+
+                risky_prior_std = 2
+                safe_prior_std = 2
 
             free_parameters['risky_prior_mu'] = {'mu_intercept':risky_prior_mu, 'transform':'identity'}
             free_parameters['risky_prior_std'] = {'mu_intercept':risky_prior_std, 'transform':'softplus'}
 
-            safe_prior_mu = np.mean(np.log(safe_n))
 
             free_parameters['safe_prior_mu'] = {'mu_intercept':safe_prior_mu, 'transform':'identity'}
 
             if self.prior_estimate == 'full':
-                safe_prior_std = np.std(np.log(safe_n))
                 free_parameters['safe_prior_std'] = {'mu_intercept':safe_prior_std, 'transform':'softplus'}
+
+        return free_parameters
+
+
+    def _get_example_paradigm(self):
+        n_safe = [5., 7., 10, 14, 20, 28]
+        risky_p = 0.55
+
+        fractions = np.exp(np.linspace(np.log(0.25), np.log(4), 8, True))
+        risky_first = [True, False]
+
+        paradigm = pd.MultiIndex.from_product([n_safe, fractions, risky_first], names=['n_safe', 'fraction', 'risky_first']).to_frame(index=False)
+
+        paradigm['n1'] = np.round(paradigm['fraction'] * paradigm['n_safe']).where(paradigm['risky_first'], paradigm['n_safe'])
+        paradigm['n2'] = np.round(paradigm['fraction'] * paradigm['n_safe']).where(~paradigm['risky_first'], paradigm['n_safe'])
+
+        paradigm['p1'] = np.where(paradigm['risky_first'], risky_p, 1.)
+        paradigm['p2'] = np.where(paradigm['risky_first'], 1., risky_p)
+
+        paradigm['log(risky/safe)'] = np.log(paradigm['fraction'])
+
+        paradigm.set_index(pd.Index(np.arange(1, len(paradigm)+1), name='trial'), inplace=True)
+
+        return paradigm
 
 class RiskRegressionModel(RegressionModel, RiskModel):
 
