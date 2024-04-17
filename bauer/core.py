@@ -197,7 +197,7 @@ class BaseModel(object):
         data = data.stack().to_frame('simulated_choice').astype(bool)
         data = data.join(paradigm)
 
-        if ('subject' in paradigm.index.names) or ('subject' in paradigm.columns):
+        if ('subject' in paradigm.columns):
             data = data.set_index('subject', append=True)
             data = data.reorder_levels(['subject'] + list(data.index.names)[:-1])
 
