@@ -360,7 +360,9 @@ class BaseModel(object):
                 samples_pars[key] = logistic_np(samples_pars[key])
 
         if n_subjects:
-            return pd.DataFrame(samples_pars, index=pd.Index(np.arange(1, n_subjects+1), name='subject'))
+            sample_pars =  pd.DataFrame(samples_pars, index=pd.Index(np.arange(1, n_subjects+1), name='subject'))
+            sample_pars.columns.name = 'parameter'
+            return sample_pars
         else:
             return samples_pars
 
