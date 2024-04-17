@@ -386,6 +386,13 @@ class BaseModel(object):
         elif transform == 'logistic':
             return logit_np(data)
 
+
+    def get_example_paradigm(self, n_subjects=None):
+        if n_subjects is None:
+            return self._get_example_paradigm()
+        else:
+            return pd.concat([self._get_example_paradigm() for _ in range(n_subjects)], keys=np.arange(1, n_subjects+1), names=['subject'])
+
 class RegressionModel(BaseModel):
 
     def __init__(self, regressors=None):
