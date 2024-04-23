@@ -89,6 +89,16 @@ class MagnitudeComparisonModel(BaseModel):
 
         return paradigm_
 
+    def _get_example_paradigm(self, n_fractions=5):
+        base_ns = np.array([5, 7, 10, 14, 20, 28])
+        fractions = np.exp(np.linspace(np.log(.5), np.log(2.), n_fractions))
+
+        n1 = np.repeat(base_ns, len(fractions))
+        n2 = (base_ns[:, None] * fractions[None, :]).ravel()
+
+        paradigm = pd.DataFrame({'n1':n1, 'n2':n2})
+
+        return paradigm
         
 class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonModel):
     def build_priors(self):
