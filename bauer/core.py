@@ -393,6 +393,26 @@ class BaseModel(object):
         else:
             return pd.concat([self._get_example_paradigm() for _ in range(n_subjects)], keys=np.arange(1, n_subjects+1), names=['subject'])
 
+class LapseModel(BaseModel):
+
+    def get_free_parameters(self):
+        pars = super().get_free_parameters()
+
+        pars['p_lapse'] = {'mu_intercept':-4., 'transform':'softplus'}
+        return pars
+
+
+    def _get_choice_predictions(self, model_inputs):
+        p_choice = super()._get_choice_predictions(model_inputs)
+        p_choice = p_choice * (1 - model_inputs['p_lapse']) + 0.5 * model_inputs['p_lapse']
+        return p_choice
+
+    def get_model_inputs(self, parameters):
+        model_inputs = super().get_model_inputs(parameters)
+        model_inputs['p_lapse'] = parameters['p_lapse']
+        return model_inputs
+
+
 class RegressionModel(BaseModel):
 
     def __init__(self, regressors=None):

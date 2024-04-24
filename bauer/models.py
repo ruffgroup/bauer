@@ -8,7 +8,7 @@ from pymc.math import logit, invlogit
 import pytensor.tensor as pt
 from pytensor import scan    
 from patsy import dmatrix
-from .core import BaseModel, RegressionModel
+from .core import BaseModel, LapseModel, RegressionModel
 from .utils.plotting import plot_prediction
 from arviz import hdi
 import seaborn as sns
@@ -101,13 +101,16 @@ class MagnitudeComparisonModel(BaseModel):
         return paradigm
         
 class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonModel):
-    def build_priors(self):
 
-        super().build_priors()
+    def __init__(self, data, regressors, fit_prior=False, fit_seperate_evidence_sd=True, save_trialwise_estimates=False):
+        RegressionModel.__init__(self, regressors)
+        MagnitudeComparisonModel.__init__(self, data, fit_prior, fit_seperate_evidence_sd, save_trialwise_estimates)
 
-        for key in ['n1_evidence_mu', 'n2_evidence_mu']:
-            if key in self.regressors:
-                self.build_hierarchical_nodes(key, mu_intercept=0.0, transform='identity')
+class MagnitudeComparisonLapseModel(LapseModel, MagnitudeComparisonModel):
+    ...
+
+class MagnitudeComparisonLapseRegressionModel(LapseModel, MagnitudeComparisonRegressionModel):
+    ...
 
 class RiskModelProbabilityDistortion(BaseModel):
 
@@ -812,57 +815,46 @@ class RiskRegressionModel(RegressionModel, RiskModel):
 
     def __init__(self,  data, regressors, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
                  save_trialwise_n_estimates=False, memory_model='independent'):
-        RegressionModel.__init__(self, data, regressors)
+        RegressionModel.__init__(self, regressors)
         RiskModel.__init__(self, data, prior_estimate, fit_seperate_evidence_sd, incorporate_probability=incorporate_probability,
                            save_trialwise_n_estimates=save_trialwise_n_estimates, memory_model=memory_model)
 
-    def build_priors(self):
-
-        super().build_priors()
-
-        for key in ['n1_evidence_mu', 'n2_evidence_mu', 'evidence_sd_diff', 'evidence_mu_diff']:
-            if key in self.regressors:
-                self.build_hierarchical_nodes(key, mu_intercept=0.0, transform='identity')
-
-        if (self.prior_estimate in ['full', 'full_normed']) and ('prior_mu' in self.regressors):
-            print("***Warning, estimating both risky and safe priors, but (some) regressors affect both equally (via `prior_mu`)***")
-            self.build_hierarchical_nodes('prior_mu', mu_intercept=0.0, transform='identity')
-
-        if (self.fit_seperate_evidence_sd) and ('evidence_sd' in self.regressors):
-            print("***Warning, estimating evidence_sd for both first and second option, but (some) regressors affect both equally (via `evidence_sd`)***")
-            self.build_hierarchical_nodes('evidence_sd', mu_intercept=0.0, transform='identity')
-
-
-    def get_trialwise_variable(self, key, transform='identity'):
+    def get_trialwise_variable(self, key):
 
         # Prior mean
         if (key == 'risky_prior_mu') and ('prior_mu' in self.regressors):
-            return super().get_trialwise_variable('risky_prior_mu', transform='identity') + super().get_trialwise_variable('prior_mu', transform='identity')
+            return super().get_trialwise_variable('risky_prior_mu') + super().get_trialwise_variable('prior_mu', transform='identity')
 
         if (key == 'safe_prior_mu') and ('prior_mu' in self.regressors):
-            return super().get_trialwise_variable('safe_prior_mu', transform='identity') + super().get_trialwise_variable('prior_mu', transform='identity')
+            return super().get_trialwise_variable('safe_prior_mu') + super().get_trialwise_variable('prior_mu', transform='identity')
 
         # Evidence SD
         if (key == 'n1_evidence_sd') and ('evidence_sd' in self.regressors):
-            return pt.softplus(super().get_trialwise_variable('n1_evidence_sd', transform='identity') + super().get_trialwise_variable('evidence_sd', transform='identity'))
+            return pt.softplus(super().get_trialwise_variable('n1_evidence_sd') + super().get_trialwise_variable('evidence_sd', transform='identity'))
 
         if (key == 'n2_evidence_sd') and ('evidence_sd' in self.regressors):
-            return pt.softplus(super().get_trialwise_variable('n2_evidence_sd', transform='identity') + super().get_trialwise_variable('evidence_sd', transform='identity'))
+            return pt.softplus(super().get_trialwise_variable('n2_evidence_sd') + super().get_trialwise_variable('evidence_sd', transform='identity'))
 
         if (key == 'n1_evidence_sd') and ('evidence_sd_diff' in self.regressors):
-            return pt.softplus(super().get_trialwise_variable('n1_evidence_sd', transform='identity') + super().get_trialwise_variable('evidence_sd_diff', transform='identity'))
+            return pt.softplus(super().get_trialwise_variable('n1_evidence_sd') + super().get_trialwise_variable('evidence_sd_diff', transform='identity'))
 
         if (key == 'n2_evidence_sd') and ('evidence_sd_diff' in self.regressors):
-            return pt.softplus(super().get_trialwise_variable('n2_evidence_sd', transform='identity') - super().get_trialwise_variable('evidence_sd_diff', transform='identity'))
+            return pt.softplus(super().get_trialwise_variable('n2_evidence_sd') - super().get_trialwise_variable('evidence_sd_diff', transform='identity'))
 
         if (key == 'n1_evidence_mu') and ('evidence_mu_diff' in self.regressors):
-            return super().get_trialwise_variable('n1_evidence_mu', transform='identity') + super().get_trialwise_variable('evidence_mu_diff', transform='identity')
+            return super().get_trialwise_variable('n1_evidence_mu') + super().get_trialwise_variable('evidence_mu_diff', transform='identity')
 
         if (key == 'n2_evidence_mu') and ('evidence_mu_diff' in self.regressors):
-            return super().get_trialwise_variable('n2_evidence_mu', transform='identity') - super().get_trialwise_variable('evidence_mu_diff', transform='identity')
+            return super().get_trialwise_variable('n2_evidence_mu') - super().get_trialwise_variable('evidence_mu_diff', transform='identity')
 
-        return super().get_trialwise_variable(key=key, transform=transform)
+        return super().get_trialwise_variable(key=key)
 
+
+class RiskLapseModel(LapseModel, RiskModel):
+    ...
+
+class RiskLapseRegressionModel(LapseModel, RiskRegressionModel):
+    ...
 
 class RNPModel(BaseModel):
 
@@ -1458,7 +1450,7 @@ class ExpectedUtilityRiskModel(BaseModel):
 class FlexibleSDRiskRegressionModel(RegressionModel, FlexibleSDRiskModel):
     def __init__(self,  data, regressors, prior_estimate='full', fit_seperate_evidence_sd=True, 
                     save_trialwise_n_estimates=False, polynomial_order=5, bspline=False, memory_model='independent'):
-        RegressionModel.__init__(self, data, regressors)
+        RegressionModel.__init__(self, regressors)
         FlexibleSDRiskModel.__init__(self, data, prior_estimate, fit_seperate_evidence_sd, 
                             save_trialwise_n_estimates=save_trialwise_n_estimates, polynomial_order=polynomial_order,
                              bspline=bspline, memory_model=memory_model)
@@ -1472,5 +1464,5 @@ class FlexibleSDRiskRegressionModel(RegressionModel, FlexibleSDRiskModel):
 
 class ExpectedUtilityRiskRegressionModel(RegressionModel, ExpectedUtilityRiskModel):
     def __init__(self,  data, save_trialwise_eu, probability_distortion, regressors):
-        RegressionModel.__init__(self, data, regressors=regressors)
+        RegressionModel.__init__(self, regressors=regressors)
         ExpectedUtilityRiskModel.__init__(self, data, save_trialwise_eu, probability_distortion=probability_distortion)
