@@ -407,8 +407,10 @@ class RegressionModel(BaseModel):
     def _get_paradigm(self, paradigm=None):
         paradigm_ = super()._get_paradigm(paradigm)
 
+        free_parameters = self.get_free_parameters()
 
-        for key in self.free_parameters.keys():
+
+        for key in free_parameters:
             dm = self.build_design_matrix(paradigm, key)
             self.design_matrices[key] = dm
             paradigm_[f'_dm_{key}'] = np.asarray(dm)
