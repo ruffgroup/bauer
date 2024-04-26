@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 
 class MagnitudeComparisonModel(BaseModel):
 
-    def __init__(self, data, fit_prior=False, fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False,
-                 memory_model='independent'):
+    def __init__(self, data, fit_prior=False, fit_seperate_evidence_sd=True, memory_model='independent', 
+                 save_trialwise_n_estimates=False):
 
         self.fit_prior = fit_prior
         self.memory_model = memory_model
@@ -96,6 +96,12 @@ class MagnitudeComparisonLapseModel(LapseModel, MagnitudeComparisonModel):
     ...
 
 class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonModel):
+    
+    
+    def __init__(self, data, regressors, fit_prior=False, fit_seperate_evidence_sd=True,memory_model='independent', save_trialwise_estimates=False):
+        RegressionModel.__init__(self,data, regressors)
+        MagnitudeComparisonModel.__init__(self, data, fit_prior, fit_seperate_evidence_sd,memory_model, save_trialwise_estimates)
+
     def build_priors(self):
 
         super().build_priors()
