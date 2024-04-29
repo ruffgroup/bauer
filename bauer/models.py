@@ -18,10 +18,11 @@ import warnings
 
 class MagnitudeComparisonModel(BaseModel):
 
-    def __init__(self, data=None, fit_prior=False, fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False):
+    def __init__(self, data=None, fit_prior=False, fit_seperate_evidence_sd=True, memory_model = 'independent',save_trialwise_n_estimates=False):
 
         self.fit_prior = fit_prior
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
+        self.memory_model = memory_model
 
         super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
@@ -34,6 +35,9 @@ class MagnitudeComparisonModel(BaseModel):
         if self.fit_prior:
             model_inputs['n1_prior_mu'] = parameters['prior_mu']
             model_inputs['n2_prior_mu'] = parameters['prior_mu']
+            model_inputs['n1_prior_sd'] = parameters['prior_sd']
+            model_inputs['n2_prior_sd'] = parameters['prior_sd']
+
         else:
             mean_prior = (pt.mean(pt.log(model['n1'])) + pt.mean(pt.log(model['n2']))) / 2.
             mean_std = (pt.std(pt.log(model['n1'])) + pt.std(pt.log(model['n2']))) / 2.
@@ -41,8 +45,8 @@ class MagnitudeComparisonModel(BaseModel):
             model_inputs['n1_prior_mu'] = mean_prior
             model_inputs['n2_prior_mu'] = mean_prior
 
-            model_inputs['n1_prior_std'] = mean_std
-            model_inputs['n2_prior_std'] = mean_std
+            model_inputs['n1_prior_sd'] = mean_std
+            model_inputs['n2_prior_sd'] = mean_std
 
         model_inputs['n1_evidence_mu'] = model['log(n1)']
         model_inputs['n2_evidence_mu'] = model['log(n2)']
@@ -50,8 +54,17 @@ class MagnitudeComparisonModel(BaseModel):
         model_inputs['threshold'] =  0.0
 
         if self.fit_seperate_evidence_sd:
-            model_inputs['n1_evidence_sd'] = parameters['n1_evidence_sd']
-            model_inputs['n2_evidence_sd'] = parameters['n2_evidence_sd']
+            if self.memory_model == 'independent':
+                model_inputs['n1_evidence_sd'] = parameters['n1_evidence_sd']
+                model_inputs['n2_evidence_sd']= parameters['n2_evidence_sd']
+            elif self.memory_model == 'shared_perceptual_noise':
+                perceptual_sd = parameters['perceptual_noise_sd']
+                memory_sd = parameters['memory_noise_sd']
+
+                model_inputs['n1_evidence_sd'] = perceptual_sd + memory_sd
+                model_inputs['n2_evidence_sd'] = perceptual_sd
+            else:
+                raise ValueError('Unknown memory model')
         else:
             model_inputs['n1_evidence_sd'] = parameters['evidence_sd']
             model_inputs['n2_evidence_sd'] = parameters['evidence_sd']
@@ -63,8 +76,13 @@ class MagnitudeComparisonModel(BaseModel):
         free_parameters = {}
 
         if self.fit_seperate_evidence_sd:
-            free_parameters['n1_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
-            free_parameters['n2_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+            if self.memory_model == 'independent':
+                free_parameters['n1_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+                free_parameters['n2_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+            elif self.memory_model == 'shared_perceptual_noise':
+                free_parameters['perceptual_noise_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+                free_parameters['memory_noise_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+        
         else:
             free_parameters['evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
 
@@ -102,9 +120,9 @@ class MagnitudeComparisonModel(BaseModel):
         
 class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonModel):
 
-    def __init__(self, data, regressors, fit_prior=False, fit_seperate_evidence_sd=True, save_trialwise_estimates=False):
+    def __init__(self, data, regressors, fit_prior=False, fit_seperate_evidence_sd=True, memory_model = 'independent',save_trialwise_estimates=False):
         RegressionModel.__init__(self, regressors)
-        MagnitudeComparisonModel.__init__(self, data, fit_prior, fit_seperate_evidence_sd, save_trialwise_estimates)
+        MagnitudeComparisonModel.__init__(self, data, fit_prior, fit_seperate_evidence_sd, memory_model, save_trialwise_estimates)
 
 class MagnitudeComparisonLapseModel(LapseModel, MagnitudeComparisonModel):
     ...
