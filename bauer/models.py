@@ -320,16 +320,16 @@ class RiskModelProbabilityDistortion(BaseModel):
 
             if self.data is not None:
                 prior_mu = np.log(np.stack([self.data[f'n{ix+1}'].values for ix in range(self.n_prospects)])).mean()
-                prior_std = np.log(np.stack([self.data[f'n{ix+1}'].values for ix in range(self.n_prospects)])).std()
+                prior_sd = np.log(np.stack([self.data[f'n{ix+1}'].values for ix in range(self.n_prospects)])).std()
             else:
                 prior_mu = np.log(10)
-                prior_std = np.log(30)
+                prior_sd = np.log(30)
 
             if self.estimate_magnitude_prior_mu:
                 free_parameters['magnitude_prior_mu'] = {'mu_intercept': prior_mu, 'transform': 'softplus'}
 
             if not self.fix_magnitude_prior_sd:
-                free_parameters['magnitude_prior_sd'] = {'mu_intercept': prior_std, 'transform': 'softplus'}
+                free_parameters['magnitude_prior_sd'] = {'mu_intercept': prior_sd, 'transform': 'softplus'}
 
         if self.distort_probabilities:
             if not self.fix_probabiliy_prior_sd:
@@ -657,28 +657,28 @@ class RiskModel(BaseModel):
 
         if self.prior_estimate == 'objective':
             model_inputs['n1_prior_mu'] = pt.mean(pt.log(pt.stack((model['n1'], model['n2']), 0)))
-            model_inputs['n1_prior_std'] = pt.std(pt.log(pt.stack((model['n1'], model['n2']), 0)))
+            model_inputs['n1_prior_sd'] = pt.std(pt.log(pt.stack((model['n1'], model['n2']), 0)))
             model_inputs['n2_prior_mu'] = model_inputs['n1_prior_mu']
-            model_inputs['n2_prior_std'] = model_inputs['n1_prior_std']
+            model_inputs['n2_prior_sd'] = model_inputs['n1_prior_sd']
 
         elif self.prior_estimate == 'shared':
             model_inputs['n1_prior_mu'] = parameters['prior_mu']
-            model_inputs['n1_prior_std'] = parameters['prior_std']
+            model_inputs['n1_prior_sd'] = parameters['prior_sd']
             model_inputs['n2_prior_mu'] = model_inputs['n1_prior_mu']
-            model_inputs['n2_prior_std'] = model_inputs['n1_prior_std']
+            model_inputs['n2_prior_sd'] = model_inputs['n1_prior_sd']
 
         elif self.prior_estimate == 'two_mus':
 
             risky_first = pt.where(model['p1'] < model['p2'], True, False)
 
             safe_n = pt.where(risky_first, model['n2'], model['n1'])
-            safe_prior_std = pt.std(pt.log(safe_n))
-            risky_prior_std = parameters['risky_prior_std']
+            safe_prior_sd = pt.std(pt.log(safe_n))
+            risky_prior_sd = parameters['risky_prior_sd']
 
             model_inputs['n1_prior_mu'] = parameters['n1_prior_mu']
-            model_inputs['n1_prior_std'] = pt.where(risky_first, risky_prior_std, safe_prior_std)
+            model_inputs['n1_prior_sd'] = pt.where(risky_first, risky_prior_sd, safe_prior_sd)
             model_inputs['n2_prior_mu'] = parameters['n2_prior_mu']
-            model_inputs['n2_prior_std'] = pt.where(risky_first, safe_prior_std, risky_prior_std)
+            model_inputs['n2_prior_sd'] = pt.where(risky_first, safe_prior_sd, risky_prior_sd)
 
         elif self.prior_estimate == 'different':
 
@@ -686,43 +686,43 @@ class RiskModel(BaseModel):
 
             safe_n = pt.where(risky_first, model['n2'], model['n1'])
             safe_prior_mu = pt.mean(pt.log(safe_n))
-            safe_prior_std = pt.std(pt.log(safe_n))
+            safe_prior_sd = pt.std(pt.log(safe_n))
 
             risky_prior_mu = parameters['risky_prior_mu']
-            risky_prior_std = parameters['risky_prior_std']
+            risky_prior_sd = parameters['risky_prior_sd']
 
             model_inputs['n1_prior_mu'] = pt.where(risky_first, risky_prior_mu, safe_prior_mu)
-            model_inputs['n1_prior_std'] = pt.where(risky_first, risky_prior_std, safe_prior_std)
+            model_inputs['n1_prior_sd'] = pt.where(risky_first, risky_prior_sd, safe_prior_sd)
 
             model_inputs['n2_prior_mu'] = pt.where(risky_first, safe_prior_mu, risky_prior_mu)
-            model_inputs['n2_prior_std'] = pt.where(risky_first, safe_prior_std, risky_prior_std)
+            model_inputs['n2_prior_sd'] = pt.where(risky_first, safe_prior_sd, risky_prior_sd)
 
         elif self.prior_estimate in ['full', 'full_normed']:
 
             risky_first = model['p1'] < model['p2']
 
             risky_prior_mu = parameters['risky_prior_mu']
-            risky_prior_std = parameters['risky_prior_std']
+            risky_prior_sd = parameters['risky_prior_sd']
 
             safe_prior_mu = parameters['safe_prior_mu']
             
             if self.prior_estimate == 'full_normed':
-                safe_prior_std = 1.
+                safe_prior_sd = 1.
             else:
-                safe_prior_std = parameters['safe_prior_std']
+                safe_prior_sd = parameters['safe_prior_sd']
 
             model_inputs['n1_prior_mu'] = pt.where(risky_first, risky_prior_mu, safe_prior_mu)
-            model_inputs['n1_prior_std'] = pt.where(risky_first, risky_prior_std, safe_prior_std)
+            model_inputs['n1_prior_sd'] = pt.where(risky_first, risky_prior_sd, safe_prior_sd)
 
             model_inputs['n2_prior_mu'] = pt.where(risky_first, safe_prior_mu, risky_prior_mu)
-            model_inputs['n2_prior_std'] = pt.where(risky_first, safe_prior_std, risky_prior_std)
+            model_inputs['n2_prior_sd'] = pt.where(risky_first, safe_prior_sd, risky_prior_sd)
 
         elif self.prior_estimate == 'klw':
             model_inputs['n1_prior_mu'] = pt.mean(pt.log(pt.stack((model['n1'], model['n2']), 0)))
             model_inputs['n2_prior_mu'] = model_inputs['n1_prior_mu']
 
-            model_inputs['n1_prior_std'] = parameters['prior_std']
-            model_inputs['n2_prior_std'] = model_inputs['n1_prior_std']
+            model_inputs['n1_prior_sd'] = parameters['prior_sd']
+            model_inputs['n2_prior_sd'] = model_inputs['n1_prior_sd']
 
 
         if self.fit_seperate_evidence_sd:
@@ -764,26 +764,26 @@ class RiskModel(BaseModel):
         if self.prior_estimate == 'shared':
             if self.data is not None:
                 prior_mu = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
-                prior_std = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+                prior_sd = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
             else:
                 prior_mu = np.log(25)
-                prior_std = 2
+                prior_sd = 2
 
             free_parameters['prior_mu'] = {'mu_intercept':prior_mu, 'transform':'identity'}
-            free_parameters['prior_std'] = {'mu_intercept':prior_std, 'transform':'identity'}
+            free_parameters['prior_sd'] = {'mu_intercept':prior_sd, 'transform':'identity'}
 
         elif self.prior_estimate == 'different':
 
             if self.data is not None:
                 risky_n = np.where(self.data['p1'] != 1.0, self.data['n1'], self.data['n2'])
                 risky_prior_mu = np.mean(np.log(risky_n))
-                risky_prior_std = np.std(np.log(risky_n))
+                risky_prior_sd = np.std(np.log(risky_n))
             else:
                 risky_prior_mu = np.log(25)
-                risky_prior_std = 2
+                risky_prior_sd = 2
 
             free_parameters['risky_prior_mu'] = {'mu_intercept':risky_prior_mu, 'transform':'identity'}
-            free_parameters['risky_prior_std'] = {'mu_intercept':risky_prior_std, 'transform':'identity'}
+            free_parameters['risky_prior_sd'] = {'mu_intercept':risky_prior_sd, 'transform':'identity'}
 
         elif self.prior_estimate in ['full', 'full_normed']:
             if self.data is not None:
@@ -791,30 +791,30 @@ class RiskModel(BaseModel):
                 safe_n = np.where(self.data != 1.0, self.data['n2'], self.data['n1'])
 
                 risky_prior_mu = np.mean(np.log(risky_n))
-                risky_prior_std = np.std(np.log(risky_n))
+                risky_prior_sd = np.std(np.log(risky_n))
 
                 safe_prior_mu = np.mean(np.log(safe_n))
-                safe_prior_std = np.std(np.log(safe_n))
+                safe_prior_sd = np.std(np.log(safe_n))
 
             else:
                 risky_prior_mu = np.log(25)
                 safe_prior_mu = np.log(25)
 
-                risky_prior_std = 2
-                safe_prior_std = 2
+                risky_prior_sd = 2
+                safe_prior_sd = 2
 
             free_parameters['risky_prior_mu'] = {'mu_intercept':risky_prior_mu, 'transform':'identity'}
-            free_parameters['risky_prior_std'] = {'mu_intercept':risky_prior_std, 'transform':'softplus'}
+            free_parameters['risky_prior_sd'] = {'mu_intercept':risky_prior_sd, 'transform':'softplus'}
 
 
             free_parameters['safe_prior_mu'] = {'mu_intercept':safe_prior_mu, 'transform':'identity'}
 
             if self.prior_estimate == 'full':
-                free_parameters['safe_prior_std'] = {'mu_intercept':safe_prior_std, 'transform':'softplus'}
+                free_parameters['safe_prior_sd'] = {'mu_intercept':safe_prior_sd, 'transform':'softplus'}
 
         elif self.prior_estimate == 'klw':
-            prior_std = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
-            free_parameters['prior_std'] = {'mu_intercept':inverse_softplus_np(prior_std), 'transform':'softplus'}
+            prior_sd = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+            free_parameters['prior_sd'] = {'mu_intercept':inverse_softplus_np(prior_sd), 'transform':'softplus'}
 
         return free_parameters
 
@@ -976,8 +976,8 @@ class FlexibleSDComparisonModel(BaseModel):
         model_inputs = {}
 
         model_inputs['n1_prior_mu'] = pt.mean(model['n1'])
-        model_inputs['n1_prior_std'] = pt.std(model['n1'])
-        model_inputs['n2_prior_std'] = pt.std(model['n2'])
+        model_inputs['n1_prior_sd'] = pt.std(model['n1'])
+        model_inputs['n2_prior_sd'] = pt.std(model['n2'])
         model_inputs['threshold'] =  0.0
 
         model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu')
@@ -1279,25 +1279,25 @@ class FlexibleSDRiskModel(FlexibleSDComparisonModel, RiskModel):
             safe_n = np.where(self.data['risky_first'], self.data['n2'], self.data['n1'])
 
             risky_prior_mu = np.mean(risky_n)
-            risky_prior_std = np.std(risky_n)
+            risky_prior_sd = np.std(risky_n)
 
             self.build_hierarchical_nodes('risky_prior_mu', mu_intercept=risky_prior_mu, sigma_intercept=15, cauchy_sigma_intercept=.5, cauchy_sigma_regressors=.5, transform='identity')
-            self.build_hierarchical_nodes('risky_prior_std', mu_intercept=risky_prior_std, sigma_intercept=15, cauchy_sigma_intercept=.5, cauchy_sigma_regressors=.5, transform='softplus')
+            self.build_hierarchical_nodes('risky_prior_sd', mu_intercept=risky_prior_sd, sigma_intercept=15, cauchy_sigma_intercept=.5, cauchy_sigma_regressors=.5, transform='softplus')
 
             safe_prior_mu = np.mean(safe_n)
 
             self.build_hierarchical_nodes('safe_prior_mu', mu_intercept=safe_prior_mu, sigma_intercept=15, cauchy_sigma_intercept=.5, cauchy_sigma_regressors=.5, transform='identity')
 
-            safe_prior_std = np.std(safe_n)
-            self.build_hierarchical_nodes('safe_prior_std', mu_intercept=safe_prior_std, sigma_intercept=15, cauchy_sigma_intercept=.5, cauchy_sigma_regressors=.5, transform='softplus')
+            safe_prior_sd = np.std(safe_n)
+            self.build_hierarchical_nodes('safe_prior_sd', mu_intercept=safe_prior_sd, sigma_intercept=15, cauchy_sigma_intercept=.5, cauchy_sigma_regressors=.5, transform='softplus')
 
             FlexibleSDComparisonModel.build_priors(self)
         else:
             prior_mu = (np.mean(self.data['n1']) + np.mean(self.data['n2']))/2.
-            prior_std = (np.std(self.data['n1']) + np.std(self.data['n2']))/2.
+            prior_sd = (np.std(self.data['n1']) + np.std(self.data['n2']))/2.
 
             self.build_hierarchical_nodes('prior_mu', mu_intercept=prior_mu, sigma_intercept=15, cauchy_sigma_intercept=0.5, cauchy_sigma_regressors=0.5, transform='identity')
-            self.build_hierarchical_nodes('prior_std', mu_intercept=prior_std, sigma_intercept=15, cauchy_sigma_intercept=0.5, cauchy_sigma_regressors=0.5, transform='softplus')
+            self.build_hierarchical_nodes('prior_sd', mu_intercept=prior_sd, sigma_intercept=15, cauchy_sigma_intercept=0.5, cauchy_sigma_regressors=0.5, transform='softplus')
 
             FlexibleSDComparisonModel.build_priors(self)
 
@@ -1317,27 +1317,27 @@ class FlexibleSDRiskModel(FlexibleSDComparisonModel, RiskModel):
             risky_first = model['risky_first'].astype(bool)
 
             risky_prior_mu = self.get_trialwise_variable('risky_prior_mu', transform='identity')
-            risky_prior_std = self.get_trialwise_variable('risky_prior_std', transform='softplus')
+            risky_prior_sd = self.get_trialwise_variable('risky_prior_sd', transform='softplus')
 
             safe_prior_mu = self.get_trialwise_variable('safe_prior_mu', transform='identity')
             
             if self.prior_estimate == 'full_normed':
-                safe_prior_std = 1.
+                safe_prior_sd = 1.
             else:
-                safe_prior_std = self.get_trialwise_variable('safe_prior_std', transform='softplus')
+                safe_prior_sd = self.get_trialwise_variable('safe_prior_sd', transform='softplus')
 
             model_inputs['n1_prior_mu'] = pt.where(risky_first, risky_prior_mu, safe_prior_mu)
-            model_inputs['n1_prior_std'] = pt.where(risky_first, risky_prior_std, safe_prior_std)
+            model_inputs['n1_prior_sd'] = pt.where(risky_first, risky_prior_sd, safe_prior_sd)
 
             model_inputs['n2_prior_mu'] = pt.where(risky_first, safe_prior_mu, risky_prior_mu)
-            model_inputs['n2_prior_std'] = pt.where(risky_first, safe_prior_std, risky_prior_std)
+            model_inputs['n2_prior_sd'] = pt.where(risky_first, safe_prior_sd, risky_prior_sd)
 
         elif self.prior_estimate == 'shared':
             model_inputs['n1_prior_mu'] = self.get_trialwise_variable('prior_mu', transform='identity')
-            model_inputs['n1_prior_std'] = self.get_trialwise_variable('prior_std', transform='softplus')
+            model_inputs['n1_prior_sd'] = self.get_trialwise_variable('prior_sd', transform='softplus')
 
             model_inputs['n2_prior_mu'] = self.get_trialwise_variable('prior_mu', transform='identity')
-            model_inputs['n2_prior_std'] = self.get_trialwise_variable('prior_std', transform='softplus')
+            model_inputs['n2_prior_sd'] = self.get_trialwise_variable('prior_sd', transform='softplus')
 
 
         model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd', transform='softplus')
@@ -1349,13 +1349,13 @@ class FlexibleSDRiskModel(FlexibleSDComparisonModel, RiskModel):
 
     def _get_choice_predictions(self, model_inputs):
         post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'], 
-                                               model_inputs['n1_prior_std'], 
+                                               model_inputs['n1_prior_sd'], 
                                                model_inputs['n1_evidence_mu'], 
                                                model_inputs['n1_evidence_sd']
                                                )
 
         post_n2_mu, post_n2_sd = get_posterior(model_inputs['n2_prior_mu'],
-                                               model_inputs['n2_prior_std'],
+                                               model_inputs['n2_prior_sd'],
                                                model_inputs['n2_evidence_mu'], 
                                                model_inputs['n2_evidence_sd'])
 
