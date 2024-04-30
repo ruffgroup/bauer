@@ -857,11 +857,11 @@ class RiskRegressionModel(RegressionModel, RiskModel):
             return super().get_trialwise_variable('safe_prior_mu') + super().get_trialwise_variable('prior_mu', transform='identity')
 
         # Evidence SD
-        if (key == 'n1_evidence_sd') and ('evidence_sd' in self.regressors):
-            return pt.softplus(super().get_trialwise_variable('n1_evidence_sd') + super().get_trialwise_variable('evidence_sd', transform='identity'))
+        # if (key == 'n1_evidence_sd') and ('evidence_sd' in self.regressors):
+        #     return pt.softplus(super().get_trialwise_variable('n1_evidence_sd') + super().get_trialwise_variable('evidence_sd', transform='identity'))
 
-        if (key == 'n2_evidence_sd') and ('evidence_sd' in self.regressors):
-            return pt.softplus(super().get_trialwise_variable('n2_evidence_sd') + super().get_trialwise_variable('evidence_sd', transform='identity'))
+        # if (key == 'n2_evidence_sd') and ('evidence_sd' in self.regressors):
+        #     return pt.softplus(super().get_trialwise_variable('n2_evidence_sd') + super().get_trialwise_variable('evidence_sd', transform='identity'))
 
         if (key == 'n1_evidence_sd') and ('evidence_sd_diff' in self.regressors):
             return pt.softplus(super().get_trialwise_variable('n1_evidence_sd') + super().get_trialwise_variable('evidence_sd_diff', transform='identity'))

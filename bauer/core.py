@@ -45,13 +45,13 @@ class BaseModel(object):
 
     def _get_choice_predictions(self, model_inputs):
         post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'], 
-                                               model_inputs['n1_prior_sd'], 
+                                               model_inputs['n1_prior_std'], 
                                                model_inputs['n1_evidence_mu'], 
                                                model_inputs['n1_evidence_sd']
                                                )
 
         post_n2_mu, post_n2_sd = get_posterior(model_inputs['n2_prior_mu'],
-                                               model_inputs['n2_prior_sd'],
+                                               model_inputs['n2_prior_std'],
                                                model_inputs['n2_evidence_mu'], 
                                                model_inputs['n2_evidence_sd'])
 
