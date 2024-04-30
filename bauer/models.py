@@ -15,7 +15,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import warnings
 
-
 class MagnitudeComparisonModel(BaseModel):
 
     def __init__(self, data=None, fit_prior=False, fit_seperate_evidence_sd=True, memory_model = 'independent',save_trialwise_n_estimates=False):
@@ -628,7 +627,7 @@ class RiskModel(BaseModel):
     def __init__(self, data=None, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
                  save_trialwise_n_estimates=False, memory_model='independent', n_prospects=2):
 
-        assert prior_estimate in ['objective', 'shared', 'different', 'full', 'full_normed']
+        assert prior_estimate in ['objective', 'shared', 'different', 'full', 'full_normed', 'klw']
 
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
         self.memory_model = memory_model
@@ -718,6 +717,14 @@ class RiskModel(BaseModel):
             model_inputs['n2_prior_mu'] = pt.where(risky_first, safe_prior_mu, risky_prior_mu)
             model_inputs['n2_prior_std'] = pt.where(risky_first, safe_prior_std, risky_prior_std)
 
+        elif self.prior_estimate == 'klw':
+            model_inputs['n1_prior_mu'] = pt.mean(pt.log(pt.stack((model['n1'], model['n2']), 0)))
+            model_inputs['n2_prior_mu'] = model_inputs['n1_prior_mu']
+
+            model_inputs['n1_prior_std'] = parameters['prior_std']
+            model_inputs['n2_prior_std'] = model_inputs['n1_prior_std']
+
+
         if self.fit_seperate_evidence_sd:
 
             if self.memory_model == 'independent':
@@ -805,8 +812,11 @@ class RiskModel(BaseModel):
             if self.prior_estimate == 'full':
                 free_parameters['safe_prior_std'] = {'mu_intercept':safe_prior_std, 'transform':'softplus'}
 
-        return free_parameters
+        elif self.prior_estimate == 'klw':
+            prior_std = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+            free_parameters['prior_std'] = {'mu_intercept':inverse_softplus_np(prior_std), 'transform':'softplus'}
 
+        return free_parameters
 
     def _get_example_paradigm(self):
         n_safe = [5., 7., 10, 14, 20, 28]

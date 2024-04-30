@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import arviz as az
+from .math import softplus_np, logistic_np
 
 def get_hdi(d):
     return pd.Series(az.hdi(d.values, hdi_prob=0.95), index=['hdi_low', 'hdi_high'])
@@ -81,9 +82,19 @@ def plot_prediction(data, x, color, y='p_predicted', alpha=.25, **kwargs):
                      data['hdi975'], color=color, alpha=alpha)
     return plt.plot(data[x], data[y], color=color)
 
-def plot_subjectwise_parameters(idata, parameter, sort_subjects=True, plot_group_mean=True, **kwargs):
+def plot_subjectwise_parameters(idata, parameter, transform=None, sort_subjects=True, plot_group_mean=True, **kwargs):
+
 
     d = idata.posterior[parameter].to_dataframe()
+
+    if transform is not None:
+        if transform == 'softplus':
+            d = softplus_np(d)
+        elif transform == 'logistic':
+            d = logistic_np(d)
+        else:
+            raise ValueError(f'{transform} is not a valid transformation')
+
     means = d.groupby('subject').mean()
     means.columns = pd.MultiIndex.from_tuples([(parameter, 'mean')])
 
