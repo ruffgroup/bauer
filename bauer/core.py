@@ -55,7 +55,7 @@ class BaseModel(object):
                                                model_inputs['n2_evidence_mu'], 
                                                model_inputs['n2_evidence_sd'])
 
-        diff_mu, diff_sd = get_diff_dist(post_n2_mu, post_n2_sd, post_n1_mu, post_n1_sd)
+        diff_mu, diff_sd = get_diff_dist(post_n2_mu, model_inputs['n1_evidence_sd'], post_n1_mu, model_inputs['n2_evidence_sd'])
 
         if self.save_trialwise_n_estimates:
             pm.Deterministic('n1_hat', post_n1_mu)
