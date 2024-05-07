@@ -86,12 +86,11 @@ class MagnitudeComparisonModel(BaseModel):
             free_parameters['evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
 
         if self.fit_prior:
-            objective_mu = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
-            objective_sd = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+            objective_mu = np.mean(np.stack((self.data['n1'], self.data['n2'])))
+            objective_sd = np.mean(np.stack((self.data['n1'], self.data['n2'])))
 
             free_parameters['prior_mu'] = {'mu_intercept': objective_mu, 'transform': 'identity'}
             free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
-
 
         return free_parameters
 
@@ -136,7 +135,7 @@ class RiskModelProbabilityDistortion(BaseModel):
                  fix_magnitude_prior_sd=False, fix_probabiliy_prior_sd=False,
                  estimate_magnitude_prior_mu=False):
 
-        assert magnitude_prior_estimate in ['objective'], 'Only objective prior is currently supported'
+        assert magnitude_prior_estimateparadigm ['objective'], 'Only objective prior is currently supported'
         assert(n_prospects == 2), 'Only two prospects are currently supported'
 
         self.magnitude_prior_estimate = magnitude_prior_estimate
@@ -787,8 +786,8 @@ class RiskModel(BaseModel):
 
         elif self.prior_estimate in ['full', 'full_normed']:
             if self.data is not None:
-                risky_n = np.where(self.data != 1.0, self.data['n1'], self.data['n2'])
-                safe_n = np.where(self.data != 1.0, self.data['n2'], self.data['n1'])
+                risky_n = np.where(self.data['p1'] != 1.0, self.data['n1'], self.data['n2'])
+                safe_n = np.where(self.data['p2'] != 1.0, self.data['n2'], self.data['n1'])
 
                 risky_prior_mu = np.mean(np.log(risky_n))
                 risky_prior_sd = np.std(np.log(risky_n))
@@ -940,282 +939,252 @@ class RNPRegressionModel(RegressionModel, RNPModel):
         RNPModel.__init__(self, data, risk_neutral_p)
 
 
-class FlexibleSDComparisonModel(BaseModel):
+class FlexibleNoiseComparisonModel(BaseModel):
 
 
     def __init__(self, data, fit_seperate_evidence_sd=True,
-                 fit_n2_prior_mu=False,
+                 fit_prior=False,
                  polynomial_order=5,
-                 bspline=False,
                  memory_model='independent'):
 
-        self.fit_n2_prior_mu = fit_n2_prior_mu
+        self.fit_prior = fit_prior
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
+
+        if ~fit_seperate_evidence_sd and (memory_model != 'independent'):
+            raise ValueError('Single evidence_sd can only be used with memory_model=independent')
         
         if (type(polynomial_order) is int) and fit_seperate_evidence_sd:
             polynomial_order = polynomial_order, polynomial_order
 
         self.polynomial_order = polynomial_order
         self.max_polynomial_order = np.max(self.polynomial_order)
-        self.bspline = bspline
         self.memory_model = memory_model
 
         super().__init__(data)
 
+    def build_estimation_model(self, data=None, coords=None, hierarchical=True, save_p_choice=False):
+        
+        coords = {}
 
-    def build_estimation_model(self, data=None, coords=None):
-        coords = {'subject': self.unique_subjects, 'order':['first', 'second']}
+        if data is None:
+            data = self.data
+
+        if hierarchical and ('subject' not in coords.keys()):
+            assert('subject' in data.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
+            coords['subject'] = data.index.unique(level='subject')
+
         coords['poly_order'] = np.arange(self.max_polynomial_order)
 
-        return BaseModel.build_estimation_model(self, data=data, coords=coords)
+        return BaseModel.build_estimation_model(self, data=data, coords=coords, hierarchical=hierarchical, save_p_choice=save_p_choice)
 
-    def get_model_inputs(self):
+    def get_model_inputs(self, parameters):
 
         model = pm.Model.get_context()
 
         model_inputs = {}
 
-        model_inputs['n1_prior_mu'] = pt.mean(model['n1'])
-        model_inputs['n1_prior_sd'] = pt.std(model['n1'])
-        model_inputs['n2_prior_sd'] = pt.std(model['n2'])
+        if self.fit_prior:
+            prior_mu = model['prior_mu']
+            prior_sd = model['prior_sd']
+        else:
+            prior_mu = pt.mean(pt.stack([model['n1'], model['n2']], axis=1), 1)
+            prior_sd = pt.std(pt.stack([model['n1'], model['n2']], axis=1), 1)
+
+        model_inputs['n1_prior_mu'] = prior_mu
+        model_inputs['n2_prior_mu'] = prior_mu
+        model_inputs['n1_prior_sd'] = prior_sd
+        model_inputs['n2_prior_sd'] = prior_sd
         model_inputs['threshold'] =  0.0
 
-        model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu')
-        model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu')
+        model_inputs['n1_evidence_mu'] = model['n1']
+        model_inputs['n2_evidence_mu'] = model['n2']
 
-        if hasattr('self', 'fit_n2_prior_mu') and self.fit_n2_prior_mu:
-            model_inputs['n2_prior_mu'] = self.get_trialwise_variable('n2_prior_mu', transform='identity')
-        else:
-            model_inputs['n2_prior_mu'] = pt.mean(model['n2'])
-
-        model_inputs['n1_evidence_sd'] = self.get_trialwise_variable('n1_evidence_sd')
-        model_inputs['n2_evidence_sd'] = self.get_trialwise_variable('n2_evidence_sd')
+        model_inputs['n1_evidence_sd'] = self._get_trialwise_evidence_sd('n1_evidence_sd', parameters)
+        model_inputs['n2_evidence_sd'] = self._get_trialwise_evidence_sd('n2_evidence_sd', parameters)
 
         return model_inputs
 
+    def get_free_parameters(self):
 
-    def build_priors(self):
-
-        model = pm.Model.get_context()
-
-        if self.bspline:
-
-            if self.fit_seperate_evidence_sd:
-                mu_prior = [np.ones(po) * inverse_softplus_np(5.) for po in self.polynomial_order]
-                std_prior = [np.ones(po) * 5 for po in self.polynomial_order]
-            else:
-                mu_prior = np.ones(self.polynomial_order) * inverse_softplus_np(5.)
-                std_prior = np.ones(self.polynomial_order) * 5
-
-            cauchy_sigma= .5
-        else:
-            mu_prior = np.concatenate([[10], np.zeros(self.polynomial_order-1)])
-            std_prior = np.concatenate([[10], 10**(-np.arange(1, self.polynomial_order) - 1)])
-            cauchy_sigma = 0.25
+        free_parameters = {}
 
         if self.fit_seperate_evidence_sd:
-
             key1, key2 = self._get_evidence_sd_labels()
+            
+            for n in range(1, self.polynomial_order[0]+1):
+                free_parameters[f'{key1}_spline{n}'] = {'mu_intercept': 5., 'sigma_intercept': 5., 'transform': 'identity'}
 
-            for n in range(self.polynomial_order[0]):
-                self.build_hierarchical_nodes(f'{key1}_poly{n}', mu_intercept=mu_prior[0][n], sigma_intercept=std_prior[0][n], cauchy_sigma_intercept=cauchy_sigma, transform='identity')
-
-            for n in range(self.polynomial_order[1]):
-                self.build_hierarchical_nodes(f'{key2}_poly{n}', mu_intercept=mu_prior[1][n], sigma_intercept=std_prior[1][n], cauchy_sigma_intercept=cauchy_sigma, transform='identity')
+            for n in range(1, self.polynomial_order[1]+1):
+                free_parameters[f'{key2}_spline{n}'] = {'mu_intercept': 5., 'sigma_intercept': 5., 'transform': 'identity'}
 
         else:
+            for n in range(1, self.polynomial_order+1):
+                free_parameters[f'evidence_sd_spline{n}'] = {'mu_intercept': 5., 'sigma_intercept': 5., 'transform': 'identity'}
 
-            n_evidence_sd_polypars = []
+        if self.fit_prior:
+            objective_mu = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+            objective_sd = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
 
-            for n in range(self.polynomial_order):
-                e = self.build_hierarchical_nodes(f'evidence_sd_poly{n}', mu_intercept=mu_prior[n], sigma_intercept=std_prior[n], transform='identity')
-                n_evidence_sd_polypars.append(e)
+            free_parameters['prior_mu'] = {'mu_intercept': objective_mu, 'transform': 'identity'}
+            free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
 
-        if hasattr(self, 'fit_n2_prior_mu') and self.fit_n2_prior_mu:
-            self.build_hierarchical_nodes('n2_prior_mu', mu_intercept=pt.mean(model['n2']), sigma_intercept=15., cauchy_sigma_intercept=.5, transform='identity')
+        return free_parameters
 
+    def _get_evidence_sd_spline_par_labels(self):
+        if self.fit_seperate_evidence_sd:
+            key1, key2 = self._get_evidence_sd_labels()
+            label1 = [f'{key1}_spline{n}' for n in range(1, self.polynomial_order[0]+1)]
+            label2 = [f'{key2}_spline{n}' for n in range(1, self.polynomial_order[1]+1)]
+            return label1, label2
+        else:
+            labels = [f'evidence_sd_spline{n}' for n in range(1, self.polynomial_order+1)]
+            return labels, labels
+        
     def _get_evidence_sd_labels(self):
         if self.memory_model == 'independent':
             key1 = 'n1_evidence_sd'
             key2 = 'n2_evidence_sd'
         elif self.memory_model == 'shared_perceptual_noise':
-            key1 = 'perceptual_noise_sd'
-            key2 = 'memory_noise_sd'
+            key1 = 'memory_noise_sd'
+            key2 = 'perceptual_noise_sd'
 
         return key1, key2
 
-    def get_trialwise_variable(self, key, transform='identity'):
-        
-        if key in ['n1_evidence_mu', 'n2_evidence_mu', 'n1_evidence_sd', 'n2_evidence_sd', 'perceptual_noise_sd', 'memory_noise_sd', 'evidence_sd']:
-            return self._get_trialwise_variable(key)
-        else:
-            return super().get_trialwise_variable(key, transform)
-
-
-    def _get_trialwise_variable(self, key):
+    def _get_trialwise_evidence_sd(self, key, parameters):
 
         model = pm.Model.get_context()
 
-        if key == 'n1_evidence_mu':
-            return model['n1']
+        key1, key2 = self._get_evidence_sd_labels()
+        labels1, labels2 = self._get_evidence_sd_spline_par_labels()
 
-        elif key == 'n2_evidence_mu':
-            return model['n2']
-
-        elif key == 'n1_evidence_sd':
-
-
+        if key == 'n1_evidence_sd':
             if self.memory_model == 'independent':
-                
-                if self.fit_seperate_evidence_sd:
-                    dm = self.make_dm(x=self.data['n1'], variable='n1_evidence_sd')
-                    n1_evidence_sd_poly_pars = pt.stack([self.get_trialwise_variable(f'n1_evidence_sd_poly{n}') for n in range(self.polynomial_order[0])], axis=1)
-                    n1_evidence_sd = pt.softplus(pt.sum(n1_evidence_sd_poly_pars * dm, 1))
-                else:
-                    dm = self.make_dm(x=self.data['n1'], variable='evidence_sd')
-                    n1_evidence_sd_poly_pars = pt.stack([self.get_trialwise_variable(f'evidence_sd_poly{n}') for n in range(self.polynomial_order)], axis=1)
-                    n1_evidence_sd = pt.softplus(pt.sum(n1_evidence_sd_poly_pars * dm, 1))
+                dm = self.make_dm(x=self.data['n1'], variable=key1)
+                spline_pars = pt.stack([parameters[l1] for l1 in labels1], axis=1)
 
             elif self.memory_model == 'shared_perceptual_noise':
+                dm1 = self.make_dm(x=self.data['n1'], variable=key1)
+                spline_pars1 = pt.stack([parameters[l1] for l1 in labels1], axis=1)
+                dm2 = self.make_dm(x=self.data['n1'], variable=key2)
+                spline_pars2 = pt.stack([parameters[l1] for l1 in labels1], axis=1)
 
-                dm = self.make_dm(x=self.data['n1'], variable='perceptual_noise_sd')
-                perceptual_noise_poly_pars = pt.stack([self.get_trialwise_variable(f'perceptual_noise_sd_poly{n}') for n in range(self.polynomial_order[0])], axis=1)
-                perceptual_noise_sd = pt.softplus(pt.sum(perceptual_noise_poly_pars * dm, 1))
-
-                dm = self.make_dm(x=self.data['n1'], variable='memory_noise_sd')
-                memory_noise_poly_pars = pt.stack([self.get_trialwise_variable(f'memory_noise_sd_poly{n}') for n in range(self.polynomial_order[1])], axis=1)
-                memory_noise_sd = pt.softplus(pt.sum(memory_noise_poly_pars * dm, 1))
-
-                n1_evidence_sd = perceptual_noise_sd + memory_noise_sd
-
-            return n1_evidence_sd
+                return pt.softplus(pt.sum(spline_pars1 * dm1, 1) + pt.sum(spline_pars2 * dm2, 1))
 
         elif key == 'n2_evidence_sd':
+            dm = self.make_dm(x=self.data['n2'], variable=key2)
+            spline_pars = pt.stack([parameters[l2] for l2 in labels2], axis=1)
 
-            if self.memory_model == 'independent':
-                if self.fit_seperate_evidence_sd:
-                    dm = self.make_dm(x=self.data['n2'], variable='n2_evidence_sd')
-                    n2_evidence_sd_poly_pars = pt.stack([self.get_trialwise_variable(f'n2_evidence_sd_poly{n}') for n in range(self.polynomial_order[1])], axis=1)
-                    n2_evidence_sd = pt.softplus(pt.sum(n2_evidence_sd_poly_pars * dm, 1))
-                else:
-                    dm = self.make_dm(x=self.data['n2'], variable='evidence_sd')
-                    n2_evidence_sd_poly_pars = pt.stack([self.get_trialwise_variable(f'evidence_sd_poly{n}') for n in range(self.polynomial_order)], axis=1)
-                    n2_evidence_sd = pt.softplus(pt.sum(n2_evidence_sd_poly_pars * dm, 1))
-
-            elif self.memory_model == 'shared_perceptual_noise':
-
-                dm = self.make_dm(x=self.data['n2'], variable='perceptual_noise_sd')
-                perceptual_noise_poly_pars = pt.stack([self.get_trialwise_variable(f'perceptual_noise_sd_poly{n}') for n in range(self.polynomial_order[0])], axis=1)
-                perceptual_noise_sd = pt.softplus(pt.sum(perceptual_noise_poly_pars * dm, 1))
-
-                n2_evidence_sd = perceptual_noise_sd
-
-            return n2_evidence_sd
-
-        else:
-            raise ValueError()
+        return pt.softplus(pt.sum(spline_pars * dm, 1))
 
     def make_dm(self, x, variable='n1_evidence_sd'):
 
+        min_n, max_n = self.data[['n1', 'n2']].min().min(), self.data[['n1', 'n2']].max().max()
 
-
-        if self.bspline:
-            min_n, max_n = self.data[['n1', 'n2']].min().min(), self.data[['n1', 'n2']].max().max()
-
-            if self.fit_seperate_evidence_sd:
-                if variable in ['n1_evidence_sd', 'perceptual_noise_sd']:
-                    polynomial_order = self.polynomial_order[0]
-                elif variable in ['n2_evidence_sd', 'memory_noise_sd']:
-                    polynomial_order = self.polynomial_order[1]
-            else:
-                polynomial_order = self.polynomial_order
-
-            if polynomial_order > 1:
-                dm = np.asarray(dmatrix(f"bs(x, degree=3, df={polynomial_order}, include_intercept=True, lower_bound={min_n}, upper_bound={max_n}) - 1",
-                                {"x": x}))
-            else:
-                dm = np.asarray(dmatrix(f"bs(x, degree=0, df=0, include_intercept=False, lower_bound={min_n}, upper_bound={max_n})",
-                                {"x": x}))
-
+        if self.fit_seperate_evidence_sd:
+            if variable in ['n1_evidence_sd', 'perceptual_noise_sd']:
+                polynomial_order = self.polynomial_order[0]
+            elif variable in ['n2_evidence_sd', 'memory_noise_sd']:
+                polynomial_order = self.polynomial_order[1]
         else:
-            model = pm.Model.get_context()
-            exponents = np.arange(self.polynomial_order)
-            dm = model[variable][:, np.newaxis]**exponents[np.newaxis, :]
+            polynomial_order = self.polynomial_order
+
+        if polynomial_order > 1:
+            dm = np.asarray(dmatrix(f"bs(x, degree=3, df={polynomial_order}, include_intercept=True, lower_bound={min_n}, upper_bound={max_n}) - 1",
+                            {"x": x}))
+        else:
+            dm = np.asarray(dmatrix(f"bs(x, degree=0, df=0, include_intercept=False, lower_bound={min_n}, upper_bound={max_n})",
+                            {"x": x}))
 
         return dm
 
-    @staticmethod
-    def get_sd_curve(model, idata, x=None, variable='both', group=True):
+    # @staticmethod
+    def get_sd_curve(self, idata, x=None, variable='n1_evidence_sd', group=True, hierarchical=True, data=None):
+
+        assert(variable in ['n1_evidence_sd', 'n2_evidence_sd', 'both', 'perceptual_noise_sd', 'memory_noise_sd']), "Variable must be 'n1_evidence_sd', 'n2_evidence_sd', 'both', 'perceptual_noise_sd', or 'memory_noise_sd'."
 
         if x is None:
-            x_min, x_max = model.data[['n1', 'n2']].min().min(), model.data[['n1', 'n2']].max().max()
+            assert((data is not None) or (hasattr(self, 'data'))), "If x is not provided, data must be provided."
+
+            if data is None:
+                data = self.data
+
+            x_min, x_max = data[['n1', 'n2']].min().min(), data[['n1', 'n2']].max().max()
             x = np.linspace(x_min, x_max, 100)
 
+        if group and not hierarchical:
+            raise ValueError('Groupwise estimates only for hierarchical models.')
+
+        labels1, labels2 = self._get_evidence_sd_spline_par_labels()
 
         if group:
-            key = 'sd_poly{}_mu'
+            labels1 = [f'{l}_mu' for l in labels1]
+            labels2 = [f'{l}_mu' for l in labels2]
+
+        if (variable == 'n1_evidence_sd') & (self.memory_model == 'shared_perceptual_noise'):
+            perceptual_noise = idata.posterior[labels1].to_dataframe()
+            memory_noise = idata.posterior[labels2].to_dataframe()
+
+            dm1 = self.make_dm(x=x, variable='perceptual_noise_sd')
+            dm2 = self.make_dm(x=x, variable='memory_noise_sd')
+
+            perceptual_noise = softplus_np(perceptual_noise.dot(dm1.T))
+            memory_noise = softplus_np(memory_noise.dot(dm2.T))
+
         else:
-            key = 'sd_poly{}'
+            if variable in ['n1_evidence_sd', 'memory_noise']:
+                labels = labels1
+            else:
+                labels = labels2
 
-        if variable in ['n1', 'memory_noise_sd', 'perceptual_noise_sd', 'both']:
-            print('yo1')
-            if model.memory_model == 'independent':
-                dm = np.asarray(model.make_dm(x=x, variable='n1_evidence_sd'))
-                n1_sd = idata.posterior[[f'n1_evidence_{key.format(ix)}' for ix in range(0, model.polynomial_order[0])]].to_dataframe()
-                n1_sd = softplus_np(n1_sd.dot(dm.T))
-            elif model.memory_model == 'shared_perceptual_noise':
-                print('yo2')
-                perceptual_noise_sd = idata.posterior[[f'perceptual_noise_{key.format(ix)}' for ix in range(0, model.polynomial_order[0])]].to_dataframe()
-                memory_noise_sd = idata.posterior[[f'memory_noise_{key.format(ix)}' for ix in range(0, model.polynomial_order[1])]].to_dataframe()
+            pars = idata.posterior[labels].to_dataframe()
+            dm = self.make_dm(x=x, variable=variable)
+            output = softplus_np(pars.dot(dm.T))
 
-                dm = np.asarray(model.make_dm(x=x, variable='perceptual_noise_sd'))
-                perceptual_noise_sd = softplus_np(perceptual_noise_sd.dot(dm.T))
+        output.columns = x
+        output.columns.name = 'x'
 
-                dm = np.asarray(model.make_dm(x=x, variable='memory_noise_sd'))
-                memory_noise_sd = softplus_np(memory_noise_sd.dot(dm.T))
-                n1_sd = memory_noise_sd + perceptual_noise_sd
+        output = output.stack().to_frame(variable)
+        output.columns.name = 'variable'
 
-                memory_noise_sd.columns = x
-                memory_noise_sd.columns.name = 'x'
-                perceptual_noise_sd.columns = x
-                perceptual_noise_sd.columns.name = 'x'
+        return output
 
+    @classmethod
+    def get_sd_curve_stats(n_sd, groupby=[]):
+        keys = ['x']
 
-            n1_sd.columns = x
-            n1_sd.columns.name = 'x'
+        if 'subject' in n_sd.index.names:
+            keys.append('subject')
 
-        if (variable == 'n2') or ((variable == 'both') & (model.memory_model == 'independent')):
-            if model.memory_model == 'independent':
-                dm = np.asarray(model.make_dm(x=x, variable='n2_evidence_sd'))
-                n2_sd = idata.posterior[[f'n2_evidence_{key.format(ix)}' for ix in range(0, model.polynomial_order[1])]].to_dataframe()
-                n2_sd = softplus_np(n2_sd.dot(dm.T))
-            elif model.memory_model == 'shared_perceptual_noise':
-                dm = np.asarray(model.make_dm(x=x, variable='perceptual_noise_sd'))
-                perceptual_noise_sd = idata.posterior[[f'perceptual_noise_{key.format(ix)}' for ix in range(0, model.polynomial_order[0])]].to_dataframe()
-                perceptual_noise_sd = softplus_np(perceptual_noise_sd.dot(dm.T))
-                n2_sd = perceptual_noise_sd.dot(dm.T)
-                perceptual_noise_sd.columns = x
-                perceptual_noise_sd.columns.name = 'x'
+        if 'variable' in n_sd.index.names:
+            keys.append('variable')
 
-            n2_sd.columns = x
-            n2_sd.columns.name = 'x'
+        keys += groupby
 
-        if variable == 'n1':
-            output = n1_sd
-        elif variable == 'n2':
-            output = n2_sd.stack().to_frame('sd')
-        elif variable == 'perceptual_noise_sd':
-            output = perceptual_noise_sd.stack().to_frame('sd')
-        elif variable == 'memory_noise_sd':
-            output = memory_noise_sd.stack().to_frame('sd')
-        else:
-            if model.memory_model == 'independent':
-                output = pd.concat((n1_sd, n2_sd), axis=0, keys=['n1', 'n2'], names=['variable'])
-            elif model.memory_model == 'shared_perceptual_noise':
-                output = pd.concat((perceptual_noise_sd, memory_noise_sd), axis=0, keys=['perceptual_noise_sd', 'memory_noise_sd'], names=['variable'])
+        sd_ci = n_sd.groupby(keys).apply(lambda d: pd.Series(hdi(d.values.ravel())))#, index=pd.Index(['hdi025', 'hdi975']))))
+        sd_ci.columns = ['hdi025', 'hdi975']
+        sd_mean = n_sd.groupby(keys).mean()
 
-        return output.stack().to_frame('sd')
+        return sd_mean.join(sd_ci)
 
+    @classmethod
+    def plot_sd_curve_stats(n_sd_stats, ylim=(0, 20), y=None, **kwargs):
+
+        if y == None:
+            y = n_sd_stats.columns[0]
+
+        hue = 'variable' if 'variable' in n_sd_stats.index.names else None
+        col = 'subject' if 'subject' in n_sd_stats.index.names else None
+
+        g = sns.FacetGrid(n_sd_stats.reset_index(), hue=hue, col=col, col_wrap=3 if col is not None else None, sharex=False, sharey=False,
+                        **kwargs)
+
+        g.map_dataframe(plot_prediction, x='x', y=y)
+        g.map_dataframe(plt.plot, 'x', y)
+
+        g.set(ylim=ylim)
+        g.fig.set_size_inches(6, 6)
+
+        return g
 
     @staticmethod
     def get_sd_curve_stats(n_sd, groupby=[]):
@@ -1251,7 +1220,16 @@ class FlexibleSDComparisonModel(BaseModel):
 
         return g
 
-class FlexibleSDRiskModel(FlexibleSDComparisonModel, RiskModel):
+    def _get_paradigm(self, paradigm=None):
+
+        paradigm_ = super()._get_paradigm(paradigm)
+
+        paradigm_['n1'] = paradigm['n1'].values
+        paradigm_['n2'] = paradigm['n2'].values
+
+        return paradigm_
+
+class FlexibleSDRiskModel(FlexibleNoiseComparisonModel, RiskModel):
 
     def __init__(self, data, prior_estimate='objective', fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, polynomial_order=5, bspline=False,
                  memory_model='independent'):
@@ -1291,7 +1269,7 @@ class FlexibleSDRiskModel(FlexibleSDComparisonModel, RiskModel):
             safe_prior_sd = np.std(safe_n)
             self.build_hierarchical_nodes('safe_prior_sd', mu_intercept=safe_prior_sd, sigma_intercept=15, cauchy_sigma_intercept=.5, cauchy_sigma_regressors=.5, transform='softplus')
 
-            FlexibleSDComparisonModel.build_priors(self)
+            FlexibleNoiseComparisonModel.build_priors(self)
         else:
             prior_mu = (np.mean(self.data['n1']) + np.mean(self.data['n2']))/2.
             prior_sd = (np.std(self.data['n1']) + np.std(self.data['n2']))/2.
@@ -1299,7 +1277,7 @@ class FlexibleSDRiskModel(FlexibleSDComparisonModel, RiskModel):
             self.build_hierarchical_nodes('prior_mu', mu_intercept=prior_mu, sigma_intercept=15, cauchy_sigma_intercept=0.5, cauchy_sigma_regressors=0.5, transform='identity')
             self.build_hierarchical_nodes('prior_sd', mu_intercept=prior_sd, sigma_intercept=15, cauchy_sigma_intercept=0.5, cauchy_sigma_regressors=0.5, transform='softplus')
 
-            FlexibleSDComparisonModel.build_priors(self)
+            FlexibleNoiseComparisonModel.build_priors(self)
 
     def _get_paradigm(self, data=None):
         return RiskModel._get_paradigm(self, data)
