@@ -1267,7 +1267,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         return paradigm_
 
-class FlexibleNoiseComparisonRegressionkModel(RegressionModel, FlexibleNoiseComparisonModel):
+class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseComparisonModel):
 
     def __init__(self, data,
                  regressors,
