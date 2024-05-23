@@ -1267,6 +1267,42 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         return paradigm_
 
+class FlexibleNoiseComparisonRegressionkModel(RegressionModel, FlexibleNoiseComparisonModel):
+
+    def __init__(self, data,
+                 regressors,
+                 fit_seperate_evidence_sd=True,
+                 fit_prior=False,
+                 polynomial_order=5, 
+                 memory_model='independent'):
+
+        if (type(polynomial_order) is int) and fit_seperate_evidence_sd:
+            polynomial_order = polynomial_order, polynomial_order 
+
+        
+        for key in list(regressors.keys()):
+
+            if key in ['evidence_sd', 'n1_evidence_sd', 'memory_noise', 'n2_evidence_sd', 'perceptual_noise']:
+
+                if key in ['evidence_sd']:
+                    po = polynomial_order
+                elif key in ['n1_evidence_sd', 'memory_noise']:
+                    po = polynomial_order[0]
+                elif key in ['n2_evidence_sd', 'perceptual_noise']:
+                    po = polynomial_order[1]
+
+                warn(f'Found {key} in regressors, will add it for all {po} splines!')
+
+                for i in range(1, po+1):
+                    regressors[f'{key}_spline{i}'] = regressors[key]
+
+                regressors.pop(key)
+            
+
+        RegressionModel.__init__(self, regressors)
+        FlexibleNoiseComparisonModel.__init__(self, data, fit_seperate_evidence_sd, fit_prior,
+                                              polynomial_order, memory_model)
+
 class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
 
     def __init__(self, data, prior_estimate='full',
@@ -1425,7 +1461,7 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
     def _get_paradigm(self, paradigm=None):
         return RiskModel._get_paradigm(self, paradigm)
 
-class FlexibleNoiseRisRegressionkModel(RegressionModel, FlexibleNoiseRiskModel):
+class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
 
     def __init__(self, data,
                  regressors,
