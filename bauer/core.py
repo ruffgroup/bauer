@@ -55,7 +55,7 @@ class BaseModel(object):
                                                model_inputs['n2_evidence_mu'], 
                                                model_inputs['n2_evidence_sd'])
 
-        diff_mu, diff_sd = get_diff_dist(post_n2_mu, model_inputs['n1_evidence_sd'], post_n1_mu, model_inputs['n2_evidence_sd'])
+        diff_mu, diff_sd = get_diff_dist(post_n2_mu, model_inputs['n2_evidence_sd'], post_n1_mu, model_inputs['n1_evidence_sd'])
 
         if self.save_trialwise_n_estimates:
             pm.Deterministic('n1_hat', post_n1_mu)
@@ -87,7 +87,6 @@ class BaseModel(object):
 
         if data is None:
             data = self.data
-
 
         if hierarchical and (coords is None):
             assert('subject' in data.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
@@ -218,7 +217,7 @@ class BaseModel(object):
             pars = {key: pars[key] for key in self.free_parameters}
 
         if 'subject' in self.estimation_model.coords:
-            pars = pd.DataFrame(pars, index=self.estimation_model.coords['subject'])
+            pars = pd.DataFrame(pars, index=pd.Index(self.estimation_model.coords['subject'], name='subject'))
             pars.columns.name = 'parameter'
         
         return pars
