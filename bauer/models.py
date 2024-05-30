@@ -430,7 +430,8 @@ class LossAversionModel(BaseModel):
                  lapse_rate=0.01, 
                  normalize_likelihoods=True,
                  paradigm_type='mixed_vs_mixed',# mixed_vs_mixed or mixed_vs_0
-                 fix_prior_sds=True):
+                 fix_prior_sds=True,
+                 prior_for_noise='numerosity'): #numerosity or number
 
         if magnitude_grid is None:
             self.magnitude_grid = np.linspace(1, 100, 50) 
@@ -447,6 +448,8 @@ class LossAversionModel(BaseModel):
 
         self.normalize_likelihoods = normalize_likelihoods
 
+        self.prior_for_noise = prior_for_noise
+
         if paradigm_type == 'mixed_vs_mixed':
             self.paradigm_keys = ['p1', 'p2', 'gain1', 'gain2', 'loss1', 'loss2']
         elif paradigm_type == 'mixed_vs_0':
@@ -462,12 +465,16 @@ class LossAversionModel(BaseModel):
     def get_free_parameters(self):
 
         free_parameters = {}
-
+        
         free_parameters['prior_mu_gains'] = {'mu_intercept': np.log(10.), 'sigma_intercept':np.log(10)/2., 'transform': 'identity'}
         free_parameters['prior_mu_losses'] = {'mu_intercept': np.log(10.), 'sigma_intercept':np.log(10)/2., 'transform': 'identity'}
-
-        free_parameters['evidence_sd_gains'] = {'mu_intercept': -1., 'transform': 'softplus'}
-        free_parameters['evidence_sd_losses'] = {'mu_intercept': -1., 'transform': 'softplus'}
+        
+        if self.prior_for_noise == 'numerosity':
+            free_parameters['evidence_sd_gains'] = {'mu_intercept': -1., 'transform': 'softplus'}
+            free_parameters['evidence_sd_losses'] = {'mu_intercept': -1., 'transform': 'softplus'}
+        else:
+            free_parameters['evidence_sd_gains'] = {'mu_intercept': -2., 'transform': 'softplus'}
+            free_parameters['evidence_sd_losses'] = {'mu_intercept': -2., 'transform': 'softplus'}
 
         if not self.fix_prior_sds:
             free_parameters['prior_sd_gains'] = {'mu_intercept': 1., 'sigma_intercept':1., 'transform': 'softplus'}
