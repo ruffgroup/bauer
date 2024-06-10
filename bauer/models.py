@@ -1480,9 +1480,9 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
 
                 if key in ['evidence_sd']:
                     po = polynomial_order
-                elif key in ['n1_evidence_sd', 'memory_noise']:
+                elif key in ['n1_evidence_sd', 'memory_noise_sd']:
                     po = polynomial_order[0]
-                elif key in ['n2_evidence_sd', 'perceptual_noise']:
+                elif key in ['n2_evidence_sd', 'perceptual_noise_sd']:
                     po = polynomial_order[1]
 
                 warn(f'Found {key} in regressors, will add it for all {po} splines!')
