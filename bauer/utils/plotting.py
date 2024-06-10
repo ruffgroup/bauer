@@ -7,6 +7,9 @@ import pandas as pd
 import arviz as az
 from .math import softplus_np, logistic_np
 
+def cluster_offers(d, n=6, key='log(risky/safe)'):
+    return pd.qcut(d[key], n, duplicates='drop').apply(lambda x: x.mid)
+
 def get_hdi(d):
     return pd.Series(az.hdi(d.values, hdi_prob=0.95), index=['hdi_low', 'hdi_high'])
 
