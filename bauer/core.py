@@ -2,7 +2,7 @@ import warnings
 import pandas as pd
 import pymc as pm
 import numpy as np
-from .utils import cumulative_normal, get_diff_dist, get_posterior
+from .utils.bayes import cumulative_normal, get_diff_dist, get_posterior
 from .utils.math import logistic, softplus_np, logistic_np, logit_np, inverse_softplus_np
 import pytensor.tensor as pt
 from patsy import dmatrix
