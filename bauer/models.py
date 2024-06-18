@@ -17,13 +17,13 @@ from warnings import warn
 
 class MagnitudeComparisonModel(BaseModel):
 
-    def __init__(self, data=None, fit_prior=False, fit_seperate_evidence_sd=True, memory_model = 'independent',save_trialwise_n_estimates=False):
+    def __init__(self, paradigm=None, fit_prior=False, fit_seperate_evidence_sd=True, memory_model = 'independent',save_trialwise_n_estimates=False):
 
         self.fit_prior = fit_prior
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
         self.memory_model = memory_model
 
-        super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
+        super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
     def get_model_inputs(self, parameters):
 
@@ -86,8 +86,8 @@ class MagnitudeComparisonModel(BaseModel):
             free_parameters['evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
 
         if self.fit_prior:
-            objective_mu = np.mean(np.stack((self.data['n1'], self.data['n2'])))
-            objective_sd = np.mean(np.stack((self.data['n1'], self.data['n2'])))
+            objective_mu = np.mean(np.stack((self.paradigm['n1'], self.paradigm['n2'])))
+            objective_sd = np.mean(np.stack((self.paradigm['n1'], self.paradigm['n2'])))
 
             free_parameters['prior_mu'] = {'mu_intercept': objective_mu, 'transform': 'identity'}
             free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
@@ -118,9 +118,9 @@ class MagnitudeComparisonModel(BaseModel):
         
 class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonModel):
 
-    def __init__(self, data, regressors, fit_prior=False, fit_seperate_evidence_sd=True, memory_model = 'independent',save_trialwise_estimates=False):
+    def __init__(self, paradigm, regressors, fit_prior=False, fit_seperate_evidence_sd=True, memory_model = 'independent',save_trialwise_estimates=False):
         RegressionModel.__init__(self, regressors)
-        MagnitudeComparisonModel.__init__(self, data, fit_prior, fit_seperate_evidence_sd, memory_model, save_trialwise_estimates)
+        MagnitudeComparisonModel.__init__(self, paradigm, fit_prior, fit_seperate_evidence_sd, memory_model, save_trialwise_estimates)
 
 class MagnitudeComparisonLapseModel(LapseModel, MagnitudeComparisonModel):
     ...
@@ -130,13 +130,12 @@ class MagnitudeComparisonLapseRegressionModel(LapseModel, MagnitudeComparisonReg
 
 class RiskModelProbabilityDistortion(BaseModel):
 
-    def __init__(self, data=None, magnitude_prior_estimate='objective', save_trialwise_n_estimates=False, n_prospects=2,
+    def __init__(self, paradigm=None, magnitude_prior_estimate='objective', save_trialwise_n_estimates=False, n_prospects=2,
                  p_grid_size=20, lapse_rate=0.01, distort_magnitudes=True, distort_probabilities=True,
                  fix_magnitude_prior_sd=False, fix_probabiliy_prior_sd=False,
                  estimate_magnitude_prior_mu=False):
 
-        assert magnitude_prior_estimateparadigm ['objective'], 'Only objective prior is currently supported'
-        assert(n_prospects == 2), 'Only two prospects are currently supported'
+        assert magnitude_prior_estimate in ['objective'], 'Only objective prior is currently supported' 
 
         self.magnitude_prior_estimate = magnitude_prior_estimate
         self.n_prospects = n_prospects
@@ -151,18 +150,18 @@ class RiskModelProbabilityDistortion(BaseModel):
         self.fix_magnitude_prior_sd = fix_magnitude_prior_sd
         self.fix_probabiliy_prior_sd = fix_probabiliy_prior_sd
 
-        if data is not None:
+        if paradigm is not None:
             for ix in range(self.n_prospects):
-                assert(f'n{ix+1}' in data.columns), f'Data should contain columns n1, n2, ... n{self.n_prospects}'
-                assert(f'p{ix+1}' in data.columns), f'Data should contain columns p1, p2, ... p{self.n_prospects}'
+                assert(f'n{ix+1}' in paradigm.columns), f'paradigm should contain columns n1, n2, ... n{self.n_prospects}'
+                assert(f'p{ix+1}' in paradigm.columns), f'paradigm should contain columns p1, p2, ... p{self.n_prospects}'
 
-        super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
+        super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
 
     def _get_paradigm(self, paradigm=None):
 
         if paradigm is None:
-            paradigm = self.data
+            paradigm = self.paradigm
 
         paradigm_ = {}
 
@@ -317,9 +316,9 @@ class RiskModelProbabilityDistortion(BaseModel):
         if self.distort_magnitudes:
             free_parameters['magnitude_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
 
-            if self.data is not None:
-                prior_mu = np.log(np.stack([self.data[f'n{ix+1}'].values for ix in range(self.n_prospects)])).mean()
-                prior_sd = np.log(np.stack([self.data[f'n{ix+1}'].values for ix in range(self.n_prospects)])).std()
+            if self.paradigm is not None:
+                prior_mu = np.log(np.stack([self.paradigm[f'n{ix+1}'].values for ix in range(self.n_prospects)])).mean()
+                prior_sd = np.log(np.stack([self.paradigm[f'n{ix+1}'].values for ix in range(self.n_prospects)])).std()
             else:
                 prior_mu = np.log(10)
                 prior_sd = np.log(30)
@@ -344,8 +343,8 @@ class ProspectTheoryModel(BaseModel):
     paradigm_keys = ['gain', 'loss', 'prob_gain']
     base_parameters = ['alpha', 'beta', 'lambda']
 
-    def __init__(self, data, save_trialwise_n_estimates=False):
-        super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
+    def __init__(self, paradigm, save_trialwise_n_estimates=False):
+        super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
     def get_free_parameters(self):
 
@@ -385,7 +384,7 @@ class LossAversionModel(BaseModel):
 
     base_parameters = ['prior_mu_gains', 'prior_mu_losses', 'evidence_sd_gains', 'evidence_sd_losses', 'prior_sd_gains', 'prior_sd_losses']
 
-    def __init__(self, data=None, save_trialwise_n_estimates=False, 
+    def __init__(self, paradigm=None, save_trialwise_n_estimates=False, 
                  magnitude_grid=None,
                  ev_diff_grid=None,
                  lapse_rate=0.01, 
@@ -417,7 +416,7 @@ class LossAversionModel(BaseModel):
 
         self.paradigm_type = paradigm_type
 
-        super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
+        super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
 
     def get_free_parameters(self):
@@ -615,15 +614,15 @@ class LossAversionModel(BaseModel):
 
 class LossAversionRegressionModel(RegressionModel, LossAversionModel):
 
-    def __init__(self, data=None, save_trialwise_n_estimates=False, magnitude_grid=None, ev_diff_grid=None, lapse_rate=0.01, normalize_likelihoods=True, paradigm_type='mixed_vs_mixed', fix_prior_sds=True, regressors=None):
-        LossAversionModel.__init__(self, data=data, save_trialwise_n_estimates=save_trialwise_n_estimates, magnitude_grid=magnitude_grid, ev_diff_grid=ev_diff_grid, lapse_rate=lapse_rate, normalize_likelihoods=normalize_likelihoods, paradigm_type=paradigm_type, fix_prior_sds=fix_prior_sds)
+    def __init__(self, paradigm=None, save_trialwise_n_estimates=False, magnitude_grid=None, ev_diff_grid=None, lapse_rate=0.01, normalize_likelihoods=True, paradigm_type='mixed_vs_mixed', fix_prior_sds=True, regressors=None):
+        LossAversionModel.__init__(self, paradigm=paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates, magnitude_grid=magnitude_grid, ev_diff_grid=ev_diff_grid, lapse_rate=lapse_rate, normalize_likelihoods=normalize_likelihoods, paradigm_type=paradigm_type, fix_prior_sds=fix_prior_sds)
         RegressionModel.__init__(self, regressors=regressors)
 
 class RiskModel(BaseModel):
 
     paradigm_keys = ['n1', 'n2', 'p1', 'p2']
 
-    def __init__(self, data=None, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
+    def __init__(self, paradigm=None, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
                  save_trialwise_n_estimates=False, memory_model='independent', n_prospects=2):
 
         assert prior_estimate in ['objective', 'shared', 'different', 'full', 'full_normed', 'klw']
@@ -633,7 +632,7 @@ class RiskModel(BaseModel):
         self.prior_estimate = prior_estimate
         self.incorporate_probability = incorporate_probability
 
-        super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
+        super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
     def get_model_inputs(self, parameters):
 
@@ -761,9 +760,9 @@ class RiskModel(BaseModel):
             free_parameters['evidence_sd'] = {'mu_intercept':-1., 'transform':'softplus'}
 
         if self.prior_estimate == 'shared':
-            if self.data is not None:
-                prior_mu = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
-                prior_sd = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+            if self.paradigm is not None:
+                prior_mu = np.mean(np.log(np.stack((self.paradigm['n1'], self.paradigm['n2']))))
+                prior_sd = np.mean(np.log(np.stack((self.paradigm['n1'], self.paradigm['n2']))))
             else:
                 prior_mu = np.log(25)
                 prior_sd = 2
@@ -773,8 +772,8 @@ class RiskModel(BaseModel):
 
         elif self.prior_estimate == 'different':
 
-            if self.data is not None:
-                risky_n = np.where(self.data['p1'] != 1.0, self.data['n1'], self.data['n2'])
+            if self.paradigm is not None:
+                risky_n = np.where(self.paradigm['p1'] != 1.0, self.paradigm['n1'], self.paradigm['n2'])
                 risky_prior_mu = np.mean(np.log(risky_n))
                 risky_prior_sd = np.std(np.log(risky_n))
             else:
@@ -785,9 +784,9 @@ class RiskModel(BaseModel):
             free_parameters['risky_prior_sd'] = {'mu_intercept':risky_prior_sd, 'transform':'identity'}
 
         elif self.prior_estimate in ['full', 'full_normed']:
-            if self.data is not None:
-                risky_n = np.where(self.data['p1'] != 1.0, self.data['n1'], self.data['n2'])
-                safe_n = np.where(self.data['p2'] != 1.0, self.data['n2'], self.data['n1'])
+            if self.paradigm is not None:
+                risky_n = np.where(self.paradigm['p1'] != 1.0, self.paradigm['n1'], self.paradigm['n2'])
+                safe_n = np.where(self.paradigm['p2'] != 1.0, self.paradigm['n2'], self.paradigm['n1'])
 
                 risky_prior_mu = np.mean(np.log(risky_n))
                 risky_prior_sd = np.std(np.log(risky_n))
@@ -812,7 +811,11 @@ class RiskModel(BaseModel):
                 free_parameters['safe_prior_sd'] = {'mu_intercept':safe_prior_sd, 'transform':'softplus'}
 
         elif self.prior_estimate == 'klw':
-            prior_sd = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+            if hasattr(self, 'paradigm') and (self.paradigm is not None):
+                prior_sd = np.std(np.log(np.stack((self.paradigm['n1'], self.paradigm['n2']))))
+            else:
+                prior_sd = 1.5
+
             free_parameters['prior_sd'] = {'mu_intercept':inverse_softplus_np(prior_sd), 'transform':'softplus'}
 
         return free_parameters
@@ -840,10 +843,10 @@ class RiskModel(BaseModel):
 
 class RiskRegressionModel(RegressionModel, RiskModel):
 
-    def __init__(self,  data, regressors, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
+    def __init__(self,  paradigm, regressors, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
                  save_trialwise_n_estimates=False, memory_model='independent'):
         RegressionModel.__init__(self, regressors)
-        RiskModel.__init__(self, data, prior_estimate, fit_seperate_evidence_sd, incorporate_probability=incorporate_probability,
+        RiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd, incorporate_probability=incorporate_probability,
                            save_trialwise_n_estimates=save_trialwise_n_estimates, memory_model=memory_model)
 
     def get_trialwise_variable(self, key):
@@ -885,10 +888,10 @@ class RiskLapseRegressionModel(LapseModel, RiskRegressionModel):
 
 class RNPModel(BaseModel):
 
-    def __init__(self, data, risk_neutral_p=0.55):
+    def __init__(self, paradigm, risk_neutral_p=0.55):
         self.risk_neutral_p = risk_neutral_p
 
-        super().__init__(data)
+        super().__init__(paradigm)
 
     def get_model_inputs(self):
 
@@ -902,13 +905,13 @@ class RNPModel(BaseModel):
 
         return model_inputs
 
-    def _get_paradigm(self, data=None):
+    def _get_paradigm(self, paradigm=None):
 
-        paradigm = super()._get_paradigm(data)
+        paradigm = super()._get_paradigm(paradigm)
 
-        paradigm['p1'] = data['p1'].values
-        paradigm['p2'] = data['p2'].values
-        paradigm['risky_first'] = data['risky_first'].values.astype(bool)
+        paradigm['p1'] = paradigm['p1'].values
+        paradigm['p2'] = paradigm['p2'].values
+        paradigm['risky_first'] = paradigm['risky_first'].values.astype(bool)
 
         return paradigm
 
@@ -934,15 +937,15 @@ class RNPModel(BaseModel):
         self.build_hierarchical_nodes('rnp', mu_intercept=0.0, sigma_intercept=1.0, transform='logistic')
 
 class RNPRegressionModel(RegressionModel, RNPModel):
-    def __init__(self,  data, regressors, risk_neutral_p=0.55):
-        RegressionModel.__init__(self, data, regressors=regressors)
-        RNPModel.__init__(self, data, risk_neutral_p)
+    def __init__(self,  paradigm, regressors, risk_neutral_p=0.55):
+        RegressionModel.__init__(self, paradigm, regressors=regressors)
+        RNPModel.__init__(self, paradigm, risk_neutral_p)
 
 
 class FlexibleNoiseComparisonModel(BaseModel):
 
 
-    def __init__(self, data, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm, fit_seperate_evidence_sd=True,
                  fit_prior=False,
                  polynomial_order=5,
                  memory_model='independent'):
@@ -960,22 +963,22 @@ class FlexibleNoiseComparisonModel(BaseModel):
         self.max_polynomial_order = np.max(self.polynomial_order)
         self.memory_model = memory_model
 
-        super().__init__(data)
+        super().__init__(paradigm)
 
-    def build_estimation_model(self, data=None, coords=None, hierarchical=True, save_p_choice=False):
+    def build_estimation_model(self, paradigm=None, coords=None, hierarchical=True, save_p_choice=False):
         
         coords = {}
 
-        if data is None:
-            data = self.data
+        if paradigm is None:
+            paradigm = self.paradigm
 
         if hierarchical and ('subject' not in coords.keys()):
-            assert('subject' in data.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
-            coords['subject'] = data.index.unique(level='subject')
+            assert('subject' in paradigm.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
+            coords['subject'] = paradigm.index.unique(level='subject')
 
         coords['poly_order'] = np.arange(self.max_polynomial_order)
 
-        return BaseModel.build_estimation_model(self, data=data, coords=coords, hierarchical=hierarchical, save_p_choice=save_p_choice)
+        return BaseModel.build_estimation_model(self, paradigm=paradigm, coords=coords, hierarchical=hierarchical, save_p_choice=save_p_choice)
 
     def get_model_inputs(self, parameters):
 
@@ -1022,8 +1025,13 @@ class FlexibleNoiseComparisonModel(BaseModel):
                 free_parameters[f'evidence_sd_spline{n}'] = {'mu_intercept': 5., 'sigma_intercept': 5., 'transform': 'identity'}
 
         if self.fit_prior:
-            objective_mu = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
-            objective_sd = np.mean(np.log(np.stack((self.data['n1'], self.data['n2']))))
+            if self.paradigm is not None:
+                objective_mu = np.mean(np.log(np.stack((self.paradigm['n1'], self.paradigm['n2']))))
+                objective_sd = np.mean(np.log(np.stack((self.paradigm['n1'], self.paradigm['n2']))))
+
+            else:
+                objective_mu = np.log(25)
+                objective_sd = 2
 
             free_parameters['prior_mu'] = {'mu_intercept': objective_mu, 'transform': 'identity'}
             free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
@@ -1059,26 +1067,26 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         if key == 'n1_evidence_sd':
             if self.memory_model == 'independent':
-                dm = self.make_dm(x=self.data['n1'], variable=key1)
+                dm = self.make_dm(x=self.paradigm['n1'], variable=key1)
                 spline_pars = pt.stack([parameters[l1] for l1 in labels1], axis=1)
 
             elif self.memory_model == 'shared_perceptual_noise':
-                dm1 = self.make_dm(x=self.data['n1'], variable=key1)
+                dm1 = self.make_dm(x=self.paradigm['n1'], variable=key1)
                 spline_pars1 = pt.stack([parameters[l1] for l1 in labels1], axis=1)
-                dm2 = self.make_dm(x=self.data['n1'], variable=key2)
+                dm2 = self.make_dm(x=self.paradigm['n1'], variable=key2)
                 spline_pars2 = pt.stack([parameters[l1] for l1 in labels1], axis=1)
 
                 return pt.softplus(pt.sum(spline_pars1 * dm1, 1) + pt.sum(spline_pars2 * dm2, 1))
 
         elif key == 'n2_evidence_sd':
-            dm = self.make_dm(x=self.data['n2'], variable=key2)
+            dm = self.make_dm(x=self.paradigm['n2'], variable=key2)
             spline_pars = pt.stack([parameters[l2] for l2 in labels2], axis=1)
 
         return pt.softplus(pt.sum(spline_pars * dm, 1))
 
     def make_dm(self, x, variable='n1_evidence_sd'):
 
-        min_n, max_n = self.data[['n1', 'n2']].min().min(), self.data[['n1', 'n2']].max().max()
+        min_n, max_n = self.paradigm[['n1', 'n2']].min().min(), self.paradigm[['n1', 'n2']].max().max()
 
         if self.fit_seperate_evidence_sd:
             if variable in ['n1_evidence_sd', 'perceptual_noise_sd']:
@@ -1269,7 +1277,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
 class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseComparisonModel):
 
-    def __init__(self, data,
+    def __init__(self, paradigm,
                  regressors,
                  fit_seperate_evidence_sd=True,
                  fit_prior=False,
@@ -1300,12 +1308,12 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
             
 
         RegressionModel.__init__(self, regressors)
-        FlexibleNoiseComparisonModel.__init__(self, data, fit_seperate_evidence_sd, fit_prior,
+        FlexibleNoiseComparisonModel.__init__(self, paradigm, fit_seperate_evidence_sd, fit_prior,
                                               polynomial_order, memory_model)
 
 class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
 
-    def __init__(self, data, prior_estimate='full',
+    def __init__(self, paradigm, prior_estimate='full',
                  fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, polynomial_order=5, 
                  representational_noise='payoff',
                  memory_model='independent'):
@@ -1323,7 +1331,7 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
         self.max_polynomial_order = np.max(self.polynomial_order)
         self.representational_noise = representational_noise
 
-        RiskModel.__init__(self, data, save_trialwise_n_estimates=save_trialwise_n_estimates,
+        RiskModel.__init__(self, paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates,
                            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
                            prior_estimate=prior_estimate,
                            memory_model=memory_model)
@@ -1418,9 +1426,9 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
         self.fit_prior = True
 
         if self.prior_estimate == 'full':
-            if self.data is not None:
-                risky_n = np.where(self.data['p1'] != 1.0, self.data['n1'], self.data['n2'])
-                safe_n = np.where(self.data['p2'] != 1.0, self.data['n2'], self.data['n1'])
+            if self.paradigm is not None:
+                risky_n = np.where(self.paradigm['p1'] != 1.0, self.paradigm['n1'], self.paradigm['n2'])
+                safe_n = np.where(self.paradigm['p2'] != 1.0, self.paradigm['n2'], self.paradigm['n1'])
 
                 risky_prior_mu = np.mean(risky_n)
                 risky_prior_sd = np.std(risky_n)
@@ -1444,9 +1452,9 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
 
         elif self.prior_estimate == 'shared':
 
-            if self.data is not None:
-                prior_mu = np.mean(np.stack((self.data['n1'], self.data['n2'])))
-                prior_sd = np.mean(np.stack((self.data['n1'], self.data['n2'])))
+            if self.paradigm is not None:
+                prior_mu = np.mean(np.stack((self.paradigm['n1'], self.paradigm['n2'])))
+                prior_sd = np.mean(np.stack((self.paradigm['n1'], self.paradigm['n2'])))
             else:
                 prior_mu = 25
                 prior_sd = 25
@@ -1463,7 +1471,7 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
 
 class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
 
-    def __init__(self, data,
+    def __init__(self, paradigm,
                  regressors,
                  prior_estimate='full',
                  fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, polynomial_order=5, 
@@ -1494,7 +1502,7 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
             
 
         RegressionModel.__init__(self, regressors)
-        FlexibleNoiseRiskModel.__init__(self, data, prior_estimate, fit_seperate_evidence_sd, save_trialwise_n_estimates,
+        FlexibleNoiseRiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd, save_trialwise_n_estimates,
                                         polynomial_order, representational_noise, memory_model)
 
 class ExpectedUtilityRiskModel(BaseModel):

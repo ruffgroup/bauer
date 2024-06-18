@@ -11,14 +11,14 @@ class BaseModel(object):
 
     paradigm_keys = []
 
-    def __init__(self, data, save_trialwise_n_estimates=False):
+    def __init__(self, paradigm, save_trialwise_n_estimates=False):
         """
         data should contain ['n1', 'n2'] and 'choice'.
         The latter should be a boolean that indicates whether the *second*
         option was chosen.
         
         """
-        self.data = data
+        self.paradigm = paradigm
         self.save_trialwise_n_estimates = save_trialwise_n_estimates
         self.free_parameters = self.get_free_parameters()
 
