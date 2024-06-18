@@ -1507,48 +1507,56 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
 
 class ExpectedUtilityRiskModel(BaseModel):
 
-    def __init__(self, data, save_trialwise_eu=False, probability_distortion=False, n_outcomes=1):
+    paradigm_keys = ['n1', 'n2', 'p1', 'p2']
+
+    def __init__(self, paradigm, save_trialwise_eu=False, probability_distortion=False, n_outcomes=1):
         self.save_trialwise_eu = save_trialwise_eu
         self.probability_distortion = probability_distortion
         self.n_outcomes = n_outcomes
 
-        super().__init__(data)
+        super().__init__(paradigm)
 
-    def _get_paradigm(self, data=None):
+    def _get_paradigm(self, paradigm=None):
 
         if self.n_outcomes == 1:
-            paradigm = super()._get_paradigm(data)
+            paradigm_ = super()._get_paradigm(paradigm)
 
-            paradigm['p1'] = data['p1'].values
-            paradigm['p2'] = data['p2'].values
-            paradigm['risky_first'] = data['risky_first'].values.astype(bool)
+            paradigm_['p1'] = paradigm['p1'].values
+            paradigm_['p2'] = paradigm['p2'].values
+            paradigm_['n1'] = paradigm['n1'].values
+            paradigm_['n2'] = paradigm['n2'].values
+            paradigm_['risky_first'] = paradigm['risky_first'].values.astype(bool)
 
         else:
-            paradigm = {}
-            paradigm['subject_ix'], _ = pd.factorize(data.index.get_level_values('subject'))
+            paradigm_ = {}
+            paradigm_['subject_ix'], _ = pd.factorize(paradigm.index.get_level_values('subject'))
 
-            if 'choice' in data.columns:
-                paradigm['choice'] = data.choice.values
+            if 'choice' in paradigm.columns:
+                paradigm_['choice'] = paradigm.choice.values
             else:
                 print('*** Warning: did not find choice column, assuming all choices are False ***')
-                paradigm['choice'] = np.zeros_like(paradigm['n1']).astype(bool)
+                paradigm_['choice'] = np.zeros_like(paradigm['n1']).astype(bool)
 
             for ix in range(1, self.n_outcomes+1):
-                paradigm[f'n1.{ix}'] = data[f'n1.{ix}'].values
-                paradigm[f'n2.{ix}'] = data[f'n2.{ix}'].values
-                paradigm[f'p1.{ix}'] = data[f'p1.{ix}'].values
-                paradigm[f'p2.{ix}'] = data[f'p2.{ix}'].values
-                paradigm[f'log(n1.{ix})'] = np.log(data[f'n1.{ix}'].values)
-                paradigm[f'log(n2.{ix})'] = np.log(data[f'n2.{ix}'].values)
+                paradigm_[f'n1.{ix}'] = paradigm[f'n1.{ix}'].values
+                paradigm_[f'n2.{ix}'] = paradigm[f'n2.{ix}'].values
+                paradigm_[f'p1.{ix}'] = paradigm[f'p1.{ix}'].values
+                paradigm_[f'p2.{ix}'] = paradigm[f'p2.{ix}'].values
+                paradigm_[f'log(n1.{ix})'] = np.log(paradigm[f'n1.{ix}'].values)
+                paradigm_[f'log(n2.{ix})'] = np.log(paradigm[f'n2.{ix}'].values)
 
-        return paradigm
+        return paradigm_
 
-    def build_priors(self):
-        self.build_hierarchical_nodes('alpha', mu_intercept=1., sigma_intercept=0.1, transform='softplus')
-        self.build_hierarchical_nodes('sigma', mu_intercept=10., sigma_intercept=10,  transform='softplus')
+    def get_free_parameters(self):
+        free_parameters = {}
+
+        free_parameters['alpha'] = {'mu_intercept': 1., 'sigma_intercept': 0.1, 'transform': 'softplus'}
+        free_parameters['sigma'] = {'mu_intercept': 10., 'sigma_intercept': 10., 'transform': 'softplus'}
 
         if self.probability_distortion:
-            self.build_hierarchical_nodes('phi', mu_intercept=inverse_softplus(0.61), sigma_intercept=1.,  transform='softplus')
+            free_parameters['phi'] = {'mu_intercept': inverse_softplus(0.61), 'sigma_intercept': 1., 'transform': 'softplus'}
+
+        return free_parameters
 
     def _get_choice_predictions(self, model_inputs):
 
@@ -1584,7 +1592,7 @@ class ExpectedUtilityRiskModel(BaseModel):
 
         return cumulative_normal(eu2 - eu1, 0.0, model_inputs['sigma'])
 
-    def get_model_inputs(self):
+    def get_model_inputs(self, parameters):
 
         model = pm.Model.get_context()
 
@@ -1603,15 +1611,15 @@ class ExpectedUtilityRiskModel(BaseModel):
                 model_inputs[f'p1.{ix}'] = model[f'p1.{ix}']
                 model_inputs[f'p2.{ix}'] = model[f'p2.{ix}']
 
-        model_inputs['alpha'] = self.get_trialwise_variable('alpha', transform='softplus')
-        model_inputs['sigma'] = self.get_trialwise_variable('sigma', transform='softplus')
+        model_inputs['alpha'] = parameters['alpha']
+        model_inputs['sigma'] = parameters['sigma']
 
         if self.probability_distortion:
-            model_inputs['phi'] = self.get_trialwise_variable('phi', transform='softplus')
+            model_inputs['phi'] = parameters['phi']
 
         return model_inputs
 
 class ExpectedUtilityRiskRegressionModel(RegressionModel, ExpectedUtilityRiskModel):
-    def __init__(self,  data, save_trialwise_eu, probability_distortion, regressors):
+    def __init__(self,  paradigm, save_trialwise_eu, probability_distortion, regressors):
         RegressionModel.__init__(self, regressors=regressors)
-        ExpectedUtilityRiskModel.__init__(self, data, save_trialwise_eu, probability_distortion=probability_distortion)
+        ExpectedUtilityRiskModel.__init__(self, paradigm, save_trialwise_eu, probability_distortion=probability_distortion)
