@@ -1,4 +1,3 @@
-from . import cluster_offers
 from .bayes import summarize_ppc
 import seaborn as sns
 import matplotlib.pyplot as plt
