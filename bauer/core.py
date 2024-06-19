@@ -86,7 +86,7 @@ class BaseModel(object):
     def build_estimation_model(self, data=None, coords=None, hierarchical=True, save_p_choice=False):
 
         if data is None:
-            data = self.data
+            data = self.paradigm
 
         if hierarchical and (coords is None):
             assert('subject' in data.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
