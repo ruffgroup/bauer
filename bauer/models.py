@@ -1525,7 +1525,6 @@ class ExpectedUtilityRiskModel(BaseModel):
             paradigm_['p2'] = paradigm['p2'].values
             paradigm_['n1'] = paradigm['n1'].values
             paradigm_['n2'] = paradigm['n2'].values
-            paradigm_['risky_first'] = paradigm['risky_first'].values.astype(bool)
 
         else:
             paradigm_ = {}
