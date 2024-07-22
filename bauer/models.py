@@ -978,7 +978,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         coords['poly_order'] = np.arange(self.max_polynomial_order)
 
-        return BaseModel.build_estimation_model(self, paradigm=paradigm, coords=coords, hierarchical=hierarchical, save_p_choice=save_p_choice)
+        return BaseModel.build_estimation_model(self, data=paradigm, coords=coords, hierarchical=hierarchical, save_p_choice=save_p_choice)
 
     def get_model_inputs(self, parameters):
 
