@@ -625,7 +625,7 @@ class RiskModel(BaseModel):
     def __init__(self, paradigm=None, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
                  save_trialwise_n_estimates=False, memory_model='independent', n_prospects=2):
 
-        assert prior_estimate in ['objective', 'shared', 'different', 'full', 'full_normed', 'klw']
+        assert prior_estimate in ['objective', 'shared', 'different', 'full', 'full_normed', 'klw', 'fix_prior_sd']
 
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
         self.memory_model = memory_model
@@ -664,6 +664,13 @@ class RiskModel(BaseModel):
             model_inputs['n1_prior_sd'] = parameters['prior_sd']
             model_inputs['n2_prior_mu'] = model_inputs['n1_prior_mu']
             model_inputs['n2_prior_sd'] = model_inputs['n1_prior_sd']
+
+        elif self.prior_estimate == 'fix_prior_sd':
+            model_inputs['n1_prior_sd'] = pt.std(pt.log(pt.stack((model['n1'], model['n2']), 0))) # fixed same prior sd
+            model_inputs['n2_prior_sd'] = model_inputs['n1_prior_sd']
+
+            model_inputs['n1_prior_mu'] = parameters['risky_prior_mu']
+            model_inputs['n2_prior_mu'] = parameters['safe_prior_mu']
 
         elif self.prior_estimate == 'two_mus':
 
@@ -809,6 +816,16 @@ class RiskModel(BaseModel):
 
             if self.prior_estimate == 'full':
                 free_parameters['safe_prior_sd'] = {'mu_intercept':safe_prior_sd, 'transform':'softplus'}
+
+        elif self.prior_estimate == 'fix_prior_sd': # only mus estimated but prior sd fixed
+            risky_n = np.where(self.paradigm['p1'] != 1.0, self.paradigm['n1'], self.paradigm['n2'])
+            safe_n = np.where(self.paradigm['p2'] != 1.0, self.paradigm['n2'], self.paradigm['n1'])
+            risky_prior_mu = np.mean(np.log(risky_n))
+            safe_prior_mu = np.mean(np.log(safe_n))
+            free_parameters['risky_prior_mu'] = {'mu_intercept':risky_prior_mu, 'transform':'identity'}
+            free_parameters['safe_prior_mu'] = {'mu_intercept':safe_prior_mu, 'transform':'identity'}
+
+
 
         elif self.prior_estimate == 'klw':
             if hasattr(self, 'paradigm') and (self.paradigm is not None):
@@ -1318,8 +1335,8 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
                  representational_noise='payoff',
                  memory_model='independent'):
 
-        if prior_estimate not in ['shared', 'full']:
-            raise NotImplementedError('For now only with shared/full prior estimate')
+        if prior_estimate not in ['shared', 'full', 'fix_prior_sd']:
+            raise NotImplementedError('For now only with shared/full/fix_prior_sd prior estimate')
 
         if representational_noise not in ['payoff', 'ev']:
             raise ValueError(f'Unknown representational noise: {representational_noise} (should be "payoff" or "ev")')
@@ -1359,6 +1376,12 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
 
             model_inputs['n2_prior_mu'] = pt.where(risky_first, safe_prior_mu, risky_prior_mu)
             model_inputs['n2_prior_sd'] = pt.where(risky_first, safe_prior_sd, risky_prior_sd)
+        elif self.prior_estimate == 'fix_prior_sd':
+            model_inputs['n1_prior_sd'] = pt.std(pt.log(pt.stack((model['n1'], model['n2']), 0))) # fixed same prior sd
+            model_inputs['n2_prior_sd'] = model_inputs['n1_prior_sd']
+
+            model_inputs['n1_prior_mu'] = parameters['risky_prior_mu']
+            model_inputs['n2_prior_mu'] = parameters['safe_prior_mu']
 
         else:
             model_inputs['n1_prior_mu'] = parameters['prior_mu']
@@ -1449,6 +1472,14 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
 
             if self.prior_estimate == 'full':
                 free_parameters['safe_prior_sd'] = {'mu_intercept':safe_prior_sd, 'transform':'softplus'}
+        
+        elif self.prior_estimate == 'fix_prior_sd': # only mus estimated but prior sd fixed
+            risky_n = np.where(self.paradigm['p1'] != 1.0, self.paradigm['n1'], self.paradigm['n2'])
+            safe_n = np.where(self.paradigm['p2'] != 1.0, self.paradigm['n2'], self.paradigm['n1'])
+            risky_prior_mu = np.mean(np.log(risky_n))
+            safe_prior_mu = np.mean(np.log(safe_n))
+            free_parameters['risky_prior_mu'] = {'mu_intercept':risky_prior_mu, 'transform':'identity'}
+            free_parameters['safe_prior_mu'] = {'mu_intercept':safe_prior_mu, 'transform':'identity'}
 
         elif self.prior_estimate == 'shared':
 
