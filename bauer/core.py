@@ -392,14 +392,27 @@ class BaseModel(object):
         else:
             return pd.concat([self._get_example_paradigm() for _ in range(n_subjects)], keys=np.arange(1, n_subjects+1), names=['subject'])
 
+    def get_model_inputs(self, parameters):
+
+        model = pm.Model.get_context()
+
+        model_inputs = {}
+
+        for key in self.base_parameters:
+            model_inputs[key] = parameters[key]
+        
+        for key in self.paradigm_keys:
+            model_inputs[key] = model[key]
+
+        return model_inputs
+
 class LapseModel(BaseModel):
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
 
-        pars['p_lapse'] = {'mu_intercept':-4., 'transform':'softplus'}
+        pars['p_lapse'] = {'mu_intercept':logit_np(0.02), 'transform':'logistic'}
         return pars
-
 
     def _get_choice_predictions(self, model_inputs):
         p_choice = super()._get_choice_predictions(model_inputs)
@@ -629,3 +642,29 @@ class RegressionModel(BaseModel):
             return pd.DataFrame(samples_pars, index=pd.Index(np.arange(1, n_subjects+1), name='subject'))
         else:
             return samples_pars
+
+    def get_conditionwise_parameters(self, idata, conditions, group=True):
+
+        parameter_values = []
+        free_parameters = self.get_free_parameters()
+
+        for parameter in free_parameters.keys():
+            dm = self.build_design_matrix(conditions, parameter)
+
+            if group:
+                trace = idata.posterior[f'{parameter}_mu'].to_dataframe().unstack(-1)
+            else:
+                trace = idata.posterior[f'{parameter}'].to_dataframe().unstack(-1)
+
+            par = (np.asarray(trace).reshape((1, -1, dm.shape[1])) @ dm.T)[0]
+
+            par = pd.DataFrame(par, columns=pd.MultiIndex.from_frame(conditions), index=trace.index)
+
+            if free_parameters[parameter]['transform'] == 'logistic':
+                par = logistic_np(par)
+            elif free_parameters[parameter]['transform'] == 'softplus':
+                par = np.log1p(np.exp(par))
+
+            parameter_values.append(par)
+
+        return pd.concat(parameter_values, axis=0, keys=free_parameters.keys(), names=['parameter'])
