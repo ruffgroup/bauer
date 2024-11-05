@@ -132,7 +132,7 @@ class BaseModel(object):
 
     def set_paradigm(self, paradigm=None):
         for key, value in paradigm.items():
-            pm.Data(key, value, mutable=True)
+            pm.Data(key, value)
 
     def update_paradigm(self, paradigm):
         raise NotImplementedError
@@ -162,7 +162,7 @@ class BaseModel(object):
 
             # Make parameters flexible
             for key, value in parameters.items():
-                pm.Data(key, value, mutable=True)
+                pm.Data(key, value)
 
             parameters = self.get_parameter_values()
             model_inputs = self.get_model_inputs(parameters)
@@ -607,10 +607,10 @@ class RegressionModel(BaseModel):
                 if hierarchical:
                     assert parameters[key].columns.tolist() == dm_keys, f'Parameter {key} needs the following columns: {dm_keys} (in that order)'
                     print(key, parameters[key].shape)
-                    pm.Data(key, parameters[key], mutable=True)
+                    pm.Data(key, parameters[key])
                 else:
                     value = [parameters[(key, dm_key)] for dm_key in dm_keys]
-                    pm.Data(key, value, mutable=True)
+                    pm.Data(key, value)
 
             parameters = self.get_parameter_values()
             model_inputs = self.get_model_inputs(parameters)
