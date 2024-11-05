@@ -22,7 +22,7 @@ class BaseModel(object):
         self.save_trialwise_n_estimates = save_trialwise_n_estimates
         self.free_parameters = self.get_free_parameters()
 
-    def _get_paradigm(self, paradigm=None):
+    def _get_paradigm(self, paradigm=None, subject_mapping=None):
 
         if paradigm is None:
             paradigm = self.data
@@ -33,10 +33,19 @@ class BaseModel(object):
         for key in self.paradigm_keys:
             paradigm_[key] = paradigm[key].values
 
-        if 'subject' in paradigm.index.names:
-            paradigm_['subject_ix'], _ = pd.factorize(paradigm.index.get_level_values('subject'))
-        elif 'subject' in paradigm.columns:
-            paradigm_['subject_ix'], _ = pd.factorize(paradigm['subject'])
+        if subject_mapping is None:
+            if 'subject' in paradigm.index.names:
+                paradigm_['subject_ix'], _ = pd.factorize(paradigm.index.get_level_values('subject'))
+            elif 'subject' in paradigm.columns:
+                paradigm_['subject_ix'], _ = pd.factorize(paradigm['subject'])
+        else:
+            # Make sure all subjects in the paradigm are in the subject_mapping
+            new_subject_ids = paradigm['subject'].unique()
+            assert(np.array_equal(new_subject_ids, list(subject_mapping.keys()))), "The unique subjects in the paradigm do not match the subjects in the subject_mapping."
+            if 'subject' in paradigm.index.names:
+                paradigm_['subject_ix'] = [subject_mapping[subject] for subject in paradigm.index.get_level_values('subject')]
+            else:
+                paradigm_['subject_ix'] = [subject_mapping[subject] for subject in paradigm['subject']]
 
         if 'choice' in paradigm.columns:
             paradigm_['choice'] = paradigm['choice'].values
@@ -436,8 +445,8 @@ class RegressionModel(BaseModel):
 
         self.design_matrices = {}
         
-    def _get_paradigm(self, paradigm=None):
-        paradigm_ = super()._get_paradigm(paradigm)
+    def _get_paradigm(self, paradigm=None, subject_mapping=None):
+        paradigm_ = super()._get_paradigm(paradigm, subject_mapping=None)
 
         free_parameters = self.get_free_parameters()
 
