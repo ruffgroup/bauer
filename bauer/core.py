@@ -231,20 +231,43 @@ class BaseModel(object):
         
         return pars
 
-    def ppc(self, paradigm, idata, var_names=['ll_bernoulli']):
+    def ppc(self, paradigm, idata, out_of_sample=False, var_names=['ll_bernoulli']):
 
-        with self.estimation_model:
-            idata = pm.sample_posterior_predictive(idata, var_names=var_names)
+        if out_of_sample:
+            assert(hasattr(self, 'paradigm')), 'Model needs to have original paradigm as an attribute (model.paradigm...) for out-of-sample prediction'
 
-        pred = [idata['posterior_predictive'][key].to_dataframe() for key in var_names]
-        pred = pd.concat(pred, axis=1, keys=var_names, names=['variable'])
-        pred = pred.unstack(['chain', 'draw']).droplevel(1, axis=1)
-        pred.index = paradigm.index
-        pred = pred.set_index(pd.MultiIndex.from_frame(paradigm), append=True)
-        pred = pred.stack('variable')
-        pred = pred.reorder_levels(np.roll(pred.index.names, 1)).sort_index()
+            if ('subject' in paradigm.index.names) or ('subject' in paradigm.columns):
+                coords = {'subject': self.paradigm.index.unique(level='subject')}            
+                hierarchical = True
+                subject_ids = paradigm.index.get_level_values('subject').unique()
+                subject_id_to_ix = {subject: ix for ix, subject in enumerate(subject_ids)}
+            else:
+                hierarchical = False
+                subject_id_to_ix = None
 
-        return pred
+            with pm.Model(coords=coords) as self.out_of_sample_model:
+                paradigm_ = self._get_paradigm(paradigm=paradigm, subject_mapping=subject_id_to_ix)
+                self.set_paradigm(paradigm_)
+                self.build_priors(hierarchical=hierarchical)
+                parameters = self.get_parameter_values()
+                save_p_choice = 'p' in var_names
+                self.build_likelihood(parameters, save_p_choice=save_p_choice)            
+    
+                idata = pm.sample_posterior_predictive(idata, var_names=var_names)
+
+        else:
+            with self.estimation_model:
+                idata = pm.sample_posterior_predictive(idata, var_names=var_names)
+
+        ppc = [idata['posterior_predictive'][key].to_dataframe() for key in var_names]
+        ppc = pd.concat(ppc, axis=1, keys=var_names, names=['variable'])
+        ppc = ppc.unstack(['chain', 'draw']).droplevel(1, axis=1)
+        ppc.index = paradigm.index
+        ppc = ppc.set_index(pd.MultiIndex.from_frame(paradigm), append=True)
+        ppc = ppc.stack('variable')
+        ppc = ppc.reorder_levels(np.roll(ppc.index.names, 1)).sort_index()
+
+        return ppc
 
     def get_trialwise_variable(self, key):
 
