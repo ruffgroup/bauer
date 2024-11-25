@@ -1179,7 +1179,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
             return n1_evidence_sd.join(n2_evidence_sd)
 
         if variable == 'evidence_sd':
-            assert(~self.fit_seperate_evidence_sd), "Single evidence_sd only when not fit_seperate_evidence_sd."
+            assert(not self.fit_seperate_evidence_sd), "Single evidence_sd only when not fit_seperate_evidence_sd."
 
             evidence_sd = self.get_sd_curve(idata, x=x, variable='n1_evidence_sd', group=group, hierarchical=hierarchical, data=data)
 
@@ -1533,12 +1533,10 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
             free_parameters['prior_mu'] = {'mu_intercept':prior_mu, 'sigma_intercept':25., 'transform':'identity'}
             free_parameters['prior_sd'] = {'mu_intercept':prior_sd, 'sigma_intercept':25., 'transform':'softplus'}
 
-        print(free_parameters)
-
         return free_parameters
 
-    def _get_paradigm(self, paradigm=None):
-        return RiskModel._get_paradigm(self, paradigm)
+    def _get_paradigm(self, paradigm=None, subject_mapping=None):
+        return RiskModel._get_paradigm(self, paradigm, subject_mapping=subject_mapping)
 
 class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
 
@@ -1564,8 +1562,6 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
                 elif key in ['n2_evidence_sd', 'perceptual_noise_sd']:
                     po = polynomial_order[1]
 
-                warn(f'Found {key} in regressors, will add it for all {po} splines!')
-
                 for i in range(1, po+1):
                     regressors[f'{key}_spline{i}'] = regressors[key]
 
@@ -1576,6 +1572,66 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
         FlexibleNoiseRiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd, save_trialwise_n_estimates,
                                         polynomial_order, representational_noise, memory_model)
 
+
+    def get_sd_curve(self, conditions, idata=None, pars=None, x=None, variable='n1_evidence_sd', group=True, hierarchical=True, data=None):
+
+        conditionwise_parameters = self.get_conditionwise_parameters(idata, conditions, group=group)
+        conditionwise_parameters = conditionwise_parameters.stack(list(range(conditions.columns.nlevels))).unstack('parameter')
+
+
+        if self.memory_model == 'independent':
+            possible_variables = ['n1_evidence_sd', 'n2_evidence_sd', 'both']
+        elif self.memory_model == 'shared_perceptual_noise':
+            possible_variables = ['memory_noise_sd', 'perceptual_noise_sd', 'both']
+        assert(variable in possible_variables), f'variable must be one of {possible_variables}'
+
+        if variable == 'both':
+            key1, key2 = self._get_evidence_sd_labels()
+
+            n1_evidence_sd = self.get_sd_curve(conditions, idata=idata, pars=pars, x=x, variable=key1, group=group, hierarchical=hierarchical, data=data)
+            n2_evidence_sd = self.get_sd_curve(conditions, idata=idata, pars=pars, x=x, variable=key2, group=group, hierarchical=hierarchical, data=data)
+
+            return n1_evidence_sd.join(n2_evidence_sd)
+
+
+        if pars is not None:
+            raise NotImplementedError('pars argument is not implemented yet')
+
+        if idata is None:
+            raise ValueError('idata argument is mandatory')
+
+        if x is None:
+            assert((data is not None) or (hasattr(self, 'data'))), "If x is not provided, data must be provided."
+
+            if data is None:
+                data = self.data
+
+            x_min, x_max = data[['n1', 'n2']].min().min(), data[['n1', 'n2']].max().max()
+            x = np.linspace(x_min, x_max, 100)
+
+        labels1, labels2 = self._get_evidence_sd_spline_par_labels()
+        if variable in ['n1_evidence_sd', 'memory_noise_sd']:
+            labels = labels1
+        else:
+            labels = labels2
+
+        if group:
+            labels1 = [f'{l}_mu' for l in labels1]
+            labels2 = [f'{l}_mu' for l in labels2]
+
+        dm = self.make_dm(x=x, variable=variable)
+
+        pars = conditionwise_parameters[labels]
+        output = softplus_np(pars.dot(dm.T))
+        
+        output.columns = x
+        output.columns.name = 'x'
+
+        output = output.stack().to_frame(variable)
+        output.columns.name = 'variable'
+
+        return output
+    
 class ExpectedUtilityRiskModel(BaseModel):
 
     paradigm_keys = ['n1', 'n2', 'p1', 'p2']
