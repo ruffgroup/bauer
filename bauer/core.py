@@ -5,7 +5,7 @@ import numpy as np
 from .utils.bayes import cumulative_normal, get_diff_dist, get_posterior
 from .utils.math import logistic, softplus_np, logistic_np, logit_np, inverse_softplus_np
 import pytensor.tensor as pt
-from patsy import dmatrix
+from patsy import dmatrix, build_design_matrices
 
 class BaseModel(object):
 
@@ -264,7 +264,7 @@ class BaseModel(object):
         ppc = ppc.unstack(['chain', 'draw']).droplevel(1, axis=1)
         ppc.index = paradigm.index
         ppc = ppc.set_index(pd.MultiIndex.from_frame(paradigm), append=True)
-        ppc = ppc.stack('variable')
+        ppc = ppc.stack('variable', future_stack=True)
         ppc = ppc.reorder_levels(np.roll(ppc.index.names, 1)).sort_index()
 
         return ppc
@@ -487,6 +487,13 @@ class RegressionModel(BaseModel):
         
         return dmatrix(self.regressors[parameter], data)
 
+    def rebuild_design_matrix(self, paradigm, parameter):
+        assert(hasattr(self, 'design_matrices')), 'Model needs to have design matrices as an attribute (model.design_matrices...) based on original data for rebuilding design matrices (HINT: use `.build_estimation_model()`)'
+
+        design_info = self.design_matrices[parameter].design_info
+
+        return build_design_matrices([design_info], paradigm)[0]
+
     def get_trialwise_variable(self, key):
 
         model = pm.Model.get_context()
@@ -638,7 +645,6 @@ class RegressionModel(BaseModel):
                 dm_keys = self.design_matrices[key].design_info.column_names
                 if hierarchical:
                     assert parameters[key].columns.tolist() == dm_keys, f'Parameter {key} needs the following columns: {dm_keys} (in that order)'
-                    print(key, parameters[key].shape)
                     pm.Data(key, parameters[key])
                 else:
                     value = [parameters[(key, dm_key)] for dm_key in dm_keys]
@@ -680,8 +686,10 @@ class RegressionModel(BaseModel):
         parameter_values = []
         free_parameters = self.get_free_parameters()
 
+        assert(hasattr(self, 'paradigm')), 'Model needs to have original paradigm as an attribute (model.paradigm...) for calcuating conditionwise parameters'
+
         for parameter in free_parameters.keys():
-            dm = self.build_design_matrix(conditions, parameter)
+            dm = self.rebuild_design_matrix(conditions, parameter)
 
             if group:
                 trace = idata.posterior[f'{parameter}_mu'].to_dataframe().unstack(-1)
@@ -690,7 +698,10 @@ class RegressionModel(BaseModel):
 
             par = (np.asarray(trace).reshape((1, -1, dm.shape[1])) @ dm.T)[0]
 
-            par = pd.DataFrame(par, columns=pd.MultiIndex.from_frame(conditions), index=trace.index)
+            if conditions.shape[1] == 1:
+                par = pd.DataFrame(par, columns=pd.Index(conditions.iloc[:, 0]), index=trace.index)
+            else:
+                par = pd.DataFrame(par, columns=pd.MultiIndex.from_frame(conditions), index=trace.index)
 
             if free_parameters[parameter]['transform'] == 'logistic':
                 par = logistic_np(par)
