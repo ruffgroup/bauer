@@ -587,8 +587,8 @@ class LossAversionModel(BaseModel):
             expectations_gains_mu_log, expectations_gains_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains), model_inputs['evidence_sd_gains'])
             expectations_losses_mu_log, expectations_losses_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses), model_inputs['evidence_sd_losses'])
 
-            diff_mu, diff_sd = get_diff_dist(p * expectations_gains_mu_log, p * expectations_gains_sd_log,
-                                             (1-p) * expectations_losses_mu_log, (1-p) * expectations_losses_sd_log)
+            diff_mu, diff_sd = get_diff_dist(p * expectations_gains_mu_log, p * model_inputs['evidence_sd_gains'],
+                                             (1-p) * expectations_losses_mu_log, (1-p) * model_inputs['evidence_sd_losses'])
 
             p_choose2 = cumulative_normal(0.0, diff_mu, diff_sd)
 
