@@ -260,6 +260,7 @@ class BaseModel(object):
                 idata = pm.sample_posterior_predictive(idata, var_names=var_names, progressbar=progressbar)
 
         ppc = [idata['posterior_predictive'][key].to_dataframe() for key in var_names]
+        ppc = [e.astype(bool) if var_name == 'll_bernoulli' else e for e, var_name in zip(ppc, var_names)]
         ppc = pd.concat(ppc, axis=1, keys=var_names, names=['variable'])
         ppc = ppc.unstack(['chain', 'draw']).droplevel(1, axis=1)
         ppc.index = paradigm.index
