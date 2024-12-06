@@ -231,7 +231,7 @@ class BaseModel(object):
         
         return pars
 
-    def ppc(self, paradigm, idata, out_of_sample=False, var_names=['ll_bernoulli']):
+    def ppc(self, paradigm, idata, out_of_sample=False, var_names=['ll_bernoulli'], progressbar=True):
 
         if out_of_sample:
             assert(hasattr(self, 'paradigm')), 'Model needs to have original paradigm as an attribute (model.paradigm...) for out-of-sample prediction'
@@ -253,11 +253,11 @@ class BaseModel(object):
                 save_p_choice = 'p' in var_names
                 self.build_likelihood(parameters, save_p_choice=save_p_choice)            
     
-                idata = pm.sample_posterior_predictive(idata, var_names=var_names)
+                idata = pm.sample_posterior_predictive(idata, var_names=var_names, progressbar=progressbar)
 
         else:
             with self.estimation_model:
-                idata = pm.sample_posterior_predictive(idata, var_names=var_names)
+                idata = pm.sample_posterior_predictive(idata, var_names=var_names, progressbar=progressbar)
 
         ppc = [idata['posterior_predictive'][key].to_dataframe() for key in var_names]
         ppc = pd.concat(ppc, axis=1, keys=var_names, names=['variable'])
