@@ -15,6 +15,8 @@ def inverse_softplus_np(x):
 
 def logistic_np(x): return 1 / (1 + np.exp(-x))
 
+def logit_np(p): return np.log(p / (1 - p))
+
 def logit(p):
     return pt.log(p / (1 - p))
 
@@ -26,4 +28,3 @@ def gaussian_pdf(x, mean, std):
     exponent = -((x - mean)**2) / (2 * variance)
     normalization = 1 / (std * pt.sqrt(2 * np.pi))
     return normalization * pt.exp(exponent)
-

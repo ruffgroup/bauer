@@ -38,12 +38,15 @@ setup(
     license="MIT license",
     long_description=readme + '\n\n' + history,
     include_package_data=True,
+    package_data={
+        'bauer': ['data/*.csv'],  # Include CSV files from data subdirectory
+    },
     keywords='bauer',
     name='bauer',
     packages=find_packages(include=['bauer', 'bauer.*']),
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/ruffgroup/bauer',
-    version='0.1.0',
+    version='0.2.0',
     zip_safe=False,
 )

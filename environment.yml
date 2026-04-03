@@ -1,0 +1,22 @@
+name: bauer
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - seaborn
+  - patsy
+  - pymc>=5
+  - pytensor
+  - arviz
+  - jupyter
+  - nbformat
+  - nbconvert
+  - nbsphinx
+  - sphinx
+  - sphinx-rtd-theme

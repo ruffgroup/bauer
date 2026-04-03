@@ -1,8 +1,16 @@
-from . import cluster_offers
 from .bayes import summarize_ppc
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import arviz as az
+from .math import softplus_np, logistic_np
+
+def cluster_offers(d, n=6, key='log(risky/safe)'):
+    return pd.qcut(d[key], n, duplicates='drop').apply(lambda x: x.mid)
+
+def get_hdi(d):
+    return pd.Series(az.hdi(d.values, hdi_prob=0.95), index=['hdi_low', 'hdi_high'])
 
 def plot_ppc(df, ppc, exp_type='magnitude', plot_type=1, var_name='p', level='subject', col_wrap=5, n_clusters=13):
 
@@ -76,3 +84,47 @@ def plot_prediction(data, x, color, y='p_predicted', alpha=.25, **kwargs):
                      data['hdi975'], color=color, alpha=alpha)
     return plt.plot(data[x], data[y], color=color)
 
+def plot_subjectwise_parameters(idata, parameter, transform=None, sort_subjects=True, plot_group_mean=True, **kwargs):
+
+
+    d = idata.posterior[parameter].to_dataframe()
+
+    if transform is not None:
+        if transform == 'softplus':
+            d = softplus_np(d)
+        elif transform == 'logistic':
+            d = logistic_np(d)
+        else:
+            raise ValueError(f'{transform} is not a valid transformation')
+
+    means = d.groupby('subject').mean()
+    means.columns = pd.MultiIndex.from_tuples([(parameter, 'mean')])
+
+    # Get 95% CI using arviz
+    cis = d[parameter].groupby('subject').apply(get_hdi).unstack(-1)
+    cis.columns = pd.MultiIndex.from_tuples([(parameter, 'hdi_low'), (parameter, 'hdi_high')])
+    print(cis)
+    summarized_pars = means.join(cis)
+
+    # summarized_pars.sort_values((parameter, 'mean'), inplace=True)
+
+    if sort_subjects:
+        summarized_pars['mean_order'] = summarized_pars[(parameter, 'mean')].rank()
+        x = 'mean_order'
+    else:
+        x = 'subject'
+        summarized_pars = summarized_pars.reset_index()
+
+    # Plot the results
+    g = sns.scatterplot(x=x, y=(parameter, 'mean'), data=summarized_pars, color='k')
+    plt.errorbar(x=summarized_pars[x], y=summarized_pars[(parameter, 'mean')], yerr=[summarized_pars[(parameter, 'mean')] - summarized_pars[(parameter, 'hdi_low')], summarized_pars[(parameter, 'hdi_high')] - summarized_pars[(parameter, 'mean')]], fmt='o', color='k',)
+
+    g.set_ylabel(parameter)
+    g.set_xlabel('Subject')
+    
+    # plot errorbars around the scatters using hd_low and hdi_high
+    sns.despine()
+
+    if plot_group_mean:
+        group_mean = idata.posterior[parameter+'_mu'].to_dataframe()
+        plt.axhline(group_mean[parameter+'_mu'].mean(), c='k', ls='--')
