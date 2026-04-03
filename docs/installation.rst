@@ -1,51 +1,60 @@
-.. highlight:: shell
-
-============
 Installation
 ============
 
+Recommended: conda environment
+-------------------------------
 
-Stable release
---------------
+The easiest way to get a fully working environment is to clone the repo and create
+the bundled conda environment:
 
-To install bauer, run this command in your terminal:
+.. code-block:: bash
 
-.. code-block:: console
+    git clone https://github.com/ruffgroup/bauer
+    cd bauer
+    conda env create -f environment.yml   # creates the 'bauer' env
+    conda activate bauer
 
-    $ pip install bauer
+This installs all runtime and documentation dependencies automatically.
 
-This is the preferred method to install bauer, as it will always install the most recent stable release.
+pip install (PyPI)
+------------------
 
-If you don't have `pip`_ installed, this `Python installation guide`_ can guide
-you through the process.
+Once released on PyPI you can install with:
 
-.. _pip: https://pip.pypa.io
-.. _Python installation guide: http://docs.python-guide.org/en/latest/starting/installation/
+.. code-block:: bash
 
+    pip install bauer
 
-From sources
-------------
+And then add the optional extras you need:
 
-The sources for bauer can be downloaded from the `Github repo`_.
+.. code-block:: bash
 
-You can either clone the public repository:
+    pip install "bauer[docs]"    # sphinx / nbsphinx for documentation
+    pip install "bauer[dev]"     # flake8 / pytest for development
 
-.. code-block:: console
+Install from source (development)
+----------------------------------
 
-    $ git clone git://github.com/Gilles86/bauer
+.. code-block:: bash
 
-Or download the `tarball`_:
+    git clone https://github.com/ruffgroup/bauer
+    cd bauer
+    pip install -e ".[docs,dev]"
 
-.. code-block:: console
+Runtime dependencies
+--------------------
 
-    $ curl -OJL https://github.com/Gilles86/bauer/tarball/master
+The core package requires:
 
-Once you have a copy of the source, you can install it with:
+* ``pymc >= 5``
+* ``pytensor``
+* ``pandas``
+* ``numpy``
+* ``patsy``
+* ``arviz``
+* ``scipy``
+* ``seaborn``
+* ``matplotlib``
 
-.. code-block:: console
-
-    $ python setup.py install
-
-
-.. _Github repo: https://github.com/Gilles86/bauer
-.. _tarball: https://github.com/Gilles86/bauer/tarball/master
+Building the documentation additionally requires ``sphinx``, ``nbsphinx``,
+``nbconvert``, and ``nbformat``.

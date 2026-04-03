@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bauer"
+version = "0.2.0"
+description = "Bayesian Estimation of Perceptual, Numerical and Risky Judgements"
+authors = [{ name = "Gilles de Hollander", email = "giles.de.hollander@gmail.com" }]
+license = { text = "MIT" }
+readme = "README.rst"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "matplotlib",
+    "seaborn",
+    "pymc>=5",
+    "pytensor",
+    "arviz",
+    "patsy",
+]
+
+[project.optional-dependencies]
+docs = [
+    "sphinx",
+    "nbsphinx",
+    "nbformat",
+    "nbconvert",
+    "jupyter",
+    "sphinx-rtd-theme",
+]
+dev = [
+    "flake8",
+    "pytest",
+    "coverage",
+]
+
+[project.urls]
+Homepage = "https://github.com/ruffgroup/bauer"
+
+[tool.setuptools.packages.find]
+include = ["bauer", "bauer.*"]
+
+[tool.setuptools.package-data]
+bauer = ["data/*.csv"]
