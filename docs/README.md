@@ -47,33 +47,35 @@ from a single source file:
 docs/tutorial/make_notebooks.py
 ```
 
-Workflow for changing a tutorial:
+### Quick workflow: full rebuild
+
+Run this script from the repo root after any change to `make_notebooks.py`:
 
 ```bash
-cd docs/tutorial
 conda activate bauer
-
-# 1. Edit make_notebooks.py
-#    Each lesson is a list of md() and code() cells.
-
-# 2. Regenerate the .ipynb files
-python make_notebooks.py
-
-# 3. Execute the notebook(s) you changed
-#    (nbsphinx renders with nbsphinx_execute='never', so outputs must be committed)
-jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=3600 \
-    lesson1.ipynb --output lesson1.ipynb
-
-# 4. Rebuild docs to check rendering
-cd .. && make html
+./docs/tutorial/build_tutorials.sh
 ```
 
-For lessons with MCMC sampling (lessons 2–4), execution can take 1–3 hours.
-Run them in the background:
+This does three things in sequence:
+1. Regenerates all `.ipynb` files from `make_notebooks.py`
+2. Executes each notebook in order (can take 1–3 h for MCMC lessons)
+3. Rebuilds the Sphinx HTML and verifies outputs appear
+
+Then commit and push:
 
 ```bash
-jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=7200 \
-    lesson2.ipynb --output lesson2.ipynb &
+git add docs/tutorial/*.ipynb
+git commit -m "Re-execute tutorial notebooks"
+git push origin main
+```
+
+### Skip re-execution (fast check)
+
+If you only changed Sphinx config or `.rst` files and don't need to re-run the
+notebooks, pass `--no-exec`:
+
+```bash
+./docs/tutorial/build_tutorials.sh --no-exec
 ```
 
 ### Adding a new lesson
