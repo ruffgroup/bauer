@@ -1151,15 +1151,9 @@ across posterior samples.
 
 code("""\
 # Get group-level noise curves from the flexible model
-x = np.linspace(df_dot[['n1', 'n2']].min().min(),
-                df_dot[['n1', 'n2']].max().max(), 100)
-
+# Returns long-format DataFrame with MultiIndex (chain, draw, x)
 sd_curves = model_flex.get_sd_curve(idata=idata_flex, variable='both',
                                      group=True, data=df_dot.reset_index())
-
-# sd_curves is (posterior_samples x x_points)
-n1_samples = sd_curves['n1_evidence_sd'].values  # shape: (samples, 100)
-n2_samples = sd_curves['n2_evidence_sd'].values
 
 # PMCM fixed noise posteriors (scalar per sample)
 nu1_pmcm = idata_pmcm.posterior['n1_evidence_sd_mu'].values.ravel()
@@ -1168,20 +1162,22 @@ nu2_pmcm = idata_pmcm.posterior['n2_evidence_sd_mu'].values.ravel()
 fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
 colors = {'flex': '#d73027', 'pmcm': '#4393c3'}
 
-for ax, (samples, nu_pmcm, label_flex, label_pmcm) in zip(
+for ax, (var_col, nu_pmcm, label_flex, label_pmcm) in zip(
         axes,
-        [(n1_samples, nu1_pmcm, 'FlexNoise  \u03bd\u2081(n)', 'PMCM  \u03bd\u2081 (fixed)'),
-         (n2_samples, nu2_pmcm, 'FlexNoise  \u03bd\u2082(n)', 'PMCM  \u03bd\u2082 (fixed)')]):
-    # Posterior mean and 95% CI for flexible model
-    mean = samples.mean(0)
-    lo   = np.percentile(samples, 2.5, axis=0)
-    hi   = np.percentile(samples, 97.5, axis=0)
-    ax.fill_between(x, lo, hi, alpha=.25, color=colors['flex'])
-    ax.plot(x, mean, lw=2.5, color=colors['flex'], label=label_flex)
+        [('n1_evidence_sd', nu1_pmcm, 'FlexNoise  \u03bd\u2081(n)', 'PMCM  \u03bd\u2081 (fixed)'),
+         ('n2_evidence_sd', nu2_pmcm, 'FlexNoise  \u03bd\u2082(n)', 'PMCM  \u03bd\u2082 (fixed)')]):
+    # Group by x to get posterior mean and 95% CI across (chain, draw) samples
+    grp    = sd_curves.groupby(level='x')[var_col]
+    x_vals = grp.mean().index.values
+    mean   = grp.mean().values
+    lo     = grp.quantile(0.025).values
+    hi     = grp.quantile(0.975).values
+    ax.fill_between(x_vals, lo, hi, alpha=.25, color=colors['flex'])
+    ax.plot(x_vals, mean, lw=2.5, color=colors['flex'], label=label_flex)
     # PMCM fixed noise
     ax.axhline(nu_pmcm.mean(), ls='--', lw=2, color=colors['pmcm'],
                label=f'{label_pmcm} = {nu_pmcm.mean():.2f}')
-    ax.fill_between(x,
+    ax.fill_between(x_vals,
                     np.percentile(nu_pmcm, 2.5),
                     np.percentile(nu_pmcm, 97.5),
                     alpha=.15, color=colors['pmcm'])
