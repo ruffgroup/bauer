@@ -1,0 +1,662 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Lesson 4: Flexible Noise Curves — the FlexibleNoiseRiskModel" href="lesson4.html"><link rel="prev" title="Lesson 2: Risky Choice and the Key Correlations (Barreto-Garc:nbsphinx-math:`u0`0eda et al., 2023)" href="lesson2.html">
+
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
+        <title>Lesson 3: Stake effects and presentation order — de Hollander et al. (2024) - bauer 0.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #eeffcc;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">bauer 0.2.0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">bauer 0.2.0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts.html">Architecture &amp; Concepts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="lesson1.html">Lesson 1: Psychophysical Modelling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson2.html">Lesson 2: Risky Choice and the Key Correlations (Barreto-Garc:nbsphinx-math:`u0`0eda et al., 2023)</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Lesson 3: Stake effects and presentation order — de Hollander et al. (2024)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson4.html">Lesson 4: Flexible Noise Curves — the <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseRiskModel</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson5.html">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/tutorial/lesson3.ipynb.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="Lesson-3:-Stake-effects-and-presentation-order-—-de-Hollander-et-al.-(2024)">
+<h1>Lesson 3: Stake effects and presentation order — de Hollander et al. (2024)<a class="headerlink" href="#Lesson-3:-Stake-effects-and-presentation-order-—-de-Hollander-et-al.-(2024)" title="Link to this heading">¶</a></h1>
+<section id="Background">
+<h2>Background<a class="headerlink" href="#Background" title="Link to this heading">¶</a></h2>
+<p>De Hollander et al. (2024, <em>Nature Human Behaviour</em>) tested whether perceptual noise during the encoding of numerical magnitudes explains risk aversion and its interaction with presentation order. The key design feature: the <strong>order</strong> in which the safe and risky options are presented is randomised across trials, allowing the model to disentangle <span class="math notranslate nohighlight">\(\nu_1\)</span> (noise on the first-presented option) from <span class="math notranslate nohighlight">\(\nu_2\)</span> (noise on the second-presented option).</p>
+<p>This produces a distinctive <strong>presentation-order × stake-size interaction</strong>: when the safe option comes first, high safe stakes are compressed downward more strongly by the prior → safe looks less attractive → the observer becomes more risk-seeking for high stakes. When the risky option comes first, the same mechanism operates on the risky stakes → risk aversion for high stakes.</p>
+<p>Standard models (EU, KLW with a shared noise) <strong>cannot</strong> capture this asymmetry.</p>
+<section id="Models-compared">
+<h3>Models compared<a class="headerlink" href="#Models-compared" title="Link to this heading">¶</a></h3>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Model</p></th>
+<th class="head"><p>Class</p></th>
+<th class="head"><p>Key parameters</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Expected Utility (EU)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ExpectedUtilityRiskModel</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">alpha</span></code>, <code class="docutils literal notranslate"><span class="pre">sigma</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>KLW</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">RiskModel(prior_estimate='klw',</span> <span class="pre">fit_seperate_evidence_sd=False)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">evidence_sd</span></code>, <code class="docutils literal notranslate"><span class="pre">prior_sd</span></code> (shared)</p></td>
+</tr>
+<tr class="row-even"><td><p>PMCM</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">RiskModel(prior_estimate='full',</span> <span class="pre">fit_seperate_evidence_sd=True)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">n1_evidence_sd</span></code>, <code class="docutils literal notranslate"><span class="pre">n2_evidence_sd</span></code>, <code class="docutils literal notranslate"><span class="pre">risky/safe_prior_mu/sd</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>We fit all three on both the <strong>dot-cloud</strong> (fMRI sessions 3T+7T) and the <strong>symbolic</strong> (Arabic numerals) datasets, then compare posterior predictives against the interaction pattern.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>import warnings; warnings.filterwarnings(&#39;ignore&#39;)
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import arviz as az
+from bauer.utils.data import load_dehollander2024
+from bauer.models import ExpectedUtilityRiskModel, RiskModel
+
+# Load both fMRI sessions and combine
+df_dot = load_dehollander2024(task=&#39;dotcloud&#39;, sessions=[&#39;3t2&#39;, &#39;7t2&#39;])
+df_sym = load_dehollander2024(task=&#39;symbolic&#39;)
+
+print(f&quot;Dot clouds  — subjects: {df_dot.index.get_level_values(&#39;subject&#39;).nunique()}, &quot;
+      f&quot;trials: {len(df_dot)}&quot;)
+print(f&quot;Symbolic    — subjects: {df_sym.index.get_level_values(&#39;subject&#39;).nunique()}, &quot;
+      f&quot;trials: {len(df_sym)}&quot;)
+df_dot.head()
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>def prep_df(df):
+    &quot;&quot;&quot;Add log_ratio, chose_risky, n_safe, order flag, and binned columns.&quot;&quot;&quot;
+    df = df.reset_index()
+    risky_first = df[&#39;p1&#39;] == 0.55
+    df[&#39;log_ratio&#39;]     = np.log(
+        np.where(risky_first, df[&#39;n1&#39;], df[&#39;n2&#39;]) /
+        np.where(risky_first, df[&#39;n2&#39;], df[&#39;n1&#39;]))
+    df[&#39;chose_risky&#39;]   = np.where(risky_first, ~df[&#39;choice&#39;], df[&#39;choice&#39;])
+    df[&#39;n_safe&#39;]        = np.where(risky_first, df[&#39;n2&#39;], df[&#39;n1&#39;])
+    df[&#39;risky_first&#39;]   = risky_first
+    df[&#39;order&#39;]         = np.where(risky_first, &#39;Risky first&#39;, &#39;Safe first&#39;)
+    df[&#39;log_ratio_bin&#39;] = (pd.cut(df[&#39;log_ratio&#39;], bins=10)
+                             .apply(lambda x: x.mid).astype(float))
+    df[&#39;n_safe_bin&#39;]    = pd.qcut(df[&#39;n_safe&#39;], q=3, labels=[&#39;Low stakes&#39;, &#39;Mid stakes&#39;, &#39;High stakes&#39;])
+    return df
+
+df_dot_p = prep_df(df_dot)
+df_sym_p = prep_df(df_sym)
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+<section id="Presentation-order-x-stake-size-interaction">
+<h2>Presentation-order x stake-size interaction<a class="headerlink" href="#Presentation-order-x-stake-size-interaction" title="Link to this heading">¶</a></h2>
+<p>Each panel shows P(chose risky) as a function of the log risky/safe magnitude ratio, split by safe-option stake tertile. The left column shows trials where the risky option came first; the right column shows trials where the safe option came first.</p>
+<p>The dashed vertical line marks the risk-neutral indifference point log(1/0.55).</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>stake_pal = {&#39;Low stakes&#39;: &#39;#4C72B0&#39;, &#39;Mid stakes&#39;: &#39;#DD8452&#39;, &#39;High stakes&#39;: &#39;#55A868&#39;}
+
+def plot_interaction(df_p, axes_row, task_label):
+    &quot;&quot;&quot;Plot stake x order interaction, one axis per order condition.&quot;&quot;&quot;
+    for ax, order_val in zip(axes_row, [&#39;Risky first&#39;, &#39;Safe first&#39;]):
+        sub  = df_p[df_p[&#39;order&#39;] == order_val]
+        subj = (sub.groupby([&#39;subject&#39;, &#39;log_ratio_bin&#39;, &#39;n_safe_bin&#39;])[&#39;chose_risky&#39;]
+                   .mean().reset_index())
+        subj = subj[subj.groupby([&#39;log_ratio_bin&#39;, &#39;n_safe_bin&#39;])
+                        [&#39;subject&#39;].transform(&#39;count&#39;) &gt;= 3]
+        hue_order = [&#39;Low stakes&#39;, &#39;Mid stakes&#39;, &#39;High stakes&#39;]
+        sns.lineplot(data=subj, x=&#39;log_ratio_bin&#39;, y=&#39;chose_risky&#39;,
+                     hue=&#39;n_safe_bin&#39;, style=&#39;n_safe_bin&#39;,
+                     hue_order=hue_order, style_order=hue_order,
+                     palette=stake_pal, markers=True, dashes=False,
+                     errorbar=&#39;se&#39;, ax=ax)
+        ax.axhline(.5,            ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
+        ax.axvline(np.log(1/.55), ls=&#39;--&#39;, c=&#39;#333333&#39;, lw=1.5, label=&#39;Risk-neutral&#39;)
+        ax.set_ylim(-.05, 1.05)
+        ax.set_xlabel(&#39;log(risky / safe)&#39;)
+        ax.set_ylabel(&#39;P(chose risky)&#39;)
+        ax.set_title(f&#39;{task_label} — {order_val}&#39;, fontsize=10)
+        ax.legend(title=&#39;Safe stake&#39;, fontsize=8)
+        sns.despine(ax=ax)
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 9), sharey=True)
+plot_interaction(df_dot_p, axes[0], &#39;Dot clouds (3T + 7T)&#39;)
+plot_interaction(df_sym_p, axes[1], &#39;Symbolic (Arabic numerals)&#39;)
+plt.suptitle(&#39;Presentation-order × safe-stake interaction&#39;, fontsize=13, y=1.01)
+plt.tight_layout()
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Fit-three-models-—-dot-cloud-data">
+<h2>Fit three models — dot-cloud data<a class="headerlink" href="#Fit-three-models-—-dot-cloud-data" title="Link to this heading">¶</a></h2>
+<p>Hierarchical MCMC, 100 draws / 100 tune / 2 chains.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ── 1. Expected Utility ──────────────────────────────────────────────────────
+model_eu = ExpectedUtilityRiskModel(paradigm=df_dot)
+model_eu.build_estimation_model(data=df_dot, hierarchical=True, save_p_choice=True)
+idata_eu = model_eu.sample(draws=100, tune=100, chains=2, progressbar=True)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ── 2. KLW (shared noise, shared prior) ─────────────────────────────────────
+model_klw = RiskModel(paradigm=df_dot, prior_estimate=&#39;klw&#39;,
+                      fit_seperate_evidence_sd=False)
+model_klw.build_estimation_model(data=df_dot, hierarchical=True, save_p_choice=True)
+idata_klw = model_klw.sample(draws=100, tune=100, chains=2, progressbar=True)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ── 3. PMCM (separate noise + separate priors) ────────────────────
+model_full = RiskModel(paradigm=df_dot, prior_estimate=&#39;full&#39;,
+                       fit_seperate_evidence_sd=True)
+model_full.build_estimation_model(data=df_dot, hierarchical=True, save_p_choice=True)
+idata_full = model_full.sample(draws=100, tune=100, chains=2, progressbar=True)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Posterior-predictives-—-dot-cloud-data">
+<h2>Posterior predictives — dot-cloud data<a class="headerlink" href="#Posterior-predictives-—-dot-cloud-data" title="Link to this heading">¶</a></h2>
+<p>Dots = observed group average; line + shading = model mean and 95 % posterior interval.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>def add_model_ppc(df_orig, df_prepped, model, idata, model_name, n_ppc_samples=50):
+    &quot;&quot;&quot;Return df_prepped with added posterior-predictive columns.&quot;&quot;&quot;
+    ppc_df = model.ppc(df_orig, idata, var_names=[&#39;p&#39;])
+    ppc_p  = ppc_df.xs(&#39;p&#39;, level=&#39;variable&#39;)
+    cols   = np.random.choice(ppc_p.columns,
+                               size=min(n_ppc_samples, ppc_p.shape[1]),
+                               replace=False)
+    ppc_p  = ppc_p[cols]
+    risky_first = df_prepped[&#39;risky_first&#39;].values
+    p_risky = np.where(risky_first[:, None], 1 - ppc_p.values, ppc_p.values)
+    df_out = df_prepped.copy()
+    df_out[&#39;p_mean&#39;] = p_risky.mean(1)
+    df_out[&#39;p_lo&#39;]   = np.percentile(p_risky, 2.5,  axis=1)
+    df_out[&#39;p_hi&#39;]   = np.percentile(p_risky, 97.5, axis=1)
+    df_out[&#39;model&#39;]  = model_name
+    return df_out
+
+
+def plot_ppc_interaction(df_pred, model_name, axes_row):
+    hue_order = [&#39;Low stakes&#39;, &#39;Mid stakes&#39;, &#39;High stakes&#39;]
+    for ax, order_val in zip(axes_row, [&#39;Risky first&#39;, &#39;Safe first&#39;]):
+        sub  = df_pred[df_pred[&#39;order&#39;] == order_val]
+        obs  = sub.groupby([&#39;n_safe_bin&#39;, &#39;log_ratio_bin&#39;])[&#39;chose_risky&#39;].mean().reset_index()
+        pred = (sub.groupby([&#39;n_safe_bin&#39;, &#39;log_ratio_bin&#39;])[[&#39;p_mean&#39;, &#39;p_lo&#39;, &#39;p_hi&#39;]]
+                   .mean().reset_index())
+        for sbin in hue_order:
+            o = obs[obs[&#39;n_safe_bin&#39;]  == sbin]
+            p = pred[pred[&#39;n_safe_bin&#39;] == sbin]
+            if len(o) == 0:
+                continue
+            c = stake_pal[sbin]
+            ax.fill_between(p[&#39;log_ratio_bin&#39;], p[&#39;p_lo&#39;], p[&#39;p_hi&#39;],
+                            color=c, alpha=.20)
+            ax.plot(p[&#39;log_ratio_bin&#39;], p[&#39;p_mean&#39;], color=c, lw=2, label=sbin)
+            ax.scatter(o[&#39;log_ratio_bin&#39;], o[&#39;chose_risky&#39;],
+                       color=c, s=25, zorder=5, alpha=.85)
+        ax.axhline(.5,            ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
+        ax.axvline(np.log(1/.55), ls=&#39;--&#39;, c=&#39;#333333&#39;, lw=1.5)
+        ax.set_ylim(-.05, 1.05)
+        ax.set_title(f&#39;{model_name} — {order_val}&#39;, fontsize=9)
+        ax.set_xlabel(&#39;log(risky / safe)&#39;)
+        ax.set_ylabel(&#39;P(chose risky)&#39;)
+        ax.legend(title=&#39;Safe stake&#39;, fontsize=7, loc=&#39;upper left&#39;)
+        sns.despine(ax=ax)
+
+
+fig, axes = plt.subplots(3, 2, figsize=(12, 13), sharey=True)
+for (mdl, idat, name), row in zip(
+        [(model_eu,   idata_eu,   &#39;EU&#39;),
+         (model_klw,  idata_klw,  &#39;KLW&#39;),
+         (model_full, idata_full, &#39;PMCM&#39;)],
+        axes):
+    df_pred = add_model_ppc(df_dot, df_dot_p, mdl, idat, name)
+    plot_ppc_interaction(df_pred, name, row)
+
+plt.suptitle(&#39;Posterior predictive checks — dot-cloud data  (dots = observed, shading = 95 % CI)&#39;,
+             fontsize=11, y=1.01)
+plt.tight_layout()
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Fit-three-models-—-symbolic-data">
+<h2>Fit three models — symbolic data<a class="headerlink" href="#Fit-three-models-—-symbolic-data" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ── 1. EU ────────────────────────────────────────────────────────────────────
+model_eu_sym = ExpectedUtilityRiskModel(paradigm=df_sym)
+model_eu_sym.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
+idata_eu_sym = model_eu_sym.sample(draws=100, tune=100, chains=2, progressbar=True)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ── 2. KLW ───────────────────────────────────────────────────────────────────
+model_klw_sym = RiskModel(paradigm=df_sym, prior_estimate=&#39;klw&#39;,
+                           fit_seperate_evidence_sd=False)
+model_klw_sym.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
+idata_klw_sym = model_klw_sym.sample(draws=100, tune=100, chains=2, progressbar=True)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ── 3. PMCM ────────────────────────────────────────────────────────
+model_full_sym = RiskModel(paradigm=df_sym, prior_estimate=&#39;full&#39;,
+                            fit_seperate_evidence_sd=True)
+model_full_sym.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
+idata_full_sym = model_full_sym.sample(draws=100, tune=100, chains=2, progressbar=True)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Posterior-predictives-—-symbolic-data">
+<h2>Posterior predictives — symbolic data<a class="headerlink" href="#Posterior-predictives-—-symbolic-data" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>fig, axes = plt.subplots(3, 2, figsize=(12, 13), sharey=True)
+for (mdl, idat, name), row in zip(
+        [(model_eu_sym,   idata_eu_sym,   &#39;EU&#39;),
+         (model_klw_sym,  idata_klw_sym,  &#39;KLW&#39;),
+         (model_full_sym, idata_full_sym, &#39;PMCM&#39;)],
+        axes):
+    df_pred = add_model_ppc(df_sym, df_sym_p, mdl, idat, name)
+    plot_ppc_interaction(df_pred, name, row)
+
+plt.suptitle(&#39;Posterior predictive checks — symbolic data  (dots = observed, shading = 95 % CI)&#39;,
+             fontsize=11, y=1.01)
+plt.tight_layout()
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Parameter-interpretation:-\nu_1-vs-\nu_2">
+<h2>Parameter interpretation: <span class="math notranslate nohighlight">\(\nu_1\)</span> vs <span class="math notranslate nohighlight">\(\nu_2\)</span><a class="headerlink" href="#Parameter-interpretation:-\nu_1-vs-\nu_2" title="Link to this heading">¶</a></h2>
+<p>For the full-prior NLC model we extract subject-level posterior means for the two noise parameters. If the first-presented option accumulates extra noise, we expect <span class="math notranslate nohighlight">\(\nu_1 &gt; \nu_2\)</span> and most subjects to lie above the diagonal.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>fig, axes = plt.subplots(1, 2, figsize=(11, 5))
+for ax, (idat, label) in zip(axes,
+        [(idata_full,     &#39;Dot clouds&#39;),
+         (idata_full_sym, &#39;Symbolic&#39;)]):
+    nu1 = idat.posterior[&#39;n1_evidence_sd&#39;].mean((&#39;chain&#39;, &#39;draw&#39;)).values
+    nu2 = idat.posterior[&#39;n2_evidence_sd&#39;].mean((&#39;chain&#39;, &#39;draw&#39;)).values
+    lim = max(nu1.max(), nu2.max()) * 1.15
+    ax.scatter(nu2, nu1, alpha=.7, s=45, color=&#39;#2166ac&#39;, zorder=3)
+    ax.plot([0, lim], [0, lim], &#39;k--&#39;, lw=1, label=&#39;ν₁ = ν₂&#39;)
+    ax.set_xlabel(&#39;Second-option noise  ν₂&#39;)
+    ax.set_ylabel(&#39;First-option noise  ν₁&#39;)
+    ax.set_title(label)
+    ax.legend(fontsize=9); sns.despine(ax=ax)
+
+plt.suptitle(&#39;Subject-level noise estimates from PMCM&#39;, fontsize=12, y=1.02)
+plt.tight_layout()
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="lesson4.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Lesson 4: Flexible Noise Curves — the <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseRiskModel</span></code></div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="lesson2.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Lesson 2: Risky Choice and the Key Correlations (Barreto-Garc:nbsphinx-math:`u0`0eda et al., 2023)</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2022, Gilles de Hollander
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Lesson 3: Stake effects and presentation order — de Hollander et al. (2024)</a><ul>
+<li><a class="reference internal" href="#Background">Background</a><ul>
+<li><a class="reference internal" href="#Models-compared">Models compared</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#Presentation-order-x-stake-size-interaction">Presentation-order x stake-size interaction</a></li>
+<li><a class="reference internal" href="#Fit-three-models-—-dot-cloud-data">Fit three models — dot-cloud data</a></li>
+<li><a class="reference internal" href="#Posterior-predictives-—-dot-cloud-data">Posterior predictives — dot-cloud data</a></li>
+<li><a class="reference internal" href="#Fit-three-models-—-symbolic-data">Fit three models — symbolic data</a></li>
+<li><a class="reference internal" href="#Posterior-predictives-—-symbolic-data">Posterior predictives — symbolic data</a></li>
+<li><a class="reference internal" href="#Parameter-interpretation:-\nu_1-vs-\nu_2">Parameter interpretation: <span class="math notranslate nohighlight">\(\nu_1\)</span> vs <span class="math notranslate nohighlight">\(\nu_2\)</span></a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    </body>
+</html>

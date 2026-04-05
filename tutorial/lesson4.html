@@ -1,0 +1,773 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood" href="lesson5.html"><link rel="prev" title="Lesson 3: Stake effects and presentation order — de Hollander et al. (2024)" href="lesson3.html">
+
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
+        <title>Lesson 4: Flexible Noise Curves — the FlexibleNoiseRiskModel - bauer 0.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #eeffcc;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">bauer 0.2.0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">bauer 0.2.0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concepts.html">Architecture &amp; Concepts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="lesson1.html">Lesson 1: Psychophysical Modelling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson2.html">Lesson 2: Risky Choice and the Key Correlations (Barreto-Garc:nbsphinx-math:`u0`0eda et al., 2023)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson3.html">Lesson 3: Stake effects and presentation order — de Hollander et al. (2024)</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Lesson 4: Flexible Noise Curves — the <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseRiskModel</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson5.html">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/tutorial/lesson4.ipynb.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="Lesson-4:-Flexible-Noise-Curves-—-the-FlexibleNoiseRiskModel">
+<h1>Lesson 4: Flexible Noise Curves — the <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseRiskModel</span></code><a class="headerlink" href="#Lesson-4:-Flexible-Noise-Curves-—-the-FlexibleNoiseRiskModel" title="Link to this heading">¶</a></h1>
+<section id="Motivation:-noise-in-natural-space-vs-log-space">
+<h2>Motivation: noise in natural space vs log space<a class="headerlink" href="#Motivation:-noise-in-natural-space-vs-log-space" title="Link to this heading">¶</a></h2>
+<p>The PMCM (lesson 3) assumes a single fixed noise level per presentation position: <span class="math notranslate nohighlight">\(\nu_1\)</span> for the first option and <span class="math notranslate nohighlight">\(\nu_2\)</span> for the second. These scalars are defined in <strong>natural (linear) payoff space</strong>.</p>
+<p>The NLC model predicts <strong>scale invariance</strong>: noise is constant on a <em>logarithmic</em> scale. When translated back to natural space, constant log-scale noise implies that natural-space noise grows <strong>linearly</strong> with magnitude — this is just Weber’s law:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\nu_\text{natural}(n) = \nu_\text{log} \times n\]</div>
+</div>
+<p>So the scale-invariant prediction for the flexible model is a <em>linear</em> curve <span class="math notranslate nohighlight">\(\nu(n) \propto n\)</span>, not a flat one. A flat curve in natural space would mean constant absolute discriminability — which would actually imply <em>improving</em> relative precision at higher magnitudes (a violation of Weber’s law in the opposite direction).</p>
+<p>The <strong>Flexible Noise Model</strong> replaces fixed scalars with <strong>polynomial curves</strong> <span class="math notranslate nohighlight">\(\nu_k(n)\)</span>, allowing the data to reveal the actual noise-vs-magnitude relationship:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\nu_k(n) = \text{softplus}\!\left(\sum_{j=0}^{p} \beta_{k,j}\, \phi_j(n)\right)\]</div>
+</div>
+<p>where <span class="math notranslate nohighlight">\(\phi_j\)</span> are polynomial basis functions and <span class="math notranslate nohighlight">\(p\)</span> is the polynomial order (default 5).</p>
+<ul class="simple">
+<li><p><strong>Linear posterior</strong> <span class="math notranslate nohighlight">\(\Rightarrow\)</span> scale invariance (Weber’s law) holds</p></li>
+<li><p><strong>Sub-linear</strong> <span class="math notranslate nohighlight">\(\Rightarrow\)</span> better-than-Weber precision at large magnitudes</p></li>
+<li><p><strong>Super-linear or curved</strong> <span class="math notranslate nohighlight">\(\Rightarrow\)</span> violations (e.g., compressed representation at extremes)</p></li>
+</ul>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span><span class="p">;</span> <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">seaborn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sns</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_dehollander2024</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">RiskModel</span><span class="p">,</span> <span class="n">FlexibleNoiseRiskModel</span>
+
+<span class="c1"># Use dot-cloud data (both sessions) as in lesson 3</span>
+<span class="n">df_dot</span> <span class="o">=</span> <span class="n">load_dehollander2024</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s1">&#39;dotcloud&#39;</span><span class="p">,</span> <span class="n">sessions</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;3t2&#39;</span><span class="p">,</span> <span class="s1">&#39;7t2&#39;</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Subjects: </span><span class="si">{</span><span class="n">df_dot</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span><span class="si">}</span><span class="s2">,  Trials: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df_dot</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Prep helper (same as lesson 3)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">prep_df</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    <span class="n">risky_first</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mf">0.55</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;log_ratio&#39;</span><span class="p">]</span>     <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">])</span> <span class="o">/</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]))</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;chose_risky&#39;</span><span class="p">]</span>   <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="o">~</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">])</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n_safe&#39;</span><span class="p">]</span>        <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;risky_first&#39;</span><span class="p">]</span>   <span class="o">=</span> <span class="n">risky_first</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;order&#39;</span><span class="p">]</span>         <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="s1">&#39;Risky first&#39;</span><span class="p">,</span> <span class="s1">&#39;Safe first&#39;</span><span class="p">)</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;log_ratio_bin&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">cut</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;log_ratio&#39;</span><span class="p">],</span> <span class="n">bins</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+                             <span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">mid</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">))</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n_safe_bin&#39;</span><span class="p">]</span>    <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">qcut</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;n_safe&#39;</span><span class="p">],</span> <span class="n">q</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+                                   <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Low stakes&#39;</span><span class="p">,</span> <span class="s1">&#39;Mid stakes&#39;</span><span class="p">,</span> <span class="s1">&#39;High stakes&#39;</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">df</span>
+
+<span class="n">df_dot_p</span> <span class="o">=</span> <span class="n">prep_df</span><span class="p">(</span><span class="n">df_dot</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Subjects: 30,  Trials: 11445
+</pre></div></div>
+</div>
+</section>
+<section id="Illustrating-flexible-noise-curves">
+<h2>Illustrating flexible noise curves<a class="headerlink" href="#Illustrating-flexible-noise-curves" title="Link to this heading">¶</a></h2>
+<p>Before fitting, we show what different noise-curve shapes look like and how they would shift the psychometric function at different magnitude levels.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.stats</span><span class="w"> </span><span class="kn">import</span> <span class="n">norm</span> <span class="k">as</span> <span class="n">scipy_norm</span>
+
+<span class="n">n_vals</span>     <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">45</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
+<span class="n">nu_log</span>     <span class="o">=</span> <span class="mf">0.30</span>          <span class="c1"># log-scale Weber fraction</span>
+<span class="n">log_ratios</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mf">1.5</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">,</span> <span class="mi">300</span><span class="p">)</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mf">4.5</span><span class="p">))</span>
+
+<span class="c1"># Left: noise curves in natural space — linear = Weber&#39;s law null</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">noise_curves</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="s1">&#39;Linear  ν(n) = ν₀·n  [Weber / scale-invariant]&#39;</span><span class="p">,</span>
+     <span class="n">nu_log</span> <span class="o">*</span> <span class="n">n_vals</span> <span class="o">/</span> <span class="n">n_vals</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span>        <span class="s1">&#39;#2166ac&#39;</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;Flat  ν(n) = const  [better precision at large n]&#39;</span><span class="p">,</span>
+     <span class="n">np</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">n_vals</span><span class="p">,</span> <span class="n">nu_log</span><span class="p">),</span>           <span class="s1">&#39;#d73027&#39;</span><span class="p">,</span> <span class="s1">&#39;--&#39;</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;Super-linear  [worse precision at large n]&#39;</span><span class="p">,</span>
+     <span class="n">nu_log</span> <span class="o">*</span> <span class="p">(</span><span class="n">n_vals</span> <span class="o">/</span> <span class="n">n_vals</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span><span class="o">**</span><span class="mf">1.8</span><span class="p">,</span> <span class="s1">&#39;#1a9850&#39;</span><span class="p">,</span> <span class="s1">&#39;:&#39;</span><span class="p">),</span>
+<span class="p">]</span>
+<span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">nu_n</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">ls</span> <span class="ow">in</span> <span class="n">noise_curves</span><span class="p">:</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">n_vals</span><span class="p">,</span> <span class="n">nu_n</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="n">ls</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Payoff magnitude  n  (natural space)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Noise  ν(n)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Noise-vs-magnitude curves in natural space&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mf">8.5</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="c1"># Right: linear = constant log-ratio discrimination (Weber law)</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">n_ref</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">ls</span> <span class="ow">in</span> <span class="p">[(</span><span class="mi">8</span><span class="p">,</span> <span class="s1">&#39;#4393c3&#39;</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">),</span> <span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="s1">&#39;#1a9850&#39;</span><span class="p">,</span> <span class="s1">&#39;--&#39;</span><span class="p">),</span> <span class="p">(</span><span class="mi">36</span><span class="p">,</span> <span class="s1">&#39;#d73027&#39;</span><span class="p">,</span> <span class="s1">&#39;:&#39;</span><span class="p">)]:</span>
+    <span class="n">nu_lin</span>  <span class="o">=</span> <span class="n">nu_log</span> <span class="o">*</span> <span class="n">n_ref</span> <span class="o">/</span> <span class="n">n_vals</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>   <span class="c1"># linear Weber noise</span>
+    <span class="n">nu_flat</span> <span class="o">=</span> <span class="n">nu_log</span>                            <span class="c1"># flat (constant) noise</span>
+    <span class="n">p_lin</span>  <span class="o">=</span> <span class="n">scipy_norm</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">log_ratios</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">nu_lin</span><span class="p">))</span>
+    <span class="n">p_flat</span> <span class="o">=</span> <span class="n">scipy_norm</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">log_ratios</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">nu_flat</span><span class="p">))</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">log_ratios</span><span class="p">,</span> <span class="n">p_lin</span><span class="p">,</span>  <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="n">ls</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;Linear ν (n=</span><span class="si">{</span><span class="n">n_ref</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">log_ratios</span><span class="p">,</span> <span class="n">p_flat</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.2</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="n">ls</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.4</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span>  <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="mf">0.97</span><span class="p">,</span> <span class="mf">0.07</span><span class="p">,</span> <span class="s1">&#39;Faint: flat ν (constant)&#39;</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="n">ax</span><span class="o">.</span><span class="n">transAxes</span><span class="p">,</span>
+        <span class="n">ha</span><span class="o">=</span><span class="s1">&#39;right&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;log(n2 / n1)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;P(chose n2)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Linear noise (Weber): psychometric slope varies with n&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mf">8.5</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Natural-space noise — linear = Weber / scale-invariant baseline&#39;</span><span class="p">,</span>
+             <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson4_3_0.png" src="../_images/tutorial_lesson4_3_0.png" />
+</div>
+</div>
+</section>
+<section id="Fit-models-—-PMCM-vs-Flexible-Noise">
+<h2>Fit models — PMCM vs Flexible Noise<a class="headerlink" href="#Fit-models-—-PMCM-vs-Flexible-Noise" title="Link to this heading">¶</a></h2>
+<p>We fit both the PMCM (fixed noise) and the Flexible Noise model on the dot-cloud data so we can directly compare them.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ── PMCM (fixed noise) ───────────────────────────────────────────────────────</span>
+<span class="n">model_pmcm</span> <span class="o">=</span> <span class="n">RiskModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df_dot</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
+                        <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model_pmcm</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">df_dot</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_p_choice</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">idata_pmcm</span> <span class="o">=</span> <span class="n">model_pmcm</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset, n2_evidence_sd_mu_untransformed, n2_evidence_sd_sd, n2_evidence_sd_offset, risky_prior_mu_mu, risky_prior_mu_sd, risky_prior_mu_offset, risky_prior_sd_mu_untransformed, risky_prior_sd_sd, risky_prior_sd_offset, safe_prior_mu_mu, safe_prior_mu_sd, safe_prior_mu_offset, safe_prior_sd_mu_untransformed, safe_prior_sd_sd, safe_prior_sd_offset]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "2e116ba1a2524883a5cccf7f4e700667", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
+</pre></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Sampling 2 chains for 100 tune and 100 draw iterations (200 + 200 draws total) took 70 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ── Flexible Noise model (polynomial noise curves) ───────────────────────────</span>
+<span class="n">model_flex</span> <span class="o">=</span> <span class="n">FlexibleNoiseRiskModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df_dot</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
+                                     <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">polynomial_order</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="n">model_flex</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df_dot</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_p_choice</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">idata_flex</span> <span class="o">=</span> <span class="n">model_flex</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [n1_evidence_sd_spline1_mu, n1_evidence_sd_spline1_sd, n1_evidence_sd_spline1_offset, n1_evidence_sd_spline2_mu, n1_evidence_sd_spline2_sd, n1_evidence_sd_spline2_offset, n1_evidence_sd_spline3_mu, n1_evidence_sd_spline3_sd, n1_evidence_sd_spline3_offset, n1_evidence_sd_spline4_mu, n1_evidence_sd_spline4_sd, n1_evidence_sd_spline4_offset, n1_evidence_sd_spline5_mu, n1_evidence_sd_spline5_sd, n1_evidence_sd_spline5_offset, n2_evidence_sd_spline1_mu, n2_evidence_sd_spline1_sd, n2_evidence_sd_spline1_offset, n2_evidence_sd_spline2_mu, n2_evidence_sd_spline2_sd, n2_evidence_sd_spline2_offset, n2_evidence_sd_spline3_mu, n2_evidence_sd_spline3_sd, n2_evidence_sd_spline3_offset, n2_evidence_sd_spline4_mu, n2_evidence_sd_spline4_sd, n2_evidence_sd_spline4_offset, n2_evidence_sd_spline5_mu, n2_evidence_sd_spline5_sd, n2_evidence_sd_spline5_offset, risky_prior_mu_mu, risky_prior_mu_sd, risky_prior_mu_offset, risky_prior_sd_mu_untransformed, risky_prior_sd_sd, risky_prior_sd_offset, safe_prior_mu_mu, safe_prior_mu_sd, safe_prior_mu_offset, safe_prior_sd_mu_untransformed, safe_prior_sd_sd, safe_prior_sd_offset]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "d955af2b832647449d403b184c2c0d9f", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
+</pre></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Sampling 2 chains for 100 tune and 100 draw iterations (200 + 200 draws total) took 223 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
+</pre></div></div>
+</div>
+</section>
+<section id="Posterior-noise-curves-\nu_k(n)">
+<h2>Posterior noise curves <span class="math notranslate nohighlight">\(\nu_k(n)\)</span><a class="headerlink" href="#Posterior-noise-curves-\nu_k(n)" title="Link to this heading">¶</a></h2>
+<p>The group-level posterior noise curves show whether noise is flat (like PMCM assumes) or varies systematically with magnitude. The shaded band is the 95 % posterior interval across posterior samples.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get group-level noise curves from the flexible model</span>
+<span class="c1"># Returns long-format DataFrame with MultiIndex (chain, draw, x)</span>
+<span class="n">sd_curves</span> <span class="o">=</span> <span class="n">model_flex</span><span class="o">.</span><span class="n">get_sd_curve</span><span class="p">(</span><span class="n">idata</span><span class="o">=</span><span class="n">idata_flex</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span>
+                                     <span class="n">group</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">df_dot</span><span class="o">.</span><span class="n">reset_index</span><span class="p">())</span>
+
+<span class="c1"># PMCM fixed noise posteriors (scalar per sample)</span>
+<span class="n">nu1_pmcm</span> <span class="o">=</span> <span class="n">idata_pmcm</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd_mu&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+<span class="n">nu2_pmcm</span> <span class="o">=</span> <span class="n">idata_pmcm</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd_mu&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mf">4.5</span><span class="p">))</span>
+<span class="n">colors</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;flex&#39;</span><span class="p">:</span> <span class="s1">&#39;#d73027&#39;</span><span class="p">,</span> <span class="s1">&#39;pmcm&#39;</span><span class="p">:</span> <span class="s1">&#39;#4393c3&#39;</span><span class="p">}</span>
+
+<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="p">(</span><span class="n">var_col</span><span class="p">,</span> <span class="n">nu_pmcm</span><span class="p">,</span> <span class="n">label_flex</span><span class="p">,</span> <span class="n">label_pmcm</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+        <span class="n">axes</span><span class="p">,</span>
+        <span class="p">[(</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="n">nu1_pmcm</span><span class="p">,</span> <span class="s1">&#39;FlexNoise  ν₁(n)&#39;</span><span class="p">,</span> <span class="s1">&#39;PMCM  ν₁ (fixed)&#39;</span><span class="p">),</span>
+         <span class="p">(</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">,</span> <span class="n">nu2_pmcm</span><span class="p">,</span> <span class="s1">&#39;FlexNoise  ν₂(n)&#39;</span><span class="p">,</span> <span class="s1">&#39;PMCM  ν₂ (fixed)&#39;</span><span class="p">)]):</span>
+    <span class="c1"># Group by x to get posterior mean and 95% CI across (chain, draw) samples</span>
+    <span class="n">grp</span>    <span class="o">=</span> <span class="n">sd_curves</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">)[</span><span class="n">var_col</span><span class="p">]</span>
+    <span class="n">x_vals</span> <span class="o">=</span> <span class="n">grp</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">mean</span>   <span class="o">=</span> <span class="n">grp</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">lo</span>     <span class="o">=</span> <span class="n">grp</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.025</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">hi</span>     <span class="o">=</span> <span class="n">grp</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.975</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">x_vals</span><span class="p">,</span> <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.25</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;flex&#39;</span><span class="p">])</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_vals</span><span class="p">,</span> <span class="n">mean</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;flex&#39;</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="n">label_flex</span><span class="p">)</span>
+    <span class="c1"># PMCM fixed noise</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">nu_pmcm</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;pmcm&#39;</span><span class="p">],</span>
+               <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">label_pmcm</span><span class="si">}</span><span class="s1"> = </span><span class="si">{</span><span class="n">nu_pmcm</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">x_vals</span><span class="p">,</span>
+                    <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">nu_pmcm</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">),</span>
+                    <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">nu_pmcm</span><span class="p">,</span> <span class="mf">97.5</span><span class="p">),</span>
+                    <span class="n">alpha</span><span class="o">=</span><span class="mf">.15</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;pmcm&#39;</span><span class="p">])</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Payoff magnitude  n&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Noise  ν&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">9</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;First-option noise  ν₁(n)&#39;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Second-option noise  ν₂(n)&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Flexible vs fixed noise (group level, 95 % posterior interval)&#39;</span><span class="p">,</span>
+             <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson4_8_0.png" src="../_images/tutorial_lesson4_8_0.png" />
+</div>
+</div>
+</section>
+<section id="Posterior-predictive-comparison">
+<h2>Posterior predictive comparison<a class="headerlink" href="#Posterior-predictive-comparison" title="Link to this heading">¶</a></h2>
+<p>We reuse the PPC helper from lesson 3 and overlay both models’ predictions against the observed presentation-order × stake-size interaction.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">stake_pal</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;Low stakes&#39;</span><span class="p">:</span> <span class="s1">&#39;#4C72B0&#39;</span><span class="p">,</span> <span class="s1">&#39;Mid stakes&#39;</span><span class="p">:</span> <span class="s1">&#39;#DD8452&#39;</span><span class="p">,</span> <span class="s1">&#39;High stakes&#39;</span><span class="p">:</span> <span class="s1">&#39;#55A868&#39;</span><span class="p">}</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">add_model_ppc</span><span class="p">(</span><span class="n">df_orig</span><span class="p">,</span> <span class="n">df_prepped</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">idata</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">n_ppc_samples</span><span class="o">=</span><span class="mi">50</span><span class="p">):</span>
+    <span class="n">ppc_df</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">ppc</span><span class="p">(</span><span class="n">df_orig</span><span class="p">,</span> <span class="n">idata</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;p&#39;</span><span class="p">])</span>
+    <span class="n">ppc_p</span>  <span class="o">=</span> <span class="n">ppc_df</span><span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="s1">&#39;p&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span><span class="p">)</span>
+    <span class="n">cols</span>   <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">ppc_p</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span>
+                               <span class="n">size</span><span class="o">=</span><span class="nb">min</span><span class="p">(</span><span class="n">n_ppc_samples</span><span class="p">,</span> <span class="n">ppc_p</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                               <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">ppc_p</span>  <span class="o">=</span> <span class="n">ppc_p</span><span class="p">[</span><span class="n">cols</span><span class="p">]</span>
+    <span class="n">risky_first</span> <span class="o">=</span> <span class="n">df_prepped</span><span class="p">[</span><span class="s1">&#39;risky_first&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">p_risky</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">ppc_p</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">ppc_p</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+    <span class="n">df_out</span> <span class="o">=</span> <span class="n">df_prepped</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">df_out</span><span class="p">[</span><span class="s1">&#39;p_mean&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">p_risky</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">df_out</span><span class="p">[</span><span class="s1">&#39;p_lo&#39;</span><span class="p">]</span>   <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">p_risky</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">,</span>  <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">df_out</span><span class="p">[</span><span class="s1">&#39;p_hi&#39;</span><span class="p">]</span>   <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">p_risky</span><span class="p">,</span> <span class="mf">97.5</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">df_out</span><span class="p">[</span><span class="s1">&#39;model&#39;</span><span class="p">]</span>  <span class="o">=</span> <span class="n">model_name</span>
+    <span class="k">return</span> <span class="n">df_out</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">plot_ppc_row</span><span class="p">(</span><span class="n">df_pred</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">axes_row</span><span class="p">):</span>
+    <span class="n">hue_order</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Low stakes&#39;</span><span class="p">,</span> <span class="s1">&#39;Mid stakes&#39;</span><span class="p">,</span> <span class="s1">&#39;High stakes&#39;</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="n">order_val</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axes_row</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;Risky first&#39;</span><span class="p">,</span> <span class="s1">&#39;Safe first&#39;</span><span class="p">]):</span>
+        <span class="n">sub</span>  <span class="o">=</span> <span class="n">df_pred</span><span class="p">[</span><span class="n">df_pred</span><span class="p">[</span><span class="s1">&#39;order&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">order_val</span><span class="p">]</span>
+        <span class="n">obs</span>  <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">&#39;n_safe_bin&#39;</span><span class="p">,</span> <span class="s1">&#39;log_ratio_bin&#39;</span><span class="p">])[</span><span class="s1">&#39;chose_risky&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+        <span class="n">pred</span> <span class="o">=</span> <span class="p">(</span><span class="n">sub</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">&#39;n_safe_bin&#39;</span><span class="p">,</span> <span class="s1">&#39;log_ratio_bin&#39;</span><span class="p">])[[</span><span class="s1">&#39;p_mean&#39;</span><span class="p">,</span> <span class="s1">&#39;p_lo&#39;</span><span class="p">,</span> <span class="s1">&#39;p_hi&#39;</span><span class="p">]]</span>
+                   <span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">())</span>
+        <span class="k">for</span> <span class="n">sbin</span> <span class="ow">in</span> <span class="n">hue_order</span><span class="p">:</span>
+            <span class="n">o</span> <span class="o">=</span> <span class="n">obs</span><span class="p">[</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;n_safe_bin&#39;</span><span class="p">]</span>  <span class="o">==</span> <span class="n">sbin</span><span class="p">]</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="n">pred</span><span class="p">[</span><span class="n">pred</span><span class="p">[</span><span class="s1">&#39;n_safe_bin&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">sbin</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">o</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">c</span> <span class="o">=</span> <span class="n">stake_pal</span><span class="p">[</span><span class="n">sbin</span><span class="p">]</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s1">&#39;log_ratio_bin&#39;</span><span class="p">],</span> <span class="n">p</span><span class="p">[</span><span class="s1">&#39;p_lo&#39;</span><span class="p">],</span> <span class="n">p</span><span class="p">[</span><span class="s1">&#39;p_hi&#39;</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.2</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s1">&#39;log_ratio_bin&#39;</span><span class="p">],</span> <span class="n">p</span><span class="p">[</span><span class="s1">&#39;p_mean&#39;</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">sbin</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">o</span><span class="p">[</span><span class="s1">&#39;log_ratio_bin&#39;</span><span class="p">],</span> <span class="n">o</span><span class="p">[</span><span class="s1">&#39;chose_risky&#39;</span><span class="p">],</span>
+                       <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.85</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mf">.55</span><span class="p">),</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;#333333&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="o">-</span><span class="mf">.05</span><span class="p">,</span> <span class="mf">1.05</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s1"> — </span><span class="si">{</span><span class="n">order_val</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">9</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;log(risky / safe)&#39;</span><span class="p">);</span> <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;P(chose risky)&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s1">&#39;Safe stake&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="s1">&#39;upper left&#39;</span><span class="p">)</span>
+        <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">9</span><span class="p">),</span> <span class="n">sharey</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">mdl</span><span class="p">,</span> <span class="n">idat</span><span class="p">,</span> <span class="n">name</span><span class="p">),</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+        <span class="p">[(</span><span class="n">model_pmcm</span><span class="p">,</span> <span class="n">idata_pmcm</span><span class="p">,</span> <span class="s1">&#39;PMCM (fixed noise)&#39;</span><span class="p">),</span>
+         <span class="p">(</span><span class="n">model_flex</span><span class="p">,</span> <span class="n">idata_flex</span><span class="p">,</span> <span class="s1">&#39;Flexible Noise&#39;</span><span class="p">)],</span>
+        <span class="n">axes</span><span class="p">):</span>
+    <span class="n">df_pred</span> <span class="o">=</span> <span class="n">add_model_ppc</span><span class="p">(</span><span class="n">df_dot</span><span class="p">,</span> <span class="n">df_dot_p</span><span class="p">,</span> <span class="n">mdl</span><span class="p">,</span> <span class="n">idat</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="n">plot_ppc_row</span><span class="p">(</span><span class="n">df_pred</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">row</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Posterior predictive comparison: PMCM vs Flexible Noise&#39;</span><span class="p">,</span>
+             <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.01</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Sampling: []
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "8382737a475e4743a89173c47cdd533f", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
+</pre></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Sampling: []
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "c0fb9892b80f45c5891fc0c6e092cfbe", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
+</pre></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson4_10_8.png" src="../_images/tutorial_lesson4_10_8.png" />
+</div>
+</div>
+</section>
+<section id="Take-aways">
+<h2>Take-aways<a class="headerlink" href="#Take-aways" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>If the posterior noise curves are <strong>flat</strong>, the flexible model reduces to the PMCM and adds no explanatory value.</p></li>
+<li><p>If the curves are <strong>rising or curved</strong>, this indicates that noise is not constant across magnitudes — violating the pure scale-invariance prediction of the NLC model.</p></li>
+<li><p>The flexible model’s PPC will tend to capture the stake-dependent spread more accurately when noise truly varies, because it can assign different noise to high- and low-magnitude safe/risky options within the same trial.</p></li>
+<li><p>In practice, compare model fit with <code class="docutils literal notranslate"><span class="pre">az.compare({'PMCM':</span> <span class="pre">idata_pmcm,</span> <span class="pre">'Flex':</span> <span class="pre">idata_flex})</span></code> after computing log-likelihoods (requires <code class="docutils literal notranslate"><span class="pre">idata_kwargs={'log_likelihood':</span> <span class="pre">True}</span></code> in <code class="docutils literal notranslate"><span class="pre">model.sample()</span></code>).</p></li>
+</ul>
+<script type="application/vnd.jupyter.widget-state+json">
+{"state": {"2e116ba1a2524883a5cccf7f4e700667": {"model_module": "@jupyter-widgets/output", "model_module_version": "1.0.0", "model_name": "OutputModel", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/output", "_model_module_version": "1.0.0", "_model_name": "OutputModel", "_view_count": null, "_view_module": "@jupyter-widgets/output", "_view_module_version": "1.0.0", "_view_name": "OutputView", "layout": "IPY_MODEL_36b8ed85a12c492388f6256522d3fb1e", "msg_id": "", "outputs": [{"data": {"text/html": "<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\">                                                                                                                   \n <span style=\"font-weight: bold\"> Progress                  </span> <span style=\"font-weight: bold\"> Draws </span> <span style=\"font-weight: bold\"> Divergences </span> <span style=\"font-weight: bold\"> Step size </span> <span style=\"font-weight: bold\"> Grad evals </span> <span style=\"font-weight: bold\"> Sampling Speed </span> <span style=\"font-weight: bold\"> Elapsed </span> <span style=\"font-weight: bold\"> Remaining </span> \n \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 \n  <span style=\"color: #1f77b4; text-decoration-color: #1f77b4\">\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501</span>   200     0             0.01        255          2.83 draws/s     0:01:10   0:00:00    \n  <span style=\"color: #1f77b4; text-decoration-color: #1f77b4\">\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501</span>   200     0             0.01        255          2.94 draws/s     0:01:07   0:00:00    \n                                                                                                                   \n</pre>\n", "text/plain": "                                                                                                                   \n \u001b[1m \u001b[0m\u001b[1mProgress                 \u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mDraws\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mDivergences\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mStep size\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mGrad evals\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mSampling Speed\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mElapsed\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mRemaining\u001b[0m\u001b[1m \u001b[0m \n \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 \n  \u001b[38;2;31;119;180m\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u001b[0m   200     0             0.01        255          2.83 draws/s     0:01:10   0:00:00    \n  \u001b[38;2;31;119;180m\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u001b[0m   200     0             0.01        255          2.94 draws/s     0:01:07   0:00:00    \n                                                                                                                   \n"}, "metadata": {}, "output_type": "display_data"}], "tabbable": null, "tooltip": null}}, "36b8ed85a12c492388f6256522d3fb1e": {"model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "model_name": "LayoutModel", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "4b91bb2edec9438da5fdd78caf1e76b3": {"model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "model_name": "LayoutModel", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "8382737a475e4743a89173c47cdd533f": {"model_module": "@jupyter-widgets/output", "model_module_version": "1.0.0", "model_name": "OutputModel", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/output", "_model_module_version": "1.0.0", "_model_name": "OutputModel", "_view_count": null, "_view_module": "@jupyter-widgets/output", "_view_module_version": "1.0.0", "_view_name": "OutputView", "layout": "IPY_MODEL_4b91bb2edec9438da5fdd78caf1e76b3", "msg_id": "", "outputs": [{"data": {"text/html": "<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\">Sampling ... <span style=\"color: #008000; text-decoration-color: #008000\">\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501</span> <span style=\"color: #800080; text-decoration-color: #800080\">100%</span> 0:00:00 / 0:00:00\n</pre>\n", "text/plain": "Sampling ... \u001b[32m\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u001b[0m \u001b[35m100%\u001b[0m 0:00:00 / 0:00:00\n"}, "metadata": {}, "output_type": "display_data"}], "tabbable": null, "tooltip": null}}, "9268fb8702114778b6b341fb6361d9e0": {"model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "model_name": "LayoutModel", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "c0fb9892b80f45c5891fc0c6e092cfbe": {"model_module": "@jupyter-widgets/output", "model_module_version": "1.0.0", "model_name": "OutputModel", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/output", "_model_module_version": "1.0.0", "_model_name": "OutputModel", "_view_count": null, "_view_module": "@jupyter-widgets/output", "_view_module_version": "1.0.0", "_view_name": "OutputView", "layout": "IPY_MODEL_9268fb8702114778b6b341fb6361d9e0", "msg_id": "", "outputs": [{"data": {"text/html": "<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\">Sampling ... <span style=\"color: #008000; text-decoration-color: #008000\">\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501</span> <span style=\"color: #800080; text-decoration-color: #800080\">100%</span> 0:00:00 / 0:00:00\n</pre>\n", "text/plain": "Sampling ... \u001b[32m\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u001b[0m \u001b[35m100%\u001b[0m 0:00:00 / 0:00:00\n"}, "metadata": {}, "output_type": "display_data"}], "tabbable": null, "tooltip": null}}, "ce926e2fa2334942b93d12997a20296b": {"model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "model_name": "LayoutModel", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "d955af2b832647449d403b184c2c0d9f": {"model_module": "@jupyter-widgets/output", "model_module_version": "1.0.0", "model_name": "OutputModel", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/output", "_model_module_version": "1.0.0", "_model_name": "OutputModel", "_view_count": null, "_view_module": "@jupyter-widgets/output", "_view_module_version": "1.0.0", "_view_name": "OutputView", "layout": "IPY_MODEL_ce926e2fa2334942b93d12997a20296b", "msg_id": "", "outputs": [{"data": {"text/html": "<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\">                                                                                                                   \n <span style=\"font-weight: bold\"> Progress                  </span> <span style=\"font-weight: bold\"> Draws </span> <span style=\"font-weight: bold\"> Divergences </span> <span style=\"font-weight: bold\"> Step size </span> <span style=\"font-weight: bold\"> Grad evals </span> <span style=\"font-weight: bold\"> Sampling Speed </span> <span style=\"font-weight: bold\"> Elapsed </span> <span style=\"font-weight: bold\"> Remaining </span> \n \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 \n  <span style=\"color: #1f77b4; text-decoration-color: #1f77b4\">\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501</span>   200     0             0.02        255          1.12 s/draws     0:03:42   0:00:00    \n  <span style=\"color: #1f77b4; text-decoration-color: #1f77b4\">\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501</span>   200     0             0.01        255          1.09 s/draws     0:03:37   0:00:00    \n                                                                                                                   \n</pre>\n", "text/plain": "                                                                                                                   \n \u001b[1m \u001b[0m\u001b[1mProgress                 \u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mDraws\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mDivergences\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mStep size\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mGrad evals\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mSampling Speed\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mElapsed\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mRemaining\u001b[0m\u001b[1m \u001b[0m \n \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 \n  \u001b[38;2;31;119;180m\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u001b[0m   200     0             0.02        255          1.12 s/draws     0:03:42   0:00:00    \n  \u001b[38;2;31;119;180m\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u001b[0m   200     0             0.01        255          1.09 s/draws     0:03:37   0:00:00    \n                                                                                                                   \n"}, "metadata": {}, "output_type": "display_data"}], "tabbable": null, "tooltip": null}}}, "version_major": 2, "version_minor": 0}
+</script></section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="lesson5.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="lesson3.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Lesson 3: Stake effects and presentation order — de Hollander et al. (2024)</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2022, Gilles de Hollander
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Lesson 4: Flexible Noise Curves — the <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseRiskModel</span></code></a><ul>
+<li><a class="reference internal" href="#Motivation:-noise-in-natural-space-vs-log-space">Motivation: noise in natural space vs log space</a></li>
+<li><a class="reference internal" href="#Illustrating-flexible-noise-curves">Illustrating flexible noise curves</a></li>
+<li><a class="reference internal" href="#Fit-models-—-PMCM-vs-Flexible-Noise">Fit models — PMCM vs Flexible Noise</a></li>
+<li><a class="reference internal" href="#Posterior-noise-curves-\nu_k(n)">Posterior noise curves <span class="math notranslate nohighlight">\(\nu_k(n)\)</span></a></li>
+<li><a class="reference internal" href="#Posterior-predictive-comparison">Posterior predictive comparison</a></li>
+<li><a class="reference internal" href="#Take-aways">Take-aways</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    </body>
+</html>

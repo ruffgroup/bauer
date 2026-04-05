@@ -1,0 +1,829 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="./">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="prev" title="Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood" href="tutorial/lesson5.html">
+
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
+        <title>API Reference - bauer 0.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #eeffcc;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="index.html"><div class="brand">bauer 0.2.0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
+  
+  <span class="sidebar-brand-text">bauer 0.2.0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concepts.html">Architecture &amp; Concepts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="tutorial/index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/lesson1.html">Lesson 1: Psychophysical Modelling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/lesson2.html">Lesson 2: Risky Choice and the Key Correlations (Barreto-Garc:nbsphinx-math:`u0`0eda et al., 2023)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/lesson3.html">Lesson 3: Stake effects and presentation order — de Hollander et al. (2024)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/lesson4.html">Lesson 4: Flexible Noise Curves — the <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseRiskModel</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/lesson5.html">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">API Reference</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="_sources/api_reference.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="api-reference">
+<h1>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">¶</a></h1>
+<section id="core">
+<h2>Core<a class="headerlink" href="#core" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.core.BaseModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.core.</span></span><span class="sig-name descname"><span class="pre">BaseModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_n_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/core.html#BaseModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.core.BaseModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="bauer.core.BaseModel.fit_map_individual">
+<span class="sig-name descname"><span class="pre">fit_map_individual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flat_prior</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/core.html#BaseModel.fit_map_individual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.core.BaseModel.fit_map_individual" title="Link to this definition">¶</a></dt>
+<dd><p>Fit MLE/MAP estimates for each subject independently (no pooling).</p>
+<p>Loops over subjects, builds a non-hierarchical model on each
+subject’s data alone, and returns a DataFrame of point estimates
+in natural (transformed) scale.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>pd.DataFrame</em><em> or </em><em>None</em>) – Trial-level data with a ‘subject’ index level.  If None, uses
+<code class="docutils literal notranslate"><span class="pre">self.paradigm</span></code>.</p></li>
+<li><p><strong>flat_prior</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – If True (default), uses a very wide prior (sigma=100), making
+this effectively maximum-likelihood estimation.  If False, uses
+the model’s default prior.</p></li>
+<li><p><strong>**kwargs</strong> – Forwarded to <code class="docutils literal notranslate"><span class="pre">pm.find_MAP</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Index = subject, columns = free parameter names (transformed scale).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.core.LapseModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.core.</span></span><span class="sig-name descname"><span class="pre">LapseModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_n_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/core.html#LapseModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.core.LapseModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.BaseModel" title="bauer.core.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.core.RegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.core.</span></span><span class="sig-name descname"><span class="pre">RegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/core.html#RegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.core.RegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.BaseModel" title="bauer.core.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a></p>
+</dd></dl>
+
+</section>
+<section id="psychometric-models">
+<h2>Psychometric models<a class="headerlink" href="#psychometric-models" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.PsychometricModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychometricModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/psychophysics.html#PsychometricModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.PsychometricModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.BaseModel" title="bauer.core.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a></p>
+<p>Psychometric model for two-alternative forced choice with a sensitivity and bias parameter.</p>
+<p>Parameters <code class="docutils literal notranslate"><span class="pre">nu</span></code> (discrimination sensitivity, softplus-transformed) and <code class="docutils literal notranslate"><span class="pre">bias</span></code>
+(decision criterion) describe the probability of choosing option 2 given stimuli x1 and x2.
+Paradigm requires columns <code class="docutils literal notranslate"><span class="pre">x1</span></code>, <code class="docutils literal notranslate"><span class="pre">x2</span></code>, and <code class="docutils literal notranslate"><span class="pre">choice</span></code>.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.PsychometricLapseModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychometricLapseModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/psychophysics.html#PsychometricLapseModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.PsychometricLapseModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.LapseModel" title="bauer.core.LapseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">LapseModel</span></code></a>, <a class="reference internal" href="#bauer.models.PsychometricModel" title="bauer.models.psychophysics.PsychometricModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">PsychometricModel</span></code></a></p>
+<p>PsychometricModel extended with a lapse rate parameter.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.PsychometricRegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychometricRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/psychophysics.html#PsychometricRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.PsychometricRegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.RegressionModel" title="bauer.core.RegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RegressionModel</span></code></a>, <a class="reference internal" href="#bauer.models.PsychometricModel" title="bauer.models.psychophysics.PsychometricModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">PsychometricModel</span></code></a></p>
+<p>PsychometricModel with patsy formula regression on nu and/or bias.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.PsychometricLapseRegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychometricLapseRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/psychophysics.html#PsychometricLapseRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.PsychometricLapseRegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.LapseModel" title="bauer.core.LapseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">LapseModel</span></code></a>, <a class="reference internal" href="#bauer.models.PsychometricRegressionModel" title="bauer.models.psychophysics.PsychometricRegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">PsychometricRegressionModel</span></code></a></p>
+<p>PsychometricModel with both a lapse rate and patsy formula regression.</p>
+</dd></dl>
+
+</section>
+<section id="magnitude-comparison-models">
+<h2>Magnitude comparison models<a class="headerlink" href="#magnitude-comparison-models" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.MagnitudeComparisonModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">MagnitudeComparisonModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_prior</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_seperate_evidence_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'independent'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_n_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/magnitude.html#MagnitudeComparisonModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.MagnitudeComparisonModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.BaseModel" title="bauer.core.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a></p>
+<p>Bayesian observer model for two-alternative magnitude comparison (e.g. numerosity).</p>
+<p>Choices between quantities n1 and n2 are modelled as Bayesian inference over log-scale
+representations corrupted by Gaussian noise.  The prior is either estimated from the
+stimulus distribution (<code class="docutils literal notranslate"><span class="pre">fit_prior=False</span></code>) or treated as free parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>paradigm</strong> (<em>pd.DataFrame</em><em>, </em><em>optional</em>) – Must contain columns <code class="docutils literal notranslate"><span class="pre">n1</span></code>, <code class="docutils literal notranslate"><span class="pre">n2</span></code>, and <code class="docutils literal notranslate"><span class="pre">choice</span></code>.</p></li>
+<li><p><strong>fit_prior</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – If True, fit <code class="docutils literal notranslate"><span class="pre">prior_mu</span></code> and <code class="docutils literal notranslate"><span class="pre">prior_sd</span></code> as free parameters.</p></li>
+<li><p><strong>fit_seperate_evidence_sd</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – If True, fit separate noise parameters for n1 and n2 (or perceptual/memory noise
+when <code class="docutils literal notranslate"><span class="pre">memory_model='shared_perceptual_noise'</span></code>).</p></li>
+<li><p><strong>memory_model</strong> (<em>{'independent'</em><em>, </em><em>'shared_perceptual_noise'}</em>) – Noise structure. <code class="docutils literal notranslate"><span class="pre">'independent'</span></code> fits n1_evidence_sd and n2_evidence_sd separately.
+<code class="docutils literal notranslate"><span class="pre">'shared_perceptual_noise'</span></code> decomposes into perceptual and memory noise.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.MagnitudeComparisonLapseModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">MagnitudeComparisonLapseModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_prior</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_seperate_evidence_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'independent'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_n_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/magnitude.html#MagnitudeComparisonLapseModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.MagnitudeComparisonLapseModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.LapseModel" title="bauer.core.LapseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">LapseModel</span></code></a>, <a class="reference internal" href="#bauer.models.MagnitudeComparisonModel" title="bauer.models.magnitude.MagnitudeComparisonModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">MagnitudeComparisonModel</span></code></a></p>
+<p>MagnitudeComparisonModel extended with a lapse rate parameter.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.MagnitudeComparisonRegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">MagnitudeComparisonRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_prior</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_seperate_evidence_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'independent'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/magnitude.html#MagnitudeComparisonRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.MagnitudeComparisonRegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.RegressionModel" title="bauer.core.RegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RegressionModel</span></code></a>, <a class="reference internal" href="#bauer.models.MagnitudeComparisonModel" title="bauer.models.magnitude.MagnitudeComparisonModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">MagnitudeComparisonModel</span></code></a></p>
+<p>MagnitudeComparisonModel with patsy formula regression on noise/prior parameters.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.MagnitudeComparisonLapseRegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">MagnitudeComparisonLapseRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_prior</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_seperate_evidence_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'independent'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/magnitude.html#MagnitudeComparisonLapseRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.MagnitudeComparisonLapseRegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.LapseModel" title="bauer.core.LapseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">LapseModel</span></code></a>, <a class="reference internal" href="#bauer.models.MagnitudeComparisonRegressionModel" title="bauer.models.magnitude.MagnitudeComparisonRegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">MagnitudeComparisonRegressionModel</span></code></a></p>
+<p>MagnitudeComparisonModel with both a lapse rate and patsy formula regression.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.FlexibleNoiseComparisonModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">FlexibleNoiseComparisonModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_seperate_evidence_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_prior</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">polynomial_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'independent'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/magnitude.html#FlexibleNoiseComparisonModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.FlexibleNoiseComparisonModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.BaseModel" title="bauer.core.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a></p>
+<p>Magnitude comparison model with stimulus-dependent noise parameterised by a polynomial spline.</p>
+<p>Unlike <a class="reference internal" href="#bauer.models.MagnitudeComparisonModel" title="bauer.models.MagnitudeComparisonModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">MagnitudeComparisonModel</span></code></a>, evidence noise is modelled as a polynomial
+function of log-magnitude, allowing the noise level to vary smoothly with stimulus size.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>paradigm</strong> (<em>pd.DataFrame</em>) – Must contain columns <code class="docutils literal notranslate"><span class="pre">n1</span></code>, <code class="docutils literal notranslate"><span class="pre">n2</span></code>, and <code class="docutils literal notranslate"><span class="pre">choice</span></code>.</p></li>
+<li><p><strong>polynomial_order</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Order(s) of the polynomial for the noise curve (one per prospect when
+<code class="docutils literal notranslate"><span class="pre">fit_seperate_evidence_sd=True</span></code>).</p></li>
+<li><p><strong>memory_model</strong> (<em>{'independent'</em><em>, </em><em>'shared_perceptual_noise'}</em>) – Noise decomposition; see <a class="reference internal" href="#bauer.models.MagnitudeComparisonModel" title="bauer.models.MagnitudeComparisonModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">MagnitudeComparisonModel</span></code></a>.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.FlexibleNoiseComparisonRegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">FlexibleNoiseComparisonRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_seperate_evidence_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_prior</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">polynomial_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'independent'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/magnitude.html#FlexibleNoiseComparisonRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.FlexibleNoiseComparisonRegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.RegressionModel" title="bauer.core.RegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RegressionModel</span></code></a>, <a class="reference internal" href="#bauer.models.FlexibleNoiseComparisonModel" title="bauer.models.magnitude.FlexibleNoiseComparisonModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">FlexibleNoiseComparisonModel</span></code></a></p>
+<p>FlexibleNoiseComparisonModel with patsy formula regression on noise spline coefficients.</p>
+</dd></dl>
+
+</section>
+<section id="risky-choice-models">
+<h2>Risky choice models<a class="headerlink" href="#risky-choice-models" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.RiskModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">RiskModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior_estimate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'objective'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_seperate_evidence_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">incorporate_probability</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'after_inference'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_n_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'independent'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_prospects</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/risky_choice.html#RiskModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.RiskModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.BaseModel" title="bauer.core.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a></p>
+<p>Bayesian observer model for risky choice between two monetary lotteries.</p>
+<p>Each lottery is characterised by a magnitude (n) and probability (p).  The model
+infers posterior beliefs about magnitudes and computes the probability of choosing
+the second option via a Bayesian threshold comparison.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>paradigm</strong> (<em>pd.DataFrame</em><em>, </em><em>optional</em>) – Must contain columns <code class="docutils literal notranslate"><span class="pre">n1</span></code>, <code class="docutils literal notranslate"><span class="pre">n2</span></code>, <code class="docutils literal notranslate"><span class="pre">p1</span></code>, <code class="docutils literal notranslate"><span class="pre">p2</span></code>, and <code class="docutils literal notranslate"><span class="pre">choice</span></code>.</p></li>
+<li><p><strong>prior_estimate</strong> (<em>{'objective'</em><em>, </em><em>'shared'</em><em>, </em><em>'different'</em><em>, </em><em>'full'</em><em>, </em><em>'full_normed'</em><em>, </em><em>'klw'</em><em>, </em><em>'fix_prior_sd'}</em>) – Strategy for estimating the magnitude prior.</p></li>
+<li><p><strong>fit_seperate_evidence_sd</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – Whether to fit separate noise for n1 and n2.</p></li>
+<li><p><strong>incorporate_probability</strong> (<em>{'after_inference'</em><em>, </em><em>'before_inference'}</em>) – Whether probabilities enter the comparison before or after Bayesian inference.</p></li>
+<li><p><strong>memory_model</strong> (<em>{'independent'</em><em>, </em><em>'shared_perceptual_noise'}</em>) – Noise structure; see <a class="reference internal" href="#bauer.models.MagnitudeComparisonModel" title="bauer.models.MagnitudeComparisonModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">MagnitudeComparisonModel</span></code></a>.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.RiskLapseModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">RiskLapseModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior_estimate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'objective'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_seperate_evidence_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">incorporate_probability</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'after_inference'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_n_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'independent'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_prospects</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/risky_choice.html#RiskLapseModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.RiskLapseModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.LapseModel" title="bauer.core.LapseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">LapseModel</span></code></a>, <a class="reference internal" href="#bauer.models.RiskModel" title="bauer.models.risky_choice.RiskModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RiskModel</span></code></a></p>
+<p>RiskModel extended with a lapse rate parameter.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.RiskRegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">RiskRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior_estimate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'objective'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_seperate_evidence_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">incorporate_probability</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'after_inference'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_n_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'independent'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/risky_choice.html#RiskRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.RiskRegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.RegressionModel" title="bauer.core.RegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RegressionModel</span></code></a>, <a class="reference internal" href="#bauer.models.RiskModel" title="bauer.models.risky_choice.RiskModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RiskModel</span></code></a></p>
+<p>RiskModel with patsy formula regression on noise, prior, or bias parameters.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.RiskLapseRegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">RiskLapseRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior_estimate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'objective'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_seperate_evidence_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">incorporate_probability</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'after_inference'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_n_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'independent'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/risky_choice.html#RiskLapseRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.RiskLapseRegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.LapseModel" title="bauer.core.LapseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">LapseModel</span></code></a>, <a class="reference internal" href="#bauer.models.RiskRegressionModel" title="bauer.models.risky_choice.RiskRegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RiskRegressionModel</span></code></a></p>
+<p>RiskModel with both a lapse rate and patsy formula regression.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.ProspectTheoryModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">ProspectTheoryModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_n_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/risky_choice.html#ProspectTheoryModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.ProspectTheoryModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.BaseModel" title="bauer.core.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a></p>
+<p>Classic Prospect Theory model for mixed (gain/loss) gambles.</p>
+<p>Utility function: <code class="docutils literal notranslate"><span class="pre">p</span> <span class="pre">*</span> <span class="pre">gain^alpha</span> <span class="pre">-</span> <span class="pre">(1-p)</span> <span class="pre">*</span> <span class="pre">lambda</span> <span class="pre">*</span> <span class="pre">loss^beta</span></code>.
+Free parameters: <code class="docutils literal notranslate"><span class="pre">alpha</span></code> (gain sensitivity), <code class="docutils literal notranslate"><span class="pre">beta</span></code> (loss sensitivity),
+<code class="docutils literal notranslate"><span class="pre">lambda</span></code> (loss aversion coefficient).
+Paradigm requires columns <code class="docutils literal notranslate"><span class="pre">gain</span></code>, <code class="docutils literal notranslate"><span class="pre">loss</span></code>, <code class="docutils literal notranslate"><span class="pre">prob_gain</span></code>, and <code class="docutils literal notranslate"><span class="pre">choice</span></code>.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.LossAversionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">LossAversionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_n_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">magnitude_grid</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ev_diff_grid</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lapse_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalize_likelihoods</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paradigm_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'mixed_vs_mixed'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fix_prior_sds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/risky_choice.html#LossAversionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.LossAversionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.BaseModel" title="bauer.core.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a></p>
+<p>Bayesian observer model for risky choices with separate gain and loss representations.</p>
+<p>Models perceptual noise and prior beliefs over gains and losses independently,
+integrating over a discrete grid of possible values to compute choice probabilities.
+Supports <code class="docutils literal notranslate"><span class="pre">'mixed_vs_mixed'</span></code> (two lotteries) and <code class="docutils literal notranslate"><span class="pre">'mixed_vs_0'</span></code> (lottery vs. sure zero)
+paradigm types.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.LossAversionRegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">LossAversionRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_n_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">magnitude_grid</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ev_diff_grid</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lapse_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalize_likelihoods</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paradigm_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'mixed_vs_mixed'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fix_prior_sds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/risky_choice.html#LossAversionRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.LossAversionRegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.RegressionModel" title="bauer.core.RegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RegressionModel</span></code></a>, <a class="reference internal" href="#bauer.models.LossAversionModel" title="bauer.models.risky_choice.LossAversionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">LossAversionModel</span></code></a></p>
+<p>LossAversionModel with patsy formula regression on noise/prior parameters.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.RiskModelProbabilityDistortion">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">RiskModelProbabilityDistortion</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">magnitude_prior_estimate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'objective'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_n_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_prospects</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p_grid_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">20</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lapse_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distort_magnitudes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distort_probabilities</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fix_magnitude_prior_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fix_probabiliy_prior_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">estimate_magnitude_prior_mu</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/risky_choice.html#RiskModelProbabilityDistortion"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.RiskModelProbabilityDistortion" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.BaseModel" title="bauer.core.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a></p>
+<p>Risky choice model with Bayesian distortion of magnitudes and/or probabilities.</p>
+<p>Computes the probability of choosing option 2 by integrating over posterior
+distributions of magnitudes and probabilities in log-odds space.
+Paradigm requires columns <code class="docutils literal notranslate"><span class="pre">n1</span></code>, <code class="docutils literal notranslate"><span class="pre">n2</span></code>, <code class="docutils literal notranslate"><span class="pre">p1</span></code>, <code class="docutils literal notranslate"><span class="pre">p2</span></code>, and <code class="docutils literal notranslate"><span class="pre">choice</span></code>.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.RNPModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">RNPModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">risk_neutral_p</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.55</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/risky_choice.html#RNPModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.RNPModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.BaseModel" title="bauer.core.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a></p>
+<p>Risk Neutral Point model for risky choice based on an indifference probability.</p>
+<p>Parameterises risk attitude through a <code class="docutils literal notranslate"><span class="pre">rnp</span></code> (risk neutral point) that sets the
+probability threshold at which the agent is indifferent between a risky and a safe
+option, scaled by a slope parameter <code class="docutils literal notranslate"><span class="pre">gamma</span></code>.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.RNPRegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">RNPRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">risk_neutral_p</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.55</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/risky_choice.html#RNPRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.RNPRegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.RegressionModel" title="bauer.core.RegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RegressionModel</span></code></a>, <a class="reference internal" href="#bauer.models.RNPModel" title="bauer.models.risky_choice.RNPModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RNPModel</span></code></a></p>
+<p>RNPModel with patsy formula regression on rnp or gamma.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.FlexibleNoiseRiskModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">FlexibleNoiseRiskModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior_estimate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'full'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_seperate_evidence_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_n_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">polynomial_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">representational_noise</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'payoff'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'independent'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/risky_choice.html#FlexibleNoiseRiskModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.FlexibleNoiseRiskModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.models.FlexibleNoiseComparisonModel" title="bauer.models.magnitude.FlexibleNoiseComparisonModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">FlexibleNoiseComparisonModel</span></code></a>, <a class="reference internal" href="#bauer.models.RiskModel" title="bauer.models.risky_choice.RiskModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RiskModel</span></code></a></p>
+<p>Risky choice model combining flexible (polynomial) noise with Bayesian magnitude inference.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.FlexibleNoiseRiskRegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">FlexibleNoiseRiskRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior_estimate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'full'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_seperate_evidence_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_n_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">polynomial_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">representational_noise</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'payoff'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memory_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'independent'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/risky_choice.html#FlexibleNoiseRiskRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.FlexibleNoiseRiskRegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.RegressionModel" title="bauer.core.RegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RegressionModel</span></code></a>, <a class="reference internal" href="#bauer.models.FlexibleNoiseRiskModel" title="bauer.models.risky_choice.FlexibleNoiseRiskModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">FlexibleNoiseRiskModel</span></code></a></p>
+<p>FlexibleNoiseRiskModel with patsy formula regression on noise spline coefficients.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.ExpectedUtilityRiskModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">ExpectedUtilityRiskModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_eu</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">probability_distortion</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_outcomes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/risky_choice.html#ExpectedUtilityRiskModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.ExpectedUtilityRiskModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.BaseModel" title="bauer.core.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a></p>
+<p>Expected utility model for risky choice with optional probability distortion.</p>
+<p>Computes expected utility for each lottery and converts the utility difference to a
+choice probability.  Supports a single-outcome paradigm (<code class="docutils literal notranslate"><span class="pre">n_outcomes=1</span></code>) and a
+multi-outcome extension.
+Paradigm requires columns <code class="docutils literal notranslate"><span class="pre">n1</span></code>, <code class="docutils literal notranslate"><span class="pre">n2</span></code>, <code class="docutils literal notranslate"><span class="pre">p1</span></code>, <code class="docutils literal notranslate"><span class="pre">p2</span></code>, and <code class="docutils literal notranslate"><span class="pre">choice</span></code>.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.ExpectedUtilityRiskRegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">ExpectedUtilityRiskRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_eu</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">probability_distortion</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/risky_choice.html#ExpectedUtilityRiskRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.ExpectedUtilityRiskRegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.RegressionModel" title="bauer.core.RegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RegressionModel</span></code></a>, <a class="reference internal" href="#bauer.models.ExpectedUtilityRiskModel" title="bauer.models.risky_choice.ExpectedUtilityRiskModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExpectedUtilityRiskModel</span></code></a></p>
+<p>ExpectedUtilityRiskModel with patsy formula regression on utility or noise parameters.</p>
+</dd></dl>
+
+</section>
+<section id="utilities">
+<h2>Utilities<a class="headerlink" href="#utilities" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.data.load_garcia2022">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.data.</span></span><span class="sig-name descname"><span class="pre">load_garcia2022</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'magnitude'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_non_responses</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/data.html#load_garcia2022"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.data.load_garcia2022" title="Link to this definition">¶</a></dt>
+<dd><p>Return behavioral data from Barreto Garcia et al. (2022) as a multi-indexed DataFrame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>task</strong> (<em>{'magnitude'</em><em>, </em><em>'risk'}</em>) – Which task dataset to load.</p></li>
+<li><p><strong>remove_non_responses</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – If True, drop trials with missing choices and cast the <code class="docutils literal notranslate"><span class="pre">choice</span></code> column to bool.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.data.load_dehollander2024">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.data.</span></span><span class="sig-name descname"><span class="pre">load_dehollander2024</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'dotcloud'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sessions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bids_folder</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'/data/ds-risk'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">symbolic_folder</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'/data/ds-symbolicrisk'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_non_responses</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/data.html#load_dehollander2024"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.data.load_dehollander2024" title="Link to this definition">¶</a></dt>
+<dd><p>Return behavioral data from de Hollander et al. (2024) as a multi-indexed DataFrame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>task</strong> (<em>{'dotcloud'</em><em>, </em><em>'symbolic'}</em>) – Which task dataset to load. <code class="docutils literal notranslate"><span class="pre">'dotcloud'</span></code> uses the fMRI dot-cloud gamble
+task (ds-risk); <code class="docutils literal notranslate"><span class="pre">'symbolic'</span></code> uses the Arabic-numeral behavioural task
+(ds-symbolicrisk).</p></li>
+<li><p><strong>sessions</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em> of </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><em>None</em>) – Sessions to include for the dotcloud task (default <code class="docutils literal notranslate"><span class="pre">['3t2',</span> <span class="pre">'7t2']</span></code>).
+Ignored for the symbolic task.</p></li>
+<li><p><strong>bids_folder</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Root of the ds-risk BIDS dataset.</p></li>
+<li><p><strong>symbolic_folder</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Root of the ds-symbolicrisk dataset.</p></li>
+<li><p><strong>remove_non_responses</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – If True, drop trials with missing choices and cast the <code class="docutils literal notranslate"><span class="pre">choice</span></code> column
+to bool.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.bayes.get_posterior">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.bayes.</span></span><span class="sig-name descname"><span class="pre">get_posterior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mu1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sd1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mu2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sd2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/bayes.html#get_posterior"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.bayes.get_posterior" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.bayes.get_posterior_np">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.bayes.</span></span><span class="sig-name descname"><span class="pre">get_posterior_np</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mu1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sd1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mu2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sd2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/bayes.html#get_posterior_np"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.bayes.get_posterior_np" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.bayes.get_diff_dist">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.bayes.</span></span><span class="sig-name descname"><span class="pre">get_diff_dist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mu1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sd1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mu2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sd2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/bayes.html#get_diff_dist"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.bayes.get_diff_dist" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.bayes.get_diff_dist_np">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.bayes.</span></span><span class="sig-name descname"><span class="pre">get_diff_dist_np</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mu1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sd1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mu2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sd2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/bayes.html#get_diff_dist_np"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.bayes.get_diff_dist_np" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.bayes.cumulative_normal">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.bayes.</span></span><span class="sig-name descname"><span class="pre">cumulative_normal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mu</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">Sqrt.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/bayes.html#cumulative_normal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.bayes.cumulative_normal" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.bayes.summarize_ppc">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.bayes.</span></span><span class="sig-name descname"><span class="pre">summarize_ppc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ppc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">groupby</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/bayes.html#summarize_ppc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.bayes.summarize_ppc" title="Link to this definition">¶</a></dt>
+<dd><p>Single-step PPC summary (legacy).  Prefer summarize_ppc_group for group-level PPCs.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.math.logistic">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.math.</span></span><span class="sig-name descname"><span class="pre">logistic</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/math.html#logistic"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.math.logistic" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.math.logistic_np">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.math.</span></span><span class="sig-name descname"><span class="pre">logistic_np</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/math.html#logistic_np"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.math.logistic_np" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.math.softplus_np">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.math.</span></span><span class="sig-name descname"><span class="pre">softplus_np</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/math.html#softplus_np"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.math.softplus_np" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.math.inverse_softplus_np">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.math.</span></span><span class="sig-name descname"><span class="pre">inverse_softplus_np</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/math.html#inverse_softplus_np"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.math.inverse_softplus_np" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.math.logit">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.math.</span></span><span class="sig-name descname"><span class="pre">logit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/math.html#logit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.math.logit" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.math.logit_np">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.math.</span></span><span class="sig-name descname"><span class="pre">logit_np</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/math.html#logit_np"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.math.logit_np" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.math.logit_derivative">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.math.</span></span><span class="sig-name descname"><span class="pre">logit_derivative</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/math.html#logit_derivative"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.math.logit_derivative" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.math.gaussian_pdf">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.math.</span></span><span class="sig-name descname"><span class="pre">gaussian_pdf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mean</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">std</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/math.html#gaussian_pdf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.math.gaussian_pdf" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.plotting.plot_ppc">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">plot_ppc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ppc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exp_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'magnitude'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'p'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'subject'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">col_wrap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_clusters</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">13</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/plotting.html#plot_ppc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.plotting.plot_ppc" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.plotting.plot_subjectwise_parameters">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">plot_subjectwise_parameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameter</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transform</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sort_subjects</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_group_mean</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hdi_prob</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.94</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'steelblue'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/plotting.html#plot_subjectwise_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.plotting.plot_subjectwise_parameters" title="Link to this definition">¶</a></dt>
+<dd><p>Plot subject-level posterior estimates as a sorted point-plot with HDI error bars.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>idata</strong> (<em>arviz.InferenceData</em>) – Posterior samples from a fitted bauer model.</p></li>
+<li><p><strong>parameter</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Name of the subject-level parameter (e.g. <code class="docutils literal notranslate"><span class="pre">'n1_evidence_sd'</span></code>).</p></li>
+<li><p><strong>transform</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><em>None</em>) – Optional transform applied to samples before plotting.
+One of <code class="docutils literal notranslate"><span class="pre">'softplus'</span></code>, <code class="docutils literal notranslate"><span class="pre">'logistic'</span></code>, or <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p></li>
+<li><p><strong>sort_subjects</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – If True (default) subjects are sorted by their posterior mean on the x-axis.
+If False, subjects appear in their original order.</p></li>
+<li><p><strong>plot_group_mean</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – If True (default) and a <code class="docutils literal notranslate"><span class="pre">{parameter}_mu</span></code> variable exists in <code class="docutils literal notranslate"><span class="pre">idata</span></code>,
+draw a dashed horizontal line at the group-mean posterior mean.</p></li>
+<li><p><strong>hdi_prob</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Posterior mass for the HDI interval shown as error bars (default 0.94).</p></li>
+<li><p><strong>color</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Colour for the points and error bars.</p></li>
+<li><p><strong>ax</strong> (<em>matplotlib.axes.Axes</em><em> or </em><em>None</em>) – Axes to plot on.  If None, the current axes are used.</p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><em>None</em>) – Legend label for the series.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>matplotlib.axes.Axes</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.plotting.plot_prediction">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">plot_prediction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'p_predicted'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.25</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/plotting.html#plot_prediction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.plotting.plot_prediction" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.plotting.cluster_offers">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">cluster_offers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">d</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'log(risky/safe)'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/plotting.html#cluster_offers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.plotting.cluster_offers" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.plotting.get_hdi">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">get_hdi</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">d</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/plotting.html#get_hdi"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.plotting.get_hdi" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          <a class="prev-page" href="tutorial/lesson5.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2022, Gilles de Hollander
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">API Reference</a><ul>
+<li><a class="reference internal" href="#core">Core</a><ul>
+<li><a class="reference internal" href="#bauer.core.BaseModel"><code class="docutils literal notranslate"><span class="pre">BaseModel</span></code></a><ul>
+<li><a class="reference internal" href="#bauer.core.BaseModel.fit_map_individual"><code class="docutils literal notranslate"><span class="pre">BaseModel.fit_map_individual()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#bauer.core.LapseModel"><code class="docutils literal notranslate"><span class="pre">LapseModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.core.RegressionModel"><code class="docutils literal notranslate"><span class="pre">RegressionModel</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#psychometric-models">Psychometric models</a><ul>
+<li><a class="reference internal" href="#bauer.models.PsychometricModel"><code class="docutils literal notranslate"><span class="pre">PsychometricModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.PsychometricLapseModel"><code class="docutils literal notranslate"><span class="pre">PsychometricLapseModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.PsychometricRegressionModel"><code class="docutils literal notranslate"><span class="pre">PsychometricRegressionModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.PsychometricLapseRegressionModel"><code class="docutils literal notranslate"><span class="pre">PsychometricLapseRegressionModel</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#magnitude-comparison-models">Magnitude comparison models</a><ul>
+<li><a class="reference internal" href="#bauer.models.MagnitudeComparisonModel"><code class="docutils literal notranslate"><span class="pre">MagnitudeComparisonModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.MagnitudeComparisonLapseModel"><code class="docutils literal notranslate"><span class="pre">MagnitudeComparisonLapseModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.MagnitudeComparisonRegressionModel"><code class="docutils literal notranslate"><span class="pre">MagnitudeComparisonRegressionModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.MagnitudeComparisonLapseRegressionModel"><code class="docutils literal notranslate"><span class="pre">MagnitudeComparisonLapseRegressionModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.FlexibleNoiseComparisonModel"><code class="docutils literal notranslate"><span class="pre">FlexibleNoiseComparisonModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.FlexibleNoiseComparisonRegressionModel"><code class="docutils literal notranslate"><span class="pre">FlexibleNoiseComparisonRegressionModel</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#risky-choice-models">Risky choice models</a><ul>
+<li><a class="reference internal" href="#bauer.models.RiskModel"><code class="docutils literal notranslate"><span class="pre">RiskModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.RiskLapseModel"><code class="docutils literal notranslate"><span class="pre">RiskLapseModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.RiskRegressionModel"><code class="docutils literal notranslate"><span class="pre">RiskRegressionModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.RiskLapseRegressionModel"><code class="docutils literal notranslate"><span class="pre">RiskLapseRegressionModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.ProspectTheoryModel"><code class="docutils literal notranslate"><span class="pre">ProspectTheoryModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.LossAversionModel"><code class="docutils literal notranslate"><span class="pre">LossAversionModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.LossAversionRegressionModel"><code class="docutils literal notranslate"><span class="pre">LossAversionRegressionModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.RiskModelProbabilityDistortion"><code class="docutils literal notranslate"><span class="pre">RiskModelProbabilityDistortion</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.RNPModel"><code class="docutils literal notranslate"><span class="pre">RNPModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.RNPRegressionModel"><code class="docutils literal notranslate"><span class="pre">RNPRegressionModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.FlexibleNoiseRiskModel"><code class="docutils literal notranslate"><span class="pre">FlexibleNoiseRiskModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.FlexibleNoiseRiskRegressionModel"><code class="docutils literal notranslate"><span class="pre">FlexibleNoiseRiskRegressionModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.ExpectedUtilityRiskModel"><code class="docutils literal notranslate"><span class="pre">ExpectedUtilityRiskModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.ExpectedUtilityRiskRegressionModel"><code class="docutils literal notranslate"><span class="pre">ExpectedUtilityRiskRegressionModel</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#utilities">Utilities</a><ul>
+<li><a class="reference internal" href="#bauer.utils.data.load_garcia2022"><code class="docutils literal notranslate"><span class="pre">load_garcia2022()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.data.load_dehollander2024"><code class="docutils literal notranslate"><span class="pre">load_dehollander2024()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.bayes.get_posterior"><code class="docutils literal notranslate"><span class="pre">get_posterior()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.bayes.get_posterior_np"><code class="docutils literal notranslate"><span class="pre">get_posterior_np()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.bayes.get_diff_dist"><code class="docutils literal notranslate"><span class="pre">get_diff_dist()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.bayes.get_diff_dist_np"><code class="docutils literal notranslate"><span class="pre">get_diff_dist_np()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.bayes.cumulative_normal"><code class="docutils literal notranslate"><span class="pre">cumulative_normal()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.bayes.summarize_ppc"><code class="docutils literal notranslate"><span class="pre">summarize_ppc()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.math.logistic"><code class="docutils literal notranslate"><span class="pre">logistic()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.math.logistic_np"><code class="docutils literal notranslate"><span class="pre">logistic_np()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.math.softplus_np"><code class="docutils literal notranslate"><span class="pre">softplus_np()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.math.inverse_softplus_np"><code class="docutils literal notranslate"><span class="pre">inverse_softplus_np()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.math.logit"><code class="docutils literal notranslate"><span class="pre">logit()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.math.logit_np"><code class="docutils literal notranslate"><span class="pre">logit_np()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.math.logit_derivative"><code class="docutils literal notranslate"><span class="pre">logit_derivative()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.math.gaussian_pdf"><code class="docutils literal notranslate"><span class="pre">gaussian_pdf()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.plotting.plot_ppc"><code class="docutils literal notranslate"><span class="pre">plot_ppc()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.plotting.plot_subjectwise_parameters"><code class="docutils literal notranslate"><span class="pre">plot_subjectwise_parameters()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.plotting.plot_prediction"><code class="docutils literal notranslate"><span class="pre">plot_prediction()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.plotting.cluster_offers"><code class="docutils literal notranslate"><span class="pre">cluster_offers()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.plotting.get_hdi"><code class="docutils literal notranslate"><span class="pre">get_hdi()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/scripts/furo.js?v=46bd48cc"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
+    </body>
+</html>
