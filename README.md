@@ -72,7 +72,7 @@ execute them with Jupyter.
 
 ## Documentation
 
-Full documentation: https://bauer.readthedocs.io
+Full documentation: https://ruffgroup.github.io/bauer/
 
 ## License
 
