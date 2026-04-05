@@ -1000,7 +1000,21 @@ class RNPRegressionModel(RegressionModel, RNPModel):
 
 
 class FlexibleNoiseComparisonModel(BaseModel):
+    """Magnitude-comparison model with a flexible, magnitude-dependent noise curve.
 
+    Unlike log-space models, this model represents evidence in **natural (linear)
+    space**: the Gaussian noise on the perceived magnitude n has standard deviation
+    ν_k(n).  This noise curve is parameterised as a B-spline of natural-space n:
+
+        ν_k(n) = softplus( Σ_j β_{k,j} · φ_j(n) )
+
+    where φ_j(n) are B-spline basis functions evaluated at natural-space n (not log n).
+    ν_k(n) is therefore **natural-space noise** (SD of the Gaussian on n, not on log n).
+
+    **Weber's law** corresponds to a *linear* ν(n) ∝ n: noise grows proportionally
+    with magnitude.  A flat ν(n) implies constant absolute noise, which violates
+    Weber's law.  Use ``get_sd_curve()`` to extract posterior ν(n) curves.
+    """
 
     def __init__(self, paradigm, fit_seperate_evidence_sd=True,
                  fit_prior=False,
@@ -1332,6 +1346,48 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         return paradigm_
 
+class AffineNoiseComparisonModel(FlexibleNoiseComparisonModel):
+    """Magnitude-comparison model with affine (intercept + linear) noise.
+
+    The noise curve is parameterised as:
+
+        ν_k(n) = softplus(β_{k,0} + β_{k,1} · n̂)
+
+    where n̂ = (n − n_min) / (n_max − n_min) normalises n to [0, 1] over the
+    observed magnitude range.  This is an **affine** function of n:
+
+    - β_{k,1} ≈ 0  →  constant absolute noise (no Weber scaling)
+    - β_{k,0} small, β_{k,1} large  →  approximately linear / Weber-like
+    - Both nonzero  →  noise floor + Weber scaling
+
+    This model sits between :class:`MagnitudeComparisonModel` (log-space, pure
+    Weber, 2 free noise params per option) and :class:`FlexibleNoiseComparisonModel`
+    (arbitrary B-spline, 2k params):
+
+        MCM  ⊂  AffineNoise (4 noise params)  ⊂  FlexNoise (2k noise params)
+
+    Parameters
+    ----------
+    paradigm : pd.DataFrame
+    fit_seperate_evidence_sd : bool
+        If True (default) fit separate noise curves for n1 and n2.
+    """
+
+    def __init__(self, paradigm, fit_seperate_evidence_sd=True,
+                 fit_prior=False, memory_model='independent'):
+        super().__init__(paradigm,
+                         fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+                         fit_prior=fit_prior,
+                         polynomial_order=2,
+                         memory_model=memory_model)
+
+    def make_dm(self, x, variable='n1_evidence_sd'):
+        min_n = self.paradigm[['n1', 'n2']].min().min()
+        max_n = self.paradigm[['n1', 'n2']].max().max()
+        x_norm = (np.asarray(x, dtype=float) - min_n) / (max_n - min_n)
+        return np.column_stack([np.ones_like(x_norm), x_norm])
+
+
 class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseComparisonModel):
 
     def __init__(self, paradigm,
@@ -1369,9 +1425,37 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
                                               polynomial_order, memory_model)
 
 class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
+    """Risk model with a flexible, magnitude-dependent noise curve.
+
+    Unlike the standard :class:`RiskModel` (which models noise in log space),
+    this model represents payoffs in **natural (linear) space**.  The Gaussian noise
+    on the perceived magnitude has standard deviation ν_k(n), parameterised as a
+    B-spline of natural-space n:
+
+        ν_k(n) = softplus( Σ_j β_{k,j} · φ_j(n) )
+
+    where φ_j are B-spline basis functions evaluated at the *natural-space*
+    magnitude n (not log n).  ν_k(n) is therefore **natural-space noise**
+    (SD of the Gaussian on n, not on log n).
+
+    **Weber's law** (scale invariance) corresponds to a *linear* ν(n) ∝ n:
+    noise grows proportionally with magnitude.  A flat ν(n) implies constant
+    absolute noise, violating Weber's law.
+
+    Use ``get_sd_curve()`` to extract posterior ν(n) curves (natural-space noise).
+
+    Parameters
+    ----------
+    polynomial_order : int or (int, int)
+        Number of B-spline basis functions per noise curve.  A single int is
+        used for both options; a 2-tuple sets (n1_order, n2_order) separately.
+    representational_noise : {'payoff', 'ev'}
+        Whether the noise curve is indexed by raw payoff magnitude or by
+        expected value.
+    """
 
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, polynomial_order=5, 
+                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, polynomial_order=5,
                  representational_noise='payoff',
                  memory_model='independent'):
 
@@ -1537,6 +1621,33 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
 
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
         return RiskModel._get_paradigm(self, paradigm, subject_mapping=subject_mapping)
+
+class AffineNoiseRiskModel(FlexibleNoiseRiskModel):
+    """Risky-choice model with affine (intercept + linear) noise.
+
+    The noise curve is parameterised as:
+
+        ν_k(n) = softplus(β_{k,0} + β_{k,1} · n̂)
+
+    where n̂ = (n − n_min) / (n_max − n_min).  See
+    :class:`AffineNoiseComparisonModel` for the magnitude-comparison variant.
+    """
+
+    def __init__(self, paradigm, prior_estimate='full',
+                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False,
+                 memory_model='independent'):
+        super().__init__(paradigm, prior_estimate=prior_estimate,
+                         fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+                         save_trialwise_n_estimates=save_trialwise_n_estimates,
+                         polynomial_order=2,
+                         memory_model=memory_model)
+
+    def make_dm(self, x, variable='n1_evidence_sd'):
+        min_n = self.paradigm[['n1', 'n2']].min().min()
+        max_n = self.paradigm[['n1', 'n2']].max().max()
+        x_norm = (np.asarray(x, dtype=float) - min_n) / (max_n - min_n)
+        return np.column_stack([np.ones_like(x_norm), x_norm])
+
 
 class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
 

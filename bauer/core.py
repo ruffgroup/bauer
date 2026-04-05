@@ -92,38 +92,61 @@ class BaseModel(object):
 
         return parameters
 
-    def build_estimation_model(self, data=None, coords=None, hierarchical=True, save_p_choice=False):
+    def build_estimation_model(self, data=None, coords=None, hierarchical=True, save_p_choice=False, flat_prior=False):
 
         if data is None:
             data = self.paradigm
 
+        if not hierarchical and 'subject' in getattr(data, 'index', pd.Index([])).names:
+            n_subjects = data.index.get_level_values('subject').nunique()
+            if n_subjects > 1:
+                raise ValueError(
+                    f"hierarchical=False with {n_subjects} subjects in the data. "
+                    f"This fits a single shared parameter set (complete pooling), which is almost "
+                    f"certainly not what you want. Use hierarchical=True, or pass single-subject "
+                    f"data (e.g. data.xs(subject, level='subject')). "
+                    f"For individual MAP per subject, use fit_map_individual()."
+                )
+
         if hierarchical and (coords is None):
             assert('subject' in data.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
             coords = {'subject': data.index.unique(level='subject')}
-                                              
+
         with pm.Model(coords=coords) as self.estimation_model:
             paradigm = self._get_paradigm(paradigm=data)
             self.set_paradigm(paradigm)
-            self.build_priors(hierarchical=hierarchical)
+            self.build_priors(hierarchical=hierarchical, flat_prior=flat_prior)
             parameters = self.get_parameter_values()
             self.build_likelihood(parameters, save_p_choice=save_p_choice)
 
-    def build_priors(self, hierarchical=True):
+    def build_priors(self, hierarchical=True, flat_prior=False):
 
         if hierarchical:
             for key, info in self.free_parameters.items():
                 self.build_hierarchical_nodes(key, **info)
         else:
             for key, info in self.free_parameters.items():
-                self.build_prior(key, **info)
+                self.build_prior(key, flat_prior=flat_prior, **info)
 
-    def build_prior(self, name, mu_intercept=None, sigma_intercept=None, transform='identity'):
+    def build_prior(self, name, mu_intercept=None, sigma_intercept=None, transform='identity', flat_prior=False):
 
         model = pm.Model.get_context()
 
+        if flat_prior:
+            # Flat in the NATURAL (transformed) space — no Jacobian issues.
+            # Safe for both MAP (= true MLE) and sampling.
+            if transform == 'identity':
+                pm.Flat(name)
+            elif transform == 'softplus':
+                pm.HalfFlat(name)
+            elif transform == 'logistic':
+                pm.Uniform(name, lower=0, upper=1)
+            else:
+                raise NotImplementedError
+            return
+
         if mu_intercept is None:
             mu_intercept = 0.0
-
         if sigma_intercept is None:
             sigma_intercept = .5
 
@@ -230,6 +253,54 @@ class BaseModel(object):
             pars.columns.name = 'parameter'
         
         return pars
+
+    def fit_map_individual(self, data=None, flat_prior=True, **kwargs):
+        """Fit MLE/MAP estimates for each subject independently (no pooling).
+
+        Loops over subjects, builds a non-hierarchical model on each
+        subject's data alone, and returns a DataFrame of point estimates
+        in natural (transformed) scale.
+
+        Parameters
+        ----------
+        data : pd.DataFrame or None
+            Trial-level data with a 'subject' index level.  If None, uses
+            ``self.paradigm``.
+        flat_prior : bool
+            If True (default), uses a very wide prior (sigma=100), making
+            this effectively maximum-likelihood estimation.  If False, uses
+            the model's default prior.
+        **kwargs
+            Forwarded to ``pm.find_MAP``.
+
+        Returns
+        -------
+        pd.DataFrame
+            Index = subject, columns = free parameter names (transformed scale).
+        """
+        if data is None:
+            data = self.paradigm
+
+        assert 'subject' in data.index.names, \
+            "fit_map_individual requires a 'subject' index level."
+
+        subjects = data.index.get_level_values('subject').unique()
+        rows = []
+
+        for subj in subjects:
+            subj_data = data.xs(subj, level='subject')
+            subj_model = self.__class__.__new__(self.__class__)
+            subj_model.__dict__.update(self.__dict__)
+            subj_model.paradigm = subj_data
+            subj_model.build_estimation_model(data=subj_data, hierarchical=False,
+                                              flat_prior=flat_prior)
+            pars = subj_model.fit_map(filter_pars=False, **kwargs)
+            row = {'subject': subj}
+            for param in self.free_parameters:
+                row[param] = float(pars[param])
+            rows.append(row)
+
+        return pd.DataFrame(rows).set_index('subject')
 
     def ppc(self, paradigm, idata, out_of_sample=False, var_names=['ll_bernoulli'], progressbar=True):
 

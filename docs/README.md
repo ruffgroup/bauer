@@ -32,7 +32,8 @@ docs/
 │   ├── lesson1.ipynb     # Pre-executed notebook — psychophysics / NLC
 │   ├── lesson2.ipynb     # Pre-executed notebook — KLW / Barreto-García 2023
 │   ├── lesson3.ipynb     # Pre-executed notebook — PMCM / de Hollander 2024
-│   └── lesson4.ipynb     # Pre-executed notebook — Flexible noise model
+│   ├── lesson4.ipynb     # Pre-executed notebook — Flexible noise model
+│   └── lesson5.ipynb     # Pre-executed notebook — Hierarchical vs MLE
 └── requirements.txt      # Sphinx + nbsphinx + nbconvert (for ReadTheDocs)
 ```
 

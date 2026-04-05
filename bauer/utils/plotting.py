@@ -84,47 +84,177 @@ def plot_prediction(data, x, color, y='p_predicted', alpha=.25, **kwargs):
                      data['hdi975'], color=color, alpha=alpha)
     return plt.plot(data[x], data[y], color=color)
 
-def plot_subjectwise_parameters(idata, parameter, transform=None, sort_subjects=True, plot_group_mean=True, **kwargs):
+def plot_subjectwise_parameters(idata, parameter, transform=None, sort_subjects=True,
+                                plot_group_mean=True, hdi_prob=0.94, color='steelblue',
+                                ax=None, label=None, **kwargs):
+    """Plot subject-level posterior estimates as a sorted point-plot with HDI error bars.
 
+    Parameters
+    ----------
+    idata : arviz.InferenceData
+        Posterior samples from a fitted bauer model.
+    parameter : str
+        Name of the subject-level parameter (e.g. ``'n1_evidence_sd'``).
+    transform : str or None
+        Optional transform applied to samples before plotting.
+        One of ``'softplus'``, ``'logistic'``, or ``None``.
+    sort_subjects : bool
+        If True (default) subjects are sorted by their posterior mean on the x-axis.
+        If False, subjects appear in their original order.
+    plot_group_mean : bool
+        If True (default) and a ``{parameter}_mu`` variable exists in ``idata``,
+        draw a dashed horizontal line at the group-mean posterior mean.
+    hdi_prob : float
+        Posterior mass for the HDI interval shown as error bars (default 0.94).
+    color : str
+        Colour for the points and error bars.
+    ax : matplotlib.axes.Axes or None
+        Axes to plot on.  If None, the current axes are used.
+    label : str or None
+        Legend label for the series.
 
-    d = idata.posterior[parameter].to_dataframe()
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    samples = idata.posterior[parameter].values  # shape (chain, draw, subject)
+    samples_flat = samples.reshape(-1, samples.shape[-1])  # (samples, subject)
 
     if transform is not None:
         if transform == 'softplus':
-            d = softplus_np(d)
+            samples_flat = softplus_np(samples_flat)
         elif transform == 'logistic':
-            d = logistic_np(d)
+            samples_flat = logistic_np(samples_flat)
         else:
             raise ValueError(f'{transform} is not a valid transformation')
 
-    means = d.groupby('subject').mean()
-    means.columns = pd.MultiIndex.from_tuples([(parameter, 'mean')])
+    means = samples_flat.mean(0)
+    lo_prob = (1 - hdi_prob) / 2 * 100
+    hi_prob = 100 - lo_prob
+    lows  = np.percentile(samples_flat, lo_prob,  axis=0)
+    highs = np.percentile(samples_flat, hi_prob, axis=0)
 
-    # Get 95% CI using arviz
-    cis = d[parameter].groupby('subject').apply(get_hdi).unstack(-1)
-    cis.columns = pd.MultiIndex.from_tuples([(parameter, 'hdi_low'), (parameter, 'hdi_high')])
-    print(cis)
-    summarized_pars = means.join(cis)
+    sort_idx = np.argsort(means) if sort_subjects else np.arange(len(means))
+    x_vals = np.arange(len(means))
 
-    # summarized_pars.sort_values((parameter, 'mean'), inplace=True)
+    ax.errorbar(
+        x_vals,
+        means[sort_idx],
+        yerr=[means[sort_idx] - lows[sort_idx], highs[sort_idx] - means[sort_idx]],
+        fmt='o', ms=5, elinewidth=0.9, capsize=2.5, alpha=0.75,
+        color=color, ecolor=color, label=label, **kwargs,
+    )
 
-    if sort_subjects:
-        summarized_pars['mean_order'] = summarized_pars[(parameter, 'mean')].rank()
-        x = 'mean_order'
-    else:
-        x = 'subject'
-        summarized_pars = summarized_pars.reset_index()
-
-    # Plot the results
-    g = sns.scatterplot(x=x, y=(parameter, 'mean'), data=summarized_pars, color='k')
-    plt.errorbar(x=summarized_pars[x], y=summarized_pars[(parameter, 'mean')], yerr=[summarized_pars[(parameter, 'mean')] - summarized_pars[(parameter, 'hdi_low')], summarized_pars[(parameter, 'hdi_high')] - summarized_pars[(parameter, 'mean')]], fmt='o', color='k',)
-
-    g.set_ylabel(parameter)
-    g.set_xlabel('Subject')
-    
-    # plot errorbars around the scatters using hd_low and hdi_high
-    sns.despine()
+    ax.set_xlabel('Subject (sorted by posterior mean)' if sort_subjects else 'Subject')
+    ax.set_ylabel(parameter)
+    sns.despine(ax=ax)
 
     if plot_group_mean:
-        group_mean = idata.posterior[parameter+'_mu'].to_dataframe()
-        plt.axhline(group_mean[parameter+'_mu'].mean(), c='k', ls='--')
+        mu_key = parameter + '_mu'
+        if mu_key in idata.posterior:
+            group_mean_val = idata.posterior[mu_key].values.mean()
+            ax.axhline(group_mean_val, c=color, ls='--', lw=1.5, alpha=0.7,
+                       label=f'Group mean ({mu_key})')
+
+    return ax
+
+
+def get_subject_posterior_df(idata, parameters, hdi_prob=0.94):
+    """Extract a tidy subject-level posterior summary DataFrame from an InferenceData.
+
+    Parameters
+    ----------
+    idata : arviz.InferenceData
+        Posterior from a fitted bauer model.
+    parameters : list of str
+        Parameter names to extract (e.g. ``['n1_evidence_sd', 'n2_evidence_sd']``).
+    hdi_prob : float
+        Posterior mass for the HDI interval (default 0.94).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: ``parameter``, ``subject``, ``mean``, ``lo``, ``hi``.
+        Suitable for use with ``sns.FacetGrid`` and ``plot_subjectwise_pointplot``.
+
+    Examples
+    --------
+    >>> df = get_subject_posterior_df(idata_mag,
+    ...                               ['n1_evidence_sd', 'n2_evidence_sd'])
+    >>> g = sns.FacetGrid(df, col='parameter', sharey=True)
+    >>> g.map_dataframe(plot_subjectwise_pointplot, 'mean', 'lo', 'hi')
+    """
+    lo_p = (1 - hdi_prob) / 2 * 100
+    hi_p = 100 - lo_p
+    rows = []
+    for param in parameters:
+        if param not in idata.posterior:
+            continue
+        samp = idata.posterior[param].values
+        samp_flat = samp.reshape(-1, samp.shape[-1])  # (samples, subjects)
+        for si in range(samp_flat.shape[-1]):
+            rows.append({
+                'parameter': param,
+                'subject': si,
+                'mean': samp_flat[:, si].mean(),
+                'lo':   np.percentile(samp_flat[:, si], lo_p),
+                'hi':   np.percentile(samp_flat[:, si], hi_p),
+            })
+    return pd.DataFrame(rows)
+
+
+def plot_subjectwise_pointplot(data, mean_col='mean', lo_col='lo', hi_col='hi',
+                               sort_subjects=True, ax=None, **kwargs):
+    """FacetGrid-compatible sorted point-plot with HDI error bars.
+
+    Designed for use with ``sns.FacetGrid.map_dataframe``.  Each row in *data*
+    represents one subject; *mean_col*, *lo_col*, *hi_col* are the column names
+    for the posterior mean and HDI bounds.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        One row per subject with at minimum columns *mean_col*, *lo_col*, *hi_col*.
+    mean_col, lo_col, hi_col : str
+        Column names for the posterior mean, HDI lower bound, HDI upper bound.
+    sort_subjects : bool
+        If True (default), subjects are sorted by their posterior mean.
+    **kwargs
+        Forwarded to ``ax.errorbar``; ``color`` is set by seaborn hue mapping.
+
+    Examples
+    --------
+    >>> df = get_subject_posterior_df(idata_mag,
+    ...                               ['n1_evidence_sd', 'n2_evidence_sd'])
+    >>> g = sns.FacetGrid(df, col='parameter', sharey=True)
+    >>> g.map_dataframe(plot_subjectwise_pointplot, 'mean', 'lo', 'hi')
+    >>> g.set_axis_labels('Subject (sorted)', 'Noise parameter')
+    """
+    if ax is None:
+        ax = plt.gca()
+    color = kwargs.pop('color', 'steelblue')
+    label = kwargs.pop('label', None)
+
+    means = data[mean_col].values
+    los   = data[lo_col].values
+    his   = data[hi_col].values
+
+    sort_idx = np.argsort(means) if sort_subjects else np.arange(len(means))
+    x_vals = np.arange(len(means))
+
+    ax.errorbar(
+        x_vals,
+        means[sort_idx],
+        yerr=[means[sort_idx] - los[sort_idx], his[sort_idx] - means[sort_idx]],
+        fmt='o', ms=5, elinewidth=0.9, capsize=2.5, alpha=0.75,
+        color=color, ecolor=color, label=label, **kwargs,
+    )
+    if sort_subjects:
+        ax.set_xlabel('Subject (sorted by posterior mean)')
+    else:
+        ax.set_xlabel('Subject')
+    sns.despine(ax=ax)
+    return ax
