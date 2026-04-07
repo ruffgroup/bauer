@@ -24,6 +24,6 @@ $PYTHON -u "$REPO/bauer/fitting/fit_efficient_coding.py" 5 \
     --draws 100 \
     --tune 100 \
     --chains 2 \
-    --output-dir /shares/zne.uzh/gdehol/ds-abstractvalue/derivatives/bauer
+    --output-dir /shares/zne.uzh/gdehol/ds-abstract_values_pilot/derivatives/bauer
 
 echo "=== Done: $(date) ==="
