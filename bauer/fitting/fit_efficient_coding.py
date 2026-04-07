@@ -2,12 +2,13 @@
 """Fit efficient coding estimation models via MCMC.
 
 Usage:
-    python fit_efficient_coding.py SUBJECT [--model MODEL] [--grid-resolution N]
-                                   [--draws N] [--tune N] [--chains N]
-                                   [--bids-folder DIR] [--output-dir DIR]
+    # Single subject:
+    python fit_efficient_coding.py 5 --model perception
 
-Fits the specified model to a single subject's data (both CDF and inverse-CDF
-mapping conditions jointly) using MCMC sampling.
+    # Hierarchical (all subjects):
+    python fit_efficient_coding.py --hierarchical --model perception
+
+Saves arviz InferenceData as netcdf.
 """
 
 import argparse
@@ -16,70 +17,65 @@ import numpy as np
 import pandas as pd
 
 
-def get_paradigm(subject_id, bids_folder):
-    """Load and prepare paradigm for a single subject (both mappings)."""
+def get_paradigm(subject_ids=None, bids_folder='/data/ds-abstract_values_pilot'):
+    """Load and prepare paradigm (both mappings per subject)."""
     from bauer.utils.data import load_abstract_values_pilot
 
-    df = load_abstract_values_pilot(bids_folder=bids_folder,
-                                     subjects=[subject_id])
+    df = load_abstract_values_pilot(bids_folder=bids_folder, subjects=subject_ids)
 
-    sub_data = df.xs(subject_id, level='subject').reset_index()
-    paradigm = sub_data[['orientation', 'response', 'mapping']].copy()
-    paradigm.index = pd.MultiIndex.from_arrays(
-        [np.full(len(paradigm), subject_id), range(len(paradigm))],
-        names=['subject', 'trial'])
+    all_paradigms = []
+    for sub_id in df.index.get_level_values('subject').unique():
+        sub_data = df.xs(sub_id, level='subject').reset_index()
+        p = sub_data[['orientation', 'response', 'mapping']].copy()
+        p['subject'] = sub_id
+        all_paradigms.append(p)
 
-    print(f"Subject {subject_id}: {len(paradigm)} trials "
-          f"({(paradigm['mapping']=='cdf').sum()} CDF, "
-          f"{(paradigm['mapping']=='inverse_cdf').sum()} inv-CDF)")
+    paradigm = pd.concat(all_paradigms, ignore_index=True)
+    paradigm = paradigm.set_index(['subject', paradigm.groupby('subject').cumcount()])
+    paradigm.index.names = ['subject', 'trial']
+
+    subjects = paradigm.index.get_level_values('subject').unique()
+    print(f"Loaded {len(subjects)} subjects, {len(paradigm)} trials")
+    for m in paradigm['mapping'].unique():
+        print(f"  {m}: {(paradigm['mapping'] == m).sum()} trials")
 
     return paradigm
 
 
-def fit_model(paradigm, model_name, grid_resolution, draws, tune, chains,
-              target_accept):
-    """Build and sample the specified model."""
-
+def make_model(paradigm, model_name, grid_resolution):
+    """Create model instance."""
     if model_name == 'perception':
         from bauer.efficient_coding import EfficientPerceptionModel
-        model = EfficientPerceptionModel(
+        return EfficientPerceptionModel(
             paradigm, grid_resolution=grid_resolution,
             perceptual_prior='long_term')
 
     elif model_name == 'valuation':
         from bauer.efficient_coding import EfficientValuationModel
-        model = EfficientValuationModel(
+        return EfficientValuationModel(
             paradigm, grid_resolution=grid_resolution)
 
     elif model_name == 'sequential':
         from bauer.efficient_coding import SequentialEfficientCodingModel
-        model = SequentialEfficientCodingModel(
+        return SequentialEfficientCodingModel(
             paradigm, grid_resolution=grid_resolution,
             perceptual_prior='long_term')
 
     else:
         raise ValueError(f"Unknown model: {model_name}")
 
-    print(f"Building model: {model_name} (grid_resolution={grid_resolution})")
-    model.build_estimation_model(paradigm, hierarchical=False, flat_prior=False,
-                                 save_p_choice=True)
-
-    print(f"Free parameters: {list(model.free_parameters.keys())}")
-    print(f"Sampling: {chains} chains, {tune} tune + {draws} draws, "
-          f"target_accept={target_accept}")
-
-    idata = model.sample(draws=draws, tune=tune, target_accept=target_accept,
-                         chains=chains, cores=1)
-
-    return model, idata
-
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('subject', type=int, help='Subject ID')
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('subject', type=int, nargs='?', default=None,
+                        help='Subject ID (for single-subject fit)')
+    parser.add_argument('--hierarchical', action='store_true',
+                        help='Fit hierarchical model across all subjects')
+    parser.add_argument('--subjects', type=int, nargs='+', default=None,
+                        help='Subset of subjects for hierarchical fit')
     parser.add_argument('--model', default='perception',
-                        choices=['perception', 'valuation', 'sequential'],
-                        help='Model to fit')
+                        choices=['perception', 'valuation', 'sequential'])
     parser.add_argument('--grid-resolution', type=int, default=31)
     parser.add_argument('--draws', type=int, default=1000)
     parser.add_argument('--tune', type=int, default=1000)
@@ -89,21 +85,47 @@ def main():
     parser.add_argument('--output-dir', default='results/efficient_coding')
     args = parser.parse_args()
 
-    paradigm = get_paradigm(args.subject, args.bids_folder)
-    model, idata = fit_model(paradigm, args.model, args.grid_resolution,
-                             args.draws, args.tune, args.chains,
-                             args.target_accept)
+    if args.hierarchical:
+        subject_ids = args.subjects  # None = all
+        paradigm = get_paradigm(subject_ids, args.bids_folder)
+        hierarchical = True
+        label = 'hierarchical'
+        if subject_ids:
+            label += f'_n{len(subject_ids)}'
+    else:
+        if args.subject is None:
+            parser.error("Provide a subject ID, or use --hierarchical")
+        paradigm = get_paradigm([args.subject], args.bids_folder)
+        hierarchical = False
+        label = f'sub-{args.subject:02d}'
+
+    model = make_model(paradigm, args.model, args.grid_resolution)
+
+    print(f"Building model: {args.model} (grid={args.grid_resolution}, "
+          f"hierarchical={hierarchical})")
+    model.build_estimation_model(paradigm, hierarchical=hierarchical,
+                                 flat_prior=not hierarchical,
+                                 save_p_choice=True)
+
+    print(f"Free parameters: {list(model.free_parameters.keys())}")
+    print(f"Sampling: {args.chains} chains, {args.tune} tune + {args.draws} draws")
+
+    idata = model.sample(draws=args.draws, tune=args.tune,
+                         target_accept=args.target_accept,
+                         chains=args.chains, cores=1)
 
     os.makedirs(args.output_dir, exist_ok=True)
     fn = os.path.join(args.output_dir,
-                      f'sub-{args.subject:02d}_model-{args.model}_'
-                      f'grid-{args.grid_resolution}.netcdf')
+                      f'{label}_model-{args.model}_grid-{args.grid_resolution}.netcdf')
     idata.to_netcdf(fn)
     print(f"Saved to {fn}")
 
     import arviz as az
+    var_names = list(model.free_parameters.keys())
+    if hierarchical:
+        var_names = [f'{k}_mu' for k in var_names] + [f'{k}_sd' for k in var_names]
     print("\nPosterior summary:")
-    print(az.summary(idata, var_names=list(model.free_parameters.keys())))
+    print(az.summary(idata, var_names=var_names))
 
 
 if __name__ == '__main__':
