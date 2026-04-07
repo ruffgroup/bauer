@@ -14,7 +14,7 @@
 #   sbatch --export=MODEL=log_encoding fit_numerosity_hierarchical.sh
 
 export PYTHONUNBUFFERED=1
-PYTHON=$HOME/.conda/envs/bauer/bin/python
+PYTHON=$HOME/data/conda/envs/bauer/bin/python
 REPO=$HOME/git/bauer
 MODEL="${MODEL:-log_encoding}"
 GRID="${GRID:-21}"

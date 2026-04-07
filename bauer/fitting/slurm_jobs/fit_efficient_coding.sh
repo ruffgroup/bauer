@@ -15,7 +15,7 @@
 # SLURM_ARRAY_TASK_ID maps to subject index (1-based).
 
 export PYTHONUNBUFFERED=1
-PYTHON=$HOME/.conda/envs/bauer/bin/python
+PYTHON=$HOME/data/conda/envs/bauer/bin/python
 REPO=$HOME/git/bauer
 MODEL="${MODEL:-perception}"
 GRID="${GRID:-31}"

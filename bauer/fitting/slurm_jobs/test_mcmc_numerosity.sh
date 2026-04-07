@@ -11,7 +11,7 @@
 # Should complete in ~30 min with grid_resolution=21.
 
 export PYTHONUNBUFFERED=1
-PYTHON=$HOME/.conda/envs/bauer/bin/python
+PYTHON=$HOME/data/conda/envs/bauer/bin/python
 REPO=$HOME/git/bauer
 
 echo "=== Test MCMC: numerosity ==="

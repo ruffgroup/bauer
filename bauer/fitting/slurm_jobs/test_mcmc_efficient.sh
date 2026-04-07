@@ -10,7 +10,7 @@
 # Quick test: fit EfficientPerceptionModel to subject 5 with 100 draws.
 
 export PYTHONUNBUFFERED=1
-PYTHON=$HOME/.conda/envs/bauer/bin/python
+PYTHON=$HOME/data/conda/envs/bauer/bin/python
 REPO=$HOME/git/bauer
 
 echo "=== Test MCMC: efficient coding ==="
