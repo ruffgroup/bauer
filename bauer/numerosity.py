@@ -211,12 +211,15 @@ class LogEncodingEstimationModel(EstimationBaseModel):
         posterior = posterior / (pt.sum(posterior, axis=2, keepdims=True) * d_stim + 1e-30)
 
         n_hat = pt.sum(posterior * stim_grid[None, None, :, None] * d_stim, axis=2)  # (S, C, R)
+        n_hat = pt.clip(n_hat, self.n_min, self.n_max)
 
-        # Step 3: Motor noise (SHARED)
+        # Step 3: Motor noise (SHARED), truncated to [n_min, n_max]
         resp_grid = stim_grid
         p_resp_given_r = pt.exp(
             -0.5 * ((resp_grid[None, None, None, :] - n_hat[:, :, :, None]) / sigma_motor[:, None, None, None]) ** 2
-        ) / (sigma_motor[:, None, None, None] * pt.sqrt(2 * np.pi))  # (S, C, R, N)
+        )
+        # Truncate: zero out responses outside [n_min, n_max] and renormalize
+        p_resp_given_r = p_resp_given_r / (pt.sum(p_resp_given_r, axis=-1, keepdims=True) + 1e-30)
 
         p_response = pt.sum(
             p_resp_given_r[:, :, None, :, :] * p_r[:, None, :, :, None] * d_rep,
@@ -456,12 +459,14 @@ class FlexibleEncodingEstimationModel(LogEncodingEstimationModel):
             posterior = posterior / (pt.sum(posterior, axis=2, keepdims=True) * d_stim + 1e-30)
 
             n_hat = pt.sum(posterior * stim_grid[None, None, :, None] * d_stim, axis=2)  # (S, C, R)
+            n_hat = pt.clip(n_hat, self.n_min, self.n_max)
 
-            # Motor noise
+            # Motor noise, truncated to [n_min, n_max]
             resp_grid = stim_grid
             p_resp_given_r = pt.exp(
                 -0.5 * ((resp_grid[None, None, None, :] - n_hat[:, :, :, None]) / sigma_motor[:, None, None, None]) ** 2
-            ) / (sigma_motor[:, None, None, None] * pt.sqrt(2 * np.pi))
+            )
+            p_resp_given_r = p_resp_given_r / (pt.sum(p_resp_given_r, axis=-1, keepdims=True) + 1e-30)
 
             # Marginalize over r
             p_response = pt.sum(
@@ -483,11 +488,13 @@ class FlexibleEncodingEstimationModel(LogEncodingEstimationModel):
             posterior = posterior / (pt.sum(posterior, axis=2, keepdims=True) * d_stim + 1e-30)
 
             n_hat = pt.sum(posterior * stim_grid[None, None, :, None] * d_stim, axis=2)
+            n_hat = pt.clip(n_hat, self.n_min, self.n_max)
 
             resp_grid = stim_grid
             p_resp_given_r = pt.exp(
                 -0.5 * ((resp_grid[None, None, None, :] - n_hat[:, :, :, None]) / sigma_motor[:, None, None, None]) ** 2
-            ) / (sigma_motor[:, None, None, None] * pt.sqrt(2 * np.pi))
+            )
+            p_resp_given_r = p_resp_given_r / (pt.sum(p_resp_given_r, axis=-1, keepdims=True) + 1e-30)
 
             p_response = pt.sum(
                 p_resp_given_r[:, :, None, :, :] * p_r[:, None, :, :, None] * d_rep,
@@ -594,12 +601,14 @@ class EfficientEncodingEstimationModel(LogEncodingEstimationModel):
         posterior = posterior / (pt.sum(posterior, axis=2, keepdims=True) * d_stim + 1e-30)
 
         n_hat = pt.sum(posterior * stim_grid[None, None, :, None] * d_stim, axis=2)  # (S, C, R)
+        n_hat = pt.clip(n_hat, self.n_min, self.n_max)
 
-        # Step 3: Motor noise (SHARED)
+        # Step 3: Motor noise (SHARED), truncated to [n_min, n_max]
         resp_grid = stim_grid
         p_resp_given_r = pt.exp(
             -0.5 * ((resp_grid[None, None, None, :] - n_hat[:, :, :, None]) / sigma_motor[:, None, None, None]) ** 2
-        ) / (sigma_motor[:, None, None, None] * pt.sqrt(2 * np.pi))
+        )
+        p_resp_given_r = p_resp_given_r / (pt.sum(p_resp_given_r, axis=-1, keepdims=True) + 1e-30)
 
         p_response = pt.sum(
             p_resp_given_r[:, :, None, :, :] * p_r[:, :, :, :, None] * d_rep,

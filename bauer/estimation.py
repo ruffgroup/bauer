@@ -110,6 +110,21 @@ class EstimationBaseModel(BaseModel):
     # ---- Grid utilities (pytensor) ----
 
     @staticmethod
+    def truncated_normal_pdf(x, mu, sigma, lower, upper):
+        """Truncated Gaussian PDF on a grid, broadcast-safe.
+
+        Computes N(x; mu, sigma^2) truncated to [lower, upper].
+        Values outside the range are zeroed, then renormalized.
+        Works on pytensor tensors.
+        """
+        raw = pt.exp(-0.5 * ((x - mu) / sigma) ** 2)
+        mask = (x >= lower) & (x <= upper)
+        raw = raw * mask
+        # Normalize: sum over the last axis (grid axis)
+        total = pt.sum(raw, axis=-1, keepdims=True) + 1e-30
+        return raw / total
+
+    @staticmethod
     def trapz(y, dx, axis=-1):
         """Trapezoidal integration along axis."""
         return pt.sum((y[..., :-1] + y[..., 1:]) / 2 * dx, axis=axis)

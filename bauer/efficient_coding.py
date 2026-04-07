@@ -59,10 +59,24 @@ V_MAX = 42.0
 def orientation_to_value_np(orientation_deg, mapping='linear'):
     """Map orientation (degrees) to value (CHF) via linear interpolation.
 
-    Works on numpy arrays. For precomputing G(theta) on a grid.
+    Works on numpy arrays. If ``mapping`` is a single string, applies the same
+    mapping to all orientations. If ``mapping`` is an array of strings (one per
+    orientation), applies each element's mapping.
     """
-    return np.interp(orientation_deg, MAPPING_ORIENTATIONS_DEG,
-                     MAPPING_VALUES[mapping])
+    if isinstance(mapping, str):
+        return np.interp(orientation_deg, MAPPING_ORIENTATIONS_DEG,
+                         MAPPING_VALUES[mapping])
+
+    # Vectorized: different mapping per element
+    orientation_deg = np.asarray(orientation_deg, dtype=float)
+    mapping = np.asarray(mapping, dtype=str)
+    result = np.empty_like(orientation_deg)
+    for m in np.unique(mapping):
+        mask = mapping == m
+        result[mask] = np.interp(orientation_deg[mask],
+                                 MAPPING_ORIENTATIONS_DEG,
+                                 MAPPING_VALUES[str(m)])
+    return result
 
 
 # ============================================================================
@@ -165,7 +179,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
 
         # Precompute value mapping G(theta) on the orientation grid for each condition
         # The paradigm tells us which mapping conditions are present
-        mappings = paradigm['mapping'].unique() if 'mapping' in paradigm.columns else ['linear']
+        mappings = list(paradigm['mapping'].astype(str).unique()) if 'mapping' in paradigm.columns else ['linear']
         self.value_on_ori_grid = {}
         for mapping in mappings:
             # Convert ori_grid (radians, doubled) back to degrees [0, 180]
@@ -197,10 +211,10 @@ class EfficientPerceptionModel(EstimationBaseModel):
         paradigm_['stimulus_ix'] = stimulus_ix.astype(int)
 
         # Map each trial's mapping condition to an index
-        if 'mapping' in paradigm.columns if isinstance(paradigm, pd.DataFrame) else False:
+        if isinstance(paradigm, pd.DataFrame) and 'mapping' in paradigm.columns:
             mappings = list(self.value_on_ori_grid.keys())
-            mapping_vals = paradigm['mapping'].values
-            paradigm_['mapping_ix'] = np.array([mappings.index(m) for m in mapping_vals], dtype=int)
+            mapping_vals = paradigm['mapping'].astype(str).values
+            paradigm_['mapping_ix'] = np.array([mappings.index(str(m)) for m in mapping_vals], dtype=int)
         else:
             paradigm_['mapping_ix'] = np.zeros(len(ori_vals), dtype=int)
 
@@ -256,6 +270,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
         weights = pt.exp(-cos_dist / (2 * h ** 2))
         weights = weights / (pt.sum(weights, axis=-1, keepdims=True) + 1e-30)
         v_hat = pt.sum(weights[None, :, :, :] * G_on_grid[:, None, None, :], axis=-1)  # (C, S, M)
+        v_hat = pt.clip(v_hat, V_MIN, V_MAX)
 
         # Step 5: Pushforward to value grid
         h_val = d_val * 0.75
@@ -318,7 +333,7 @@ class EfficientValuationModel(EstimationBaseModel):
         self.d_val_rep = self.val_rep_grid[1] - self.val_rep_grid[0]
 
         # Unique stimuli and their true values per mapping condition
-        mappings = paradigm['mapping'].unique() if 'mapping' in paradigm.columns else ['linear']
+        mappings = list(paradigm['mapping'].astype(str).unique()) if 'mapping' in paradigm.columns else ['linear']
         self.unique_orientations_deg = np.sort(paradigm['orientation'].unique())
 
         self.true_values = {}
@@ -367,7 +382,7 @@ class EfficientValuationModel(EstimationBaseModel):
         if isinstance(paradigm, pd.DataFrame) and 'mapping' in paradigm.columns:
             mappings = list(self.true_values.keys())
             paradigm_['mapping_ix'] = np.array(
-                [mappings.index(m) for m in paradigm['mapping'].values], dtype=int)
+                [mappings.index(str(m)) for m in paradigm['mapping'].astype(str).values], dtype=int)
         else:
             paradigm_['mapping_ix'] = np.zeros(len(ori_vals), dtype=int)
 
@@ -517,7 +532,7 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         super()._setup_grids(paradigm)
 
         # Then add value-stage grids
-        mappings = paradigm['mapping'].unique() if 'mapping' in paradigm.columns else ['linear']
+        mappings = list(paradigm['mapping'].astype(str).unique()) if 'mapping' in paradigm.columns else ['linear']
 
         # Value prior per condition (induced by uniform orientation sampling through G)
         self.value_priors = {}
@@ -605,6 +620,7 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
 
         # v_per for each condition: (C, S, M)
         v_per = pt.sum(weights_ori[None, :, :, :] * G_on_grid[:, None, None, :], axis=-1)
+        v_per = pt.clip(v_per, V_MIN, V_MAX)
 
         # Pushforward to value grid: p(v_per | theta_0)
         h_val_push = d_val * 0.75
