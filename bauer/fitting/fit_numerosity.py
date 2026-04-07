@@ -125,7 +125,7 @@ def main():
           f"hierarchical={hierarchical})")
     model.build_estimation_model(paradigm, hierarchical=hierarchical,
                                  flat_prior=not hierarchical,
-                                 save_p_choice=True)
+                                 save_p_choice=False)
 
     print(f"Free parameters: {list(model.free_parameters.keys())}")
     print(f"Sampling: {args.chains} chains, {args.tune} tune + {args.draws} draws")
