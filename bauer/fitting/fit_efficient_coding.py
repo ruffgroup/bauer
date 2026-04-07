@@ -81,6 +81,8 @@ def main():
     parser.add_argument('--tune', type=int, default=1000)
     parser.add_argument('--chains', type=int, default=4)
     parser.add_argument('--target-accept', type=float, default=0.95)
+    parser.add_argument('--nuts-sampler', default='pymc',
+                        choices=['pymc', 'numpyro', 'nutpie'])
     parser.add_argument('--bids-folder', default='/data/ds-abstract_values_pilot')
     parser.add_argument('--output-dir', default='results/efficient_coding')
     args = parser.parse_args()
@@ -105,14 +107,17 @@ def main():
           f"hierarchical={hierarchical})")
     model.build_estimation_model(paradigm, hierarchical=hierarchical,
                                  flat_prior=not hierarchical,
-                                 save_p_choice=True)
+                                 save_p_choice=False)
 
     print(f"Free parameters: {list(model.free_parameters.keys())}")
     print(f"Sampling: {args.chains} chains, {args.tune} tune + {args.draws} draws")
 
-    idata = model.sample(draws=args.draws, tune=args.tune,
+    sample_kwargs = dict(draws=args.draws, tune=args.tune,
                          target_accept=args.target_accept,
                          chains=args.chains, cores=1)
+    if args.nuts_sampler != 'pymc':
+        sample_kwargs['nuts_sampler'] = args.nuts_sampler
+    idata = model.sample(**sample_kwargs)
 
     os.makedirs(args.output_dir, exist_ok=True)
     fn = os.path.join(args.output_dir,
