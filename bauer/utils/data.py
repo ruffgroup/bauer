@@ -121,6 +121,166 @@ def _load_dehollander2024_dotcloud(sessions=None, bids_folder='/data/ds-risk',
     return df
 
 
+def load_abstract_values_pilot(bids_folder='/data/ds-abstract_values_pilot',
+                               subjects=None, phase='test',
+                               remove_non_responses=True):
+    """Load pilot orientation-to-value estimation data.
+
+    Parameters
+    ----------
+    bids_folder : str
+        Root of the BIDS dataset.
+    subjects : list of int or None
+        Subject IDs to load. Default: all usable subjects (2-7, 9-16).
+    phase : {'test', 'training', 'both'}
+        Which task phase to load. 'test' = estimation runs only.
+    remove_non_responses : bool
+        Drop trials with NaN responses.
+
+    Returns
+    -------
+    pd.DataFrame
+        Multi-indexed (subject, session, mapping, run, trial_nr) with columns:
+        orientation, value, response, mapping, response_time, etc.
+    """
+    if subjects is None:
+        subjects = [2, 3, 4, 5, 7, 9, 10, 11, 12, 13, 14, 15, 16]
+
+    all_dfs = []
+
+    for subject in subjects:
+        for session in [1, 2]:
+            behavior_dir = op.join(bids_folder, 'sourcedata', 'behavior',
+                                   f'sub-{subject}', f'session-{session:02d}')
+            if not op.exists(behavior_dir):
+                continue
+
+            # Find mapping for this session
+            for mapping in ['cdf', 'inverse_cdf']:
+                for run in range(1, 9):
+                    fn = op.join(behavior_dir,
+                                f'sub-{subject}_ses-{session:02d}_run-{run:02d}'
+                                f'_task-estimate.{mapping}_events.tsv')
+                    if not op.exists(fn):
+                        continue
+
+                    d = pd.read_csv(fn, sep='\t')
+                    # Filter to feedback events (contain response)
+                    d = d[d['event_type'] == 'feedback'].copy()
+                    d['subject'] = subject
+                    d['session'] = session
+                    d['mapping'] = mapping
+                    d['run'] = run
+                    all_dfs.append(d)
+
+    if not all_dfs:
+        raise FileNotFoundError(f'No data found in {bids_folder}')
+
+    df = pd.concat(all_dfs, ignore_index=True)
+    df['response'] = pd.to_numeric(df['response'], errors='coerce')
+
+    if remove_non_responses:
+        df = df.dropna(subset=['response'])
+
+    df = df.set_index(['subject', 'session', 'mapping', 'run', 'trial_nr'])
+    df = df.sort_index()
+
+    return df
+
+
+def load_neuralpriors(bids_folder=None, subjects=None, remove_non_responses=True):
+    """Load numerosity estimation data from the neural_priors experiment.
+
+    If bids_folder is None, loads the bundled CSV from the bauer package.
+    Otherwise reads directly from TSV files (no nilearn dependency required).
+
+    Parameters
+    ----------
+    bids_folder : str
+        Root of the BIDS dataset.
+    subjects : list of str or None
+        Subject IDs (e.g., ['01', '02']). Default: all subjects with 2 sessions.
+    remove_non_responses : bool
+        Drop trials with NaN responses.
+
+    Returns
+    -------
+    pd.DataFrame
+        Multi-indexed (subject, session, run, trial_nr) with columns:
+        n, response, range, response_time, error, abs_error, etc.
+    """
+    # If no bids_folder, load the bundled CSV
+    if bids_folder is None:
+        with (files(__package__) / '../data/neuralpriors.csv').open('rb') as f:
+            df = pd.read_csv(f, index_col=[0, 1, 2, 3])
+        if subjects is not None:
+            df = df[df.index.get_level_values('subject').isin(subjects)]
+        if remove_non_responses:
+            df = df.dropna(subset=['response'])
+        df['error'] = df['response'] - df['n']
+        df['abs_error'] = np.abs(df['error'])
+        return df
+
+    if subjects is None:
+        # Default: all subjects with 2 sessions (same as neural_priors package)
+        import yaml
+        subjects_yml = op.join(bids_folder, 'sourcedata', 'behavior')
+        # Discover subjects by listing sub-XX directories
+        all_subs = sorted([
+            d.replace('sub-', '') for d in os.listdir(subjects_yml)
+            if d.startswith('sub-') and d[4:].isdigit()
+            and op.exists(op.join(subjects_yml, d, 'ses-2'))
+        ])
+        subjects = all_subs
+
+    all_dfs = []
+    for subject in subjects:
+        for session in [1, 2]:
+            behavior_dir = op.join(bids_folder, 'sourcedata', 'behavior',
+                                   f'sub-{subject}', f'ses-{session}')
+            if not op.exists(behavior_dir):
+                continue
+
+            for run in range(1, 9):
+                fn = op.join(behavior_dir,
+                             f'sub-{subject}_ses-{session}_task-estimation_task'
+                             f'_run-{run}_events.tsv')
+                if not op.exists(fn):
+                    continue
+
+                d = pd.read_csv(fn, sep='\t')
+                d = d[d['event_type'] == 'feedback'].copy()
+
+                d['n'] = d['n'].astype(float)
+                d['response'] = pd.to_numeric(d['response'], errors='coerce')
+
+                # Determine range condition
+                d['range'] = 'wide' if (d['n'] > 25).any() else 'narrow'
+
+                d['subject'] = subject
+                d['session'] = session
+                d['run'] = run
+
+                all_dfs.append(d)
+
+    if not all_dfs:
+        raise FileNotFoundError(f'No data found in {bids_folder}')
+
+    df = pd.concat(all_dfs, ignore_index=True)
+
+    if remove_non_responses:
+        df = df.dropna(subset=['response'])
+
+    df['response'] = df['response'].astype(float)
+    df['error'] = df['response'] - df['n']
+    df['abs_error'] = np.abs(df['error'])
+
+    df = df.set_index(['subject', 'session', 'run', 'trial_nr'])
+    df = df.sort_index()
+
+    return df
+
+
 def _load_dehollander2024_symbolic(symbolic_folder='/data/ds-symbolicrisk',
                                     remove_non_responses=True):
     logs_dir = op.join(symbolic_folder, 'sourcedata', 'logs')

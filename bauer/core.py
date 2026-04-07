@@ -241,9 +241,9 @@ class BaseModel(object):
         
         return self.idata            
 
-    def fit_map(self, filter_pars=True, **kwargs):
+    def fit_map(self, filter_pars=True, progressbar=True, **kwargs):
         with self.estimation_model:
-            pars = pm.find_MAP(**kwargs)
+            pars = pm.find_MAP(progressbar=progressbar, **kwargs)
 
         if filter_pars:
             pars = {key: pars[key] for key in self.free_parameters}
@@ -294,7 +294,7 @@ class BaseModel(object):
             subj_model.paradigm = subj_data
             subj_model.build_estimation_model(data=subj_data, hierarchical=False,
                                               flat_prior=flat_prior)
-            pars = subj_model.fit_map(filter_pars=False, **kwargs)
+            pars = subj_model.fit_map(filter_pars=False, progressbar=False, **kwargs)
             row = {'subject': subj}
             for param in self.free_parameters:
                 row[param] = float(pars[param])
