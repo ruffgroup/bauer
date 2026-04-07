@@ -99,6 +99,9 @@ def main():
     parser.add_argument('--tune', type=int, default=1000)
     parser.add_argument('--chains', type=int, default=4)
     parser.add_argument('--target-accept', type=float, default=0.95)
+    parser.add_argument('--nuts-sampler', default='pymc',
+                        choices=['pymc', 'numpyro', 'nutpie'],
+                        help='NUTS implementation (numpyro uses JAX/GPU)')
     parser.add_argument('--output-dir', default='results/numerosity')
     args = parser.parse_args()
 
@@ -127,9 +130,12 @@ def main():
     print(f"Free parameters: {list(model.free_parameters.keys())}")
     print(f"Sampling: {args.chains} chains, {args.tune} tune + {args.draws} draws")
 
-    idata = model.sample(draws=args.draws, tune=args.tune,
+    sample_kwargs = dict(draws=args.draws, tune=args.tune,
                          target_accept=args.target_accept,
                          chains=args.chains, cores=1)
+    if args.nuts_sampler != 'pymc':
+        sample_kwargs['nuts_sampler'] = args.nuts_sampler
+    idata = model.sample(**sample_kwargs)
 
     # Save
     os.makedirs(args.output_dir, exist_ok=True)
