@@ -22,7 +22,7 @@ GRID="${GRID:-31}"
 DRAWS="${DRAWS:-1000}"
 TUNE="${TUNE:-1000}"
 CHAINS="${CHAINS:-4}"
-BIDS_FOLDER="${BIDS_FOLDER:-/data/ds-abstract_values_pilot}"
+BIDS_FOLDER="${BIDS_FOLDER:-/shares/zne.uzh/gdehol/ds-abstractvalue}"
 
 # Pilot subjects: 2,3,4,5,7,9,10,11,12,13,14,15,16
 SUBJECTS=(2 3 4 5 7 9 10 11 12 13 14 15 16)
@@ -40,6 +40,6 @@ $PYTHON -u "$REPO/bauer/fitting/fit_efficient_coding.py" "$SUBJECT" \
     --tune "$TUNE" \
     --chains "$CHAINS" \
     --bids-folder "$BIDS_FOLDER" \
-    --output-dir "$REPO/results/efficient_coding"
+    --output-dir /shares/zne.uzh/gdehol/ds-abstractvalue/derivatives/bauer
 
 echo "=== Done: $(date) ==="

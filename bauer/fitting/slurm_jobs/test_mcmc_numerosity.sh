@@ -25,6 +25,6 @@ $PYTHON -u "$REPO/bauer/fitting/fit_numerosity.py" 1 \
     --draws 100 \
     --tune 100 \
     --chains 2 \
-    --output-dir "$REPO/results/numerosity"
+    --output-dir /shares/zne.uzh/gdehol/ds-neuralpriors/derivatives/bauer
 
 echo "=== Done: $(date) ==="

@@ -39,6 +39,6 @@ $PYTHON -u "$REPO/bauer/fitting/fit_numerosity.py" "$SUBJECT" \
     --draws "$DRAWS" \
     --tune "$TUNE" \
     --chains "$CHAINS" \
-    --output-dir "$REPO/results/numerosity"
+    --output-dir /shares/zne.uzh/gdehol/ds-neuralpriors/derivatives/bauer
 
 echo "=== Done: $(date) ==="
