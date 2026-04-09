@@ -11,7 +11,7 @@ class BaseModel(object):
 
     paradigm_keys = []
 
-    def __init__(self, paradigm, save_trialwise_n_estimates=False):
+    def __init__(self, paradigm, save_trialwise_n_estimates=False, natural_space=False):
         """
         data should contain ['n1', 'n2'] and 'choice'.
         The latter should be a boolean that indicates whether the *second*
@@ -20,6 +20,8 @@ class BaseModel(object):
         """
         self.paradigm = paradigm
         self.save_trialwise_n_estimates = save_trialwise_n_estimates
+        self.natural_space = natural_space
+
         self.free_parameters = self.get_free_parameters()
 
     def _get_paradigm(self, paradigm=None):
@@ -245,10 +247,18 @@ class BaseModel(object):
         n_trials = pt.cast(model['_data_n'], int)
 
         if key == 'n1_evidence_mu':
-            return model['log(n1)']
+            if self.natural_space:
+                n = model['n1']
+            else:
+                n = model['log(n1)']
+            return n
 
         if key == 'n2_evidence_mu':
-            return model['log(n2)']
+            if self.natural_space:
+                n = model['n2']
+            else:
+                n = model['log(n2)']
+            return n
 
         if model[f'{key}'].ndim == 1:
             return model[f'{key}'][model['subject_ix']]
