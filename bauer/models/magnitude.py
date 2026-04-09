@@ -532,3 +532,206 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
         RegressionModel.__init__(self, regressors)
         FlexibleNoiseComparisonModel.__init__(self, paradigm, fit_seperate_evidence_sd, fit_prior,
                                               polynomial_order, memory_model)
+
+
+class PowerLawNoiseComparisonModel(BaseModel):
+    """Magnitude-comparison model with power-law magnitude-dependent noise.
+
+    Evidence is represented in **natural (linear) space**.  The noise standard
+    deviation follows a power law in magnitude:
+
+        SD_k(n) = exp(log_sd_intercept_k) · n^noise_exponent
+
+    In terms of variance this is equivalent to:
+
+        log Var_k(n) = 2·log_sd_intercept_k + 2·noise_exponent · log(n)
+
+    so the ``param`` in ``log(Var) = param·log(n) + c`` equals
+    ``2 * noise_exponent``.  Special cases:
+
+    * ``noise_exponent = 0`` (param = 0): constant absolute noise (no Weber scaling)
+    * ``noise_exponent = 1`` (param = 2): Weber's law (SD ∝ n)
+
+    The exponent is **shared** across n1 and n2 — it characterises the geometry
+    of the representational space — while separate log-scale intercepts allow
+    different overall noise levels for the two stimuli.  Because ``noise_exponent``
+    is a standard free parameter it can vary across subjects and serve as the
+    target of regressors in :class:`PowerLawNoiseComparisonRegressionModel`.
+
+    Parameters
+    ----------
+    paradigm : pd.DataFrame
+        Must contain columns ``n1``, ``n2``, ``choice``.
+    fit_seperate_evidence_sd : bool
+        If True (default) fit separate log-SD intercepts for n1 and n2.
+    fit_prior : bool
+        If True, estimate the prior mean and SD as free parameters.
+    memory_model : str
+        ``'independent'`` (default) or ``'shared_perceptual_noise'``.
+    """
+
+    def __init__(self, paradigm=None, fit_seperate_evidence_sd=True,
+                 fit_prior=False, memory_model='independent',
+                 save_trialwise_n_estimates=False):
+        self.fit_prior = fit_prior
+        self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
+        self.memory_model = memory_model
+        super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
+
+    def get_model_inputs(self, parameters):
+
+        model = pm.Model.get_context()
+        model_inputs = {}
+
+        if self.fit_prior:
+            prior_mu = parameters['prior_mu']
+            prior_sd = parameters['prior_sd']
+        else:
+            prior_mu = pt.mean(pt.stack([model['n1'], model['n2']], axis=1), 1)
+            prior_sd = pt.std(pt.stack([model['n1'], model['n2']], axis=1), 1)
+
+        model_inputs['n1_prior_mu'] = prior_mu
+        model_inputs['n2_prior_mu'] = prior_mu
+        model_inputs['n1_prior_sd'] = prior_sd
+        model_inputs['n2_prior_sd'] = prior_sd
+        model_inputs['threshold'] = 0.0
+
+        model_inputs['n1_evidence_mu'] = model['n1']
+        model_inputs['n2_evidence_mu'] = model['n2']
+
+        noise_exponent = parameters['noise_exponent']
+
+        if self.fit_seperate_evidence_sd:
+            if self.memory_model == 'independent':
+                model_inputs['n1_evidence_sd'] = pt.exp(
+                    parameters['n1_log_sd_intercept'] + noise_exponent * pt.log(model['n1']))
+                model_inputs['n2_evidence_sd'] = pt.exp(
+                    parameters['n2_log_sd_intercept'] + noise_exponent * pt.log(model['n2']))
+            elif self.memory_model == 'shared_perceptual_noise':
+                perceptual_log_sd = parameters['perceptual_log_sd_intercept']
+                memory_log_sd = parameters['memory_log_sd_intercept']
+                # Combine perceptual and memory noise in variance (linear) space
+                model_inputs['n1_evidence_sd'] = pt.sqrt(
+                    pt.exp(2 * (perceptual_log_sd + noise_exponent * pt.log(model['n1']))) +
+                    pt.exp(2 * (memory_log_sd + noise_exponent * pt.log(model['n1']))))
+                model_inputs['n2_evidence_sd'] = pt.exp(
+                    perceptual_log_sd + noise_exponent * pt.log(model['n2']))
+            else:
+                raise ValueError(f'Unknown memory_model: {self.memory_model}')
+        else:
+            model_inputs['n1_evidence_sd'] = pt.exp(
+                parameters['log_sd_intercept'] + noise_exponent * pt.log(model['n1']))
+            model_inputs['n2_evidence_sd'] = pt.exp(
+                parameters['log_sd_intercept'] + noise_exponent * pt.log(model['n2']))
+
+        return model_inputs
+
+    def get_free_parameters(self):
+
+        free_parameters = {}
+
+        if self.fit_seperate_evidence_sd:
+            if self.memory_model == 'independent':
+                free_parameters['n1_log_sd_intercept'] = {'mu_intercept': 0., 'transform': 'identity'}
+                free_parameters['n2_log_sd_intercept'] = {'mu_intercept': 0., 'transform': 'identity'}
+            elif self.memory_model == 'shared_perceptual_noise':
+                free_parameters['perceptual_log_sd_intercept'] = {'mu_intercept': 0., 'transform': 'identity'}
+                free_parameters['memory_log_sd_intercept'] = {'mu_intercept': 0., 'transform': 'identity'}
+        else:
+            free_parameters['log_sd_intercept'] = {'mu_intercept': 0., 'transform': 'identity'}
+
+        free_parameters['noise_exponent'] = {'mu_intercept': 1., 'sigma_intercept': 1., 'transform': 'identity'}
+
+        if self.fit_prior:
+            if self.paradigm is not None:
+                objective_mu = float(np.mean(np.stack((self.paradigm['n1'], self.paradigm['n2']))))
+                objective_sd = float(np.std(np.stack((self.paradigm['n1'], self.paradigm['n2']))))
+            else:
+                objective_mu = 25.
+                objective_sd = 10.
+            free_parameters['prior_mu'] = {'mu_intercept': objective_mu, 'transform': 'identity'}
+            free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
+
+        return free_parameters
+
+    def _get_paradigm(self, paradigm=None):
+        paradigm_ = super()._get_paradigm(paradigm)
+        paradigm_['n1'] = paradigm['n1'].values
+        paradigm_['n2'] = paradigm['n2'].values
+        return paradigm_
+
+    def _get_example_paradigm(self, n_fractions=5):
+        base_ns = np.array([5, 7, 10, 14, 20, 28])
+        fractions = np.exp(np.linspace(np.log(.5), np.log(2.), n_fractions))
+        n1 = np.repeat(base_ns, len(fractions))
+        n2 = (base_ns[:, None] * fractions[None, :]).ravel()
+        return pd.DataFrame({'n1': n1, 'n2': n2})
+
+    def get_sd_curve(self, idata=None, pars=None, x=None, variable='n1_evidence_sd'):
+        """Compute posterior SD curves: SD(n) = exp(intercept) · n^noise_exponent.
+
+        Parameters
+        ----------
+        idata : arviz.InferenceData, optional
+        pars : pd.DataFrame, optional
+            MAP estimates indexed by subject (alternative to idata).
+        x : array-like, optional
+            Magnitudes at which to evaluate SD(n).  Defaults to a log-spaced
+            grid over the observed data range.
+        variable : str
+            ``'n1_evidence_sd'``, ``'n2_evidence_sd'``, or ``'both'``.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columns are magnitudes, rows are posterior draws or subjects.
+        """
+        if (idata is None) == (pars is None):
+            raise ValueError('Provide exactly one of idata or pars.')
+
+        if variable == 'both':
+            n1 = self.get_sd_curve(idata=idata, pars=pars, x=x, variable='n1_evidence_sd')
+            n2 = self.get_sd_curve(idata=idata, pars=pars, x=x, variable='n2_evidence_sd')
+            return n1.join(n2, lsuffix='_n1', rsuffix='_n2')
+
+        if x is None:
+            min_n = self.paradigm[['n1', 'n2']].min().min()
+            max_n = self.paradigm[['n1', 'n2']].max().max()
+            x = np.exp(np.linspace(np.log(min_n), np.log(max_n), 50))
+        x = np.asarray(x, dtype=float)
+
+        if self.fit_seperate_evidence_sd:
+            intercept_key = 'n1_log_sd_intercept' if variable == 'n1_evidence_sd' else 'n2_log_sd_intercept'
+        else:
+            intercept_key = 'log_sd_intercept'
+
+        if pars is not None:
+            intercepts = pars[intercept_key].values
+            exponents = pars['noise_exponent'].values
+            result = np.exp(intercepts[:, None] + exponents[:, None] * np.log(x)[None, :])
+            return pd.DataFrame(result, index=pars.index, columns=x)
+
+        # arviz InferenceData: use group-level posterior means
+        post = idata.posterior
+        intercept_samples = post[intercept_key + '_mu'].values.ravel()
+        exponent_samples = post['noise_exponent_mu'].values.ravel()
+        result = np.exp(intercept_samples[:, None] + exponent_samples[:, None] * np.log(x)[None, :])
+        return pd.DataFrame(result, columns=x)
+
+
+class PowerLawNoiseComparisonRegressionModel(RegressionModel, PowerLawNoiseComparisonModel):
+
+    def __init__(self, paradigm, regressors, fit_seperate_evidence_sd=True,
+                 fit_prior=False, memory_model='independent',
+                 save_trialwise_n_estimates=False):
+        RegressionModel.__init__(self, regressors)
+        PowerLawNoiseComparisonModel.__init__(self, paradigm, fit_seperate_evidence_sd,
+                                              fit_prior, memory_model, save_trialwise_n_estimates)
+
+
+class PowerLawNoiseComparisonLapseModel(LapseModel, PowerLawNoiseComparisonModel):
+    ...
+
+
+class PowerLawNoiseComparisonLapseRegressionModel(LapseModel, PowerLawNoiseComparisonRegressionModel):
+    ...

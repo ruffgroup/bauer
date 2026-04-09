@@ -6,6 +6,8 @@ from .magnitude import (
     MagnitudeComparisonModel, MagnitudeComparisonRegressionModel,
     MagnitudeComparisonLapseModel, MagnitudeComparisonLapseRegressionModel,
     FlexibleNoiseComparisonModel, FlexibleNoiseComparisonRegressionModel,
+    PowerLawNoiseComparisonModel, PowerLawNoiseComparisonRegressionModel,
+    PowerLawNoiseComparisonLapseModel, PowerLawNoiseComparisonLapseRegressionModel,
 )
 from .risky_choice import (
     RiskModelProbabilityDistortion, ProspectTheoryModel,
@@ -14,4 +16,5 @@ from .risky_choice import (
     RNPModel, RNPRegressionModel,
     FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
     ExpectedUtilityRiskModel, ExpectedUtilityRiskRegressionModel,
+    PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
 )

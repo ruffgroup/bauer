@@ -13,7 +13,7 @@ from ..core import BaseModel, LapseModel, RegressionModel
 from ..utils.bayes import cumulative_normal, get_posterior, get_diff_dist, get_posterior_np
 from ..utils.math import inverse_softplus_np, softplus_np, inverse_softplus, logit_derivative, gaussian_pdf
 from ..utils.plotting import plot_prediction
-from .magnitude import FlexibleNoiseComparisonModel
+from .magnitude import FlexibleNoiseComparisonModel, PowerLawNoiseComparisonModel
 
 class RiskModelProbabilityDistortion(BaseModel):
     """Risky choice model with Bayesian distortion of magnitudes and/or probabilities.
@@ -1290,3 +1290,160 @@ class ExpectedUtilityRiskRegressionModel(RegressionModel, ExpectedUtilityRiskMod
     def __init__(self,  paradigm, save_trialwise_eu, probability_distortion, regressors):
         RegressionModel.__init__(self, regressors=regressors)
         ExpectedUtilityRiskModel.__init__(self, paradigm, save_trialwise_eu, probability_distortion=probability_distortion)
+
+
+class PowerLawNoiseRiskModel(PowerLawNoiseComparisonModel, RiskModel):
+    """Risky-choice model with power-law magnitude-dependent noise.
+
+    Extends :class:`PowerLawNoiseComparisonModel` to the risky-choice paradigm
+    (payoffs + probabilities).  Payoffs are represented in **natural (linear)
+    space** with power-law noise:
+
+        SD_k(n) = exp(log_sd_intercept_k) · n^noise_exponent
+
+    Prior estimation follows the same ``prior_estimate`` options as
+    :class:`FlexibleNoiseRiskModel` (``'full'``, ``'shared'``,
+    ``'fix_prior_sd'``).
+
+    Parameters
+    ----------
+    paradigm : pd.DataFrame
+    prior_estimate : str
+        ``'full'`` (default), ``'shared'``, or ``'fix_prior_sd'``.
+    fit_seperate_evidence_sd : bool
+    memory_model : str
+    """
+
+    def __init__(self, paradigm, prior_estimate='full',
+                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False,
+                 memory_model='independent'):
+
+        if prior_estimate not in ['shared', 'full', 'fix_prior_sd']:
+            raise NotImplementedError('Only shared/full/fix_prior_sd prior_estimate supported')
+
+        self.prior_estimate = prior_estimate
+
+        RiskModel.__init__(self, paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates,
+                           fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+                           prior_estimate=prior_estimate,
+                           memory_model=memory_model)
+
+    def get_model_inputs(self, parameters):
+
+        model = pm.Model.get_context()
+        model_inputs = {}
+
+        # Prior estimation (mirrors FlexibleNoiseRiskModel)
+        if self.prior_estimate == 'full':
+            risky_first = model['p1'] < model['p2']
+            model_inputs['n1_prior_mu'] = pt.where(risky_first, parameters['risky_prior_mu'], parameters['safe_prior_mu'])
+            model_inputs['n1_prior_sd'] = pt.where(risky_first, parameters['risky_prior_sd'], parameters['safe_prior_sd'])
+            model_inputs['n2_prior_mu'] = pt.where(risky_first, parameters['safe_prior_mu'], parameters['risky_prior_mu'])
+            model_inputs['n2_prior_sd'] = pt.where(risky_first, parameters['safe_prior_sd'], parameters['risky_prior_sd'])
+        elif self.prior_estimate == 'fix_prior_sd':
+            model_inputs['n1_prior_sd'] = pt.std(pt.log(pt.stack((model['n1'], model['n2']), 0)))
+            model_inputs['n2_prior_sd'] = model_inputs['n1_prior_sd']
+            model_inputs['n1_prior_mu'] = parameters['risky_prior_mu']
+            model_inputs['n2_prior_mu'] = parameters['safe_prior_mu']
+        else:  # 'shared'
+            model_inputs['n1_prior_mu'] = parameters['prior_mu']
+            model_inputs['n1_prior_sd'] = parameters['prior_sd']
+            model_inputs['n2_prior_mu'] = parameters['prior_mu']
+            model_inputs['n2_prior_sd'] = parameters['prior_sd']
+
+        # Evidence in natural space with power-law noise
+        model_inputs['n1_evidence_mu'] = model['n1']
+        model_inputs['n2_evidence_mu'] = model['n2']
+
+        noise_exponent = parameters['noise_exponent']
+
+        if self.fit_seperate_evidence_sd:
+            model_inputs['n1_evidence_sd'] = pt.exp(
+                parameters['n1_log_sd_intercept'] + noise_exponent * pt.log(model['n1']))
+            model_inputs['n2_evidence_sd'] = pt.exp(
+                parameters['n2_log_sd_intercept'] + noise_exponent * pt.log(model['n2']))
+        else:
+            model_inputs['n1_evidence_sd'] = pt.exp(
+                parameters['log_sd_intercept'] + noise_exponent * pt.log(model['n1']))
+            model_inputs['n2_evidence_sd'] = pt.exp(
+                parameters['log_sd_intercept'] + noise_exponent * pt.log(model['n2']))
+
+        model_inputs['p1'] = model['p1']
+        model_inputs['p2'] = model['p2']
+
+        return model_inputs
+
+    def _get_choice_predictions(self, model_inputs):
+
+        post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'],
+                                               model_inputs['n1_prior_sd'],
+                                               model_inputs['n1_evidence_mu'],
+                                               model_inputs['n1_evidence_sd'])
+        post_n2_mu, post_n2_sd = get_posterior(model_inputs['n2_prior_mu'],
+                                               model_inputs['n2_prior_sd'],
+                                               model_inputs['n2_evidence_mu'],
+                                               model_inputs['n2_evidence_sd'])
+
+        diff_mu, diff_sd = get_diff_dist(post_n2_mu * model_inputs['p2'], model_inputs['n2_evidence_sd'],
+                                         post_n1_mu * model_inputs['p1'], model_inputs['n1_evidence_sd'])
+
+        if self.save_trialwise_n_estimates:
+            pm.Deterministic('n1_hat', post_n1_mu)
+            pm.Deterministic('n2_hat', post_n2_mu)
+
+        return cumulative_normal(0.0, diff_mu, diff_sd)
+
+    def get_free_parameters(self):
+
+        # Noise parameters from PowerLawNoiseComparisonModel (temporarily skip fit_prior)
+        self.fit_prior = False
+        free_parameters = PowerLawNoiseComparisonModel.get_free_parameters(self)
+        self.fit_prior = True
+
+        # Prior parameters depending on prior_estimate mode
+        if self.prior_estimate == 'full':
+            if self.paradigm is not None:
+                risky_n = np.where(self.paradigm['p1'] != 1.0, self.paradigm['n1'], self.paradigm['n2'])
+                safe_n = np.where(self.paradigm['p2'] != 1.0, self.paradigm['n2'], self.paradigm['n1'])
+                risky_prior_mu = float(np.mean(risky_n))
+                risky_prior_sd = float(np.std(risky_n))
+                safe_prior_mu = float(np.mean(safe_n))
+                safe_prior_sd = float(np.std(safe_n))
+            else:
+                risky_prior_mu = safe_prior_mu = 25.
+                risky_prior_sd = safe_prior_sd = 50.
+            free_parameters['risky_prior_mu'] = {'mu_intercept': risky_prior_mu, 'sigma_intercept': 25., 'transform': 'identity'}
+            free_parameters['risky_prior_sd'] = {'mu_intercept': risky_prior_sd, 'sigma_intercept': 25., 'transform': 'softplus'}
+            free_parameters['safe_prior_mu'] = {'mu_intercept': safe_prior_mu, 'sigma_intercept': 25., 'transform': 'identity'}
+            free_parameters['safe_prior_sd'] = {'mu_intercept': safe_prior_sd, 'transform': 'softplus'}
+
+        elif self.prior_estimate == 'fix_prior_sd':
+            risky_n = np.where(self.paradigm['p1'] != 1.0, self.paradigm['n1'], self.paradigm['n2'])
+            safe_n = np.where(self.paradigm['p2'] != 1.0, self.paradigm['n2'], self.paradigm['n1'])
+            free_parameters['risky_prior_mu'] = {'mu_intercept': float(np.mean(risky_n)), 'transform': 'identity'}
+            free_parameters['safe_prior_mu'] = {'mu_intercept': float(np.mean(safe_n)), 'transform': 'identity'}
+
+        elif self.prior_estimate == 'shared':
+            if self.paradigm is not None:
+                prior_mu = float(np.mean(np.stack((self.paradigm['n1'], self.paradigm['n2']))))
+                prior_sd = float(np.std(np.stack((self.paradigm['n1'], self.paradigm['n2']))))
+            else:
+                prior_mu = 25.
+                prior_sd = 25.
+            free_parameters['prior_mu'] = {'mu_intercept': prior_mu, 'sigma_intercept': 25., 'transform': 'identity'}
+            free_parameters['prior_sd'] = {'mu_intercept': prior_sd, 'sigma_intercept': 25., 'transform': 'softplus'}
+
+        return free_parameters
+
+    def _get_paradigm(self, paradigm=None, subject_mapping=None):
+        return RiskModel._get_paradigm(self, paradigm, subject_mapping=subject_mapping)
+
+
+class PowerLawNoiseRiskRegressionModel(RegressionModel, PowerLawNoiseRiskModel):
+
+    def __init__(self, paradigm, regressors, prior_estimate='full',
+                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False,
+                 memory_model='independent'):
+        RegressionModel.__init__(self, regressors)
+        PowerLawNoiseRiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd,
+                                        save_trialwise_n_estimates, memory_model)
