@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Lesson 2: Risky Choice and the Key Correlations (Barreto-Garc:nbsphinx-math:`u0`0eda et al., 2023)" href="lesson2.html"><link rel="prev" title="Tutorials" href="index.html">
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Lesson 2: Risky Choice — Psychometric Functions and the Noise–Risk Link" href="lesson2.html"><link rel="prev" title="Tutorials" href="index.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Lesson 1: Psychophysical Modelling - bauer 0.2.0 documentation</title>
+        <title>Lesson 1: An Introduction to Psychophysical Modelling - bauer 0.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -199,10 +199,10 @@
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
-<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Lesson 1: Psychophysical Modelling</a></li>
-<li class="toctree-l2"><a class="reference internal" href="lesson2.html">Lesson 2: Risky Choice and the Key Correlations (Barreto-Garc:nbsphinx-math:`u0`0eda et al., 2023)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="lesson3.html">Lesson 3: Stake effects and presentation order — de Hollander et al. (2024)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="lesson4.html">Lesson 4: Flexible Noise Curves — the <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseRiskModel</span></code></a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Lesson 1: An Introduction to Psychophysical Modelling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson2.html">Lesson 2: Risky Choice — Psychometric Functions and the Noise–Risk Link</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson3.html">Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson4.html">Lesson 4: Flexible Noise Curves — <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseComparisonModel</span></code> and <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseRiskModel</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="lesson5.html">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</a></li>
 </ul>
 </li>
@@ -248,312 +248,1046 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="Lesson-1:-Psychophysical-Modelling">
-<h1>Lesson 1: Psychophysical Modelling<a class="headerlink" href="#Lesson-1:-Psychophysical-Modelling" title="Link to this heading">¶</a></h1>
+          <section id="Lesson-1:-An-Introduction-to-Psychophysical-Modelling">
+<h1>Lesson 1: An Introduction to Psychophysical Modelling<a class="headerlink" href="#Lesson-1:-An-Introduction-to-Psychophysical-Modelling" title="Link to this heading">¶</a></h1>
+<section id="What-is-psychophysics?">
+<h2>What is psychophysics?<a class="headerlink" href="#What-is-psychophysics?" title="Link to this heading">¶</a></h2>
+<p><strong>Psychophysics</strong> studies the quantitative relationship between physical stimuli and the perceptions or decisions they produce. The key insight is that perception is not deterministic: the same physical stimulus does not always produce the same internal representation. Noise — arising from photoreceptor variability, neural transmission, working memory limitations, and random fluctuations throughout the sensory hierarchy — means that every measurement is uncertain.</p>
+<p>A <strong>psychophysical model</strong> formalises this noise to link three things:</p>
+<ol class="arabic simple">
+<li><p>The <strong>stimulus</strong> (a physical quantity such as the number of dots on a screen).</p></li>
+<li><p>The <strong>internal representation</strong> (a noisy encoding of the stimulus).</p></li>
+<li><p>The <strong>response</strong> (a forced choice, a rating, a reaction time).</p></li>
+</ol>
+<p>By fitting such a model to behavioural data we can <em>infer</em> parameters that are not directly observable — things like how much noise the brain adds to a given stimulus, or what prior beliefs the observer brings into the experiment. This inference is what separates psychophysical modelling from simple curve-fitting: we get <strong>posterior distributions</strong> over interpretable parameters, with proper uncertainty quantification.</p>
+</section>
+<section id="The-bauer-library">
+<h2>The bauer library<a class="headerlink" href="#The-bauer-library" title="Link to this heading">¶</a></h2>
+<p><strong>bauer</strong> (<em>B</em>ayesian Estimation of Perceptu<em>a</em>l, N<em>u</em>merical and <em>R</em>isky Choic<em>e</em>) is a Python library that makes hierarchical Bayesian psychophysical modelling easy. It is built on <a class="reference external" href="https://www.pymc.io">PyMC</a> and <a class="reference external" href="https://python.arviz.org">ArviZ</a> and provides:</p>
+<ul class="simple">
+<li><p>Ready-to-use model classes for <strong>magnitude comparison</strong>, <strong>psychometric functions</strong>, and <strong>risky choice</strong> — no need to hand-code PyMC models.</p></li>
+<li><p><strong>Hierarchical fitting</strong> by default: each participant gets their own parameters, but they are regularised by a shared group-level distribution.</p></li>
+<li><p><strong>Regression support</strong> via patsy formulas — e.g. <code class="docutils literal notranslate"><span class="pre">regressors={'nu':</span> <span class="pre">'C(condition)'}</span></code> to estimate noise separately per condition.</p></li>
+<li><p><strong>Posterior predictive checks</strong> (PPC) with a single <code class="docutils literal notranslate"><span class="pre">model.ppc(data,</span> <span class="pre">idata)</span></code> call.</p></li>
+<li><p>Full <strong>ArviZ</strong> integration for trace diagnostics, HDI plots, ELPD comparison, and more.</p></li>
+</ul>
+<p>In these tutorials we walk through the main model families, starting from first principles.</p>
+</section>
 <section id="The-Noisy-Logarithmic-Coding-(NLC)-model">
 <h2>The Noisy Logarithmic Coding (NLC) model<a class="headerlink" href="#The-Noisy-Logarithmic-Coding-(NLC)-model" title="Link to this heading">¶</a></h2>
-<p>When we judge quantities — the number of coins in a pile, the size of a reward — our internal representations are noisy. The <strong>NLC model</strong> posits that the brain encodes numerical magnitude <span class="math notranslate nohighlight">\(n\)</span> on a logarithmic scale, and that this log-representation is corrupted by Gaussian noise:</p>
+<p>When we judge quantities — the number of coins in a pile, the size of a reward — our internal representations are noisy. The <strong>NLC model</strong> posits that the brain encodes numerical magnitude <span class="math notranslate nohighlight">\(n\)</span> on a <strong>logarithmic</strong> scale, and that this log-representation is corrupted by Gaussian noise:</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
 \[r \sim \mathcal{N}(\log n, \; \nu^2)\]</div>
 </div>
-<p>Given two stimuli <span class="math notranslate nohighlight">\(n_1\)</span> and <span class="math notranslate nohighlight">\(n_2\)</span> with independent noise, the probability of choosing <span class="math notranslate nohighlight">\(n_2\)</span> as the larger is</p>
+<p>The logarithmic encoding has two important consequences:</p>
+<ol class="arabic simple">
+<li><p><strong>Weber’s law</strong> falls out automatically. Because the noise <span class="math notranslate nohighlight">\(\nu\)</span> is constant on a log scale, the <em>absolute</em> noise on the original scale grows in proportion to the magnitude: equal log-space noise means proportionally larger linear-space uncertainty for big numbers than for small ones.</p></li>
+<li><p><strong>Scale invariance</strong>: when we plot the psychometric function against the log-ratio <span class="math notranslate nohighlight">\(\log(n_2/n_1)\)</span>, all curves for different reference magnitudes <span class="math notranslate nohighlight">\(n_1\)</span> collapse onto a single sigmoid. This is a direct and falsifiable prediction of the model.</p></li>
+</ol>
+<section id="The-decision-rule">
+<h3>The decision rule<a class="headerlink" href="#The-decision-rule" title="Link to this heading">¶</a></h3>
+<p>Given two stimuli <span class="math notranslate nohighlight">\(n_1\)</span> and <span class="math notranslate nohighlight">\(n_2\)</span> with independent log-space noise, the probability of choosing <span class="math notranslate nohighlight">\(n_2\)</span> as the larger is</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
 \[P(\text{chose}\; n_2) = \Phi\!\left(\frac{\log(n_2/n_1)}{\sqrt{\nu_1^2 + \nu_2^2}}\right)\]</div>
 </div>
 <p>where <span class="math notranslate nohighlight">\(\Phi\)</span> is the standard normal CDF, <span class="math notranslate nohighlight">\(\nu_1\)</span> is the noise on <span class="math notranslate nohighlight">\(n_1\)</span> (the first-presented option) and <span class="math notranslate nohighlight">\(\nu_2\)</span> is the noise on <span class="math notranslate nohighlight">\(n_2\)</span> (the second-presented option).</p>
-<p>In many experimental paradigms stimuli are shown <strong>sequentially</strong>: the observer perceives <span class="math notranslate nohighlight">\(n_1\)</span>, holds it in working memory, then perceives <span class="math notranslate nohighlight">\(n_2\)</span>. Memory retention may add extra noise on top of perception, so the model allows <span class="math notranslate nohighlight">\(\nu_1 \neq \nu_2\)</span>. In tasks where both options are visible simultaneously there is no reason to separate the two, and a single shared <span class="math notranslate nohighlight">\(\nu\)</span> is sufficient.</p>
-<p><strong>Scale invariance</strong>: when <span class="math notranslate nohighlight">\(x = \log(n_2/n_1)\)</span> is used as the horizontal axis, the psychometric function collapses to a single sigmoid regardless of the absolute magnitude of <span class="math notranslate nohighlight">\(n_1\)</span> — a direct prediction of the logarithmic encoding.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<p>In tasks where stimuli are shown <strong>sequentially</strong> (the observer perceives <span class="math notranslate nohighlight">\(n_1\)</span>, holds it in working memory, then perceives <span class="math notranslate nohighlight">\(n_2\)</span>), memory retention may add noise. The model therefore allows <span class="math notranslate nohighlight">\(\nu_1 \neq \nu_2\)</span>. In simultaneous-presentation tasks a single shared <span class="math notranslate nohighlight">\(\nu\)</span> is sufficient.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
 </pre></div>
 </div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>import warnings; warnings.filterwarnings(&#39;ignore&#39;)
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from scipy.stats import norm as scipy_norm
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span><span class="p">;</span> <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">seaborn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sns</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.stats</span><span class="w"> </span><span class="kn">import</span> <span class="n">norm</span> <span class="k">as</span> <span class="n">scipy_norm</span>
 
-# ── Scale invariance demo ─────────────────────────────────────────────────────
-nu = 0.45                              # equal noise for both options
-n1_vals = [5, 10, 20, 28]
-n2_linear = np.linspace(1, 60, 300)
-log_ratios = np.linspace(-1.8, 1.8, 300)
+<span class="c1"># ── Scale invariance demo ─────────────────────────────────────────────────────</span>
+<span class="n">nu</span> <span class="o">=</span> <span class="mf">0.45</span>                              <span class="c1"># equal noise for both options</span>
+<span class="n">n1_vals</span> <span class="o">=</span> <span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">28</span><span class="p">]</span>
+<span class="n">n2_linear</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="mi">300</span><span class="p">)</span>
+<span class="n">log_ratios</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mf">1.8</span><span class="p">,</span> <span class="mf">1.8</span><span class="p">,</span> <span class="mi">300</span><span class="p">)</span>
 
-fig, axes = plt.subplots(1, 2, figsize=(11, 4))
-pal = sns.color_palette(&#39;Blues_d&#39;, len(n1_vals))
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="n">pal</span> <span class="o">=</span> <span class="n">sns</span><span class="o">.</span><span class="n">color_palette</span><span class="p">(</span><span class="s1">&#39;YlOrRd&#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">n1_vals</span><span class="p">))</span>
 
-for (n1, c) in zip(n1_vals, pal):
-    p_lin = scipy_norm.cdf(np.log(n2_linear / n1) / (np.sqrt(2) * nu))
-    p_log = scipy_norm.cdf(log_ratios            / (np.sqrt(2) * nu))
-    axes[0].plot(n2_linear, p_lin, color=c, lw=2, label=f&#39;n1={n1}&#39;)
-    axes[1].plot(log_ratios, p_log, color=c, lw=2, label=f&#39;n1={n1}&#39;)
+<span class="k">for</span> <span class="p">(</span><span class="n">n1</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">n1_vals</span><span class="p">,</span> <span class="n">pal</span><span class="p">):</span>
+    <span class="n">p_lin</span> <span class="o">=</span> <span class="n">scipy_norm</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">n2_linear</span> <span class="o">/</span> <span class="n">n1</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">nu</span><span class="p">))</span>
+    <span class="n">p_log</span> <span class="o">=</span> <span class="n">scipy_norm</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">log_ratios</span>            <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">nu</span><span class="p">))</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">n2_linear</span><span class="p">,</span> <span class="n">p_lin</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;n1=</span><span class="si">{</span><span class="n">n1</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">log_ratios</span><span class="p">,</span> <span class="n">p_log</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;n1=</span><span class="si">{</span><span class="n">n1</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
 
-for ax in axes:
-    ax.axhline(0.5, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
-    ax.set_ylim(-0.03, 1.03)
-    ax.legend(title=&#39;n1&#39;, fontsize=8)
-    sns.despine(ax=ax)
+<span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="n">axes</span><span class="p">:</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="o">-</span><span class="mf">0.03</span><span class="p">,</span> <span class="mf">1.03</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
 
-axes[0].axvline(0, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
-axes[1].axvline(0, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
-axes[0].set_xlabel(&#39;n2 (linear)&#39;)
-axes[1].set_xlabel(&#39;log(n2 / n1)&#39;)
-axes[0].set_ylabel(&#39;P(chose n2)&#39;)
-axes[0].set_title(&#39;Linear scale — curves spread out&#39;)
-axes[1].set_title(&#39;Log-ratio scale — curves collapse&#39;)
-plt.tight_layout()
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;n2 (linear)&#39;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;log(n2 / n1)&#39;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;P(chose n2)&#39;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Linear scale — curves spread out&#39;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Log-ratio scale — curves collapse&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Scale invariance: log encoding makes all n₁ curves identical&#39;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
-<section id="Effect-of-noise-level-and-asymmetric-noise">
-<h3>Effect of noise level and asymmetric noise<a class="headerlink" href="#Effect-of-noise-level-and-asymmetric-noise" title="Link to this heading">¶</a></h3>
-<p><strong>Precision</strong> <span class="math notranslate nohighlight">\(\gamma = 1/(\sqrt{2}\,\nu)\)</span> is the slope of the psychometric curve on a log-ratio axis. Higher noise → shallower curve → less precise observer.</p>
-<p>When stimuli are presented sequentially, <span class="math notranslate nohighlight">\(n_1\)</span> must be retained in memory while <span class="math notranslate nohighlight">\(n_2\)</span> is being perceived, which often leads to <span class="math notranslate nohighlight">\(\nu_1 &gt; \nu_2\)</span>. Unequal noise alone (without a prior) does <strong>not</strong> shift the crossing point — it only changes the effective slope. The shift arises from the Bayesian prior, shown next.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
 </div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>log_r = np.linspace(-2, 2, 300)
-fig, axes = plt.subplots(1, 2, figsize=(11, 4))
-
-# Left: noise level → precision
-ax = axes[0]
-for nu_val, label, c in [(.2, &#39;ν = 0.20 (sharp)&#39;, &#39;#08519c&#39;),
-                           (.5, &#39;ν = 0.50&#39;, &#39;#3182bd&#39;),
-                           (1., &#39;ν = 1.00 (noisy)&#39;, &#39;#bdd7e7&#39;)]:
-    ax.plot(log_r, scipy_norm.cdf(log_r / (np.sqrt(2)*nu_val)), lw=2, color=c, label=label)
-ax.axhline(.5, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1); ax.axvline(0, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
-ax.set_xlabel(&#39;log(n2/n1)&#39;); ax.set_ylabel(&#39;P(chose n2)&#39;)
-ax.set_title(&#39;Effect of noise level on precision&#39;)
-ax.legend(); sns.despine(ax=ax)
-
-# Right: asymmetric noise  ν1 vs ν2
-ax = axes[1]
-for (nu1, nu2), label, c in [((0.4, 0.4), &#39;Equal noise  ν₁=ν₂=0.4&#39;, &#39;#1a9850&#39;),
-                               ((0.7, 0.3), &#39;Asymm. noise  ν₁=0.7, ν₂=0.3&#39;, &#39;#d73027&#39;)]:
-    ax.plot(log_r, scipy_norm.cdf(log_r / np.sqrt(nu1**2+nu2**2)), lw=2, color=c, label=label)
-ax.axhline(.5, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1); ax.axvline(0, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
-ax.set_xlabel(&#39;log(n2/n1)&#39;)
-ax.set_title(&#39;Asymmetric noise (same total) → different slope&#39;)
-ax.legend(fontsize=8); sns.despine(ax=ax)
-
-plt.tight_layout()
-</pre></div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson1_2_0.png" src="../_images/tutorial_lesson1_2_0.png" />
 </div>
 </div>
 </section>
-<section id="The-Bayesian-prior-and-central-tendency-bias">
-<h3>The Bayesian prior and central tendency bias<a class="headerlink" href="#The-Bayesian-prior-and-central-tendency-bias" title="Link to this heading">¶</a></h3>
-<p>Pure measurement noise is symmetric. The <em>shift</em> of the psychometric curve arises from a <strong>Bayesian prior</strong> over log-magnitudes. The observer combines noisy evidence <span class="math notranslate nohighlight">\(r \sim \mathcal{N}(\log n, \nu^2)\)</span> with a prior <span class="math notranslate nohighlight">\(\mathcal{N}(\mu_0, \sigma_0^2)\)</span> to form a posterior:</p>
+</section>
+<section id="The-psychometric-function:-noise,-precision,-and-asymmetry">
+<h2>The psychometric function: noise, precision, and asymmetry<a class="headerlink" href="#The-psychometric-function:-noise,-precision,-and-asymmetry" title="Link to this heading">¶</a></h2>
+<section id="1.-Noise-level-controls-the-slope">
+<h3>1. Noise level controls the slope<a class="headerlink" href="#1.-Noise-level-controls-the-slope" title="Link to this heading">¶</a></h3>
+<p>The slope of the psychometric function is entirely determined by the <strong>combined noise</strong> <span class="math notranslate nohighlight">\(\sigma_\text{total} = \sqrt{\nu_1^2 + \nu_2^2}\)</span>. More noise → shallower curve → worse discrimination. The left panel below illustrates this for equal noise on both options (<span class="math notranslate nohighlight">\(\nu_1 = \nu_2 = \nu\)</span>).</p>
+</section>
+<section id="2.-Asymmetric-noise-flattens-but-does-not-shift-the-curve">
+<h3>2. Asymmetric noise flattens but does not shift the curve<a class="headerlink" href="#2.-Asymmetric-noise-flattens-but-does-not-shift-the-curve" title="Link to this heading">¶</a></h3>
+<p>When one option is noisier than the other — for instance because <span class="math notranslate nohighlight">\(n_1\)</span> was encoded a few seconds ago and is now degraded in working memory — the midpoint of the curve (<span class="math notranslate nohighlight">\(P = 0.5\)</span> at <span class="math notranslate nohighlight">\(\log(n_2/n_1) = 0\)</span>) does not shift: <strong>asymmetric noise alone does not produce a bias</strong>, it just makes discrimination harder.</p>
+<p>The right panel illustrates a subtlety: even when the <em>total</em> noise budget <span class="math notranslate nohighlight">\(\nu_1 + \nu_2\)</span> is held constant, redistributing it unequally raises <span class="math notranslate nohighlight">\(\sigma_\text{total} = \sqrt{\nu_1^2 + \nu_2^2}\)</span> (by Cauchy-Schwarz, this is minimised when <span class="math notranslate nohighlight">\(\nu_1 = \nu_2\)</span>). So working-memory degradation does not just “move” noise from one option to the other — it genuinely costs precision.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">log_r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">300</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+
+<span class="c1"># Left: noise level → precision (equal noise on both options)</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">nu_val</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">[(</span><span class="mf">.2</span><span class="p">,</span> <span class="s1">&#39;ν = 0.20 (sharp)&#39;</span><span class="p">,</span> <span class="s1">&#39;#08519c&#39;</span><span class="p">),</span>
+                           <span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="s1">&#39;ν = 0.50&#39;</span><span class="p">,</span> <span class="s1">&#39;#3182bd&#39;</span><span class="p">),</span>
+                           <span class="p">(</span><span class="mf">1.</span><span class="p">,</span> <span class="s1">&#39;ν = 1.00 (noisy)&#39;</span><span class="p">,</span> <span class="s1">&#39;#bdd7e7&#39;</span><span class="p">)]:</span>
+    <span class="n">sigma</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">nu_val</span>   <span class="c1"># nu1 = nu2 = nu_val</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">log_r</span><span class="p">,</span> <span class="n">scipy_norm</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">log_r</span> <span class="o">/</span> <span class="n">sigma</span><span class="p">),</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">);</span> <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;log(n2/n1)&#39;</span><span class="p">);</span> <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;P(chose n2)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Effect of noise level (ν₁ = ν₂ = ν)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">();</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="c1"># Right: same total noise budget ν₁ + ν₂ = 0.80, but distributed differently</span>
+<span class="c1"># Key: σ_total = √(ν₁² + ν₂²) is MINIMISED when ν₁ = ν₂ (Cauchy-Schwarz).</span>
+<span class="c1"># So asymmetric noise → higher σ_total → flatter curve, even at equal total.</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="n">cases</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">,</span> <span class="s1">&#39;Equal  ν₁=ν₂=0.40  (sum=0.80)&#39;</span><span class="p">,</span> <span class="s1">&#39;#1a9850&#39;</span><span class="p">),</span>
+    <span class="p">(</span><span class="mf">0.55</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">,</span> <span class="s1">&#39;Mild asymmetry  ν₁=0.55, ν₂=0.25  (sum=0.80)&#39;</span><span class="p">,</span> <span class="s1">&#39;#f46d43&#39;</span><span class="p">),</span>
+    <span class="p">(</span><span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="s1">&#39;Strong asymmetry  ν₁=0.70, ν₂=0.10  (sum=0.80)&#39;</span><span class="p">,</span> <span class="s1">&#39;#a50026&#39;</span><span class="p">),</span>
+<span class="p">]</span>
+<span class="k">for</span> <span class="n">nu1</span><span class="p">,</span> <span class="n">nu2</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">cases</span><span class="p">:</span>
+    <span class="n">sigma</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">nu1</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">nu2</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">log_r</span><span class="p">,</span> <span class="n">scipy_norm</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">log_r</span> <span class="o">/</span> <span class="n">sigma</span><span class="p">),</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span>
+            <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s1">  (σ=</span><span class="si">{</span><span class="n">sigma</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">);</span> <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;log(n2/n1)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Same total noise (ν₁+ν₂=0.80), different split → flatter curve&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mf">7.5</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson1_4_0.png" src="../_images/tutorial_lesson1_4_0.png" />
+</div>
+</div>
+</section>
+</section>
+<section id="Bayesian-inference-and-the-central-tendency-bias">
+<h2>Bayesian inference and the central tendency bias<a class="headerlink" href="#Bayesian-inference-and-the-central-tendency-bias" title="Link to this heading">¶</a></h2>
+<section id="The-Bayesian-observer">
+<h3>The Bayesian observer<a class="headerlink" href="#The-Bayesian-observer" title="Link to this heading">¶</a></h3>
+<p>The NLC observer does not simply report the noisy measurement <span class="math notranslate nohighlight">\(r = \log n + \epsilon\)</span>. Instead, they act as an <strong>ideal Bayesian observer</strong>: they combine the noisy evidence with a <strong>prior</strong> belief about what magnitudes are likely to appear in the experiment. If the prior is <span class="math notranslate nohighlight">\(\mathcal{N}(\mu_0, \sigma_0^2)\)</span> and the likelihood is <span class="math notranslate nohighlight">\(\mathcal{N}(\log n, \nu^2)\)</span>, Bayes’ rule gives a Gaussian posterior:</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
 \[\hat\mu = \underbrace{\frac{\sigma_0^2}{\sigma_0^2 + \nu^2}}_{\gamma}\, r
            + (1-\gamma)\,\mu_0, \qquad
 \hat\sigma^2 = \frac{\sigma_0^2\,\nu^2}{\sigma_0^2 + \nu^2}\]</div>
 </div>
-<p>The posterior mean is pulled toward <span class="math notranslate nohighlight">\(\mu_0\)</span> — the <strong>central tendency effect</strong>. A stronger prior (smaller <span class="math notranslate nohighlight">\(\sigma_0\)</span>) compresses representations more, shifting choices systematically toward the prior mean.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<p>The posterior mean <span class="math notranslate nohighlight">\(\hat\mu\)</span> is a <strong>weighted average</strong> of the raw evidence <span class="math notranslate nohighlight">\(r\)</span> and the prior mean <span class="math notranslate nohighlight">\(\mu_0\)</span>. The weight given to the prior, <span class="math notranslate nohighlight">\(1 - \gamma\)</span>, is larger when the noise <span class="math notranslate nohighlight">\(\nu\)</span> is large (the evidence is unreliable) or the prior is narrow (the observer is confident about the range of stimuli).</p>
+</section>
+<section id="Central-tendency-bias">
+<h3>Central tendency bias<a class="headerlink" href="#Central-tendency-bias" title="Link to this heading">¶</a></h3>
+<p>Because the prior pulls representations toward <span class="math notranslate nohighlight">\(\mu_0\)</span>, stimuli larger than <span class="math notranslate nohighlight">\(\mu_0\)</span> are <strong>underestimated</strong> and stimuli smaller than <span class="math notranslate nohighlight">\(\mu_0\)</span> are <strong>overestimated</strong>. This systematic compression toward the prior mean is the <strong>central tendency effect</strong> — a well-documented perceptual bias.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
 </pre></div>
 </div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
 
-x = np.linspace(0.5, 5.5, 400)       # log-magnitude axis
-log_n_true  = np.log(20)              # true stimulus: n=20
-prior_mu    = np.log(10)              # prior centred at n=10
-nu          = 0.4                     # measurement noise
+<span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">5.5</span><span class="p">,</span> <span class="mi">400</span><span class="p">)</span>       <span class="c1"># log-magnitude axis</span>
+<span class="n">log_n_true</span>  <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span>              <span class="c1"># true stimulus: n=20</span>
+<span class="n">prior_mu</span>    <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>              <span class="c1"># prior centred at n=10</span>
+<span class="n">nu</span>          <span class="o">=</span> <span class="mf">0.4</span>                     <span class="c1"># measurement noise</span>
 
-for ax, (prior_sd, title) in zip(axes,
-        [(1.0, &#39;Weak prior  (σ₀ = 1.0)&#39;),
-         (0.25, &#39;Strong prior  (σ₀ = 0.25)&#39;)]):
+<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="p">(</span><span class="n">prior_sd</span><span class="p">,</span> <span class="n">title</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axes</span><span class="p">,</span>
+        <span class="p">[(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s1">&#39;Weak prior  (σ₀ = 1.0)&#39;</span><span class="p">),</span>
+         <span class="p">(</span><span class="mf">0.25</span><span class="p">,</span> <span class="s1">&#39;Strong prior  (σ₀ = 0.25)&#39;</span><span class="p">)]):</span>
 
-    gamma   = prior_sd**2 / (prior_sd**2 + nu**2)
-    post_mu = prior_mu + gamma * (log_n_true - prior_mu)
-    post_sd = np.sqrt(prior_sd**2 * nu**2 / (prior_sd**2 + nu**2))
+    <span class="n">gamma</span>   <span class="o">=</span> <span class="n">prior_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="p">(</span><span class="n">prior_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">nu</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">post_mu</span> <span class="o">=</span> <span class="n">prior_mu</span> <span class="o">+</span> <span class="n">gamma</span> <span class="o">*</span> <span class="p">(</span><span class="n">log_n_true</span> <span class="o">-</span> <span class="n">prior_mu</span><span class="p">)</span>
+    <span class="n">post_sd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">prior_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">nu</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="p">(</span><span class="n">prior_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">nu</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
 
-    like  = scipy_norm.pdf(x, log_n_true, nu)
-    prior = scipy_norm.pdf(x, prior_mu,  prior_sd)
-    post  = scipy_norm.pdf(x, post_mu,   post_sd)
-    mx    = max(like.max(), prior.max(), post.max())
+    <span class="n">like</span>  <span class="o">=</span> <span class="n">scipy_norm</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">log_n_true</span><span class="p">,</span> <span class="n">nu</span><span class="p">)</span>
+    <span class="n">prior</span> <span class="o">=</span> <span class="n">scipy_norm</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">prior_mu</span><span class="p">,</span>  <span class="n">prior_sd</span><span class="p">)</span>
+    <span class="n">post</span>  <span class="o">=</span> <span class="n">scipy_norm</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">post_mu</span><span class="p">,</span>   <span class="n">post_sd</span><span class="p">)</span>
+    <span class="n">mx</span>    <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">like</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="n">prior</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="n">post</span><span class="o">.</span><span class="n">max</span><span class="p">())</span>
 
-    ax.fill_between(x, prior/mx, alpha=.3, color=&#39;#4393c3&#39;, label=f&#39;Prior  μ₀={prior_mu:.2f}&#39;)
-    ax.fill_between(x, like/mx,  alpha=.3, color=&#39;#d6604d&#39;, label=f&#39;Evidence  log(n)={log_n_true:.2f}&#39;)
-    ax.fill_between(x, post/mx,  alpha=.5, color=&#39;#4dac26&#39;, label=f&#39;Posterior  μ̂={post_mu:.2f}&#39;)
-    ax.axvline(log_n_true, ls=&#39;--&#39;, c=&#39;#d6604d&#39;, lw=1.5)
-    ax.axvline(prior_mu,   ls=&#39;--&#39;, c=&#39;#4393c3&#39;, lw=1.5)
-    ax.axvline(post_mu,    ls=&#39;-&#39;,  c=&#39;#4dac26&#39;, lw=2.5)
-    ax.set_xlabel(&#39;Internal log-magnitude representation&#39;)
-    ax.set_ylabel(&#39;Probability density (normalised)&#39;)
-    ax.set_title(title)
-    ax.legend(fontsize=8)
-    sns.despine(ax=ax)
+    <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">prior</span><span class="o">/</span><span class="n">mx</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.3</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;#4393c3&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;Prior  μ₀=</span><span class="si">{</span><span class="n">prior_mu</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">like</span><span class="o">/</span><span class="n">mx</span><span class="p">,</span>  <span class="n">alpha</span><span class="o">=</span><span class="mf">.3</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;#d6604d&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;Evidence  log(n)=</span><span class="si">{</span><span class="n">log_n_true</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">post</span><span class="o">/</span><span class="n">mx</span><span class="p">,</span>  <span class="n">alpha</span><span class="o">=</span><span class="mf">.5</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;#4dac26&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;Posterior  μ̂=</span><span class="si">{</span><span class="n">post_mu</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">log_n_true</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;#d6604d&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">prior_mu</span><span class="p">,</span>   <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;#4393c3&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">post_mu</span><span class="p">,</span>    <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span>  <span class="n">c</span><span class="o">=</span><span class="s1">&#39;#4dac26&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">2.5</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Internal log-magnitude representation&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Probability density (normalised)&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">title</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
 
-plt.suptitle(&#39;Central tendency: posterior mean is pulled toward the prior&#39;, y=1.02)
-plt.tight_layout()
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Central tendency: posterior mean is pulled toward the prior&#39;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson1_6_0.png" src="../_images/tutorial_lesson1_6_0.png" />
+</div>
+</div>
+</section>
+<section id="Why-asymmetric-noise-creates-magnitude–order-interactions">
+<h3>Why asymmetric noise creates magnitude–order interactions<a class="headerlink" href="#Why-asymmetric-noise-creates-magnitude–order-interactions" title="Link to this heading">¶</a></h3>
+<p>In a sequential task, <span class="math notranslate nohighlight">\(n_1\)</span> is noisier than <span class="math notranslate nohighlight">\(n_2\)</span> because of memory degradation: <span class="math notranslate nohighlight">\(\nu_1 &gt; \nu_2\)</span>. The Bayesian posterior mean is</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\hat\mu_k = \gamma_k \log n_k + (1-\gamma_k)\mu_0,
+\quad \gamma_k = \frac{\sigma_0^2}{\sigma_0^2 + \nu_k^2}\]</div>
+</div>
+<p>The weight <span class="math notranslate nohighlight">\(\gamma_k\)</span> is <strong>different</strong> for the two options whenever <span class="math notranslate nohighlight">\(\nu_1 \neq \nu_2\)</span>.</p>
+<ul class="simple">
+<li><p>The <strong>noisier</strong> option (usually <span class="math notranslate nohighlight">\(n_1\)</span>) gets a smaller weight <span class="math notranslate nohighlight">\(\gamma_1\)</span>, meaning its posterior is pulled <em>more</em> toward <span class="math notranslate nohighlight">\(\mu_0\)</span>.</p></li>
+<li><p>The <strong>less noisy</strong> option (usually <span class="math notranslate nohighlight">\(n_2\)</span>) gets a larger weight <span class="math notranslate nohighlight">\(\gamma_2\)</span> and is pulled <em>less</em> toward <span class="math notranslate nohighlight">\(\mu_0\)</span>.</p></li>
+</ul>
+<p>If <span class="math notranslate nohighlight">\(\mu_0\)</span> is set to the mean of the log-stimulus distribution, then large stimuli are underestimated and small stimuli are overestimated. Because <span class="math notranslate nohighlight">\(n_1\)</span> is underestimated <em>more</em> than <span class="math notranslate nohighlight">\(n_2\)</span>, the observer is effectively biased <strong>toward choosing :math:`n_2`</strong> when both are large (big <span class="math notranslate nohighlight">\(n_1\)</span> is shrunk, making <span class="math notranslate nohighlight">\(n_2\)</span> look relatively bigger), and <strong>against choosing :math:`n_2`</strong> when both are small (small <span class="math notranslate nohighlight">\(n_1\)</span> is inflated, making <span class="math notranslate nohighlight">\(n_2\)</span> look relatively smaller).</p>
+<p><strong>This is the source of the magnitude–order interaction</strong>: it is not asymmetric noise per se that causes it, but asymmetric noise interacting with a Bayesian prior that compresses different options by different amounts. Equal noise on both options would produce a uniform shift of the midpoint — no interaction with the reference magnitude.</p>
+<p>The NLC model captures all of this with just three parameters per subject: <span class="math notranslate nohighlight">\(\nu_1\)</span>, <span class="math notranslate nohighlight">\(\nu_2\)</span>, and <span class="math notranslate nohighlight">\(\sigma_0\)</span> (prior width).</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Illustrate the interaction: how the choice bias changes with n1 and noise asymmetry</span>
+<span class="n">log_r_range</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">400</span><span class="p">)</span>
+<span class="n">nu1_values</span>  <span class="o">=</span> <span class="p">[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">]</span>   <span class="c1"># increasing memory noise on n1</span>
+<span class="n">nu2</span>         <span class="o">=</span> <span class="mf">0.3</span>                <span class="c1"># fixed perceptual noise on n2</span>
+<span class="n">prior_sd</span>    <span class="o">=</span> <span class="mf">0.6</span>                <span class="c1"># moderate prior</span>
+<span class="n">prior_mu</span>    <span class="o">=</span> <span class="mf">0.0</span>                <span class="c1"># centred (mean of log-stimulus distribution)</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">13</span><span class="p">,</span> <span class="mf">4.5</span><span class="p">))</span>
+<span class="n">pal</span> <span class="o">=</span> <span class="n">sns</span><span class="o">.</span><span class="n">color_palette</span><span class="p">(</span><span class="s1">&#39;Reds_d&#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nu1_values</span><span class="p">))</span>
+
+<span class="c1"># Left: large n1 (above prior mean); Right: small n1 (below prior mean)</span>
+<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="n">log_n1</span><span class="p">,</span> <span class="n">n1_label</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axes</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.5</span><span class="p">],</span>
+        <span class="p">[</span><span class="s1">&#39;Large n₁ (above prior → compressed down)&#39;</span><span class="p">,</span>
+         <span class="s1">&#39;Small n₁ (below prior → compressed up)&#39;</span><span class="p">]):</span>
+    <span class="k">for</span> <span class="n">nu1</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">nu1_values</span><span class="p">,</span> <span class="n">pal</span><span class="p">):</span>
+        <span class="n">gamma1</span> <span class="o">=</span> <span class="n">prior_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="p">(</span><span class="n">prior_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">nu1</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">gamma2</span> <span class="o">=</span> <span class="n">prior_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="p">(</span><span class="n">prior_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">nu2</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">log_n2_vals</span> <span class="o">=</span> <span class="n">log_n1</span> <span class="o">+</span> <span class="n">log_r_range</span>
+        <span class="n">mu1_hat</span> <span class="o">=</span> <span class="n">prior_mu</span> <span class="o">+</span> <span class="n">gamma1</span> <span class="o">*</span> <span class="p">(</span><span class="n">log_n1</span>      <span class="o">-</span> <span class="n">prior_mu</span><span class="p">)</span>
+        <span class="n">mu2_hat</span> <span class="o">=</span> <span class="n">prior_mu</span> <span class="o">+</span> <span class="n">gamma2</span> <span class="o">*</span> <span class="p">(</span><span class="n">log_n2_vals</span>  <span class="o">-</span> <span class="n">prior_mu</span><span class="p">)</span>
+        <span class="n">sigma_total</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">prior_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">nu1</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="p">(</span><span class="n">prior_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">nu1</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+                            <span class="o">+</span> <span class="n">prior_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">nu2</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="p">(</span><span class="n">prior_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">nu2</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">scipy_norm</span><span class="o">.</span><span class="n">cdf</span><span class="p">((</span><span class="n">mu2_hat</span> <span class="o">-</span> <span class="n">mu1_hat</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">sigma_total</span><span class="p">))</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">log_r_range</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span>
+                <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;ν₁=</span><span class="si">{</span><span class="n">nu1</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">, ν₂=</span><span class="si">{</span><span class="n">nu2</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span>  <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;log(n₂ / n₁)&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;P(chose n₂)&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">n1_label</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mf">8.5</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Asymmetric noise + prior: curve shift depends on reference magnitude&#39;</span><span class="p">,</span>
+             <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson1_8_0.png" src="../_images/tutorial_lesson1_8_0.png" />
 </div>
 </div>
 </section>
 </section>
 <section id="Barreto-García-et-al.-(2023):-Magnitude-comparison-task">
 <h2>Barreto-García et al. (2023): Magnitude comparison task<a class="headerlink" href="#Barreto-García-et-al.-(2023):-Magnitude-comparison-task" title="Link to this heading">¶</a></h2>
-<p>64 participants viewed two sequentially presented coin clouds and judged which contained more 1-CHF coins. Reference magnitudes <span class="math notranslate nohighlight">\(n_1 \in \{5, 7, 10, 14, 20, 28\}\)</span>; comparison magnitudes <span class="math notranslate nohighlight">\(n_2\)</span> varied widely. We load the bundled dataset and inspect it.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<p>With the theory in place, we now fit models to real data. The dataset from <strong>Barreto-García et al. (2023)</strong> is bundled with bauer and contains magnitude comparison choices from 64 participants. On each trial participants viewed two sequentially presented coin clouds (visual dot arrays) and judged which contained more 1-CHF coins.</p>
+<ul class="simple">
+<li><p><strong>Reference magnitudes</strong>: <span class="math notranslate nohighlight">\(n_1 \in \{5, 7, 10, 14, 20, 28\}\)</span></p></li>
+<li><p><strong>Comparison magnitudes</strong>: <span class="math notranslate nohighlight">\(n_2\)</span> varied over a wide range</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">choice</span></code> column encodes <code class="docutils literal notranslate"><span class="pre">True</span></code> = chose <span class="math notranslate nohighlight">\(n_2\)</span> (the second cloud)</p></li>
+</ul>
+<p>bauer provides a one-liner to load the data:</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
 </pre></div>
 </div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>import pandas as pd
-import arviz as az
-from bauer.utils.data import load_garcia2022
-from bauer.models import MagnitudeComparisonModel
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_garcia2022</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">MagnitudeComparisonModel</span>
 
-data = load_garcia2022(task=&#39;magnitude&#39;)
-print(f&quot;Subjects: {data.index.get_level_values(&#39;subject&#39;).nunique()},  &quot;
-      f&quot;Trials: {len(data)}&quot;)
-data.head()
+<span class="n">data</span> <span class="o">=</span> <span class="n">load_garcia2022</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s1">&#39;magnitude&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Subjects: </span><span class="si">{</span><span class="n">data</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span><span class="si">}</span><span class="s2">,  &quot;</span>
+      <span class="sa">f</span><span class="s2">&quot;Trials: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">data</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Subjects: 64,  Trials: 13824
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
 </pre></div>
 </div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># Compute log-ratio for each trial
-data[&#39;log(n2/n1)&#39;] = np.log(data[&#39;n2&#39;] / data[&#39;n1&#39;])
-data[&#39;bin&#39;] = (pd.cut(data[&#39;log(n2/n1)&#39;], bins=12)
-                 .apply(lambda x: x.mid).astype(float))
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
 
-grouped = (data.groupby([&#39;n1&#39;, &#39;bin&#39;])[&#39;choice&#39;]
-               .agg([&#39;mean&#39;, &#39;count&#39;]).reset_index()
-               .query(&#39;count &gt;= 5&#39;))
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
 
-g = sns.FacetGrid(grouped, col=&#39;n1&#39;, col_wrap=3, height=3.2, aspect=1.1)
-g.map(plt.scatter, &#39;bin&#39;, &#39;mean&#39;, s=25, alpha=.8, color=&#39;#2166ac&#39;)
-g.map(sns.lineplot,  &#39;bin&#39;, &#39;mean&#39;, color=&#39;#2166ac&#39;, lw=1.5)
-for ax in g.axes.flat:
-    ax.axhline(.5, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
-    ax.axvline(.0, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
-    ax.set_ylim(-.05, 1.05)
-g.set_axis_labels(&#39;log(n2 / n1)&#39;, &#39;P(chose n2)&#39;)
-g.set_titles(&#39;n1 = {col_name}&#39;)
-plt.suptitle(&#39;Group-averaged psychometric curves — scale invariance confirmed&#39;, y=1.02)
-plt.tight_layout()
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th>cueonset1</th>
+      <th>cueoffset1</th>
+      <th>cueonset2</th>
+      <th>cueoffset2</th>
+      <th>stimonset1</th>
+      <th>stimoffset1</th>
+      <th>isistimonset</th>
+      <th>isistimoffset</th>
+      <th>stimonset2</th>
+      <th>stimoffset2</th>
+      <th>...</th>
+      <th>prob_value</th>
+      <th>diffval</th>
+      <th>rad</th>
+      <th>correct</th>
+      <th>leftright</th>
+      <th>pressedkey</th>
+      <th>n1</th>
+      <th>n2</th>
+      <th>choice</th>
+      <th>log(n1/n2)</th>
+    </tr>
+    <tr>
+      <th>subject</th>
+      <th>format</th>
+      <th>run</th>
+      <th>trial_nr</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th rowspan="5" valign="top">1</th>
+      <th rowspan="5" valign="top">non-symbolic</th>
+      <th rowspan="5" valign="top">1</th>
+      <th>1</th>
+      <td>35070</td>
+      <td>36600</td>
+      <td>36600</td>
+      <td>37630</td>
+      <td>37630</td>
+      <td>38243</td>
+      <td>38276</td>
+      <td>46276</td>
+      <td>46276</td>
+      <td>46903</td>
+      <td>...</td>
+      <td>10</td>
+      <td>-3</td>
+      <td>190</td>
+      <td>-1</td>
+      <td>-1</td>
+      <td>49</td>
+      <td>7</td>
+      <td>10</td>
+      <td>True</td>
+      <td>-0.356675</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>50095</td>
+      <td>51614</td>
+      <td>51614</td>
+      <td>52628</td>
+      <td>52628</td>
+      <td>53248</td>
+      <td>53280</td>
+      <td>61780</td>
+      <td>61780</td>
+      <td>62380</td>
+      <td>...</td>
+      <td>14</td>
+      <td>-9</td>
+      <td>170</td>
+      <td>-1</td>
+      <td>1</td>
+      <td>51</td>
+      <td>5</td>
+      <td>14</td>
+      <td>False</td>
+      <td>-1.029619</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>65565</td>
+      <td>67087</td>
+      <td>67087</td>
+      <td>68095</td>
+      <td>68095</td>
+      <td>68719</td>
+      <td>68752</td>
+      <td>75252</td>
+      <td>75252</td>
+      <td>75852</td>
+      <td>...</td>
+      <td>14</td>
+      <td>-7</td>
+      <td>210</td>
+      <td>-1</td>
+      <td>-1</td>
+      <td>49</td>
+      <td>7</td>
+      <td>14</td>
+      <td>True</td>
+      <td>-0.693147</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>79005</td>
+      <td>80523</td>
+      <td>80523</td>
+      <td>81527</td>
+      <td>81527</td>
+      <td>82147</td>
+      <td>82180</td>
+      <td>89180</td>
+      <td>89180</td>
+      <td>89810</td>
+      <td>...</td>
+      <td>10</td>
+      <td>-3</td>
+      <td>210</td>
+      <td>-1</td>
+      <td>-1</td>
+      <td>49</td>
+      <td>7</td>
+      <td>10</td>
+      <td>True</td>
+      <td>-0.356675</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>92946</td>
+      <td>94467</td>
+      <td>94467</td>
+      <td>95473</td>
+      <td>95473</td>
+      <td>96096</td>
+      <td>96129</td>
+      <td>105129</td>
+      <td>105129</td>
+      <td>105754</td>
+      <td>...</td>
+      <td>10</td>
+      <td>-5</td>
+      <td>150</td>
+      <td>-1</td>
+      <td>-1</td>
+      <td>49</td>
+      <td>5</td>
+      <td>10</td>
+      <td>True</td>
+      <td>-0.693147</td>
+    </tr>
+  </tbody>
+</table>
+<p>5 rows × 38 columns</p>
+</div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
 </pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Compute log-ratio for each trial and bin for plotting</span>
+<span class="n">data</span><span class="p">[</span><span class="s1">&#39;log(n2/n1)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])</span>
+<span class="n">data</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">cut</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;log(n2/n1)&#39;</span><span class="p">],</span> <span class="n">bins</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+                 <span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">mid</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">))</span>
+
+<span class="n">grouped</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;bin&#39;</span><span class="p">])[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span>
+               <span class="o">.</span><span class="n">agg</span><span class="p">([</span><span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="s1">&#39;count&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+               <span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;count &gt;= 5&#39;</span><span class="p">))</span>
+
+<span class="n">n1_unique</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">grouped</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+<span class="n">pal_n1</span> <span class="o">=</span> <span class="n">sns</span><span class="o">.</span><span class="n">color_palette</span><span class="p">(</span><span class="s1">&#39;YlOrRd&#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">n1_unique</span><span class="p">))</span>
+<span class="n">n1_colors</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">n1_unique</span><span class="p">,</span> <span class="n">pal_n1</span><span class="p">))</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="k">for</span> <span class="n">n1_val</span> <span class="ow">in</span> <span class="n">n1_unique</span><span class="p">:</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">grouped</span><span class="p">[</span><span class="n">grouped</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">n1_val</span><span class="p">]</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">],</span> <span class="n">d</span><span class="p">[</span><span class="s1">&#39;mean&#39;</span><span class="p">],</span> <span class="s1">&#39;o-&#39;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span>
+            <span class="n">color</span><span class="o">=</span><span class="n">n1_colors</span><span class="p">[</span><span class="n">n1_val</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;n₁ = </span><span class="si">{</span><span class="n">n1_val</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mf">.0</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="o">-</span><span class="mf">.05</span><span class="p">,</span> <span class="mf">1.05</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;log(n₂ / n₁)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;P(chose n₂)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Log-ratio scale: all n₁ curves collapse (scale invariance)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s1">&#39;Reference n₁&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">9</span><span class="p">)</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">();</span> <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson1_11_0.png" src="../_images/tutorial_lesson1_11_0.png" />
+</div>
+</div>
+<p>The curves collapse when plotted against <span class="math notranslate nohighlight">\(\log(n_2/n_1)\)</span>, confirming the NLC model’s scale-invariance prediction. The overlap is not perfect — small <span class="math notranslate nohighlight">\(n_1\)</span> (5, 7) produce slightly steeper curves, hinting at a mild departure from strict Weber’s law at low magnitudes. Compare this with the natural-scale plots below.</p>
+</section>
+<section id="Weber's-law:-what-linear-encoding-gets-wrong">
+<h2>Weber’s law: what linear encoding gets wrong<a class="headerlink" href="#Weber's-law:-what-linear-encoding-gets-wrong" title="Link to this heading">¶</a></h2>
+<p>If we model choices in <em>natural</em> (linear) space and use a fixed noise <span class="math notranslate nohighlight">\(\nu\)</span>, the slope of the psychometric function would be the same for all <span class="math notranslate nohighlight">\(n_1\)</span> values. But the data shows a clear pattern: <strong>steeper curves for small :math:`n_1`, shallower for large :math:`n_1`</strong>. This is <strong>Weber’s law</strong> — discrimination is proportionally harder for larger magnitudes.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Natural-space psychometric curves: slope and indifference point shift with n1</span>
+<span class="n">n1_unique</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+<span class="n">pal_n1</span> <span class="o">=</span> <span class="n">sns</span><span class="o">.</span><span class="n">color_palette</span><span class="p">(</span><span class="s1">&#39;YlOrRd&#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">n1_unique</span><span class="p">))</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mf">7.5</span><span class="p">),</span> <span class="n">sharey</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">axes</span> <span class="o">=</span> <span class="n">axes</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+
+<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="n">n1_val</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axes</span><span class="p">,</span> <span class="n">n1_unique</span><span class="p">,</span> <span class="n">pal_n1</span><span class="p">):</span>
+    <span class="n">d_n1</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">n1_val</span><span class="p">]</span>
+    <span class="n">grp</span>  <span class="o">=</span> <span class="p">(</span><span class="n">d_n1</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s1">&#39;n2&#39;</span><span class="p">)[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span>
+               <span class="o">.</span><span class="n">agg</span><span class="p">([</span><span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="s1">&#39;count&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+               <span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;count &gt;= 3&#39;</span><span class="p">))</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">grp</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">],</span> <span class="n">grp</span><span class="p">[</span><span class="s1">&#39;mean&#39;</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.8</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">grp</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">],</span> <span class="n">grp</span><span class="p">[</span><span class="s1">&#39;mean&#39;</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">n1_val</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;:&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;tomato&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;n2 = n1 = </span><span class="si">{</span><span class="n">n1_val</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;n1 = </span><span class="si">{</span><span class="n">n1_val</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;n2  (linear scale)&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="o">-</span><span class="mf">.05</span><span class="p">,</span> <span class="mf">1.05</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mf">7.5</span><span class="p">)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;P(chose n2)&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span>
+    <span class="s1">&#39;Natural-space: slope decreases with n₁  →  Weber’s law&#39;</span><span class="p">,</span>
+    <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.01</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson1_13_0.png" src="../_images/tutorial_lesson1_13_0.png" />
+</div>
+</div>
+<section id="Recovering-Weber's-law-non-parametrically">
+<h3>Recovering Weber’s law non-parametrically<a class="headerlink" href="#Recovering-Weber's-law-non-parametrically" title="Link to this heading">¶</a></h3>
+<p>The NLC model assumes log-space encoding and derives Weber’s law as a consequence. But we can also test Weber’s law <em>without</em> assuming log encoding, by fitting a model that works in <strong>natural space</strong> — that is, the space of raw stimulus magnitudes <span class="math notranslate nohighlight">\(n\)</span>, not <span class="math notranslate nohighlight">\(\log n\)</span>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">PsychometricRegressionModel</span></code> is a simple psychometric-function model that takes two stimuli <span class="math notranslate nohighlight">\(x_1, x_2\)</span> and fits the probability of choosing <span class="math notranslate nohighlight">\(x_2\)</span> as:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[P(\text{chose}\; x_2) = \Phi\!\left(\frac{x_2 - x_1}{\nu}\right)\]</div>
+</div>
+<p>where the noise <span class="math notranslate nohighlight">\(\nu\)</span> is now in the same units as <span class="math notranslate nohighlight">\(n\)</span> (dots on screen), not in log-units. By using <code class="docutils literal notranslate"><span class="pre">regressors={'nu':</span> <span class="pre">'C(n1)'}</span></code>, we estimate a <strong>separate :math:`nu`</strong> for each reference magnitude <span class="math notranslate nohighlight">\(n_1\)</span> — no functional form is assumed.</p>
+<p>If Weber’s law holds, we expect <span class="math notranslate nohighlight">\(\nu(n_1) \propto n_1\)</span>: noise in natural space should grow proportionally with magnitude. This is the empirical signature of log-space encoding when measured from outside, in the raw stimulus space.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">PsychometricRegressionModel</span>
+
+<span class="c1"># x1 = n1, x2 = n2 in natural space (raw magnitudes, not log-transformed)</span>
+<span class="n">data_lin</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">data_lin</span><span class="p">[</span><span class="s1">&#39;x1&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_lin</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+<span class="n">data_lin</span><span class="p">[</span><span class="s1">&#39;x2&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_lin</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+
+<span class="c1"># C(n1): categorical coding — separate nu per n1 level, no linearity assumption</span>
+<span class="n">model_lin_reg</span> <span class="o">=</span> <span class="n">PsychometricRegressionModel</span><span class="p">(</span>
+    <span class="n">paradigm</span><span class="o">=</span><span class="n">data_lin</span><span class="p">,</span>
+    <span class="n">regressors</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;nu&#39;</span><span class="p">:</span> <span class="s1">&#39;C(n1)&#39;</span><span class="p">},</span>
+<span class="p">)</span>
+<span class="n">model_lin_reg</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data_lin</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">idata_lin_reg</span> <span class="o">=</span> <span class="n">model_lin_reg</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 4 jobs)
+NUTS: [nu_mu, nu_sd, nu_offset, bias_mu, bias_sd, bias_offset]
+Sampling 4 chains for 150 tune and 150 draw iterations (600 + 600 draws total) took 62 seconds.
+There was 1 divergence after tuning. Increase `target_accept` or reparameterize.
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Extract group-level nu at each unique n1 level via the model&#39;s design matrix</span>
+<span class="n">conditions_n1</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;n1&#39;</span><span class="p">:</span> <span class="n">n1_unique</span><span class="p">})</span>
+<span class="n">cond_pars</span> <span class="o">=</span> <span class="n">model_lin_reg</span><span class="o">.</span><span class="n">get_conditionwise_parameters</span><span class="p">(</span><span class="n">idata_lin_reg</span><span class="p">,</span> <span class="n">conditions_n1</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">nu_at_n1</span> <span class="o">=</span> <span class="n">cond_pars</span><span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="s1">&#39;nu&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s1">&#39;parameter&#39;</span><span class="p">)</span>  <span class="c1"># posterior samples × n1 levels</span>
+
+<span class="n">nu_mean</span> <span class="o">=</span> <span class="n">nu_at_n1</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+<span class="n">nu_lo</span><span class="p">,</span> <span class="n">nu_hi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">nu_at_n1</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="p">[</span><span class="mf">2.5</span><span class="p">,</span> <span class="mf">97.5</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">n1_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">n1_unique</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mf">4.5</span><span class="p">))</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">n1_arr</span><span class="p">,</span> <span class="n">nu_lo</span><span class="p">,</span> <span class="n">nu_hi</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.30</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;#d73027&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;95 </span><span class="si">% c</span><span class="s1">redible interval&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">n1_arr</span><span class="p">,</span> <span class="n">nu_mean</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;#d73027&#39;</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;o&#39;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Group-level ν(n₁)  (C(n1) model)&#39;</span><span class="p">)</span>
+
+<span class="c1"># Weber&#39;s law reference: proportional noise  ν ∝ n1</span>
+<span class="n">k_weber</span> <span class="o">=</span> <span class="n">nu_mean</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">n1_arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">n1_arr</span><span class="p">,</span> <span class="n">k_weber</span> <span class="o">*</span> <span class="n">n1_arr</span><span class="p">,</span> <span class="s1">&#39;--k&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;Weber reference  (ν = </span><span class="si">{</span><span class="n">k_weber</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1">×n₁)&#39;</span><span class="p">)</span>
+
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Reference magnitude  n₁&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Linear-space noise  ν&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Per-level ν(n₁): proportional growth confirms Weber’s law&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">9</span><span class="p">)</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson1_16_0.png" src="../_images/tutorial_lesson1_16_0.png" />
+</div>
+</div>
+<p><strong>Key takeaway:</strong> <span class="math notranslate nohighlight">\(\nu\)</span> grows proportionally to <span class="math notranslate nohighlight">\(n_1\)</span>. This is precisely <strong>Weber’s law</strong>, and it is <em>automatically</em> accounted for when noise is constant on a log scale (the NLC model). There is no need to model the <span class="math notranslate nohighlight">\(n_1\)</span>-dependence of noise explicitly: logarithmic encoding produces it for free. This is why <code class="docutils literal notranslate"><span class="pre">MagnitudeComparisonModel</span></code> works so well — and why the next section fits it to the data.</p>
+</section>
+</section>
+<section id="Fitting-MagnitudeComparisonModel-with-bauer">
+<h2>Fitting <code class="docutils literal notranslate"><span class="pre">MagnitudeComparisonModel</span></code> with bauer<a class="headerlink" href="#Fitting-MagnitudeComparisonModel-with-bauer" title="Link to this heading">¶</a></h2>
+<section id="Why-use-bauer?">
+<h3>Why use bauer?<a class="headerlink" href="#Why-use-bauer?" title="Link to this heading">¶</a></h3>
+<p>You could code a PyMC model by hand. But bauer gives you:</p>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Feature</p></th>
+<th class="head"><p>What it means in practice</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>One-line model construction</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">MagnitudeComparisonModel(paradigm=data)</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Hierarchical structure automatically</strong></p></td>
+<td><p>Group mean + between-subject SD inferred jointly with subject parameters</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Prior transforms baked in</strong></p></td>
+<td><p>Noise parameters are always positive (softplus link), lapse rates in [0,1]</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Formula-based regression</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">regressors={'nu':</span> <span class="pre">'C(condition)'}</span></code> — all patsy formulas work</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Built-in PPC</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model.ppc(data,</span> <span class="pre">idata)</span></code> draws posterior-predictive choices</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>ArviZ-native output</strong></p></td>
+<td><p>All posteriors as <code class="docutils literal notranslate"><span class="pre">InferenceData</span></code>; use <code class="docutils literal notranslate"><span class="pre">az.plot_posterior</span></code>, <code class="docutils literal notranslate"><span class="pre">az.compare</span></code>, etc. directly</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="Why-hierarchical-modelling-is-essential">
+<h3>Why hierarchical modelling is essential<a class="headerlink" href="#Why-hierarchical-modelling-is-essential" title="Link to this heading">¶</a></h3>
+<p>In a typical psychophysics experiment each participant sees a few hundred trials at most. Fitting a multi-parameter cognitive model to 100–200 trials per subject gives very noisy, often unidentifiable individual estimates. The more expressive and theoretically interesting the model, the worse this problem becomes: a 4-parameter model needs far more data per subject than a 2-parameter model.</p>
+<p><strong>Hierarchical (multilevel) modelling</strong> solves this by assuming that participants are drawn from a shared population. Each subject <span class="math notranslate nohighlight">\(s\)</span> gets their own parameters, but those parameters are <em>regularised</em> toward the group mean — subjects with little data or extreme estimates are pulled back toward the population, while subjects with lots of clear data are left mostly alone. This <strong>partial pooling</strong> gives you the best of both worlds:</p>
+<ul class="simple">
+<li><p><strong>Individual differences are preserved</strong> — unlike a single group-level fit.</p></li>
+<li><p><strong>Noisy individuals are stabilised</strong> — unlike fitting each subject independently.</p></li>
+<li><p><strong>Complex models become feasible</strong> even at modest trial counts, because the group prior acts as a principled regulariser that prevents overfitting.</p></li>
+</ul>
+<p>In practice, hierarchical fitting is what makes it possible to use models like the KLW risk model (lesson 2) or the flexible-noise model (lesson 4) on real experimental data. Without the group-level regularisation, the posterior for many subjects would be dominated by the prior and the individual estimates would be meaningless.</p>
+</section>
+<section id="Hierarchical-parameter-structure-in-bauer">
+<h3>Hierarchical parameter structure in bauer<a class="headerlink" href="#Hierarchical-parameter-structure-in-bauer" title="Link to this heading">¶</a></h3>
+<p>For the noise parameters, bauer sets up the hierarchy as:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\nu_k^{(s)} \sim \text{HalfNormal}(\mu_k,\, \sigma_k)\]</div>
+</div>
+<p>where <span class="math notranslate nohighlight">\(\mu_k\)</span> (<code class="docutils literal notranslate"><span class="pre">n{k}_evidence_sd_mu</span></code>) is the <strong>group mean</strong> and <span class="math notranslate nohighlight">\(\sigma_k\)</span> (<code class="docutils literal notranslate"><span class="pre">n{k}_evidence_sd_sd</span></code>) is the <strong>between-subject spread</strong>. The posterior therefore contains both the population-level estimate and the full distribution of individual differences.</p>
+</section>
+<section id="MCMC-sampling-and-posterior-summaries">
+<h3>MCMC sampling and posterior summaries<a class="headerlink" href="#MCMC-sampling-and-posterior-summaries" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">.sample()</span></code> runs <strong>Markov Chain Monte Carlo (MCMC)</strong> — specifically, PyMC’s No-U-Turn Sampler (NUTS). MCMC generates a large collection of <em>samples</em> that, after a warm-up (“tuning”) phase, are drawn proportionally to the posterior probability. The key idea: rather than returning a single best-fit value, MCMC gives you a <em>distribution</em> over parameter values that reflects both what the data support and how uncertain we are.</p>
+<p>Two numbers summarise that distribution most usefully:</p>
+<ul class="simple">
+<li><p><strong>Posterior mean</strong> — the expected value of the parameter.</p></li>
+<li><p><strong>Highest Density Interval (HDI)</strong> — the shortest interval containing a given probability mass (typically 94 % or 95 %). Unlike a frequentist confidence interval, the HDI can be read directly: <em>“there is 94 % posterior probability that the true value lies in this range.”</em></p></li>
+</ul>
+<p>ArviZ’s <code class="docutils literal notranslate"><span class="pre">az.plot_posterior</span></code> displays both automatically. bauer exposes the samples as an <code class="docutils literal notranslate"><span class="pre">arviz.InferenceData</span></code> object so all ArviZ diagnostics work out-of-the-box.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model_mag</span> <span class="o">=</span> <span class="n">MagnitudeComparisonModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
+<span class="n">model_mag</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_p_choice</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">idata_mag</span> <span class="o">=</span> <span class="n">model_mag</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 4 jobs)
+NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset, n2_evidence_sd_mu_untransformed, n2_evidence_sd_sd, n2_evidence_sd_offset]
+Sampling 4 chains for 200 tune and 200 draw iterations (800 + 800 draws total) took 46 seconds.
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
+</pre></div></div>
+</div>
+</section>
+<section id="Group-level-posteriors">
+<h3>Group-level posteriors<a class="headerlink" href="#Group-level-posteriors" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">az.plot_posterior</span></code> gives us the group-level posteriors for <span class="math notranslate nohighlight">\(\nu_1\)</span> and <span class="math notranslate nohighlight">\(\nu_2\)</span>. The 94 % HDI quantifies our uncertainty about the group mean. We expect <span class="math notranslate nohighlight">\(\nu_1 &gt; \nu_2\)</span> because of working-memory degradation for the first-presented option.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">az</span><span class="o">.</span><span class="n">plot_posterior</span><span class="p">(</span>
+    <span class="n">idata_mag</span><span class="p">,</span>
+    <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd_mu&#39;</span><span class="p">,</span> <span class="s1">&#39;n2_evidence_sd_mu&#39;</span><span class="p">],</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Group-level noise posteriors  (ν₁ = first option,  ν₂ = second option)&#39;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.04</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson1_21_0.png" src="../_images/tutorial_lesson1_21_0.png" />
+</div>
+</div>
+<p>The group-level posterior for <span class="math notranslate nohighlight">\(\nu_1\)</span> (<code class="docutils literal notranslate"><span class="pre">n1_evidence_sd_mu</span></code>) is consistently <strong>larger</strong> than for <span class="math notranslate nohighlight">\(\nu_2\)</span> (<code class="docutils literal notranslate"><span class="pre">n2_evidence_sd_mu</span></code>) — working-memory degradation in action.</p>
+</section>
+<section id="Individual-subject-estimates-with-95-%-credible-intervals">
+<h3>Individual subject estimates with 95 % credible intervals<a class="headerlink" href="#Individual-subject-estimates-with-95-%-credible-intervals" title="Link to this heading">¶</a></h3>
+<p>The posterior also contains a full distribution for <strong>each individual subject</strong>. bauer provides two complementary tools:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">plot_subjectwise_parameters(idata,</span> <span class="pre">parameter,</span> <span class="pre">ax=ax)</span></code> — direct call for a single parameter</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get_subject_posterior_df(idata,</span> <span class="pre">parameters)</span></code> + <code class="docutils literal notranslate"><span class="pre">plot_subjectwise_pointplot</span></code> — tidy DataFrame workflow compatible with <code class="docutils literal notranslate"><span class="pre">sns.FacetGrid</span></code> (supports hue, facetting, etc.)</p></li>
+</ul>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">plot_subjectwise_parameters</span><span class="p">,</span>
+                          <span class="n">get_subject_posterior_df</span><span class="p">,</span> <span class="n">plot_subjectwise_pointplot</span><span class="p">)</span>
+
+<span class="c1"># ── FacetGrid workflow: one panel per parameter ───────────────────────────────</span>
+<span class="n">df_post</span> <span class="o">=</span> <span class="n">get_subject_posterior_df</span><span class="p">(</span>
+    <span class="n">idata_mag</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">])</span>
+
+<span class="n">g</span> <span class="o">=</span> <span class="n">sns</span><span class="o">.</span><span class="n">FacetGrid</span><span class="p">(</span><span class="n">df_post</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="s1">&#39;parameter&#39;</span><span class="p">,</span> <span class="n">sharey</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mf">4.5</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="mf">1.1</span><span class="p">)</span>
+<span class="n">g</span><span class="o">.</span><span class="n">map_dataframe</span><span class="p">(</span><span class="n">plot_subjectwise_pointplot</span><span class="p">)</span>  <span class="c1"># uses default mean_col=&#39;mean&#39;, lo_col=&#39;lo&#39;, hi_col=&#39;hi&#39;</span>
+<span class="n">g</span><span class="o">.</span><span class="n">set_axis_labels</span><span class="p">(</span><span class="s1">&#39;Subject (sorted)&#39;</span><span class="p">,</span> <span class="s1">&#39;Noise  ν&#39;</span><span class="p">)</span>
+<span class="n">g</span><span class="o">.</span><span class="n">set_titles</span><span class="p">(</span><span class="n">col_template</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{col_name}</span><span class="s1">&#39;</span><span class="p">)</span>
+<span class="n">g</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Subject-level noise estimates (error bars = 94 % HDI)&#39;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.04</span><span class="p">)</span>
+
+<span class="c1"># Add group-mean line to each panel</span>
+<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="n">param</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">flat</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">]):</span>
+    <span class="n">mu_key</span> <span class="o">=</span> <span class="n">param</span> <span class="o">+</span> <span class="s1">&#39;_mu&#39;</span>
+    <span class="k">if</span> <span class="n">mu_key</span> <span class="ow">in</span> <span class="n">idata_mag</span><span class="o">.</span><span class="n">posterior</span><span class="p">:</span>
+        <span class="n">gm</span> <span class="o">=</span> <span class="n">idata_mag</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="n">mu_key</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;steelblue&#39;</span><span class="p">,</span>
+                   <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Group mean&#39;</span><span class="p">)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson1_23_0.png" src="../_images/tutorial_lesson1_23_0.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ── Scatter: ν₁ vs ν₂ per subject with 94 % HDI error bars ───────────────────</span>
+<span class="n">n_subj</span> <span class="o">=</span> <span class="n">idata_mag</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<span class="n">s1</span> <span class="o">=</span> <span class="n">idata_mag</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_subj</span><span class="p">)</span>
+<span class="n">s2</span> <span class="o">=</span> <span class="n">idata_mag</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_subj</span><span class="p">)</span>
+<span class="n">nu1_mean</span><span class="p">,</span> <span class="n">nu2_mean</span> <span class="o">=</span> <span class="n">s1</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">s2</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">nu1_lo</span><span class="p">,</span> <span class="n">nu1_hi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">97</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">nu2_lo</span><span class="p">,</span> <span class="n">nu2_hi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">s2</span><span class="p">,</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">97</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mf">5.5</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">errorbar</span><span class="p">(</span><span class="n">nu2_mean</span><span class="p">,</span> <span class="n">nu1_mean</span><span class="p">,</span>
+            <span class="n">xerr</span><span class="o">=</span><span class="p">[</span><span class="n">nu2_mean</span> <span class="o">-</span> <span class="n">nu2_lo</span><span class="p">,</span> <span class="n">nu2_hi</span> <span class="o">-</span> <span class="n">nu2_mean</span><span class="p">],</span>
+            <span class="n">yerr</span><span class="o">=</span><span class="p">[</span><span class="n">nu1_mean</span> <span class="o">-</span> <span class="n">nu1_lo</span><span class="p">,</span> <span class="n">nu1_hi</span> <span class="o">-</span> <span class="n">nu1_mean</span><span class="p">],</span>
+            <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;o&#39;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.65</span><span class="p">,</span> <span class="n">elinewidth</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span> <span class="n">capsize</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span>
+            <span class="n">color</span><span class="o">=</span><span class="s1">&#39;#2166ac&#39;</span><span class="p">,</span> <span class="n">ecolor</span><span class="o">=</span><span class="s1">&#39;#9ecae1&#39;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">lim</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">nu1_hi</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="n">nu2_hi</span><span class="o">.</span><span class="n">max</span><span class="p">())</span> <span class="o">*</span> <span class="mf">1.1</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="n">lim</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">lim</span><span class="p">],</span> <span class="s1">&#39;k--&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;ν₁ = ν₂&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Second-option noise  ν₂&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;First-option noise  ν₁&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;ν₁ vs ν₂ — most subjects above diagonal (memory noise)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">9</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson1_24_0.png" src="../_images/tutorial_lesson1_24_0.png" />
 </div>
 </div>
 </section>
-<section id="Fitting-MagnitudeComparisonModel">
-<h2>Fitting <code class="docutils literal notranslate"><span class="pre">MagnitudeComparisonModel</span></code><a class="headerlink" href="#Fitting-MagnitudeComparisonModel" title="Link to this heading">¶</a></h2>
-<p>We fit the full hierarchical NLC model. Free parameters per subject:</p>
-<ul class="simple">
-<li><p><strong>``n1_evidence_sd``</strong> (<span class="math notranslate nohighlight">\(\nu_1\)</span>): noise on the first-presented cloud (perception + memory retention)</p></li>
-<li><p><strong>``n2_evidence_sd``</strong> (<span class="math notranslate nohighlight">\(\nu_2\)</span>): noise on the second-presented cloud (perception only)</p></li>
-</ul>
-<p>The group-level means (<code class="docutils literal notranslate"><span class="pre">_mu</span></code>) and standard deviations (<code class="docutils literal notranslate"><span class="pre">_sd</span></code>) are estimated jointly.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>model_mag = MagnitudeComparisonModel(paradigm=data)
-model_mag.build_estimation_model(data=data, hierarchical=True, save_p_choice=True)
-idata_mag = model_mag.sample(draws=200, tune=200, chains=4, progressbar=True)
-</pre></div>
-</div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>az.plot_posterior(
-    idata_mag,
-    var_names=[&#39;n1_evidence_sd_mu&#39;, &#39;n2_evidence_sd_mu&#39;],
-    figsize=(9, 3),
-)
-plt.suptitle(&#39;Group-level noise posteriors  (ν₁ = first option,  ν₂ = second option)&#39;, y=1.04)
-plt.tight_layout()
-</pre></div>
-</div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># Subject-level posterior means: ν₁ vs ν₂
-params = [&#39;n1_evidence_sd&#39;, &#39;n2_evidence_sd&#39;]
-means  = (idata_mag.posterior[params]
-                   .mean(dim=[&#39;chain&#39;, &#39;draw&#39;])
-                   .to_dataframe()
-                   .reset_index())
-
-fig, ax = plt.subplots(figsize=(5.5, 5))
-ax.scatter(means[&#39;n2_evidence_sd&#39;], means[&#39;n1_evidence_sd&#39;],
-           alpha=.7, color=&#39;steelblue&#39;, s=40, zorder=3)
-lim = max(means[params].max()) * 1.15
-ax.plot([0, lim], [0, lim], &#39;k--&#39;, lw=1, label=&#39;ν₁ = ν₂&#39;)
-ax.set_xlabel(&#39;Second-option noise  ν₂  (n2_evidence_sd)&#39;)
-ax.set_ylabel(&#39;First-option noise  ν₁  (n1_evidence_sd)&#39;)
-ax.set_title(&#39;Subject-level noise estimates  (ν₁ &gt; ν₂ for most subjects, consistent with memory retention)&#39;)
-ax.legend(); sns.despine(); plt.tight_layout()
-</pre></div>
-</div>
-</div>
 </section>
 <section id="Posterior-predictive-check">
 <h2>Posterior predictive check<a class="headerlink" href="#Posterior-predictive-check" title="Link to this heading">¶</a></h2>
-<p>We draw predicted choice probabilities from the full posterior and overlay the 95 % credible interval on the observed group-average data (one panel per <span class="math notranslate nohighlight">\(n_1\)</span> value). Good model fit means the shaded region covers the observed dots.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<p>We draw predicted choice probabilities from the full posterior and overlay the 95 % credible interval on the observed group-average data (one panel per <span class="math notranslate nohighlight">\(n_1\)</span> value). A good fit means the shaded band covers the observed dots — and the model should also capture the different slopes across <span class="math notranslate nohighlight">\(n_1\)</span> values (the Weber’s-law signature).</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
 </pre></div>
 </div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>ppc_df = model_mag.ppc(data, idata_mag, var_names=[&#39;p&#39;])
-ppc_p  = ppc_df.xs(&#39;p&#39;, level=&#39;variable&#39;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">summarize_ppc_group</span>
 
-data_ppc            = data.copy()
-data_ppc[&#39;p_mean&#39;]  = ppc_p.mean(axis=1).values
-data_ppc[&#39;p_lo&#39;]    = ppc_p.quantile(.025, axis=1).values
-data_ppc[&#39;p_hi&#39;]    = ppc_p.quantile(.975, axis=1).values
-data_ppc[&#39;bin&#39;]     = (pd.cut(data_ppc[&#39;log(n2/n1)&#39;], 12)
-                         .apply(lambda x: x.mid).astype(float))
+<span class="c1"># Simulate binary choices from the posterior predictive</span>
+<span class="n">ppc_df</span>  <span class="o">=</span> <span class="n">model_mag</span><span class="o">.</span><span class="n">ppc</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">idata_mag</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;ll_bernoulli&#39;</span><span class="p">])</span>
+<span class="n">ppc_ll</span>  <span class="o">=</span> <span class="n">ppc_df</span><span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="s1">&#39;ll_bernoulli&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span><span class="p">)</span>   <span class="c1"># trials × posterior samples</span>
 
-g_ppc = (data_ppc.groupby([&#39;n1&#39;, &#39;bin&#39;])[[&#39;choice&#39;, &#39;p_mean&#39;, &#39;p_lo&#39;, &#39;p_hi&#39;]]
-                  .mean().reset_index())
+<span class="n">ppc_flat</span> <span class="o">=</span> <span class="n">ppc_ll</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+<span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">cut</span><span class="p">(</span><span class="o">-</span><span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;log(n1/n2)&#39;</span><span class="p">],</span> <span class="mi">12</span><span class="p">)</span>
+                     <span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">mid</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">))</span>
 
-import matplotlib.patches as mpatches
+<span class="n">g_ppc</span> <span class="o">=</span> <span class="n">summarize_ppc_group</span><span class="p">(</span><span class="n">ppc_flat</span><span class="p">,</span> <span class="n">condition_cols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;bin&#39;</span><span class="p">])</span>
+<span class="n">g_ppc</span> <span class="o">=</span> <span class="n">g_ppc</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;p_predicted&#39;</span><span class="p">:</span> <span class="s1">&#39;p_mean&#39;</span><span class="p">,</span> <span class="s1">&#39;hdi025&#39;</span><span class="p">:</span> <span class="s1">&#39;p_lo&#39;</span><span class="p">,</span> <span class="s1">&#39;hdi975&#39;</span><span class="p">:</span> <span class="s1">&#39;p_hi&#39;</span><span class="p">})</span>
 
-def draw_ppc(data, **kwargs):
-    ax = plt.gca()
-    ax.fill_between(data[&#39;bin&#39;], data[&#39;p_lo&#39;], data[&#39;p_hi&#39;],
-                    color=&#39;steelblue&#39;, alpha=.25, label=&#39;95 % CI&#39;)
-    ax.plot(data[&#39;bin&#39;], data[&#39;p_mean&#39;], color=&#39;steelblue&#39;, lw=2, label=&#39;Model mean&#39;)
-    ax.scatter(data[&#39;bin&#39;], data[&#39;choice&#39;], color=&#39;steelblue&#39;, s=20, zorder=5, label=&#39;Observed&#39;)
-    ax.axhline(.5, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
-    ax.axvline(0, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
-    ax.set_ylim(-.05, 1.05)
+<span class="n">data_copy</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+<span class="n">data_copy</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">cut</span><span class="p">(</span><span class="o">-</span><span class="n">data_copy</span><span class="p">[</span><span class="s1">&#39;log(n1/n2)&#39;</span><span class="p">],</span> <span class="mi">12</span><span class="p">)</span>
+                      <span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">mid</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">))</span>
+<span class="n">obs</span> <span class="o">=</span> <span class="p">(</span><span class="n">data_copy</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;bin&#39;</span><span class="p">])[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+                <span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;bin&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+<span class="n">g_ppc</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">obs</span>
+<span class="n">g_ppc</span> <span class="o">=</span> <span class="n">g_ppc</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
 
-g = sns.FacetGrid(g_ppc, col=&#39;n1&#39;, col_wrap=3, height=3.2, aspect=1.1, sharey=True)
-g.map_dataframe(draw_ppc)
-g.set_axis_labels(&#39;log(n2 / n1)&#39;, &#39;P(chose n2)&#39;)
-g.set_titles(&#39;n₁ = {col_name}&#39;)
-for ax in g.axes.flat:
-    sns.despine(ax=ax)
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.patches</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mpatches</span>
 
-legend_handles = [
-    mpatches.Patch(color=&#39;steelblue&#39;, alpha=.25, label=&#39;95 % CI&#39;),
-    plt.Line2D([0], [0], color=&#39;steelblue&#39;, lw=2, label=&#39;Model mean&#39;),
-    plt.Line2D([0], [0], marker=&#39;o&#39;, color=&#39;w&#39;, markerfacecolor=&#39;steelblue&#39;,
-               markersize=6, label=&#39;Observed&#39;),
-]
-g.figure.legend(handles=legend_handles, loc=&#39;lower center&#39;, ncol=3,
-                fontsize=9, bbox_to_anchor=(.5, -.04))
-g.figure.suptitle(&#39;Posterior predictive check — MagnitudeComparisonModel&#39;,
-                   fontsize=13, y=1.02)
-g.figure.tight_layout()
+<span class="k">def</span><span class="w"> </span><span class="nf">draw_ppc</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">gca</span><span class="p">()</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;p_lo&#39;</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;p_hi&#39;</span><span class="p">],</span>
+                    <span class="n">color</span><span class="o">=</span><span class="s1">&#39;steelblue&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.25</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;p_mean&#39;</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;steelblue&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;steelblue&#39;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span>  <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="o">-</span><span class="mf">.05</span><span class="p">,</span> <span class="mf">1.05</span><span class="p">)</span>
+
+<span class="n">g</span> <span class="o">=</span> <span class="n">sns</span><span class="o">.</span><span class="n">FacetGrid</span><span class="p">(</span><span class="n">g_ppc</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="n">col_wrap</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mf">3.2</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="mf">1.1</span><span class="p">,</span> <span class="n">sharey</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">g</span><span class="o">.</span><span class="n">map_dataframe</span><span class="p">(</span><span class="n">draw_ppc</span><span class="p">)</span>
+<span class="n">g</span><span class="o">.</span><span class="n">set_axis_labels</span><span class="p">(</span><span class="s1">&#39;log(n2 / n1)&#39;</span><span class="p">,</span> <span class="s1">&#39;P(chose n2)&#39;</span><span class="p">)</span>
+<span class="n">g</span><span class="o">.</span><span class="n">set_titles</span><span class="p">(</span><span class="s1">&#39;n₁ = </span><span class="si">{col_name}</span><span class="s1">&#39;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="n">g</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">flat</span><span class="p">:</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="n">legend_handles</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">mpatches</span><span class="o">.</span><span class="n">Patch</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;steelblue&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.25</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;95 </span><span class="si">% c</span><span class="s1">redible interval&#39;</span><span class="p">),</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">Line2D</span><span class="p">([</span><span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;steelblue&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Model mean&#39;</span><span class="p">),</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">Line2D</span><span class="p">([</span><span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;o&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">markerfacecolor</span><span class="o">=</span><span class="s1">&#39;steelblue&#39;</span><span class="p">,</span>
+               <span class="n">markersize</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Observed&#39;</span><span class="p">),</span>
+<span class="p">]</span>
+<span class="n">g</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">handles</span><span class="o">=</span><span class="n">legend_handles</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="s1">&#39;lower center&#39;</span><span class="p">,</span> <span class="n">ncol</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+                <span class="n">fontsize</span><span class="o">=</span><span class="mi">9</span><span class="p">,</span> <span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">.04</span><span class="p">))</span>
+<span class="n">g</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Posterior predictive check — MagnitudeComparisonModel&#39;</span><span class="p">,</span>
+                   <span class="n">fontsize</span><span class="o">=</span><span class="mi">13</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
+<span class="n">g</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Sampling: [ll_bernoulli]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "0e57b5efdb2047b39d145c47b43957ea", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
+</pre></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson1_26_4.png" src="../_images/tutorial_lesson1_26_4.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># PPC overlay: all n1 values in one panel (hue = n1)</span>
+<span class="n">n1_pal</span> <span class="o">=</span> <span class="n">sns</span><span class="o">.</span><span class="n">color_palette</span><span class="p">(</span><span class="s1">&#39;YlOrRd&#39;</span><span class="p">,</span> <span class="n">g_ppc</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">nunique</span><span class="p">())</span>
+<span class="n">n1_colors</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">g_ppc</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">()),</span> <span class="n">n1_pal</span><span class="p">))</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="k">for</span> <span class="n">n1_val</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">g_ppc</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">()):</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">g_ppc</span><span class="p">[</span><span class="n">g_ppc</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">n1_val</span><span class="p">]</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s1">&#39;bin&#39;</span><span class="p">)</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">n1_colors</span><span class="p">[</span><span class="n">n1_val</span><span class="p">]</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">],</span> <span class="n">d</span><span class="p">[</span><span class="s1">&#39;p_lo&#39;</span><span class="p">],</span> <span class="n">d</span><span class="p">[</span><span class="s1">&#39;p_hi&#39;</span><span class="p">],</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.15</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">],</span> <span class="n">d</span><span class="p">[</span><span class="s1">&#39;p_mean&#39;</span><span class="p">],</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;n₁ = </span><span class="si">{</span><span class="n">n1_val</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">],</span> <span class="n">d</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">],</span> <span class="n">s</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span>  <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="o">-</span><span class="mf">.05</span><span class="p">,</span> <span class="mf">1.05</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;log(n₂ / n₁)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;P(chose n₂)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;PPC overlay: model predictions (bands) vs data (dots) by n₁&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s1">&#39;Reference n₁&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">9</span><span class="p">)</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">();</span> <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson1_27_0.png" src="../_images/tutorial_lesson1_27_0.png" />
 </div>
 </div>
 </section>
+<section id="Summary">
+<h2>Summary<a class="headerlink" href="#Summary" title="Link to this heading">¶</a></h2>
+<p>In this lesson we built up the NLC model from first principles:</p>
+<ol class="arabic simple">
+<li><p><strong>Logarithmic encoding</strong> of numerical magnitudes, with Gaussian noise <span class="math notranslate nohighlight">\(\nu\)</span>.</p></li>
+<li><p><strong>Scale invariance</strong>: the psychometric function collapses to a single sigmoid on the log-ratio axis.</p></li>
+<li><p><strong>Noise level</strong> controls slope; <strong>asymmetric noise</strong> (<span class="math notranslate nohighlight">\(\nu_1 &gt; \nu_2\)</span>) flattens the curve without shifting it.</p></li>
+<li><p><strong>Bayesian prior</strong> produces the central tendency bias; asymmetric noise interacting with the prior creates <strong>magnitude–order interactions</strong>.</p></li>
+<li><p><strong>Weber’s law</strong> falls out automatically from log-space encoding.</p></li>
+<li><p>bauer fits all parameters hierarchically in a few lines, yielding full posterior distributions at both the group and individual-subject level.</p></li>
+</ol>
+<p>In <a class="reference internal" href="lesson2.html"><span class="doc">Lesson 2</span></a> we move to <strong>risky choice</strong> and see how the same perceptual noise parameters that distort magnitude perception also drive risk attitudes.</p>
+<script type="application/vnd.jupyter.widget-state+json">
+{"state": {"0e57b5efdb2047b39d145c47b43957ea": {"model_module": "@jupyter-widgets/output", "model_module_version": "1.0.0", "model_name": "OutputModel", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/output", "_model_module_version": "1.0.0", "_model_name": "OutputModel", "_view_count": null, "_view_module": "@jupyter-widgets/output", "_view_module_version": "1.0.0", "_view_name": "OutputView", "layout": "IPY_MODEL_18c8ab1d501f47c0b8a412796a650d53", "msg_id": "", "outputs": [{"data": {"text/html": "<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\">Sampling ... <span style=\"color: #008000; text-decoration-color: #008000\">\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501</span> <span style=\"color: #800080; text-decoration-color: #800080\">100%</span> 0:00:00 / 0:00:00\n</pre>\n", "text/plain": "Sampling ... \u001b[32m\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u001b[0m \u001b[35m100%\u001b[0m 0:00:00 / 0:00:00\n"}, "metadata": {}, "output_type": "display_data"}], "tabbable": null, "tooltip": null}}, "18c8ab1d501f47c0b8a412796a650d53": {"model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "model_name": "LayoutModel", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}}, "version_major": 2, "version_minor": 0}
+</script></section>
 </section>
 
         </article>
@@ -566,7 +1300,7 @@ g.figure.tight_layout()
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Lesson 2: Risky Choice and the Key Correlations (Barreto-Garc:nbsphinx-math:`u0`0eda et al., 2023)</div>
+                <div class="title">Lesson 2: Risky Choice — Psychometric Functions and the Noise–Risk Link</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -611,15 +1345,40 @@ g.figure.tight_layout()
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Lesson 1: Psychophysical Modelling</a><ul>
+<li><a class="reference internal" href="#">Lesson 1: An Introduction to Psychophysical Modelling</a><ul>
+<li><a class="reference internal" href="#What-is-psychophysics?">What is psychophysics?</a></li>
+<li><a class="reference internal" href="#The-bauer-library">The bauer library</a></li>
 <li><a class="reference internal" href="#The-Noisy-Logarithmic-Coding-(NLC)-model">The Noisy Logarithmic Coding (NLC) model</a><ul>
-<li><a class="reference internal" href="#Effect-of-noise-level-and-asymmetric-noise">Effect of noise level and asymmetric noise</a></li>
-<li><a class="reference internal" href="#The-Bayesian-prior-and-central-tendency-bias">The Bayesian prior and central tendency bias</a></li>
+<li><a class="reference internal" href="#The-decision-rule">The decision rule</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#The-psychometric-function:-noise,-precision,-and-asymmetry">The psychometric function: noise, precision, and asymmetry</a><ul>
+<li><a class="reference internal" href="#1.-Noise-level-controls-the-slope">1. Noise level controls the slope</a></li>
+<li><a class="reference internal" href="#2.-Asymmetric-noise-flattens-but-does-not-shift-the-curve">2. Asymmetric noise flattens but does not shift the curve</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#Bayesian-inference-and-the-central-tendency-bias">Bayesian inference and the central tendency bias</a><ul>
+<li><a class="reference internal" href="#The-Bayesian-observer">The Bayesian observer</a></li>
+<li><a class="reference internal" href="#Central-tendency-bias">Central tendency bias</a></li>
+<li><a class="reference internal" href="#Why-asymmetric-noise-creates-magnitude–order-interactions">Why asymmetric noise creates magnitude–order interactions</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#Barreto-García-et-al.-(2023):-Magnitude-comparison-task">Barreto-García et al. (2023): Magnitude comparison task</a></li>
-<li><a class="reference internal" href="#Fitting-MagnitudeComparisonModel">Fitting <code class="docutils literal notranslate"><span class="pre">MagnitudeComparisonModel</span></code></a></li>
+<li><a class="reference internal" href="#Weber's-law:-what-linear-encoding-gets-wrong">Weber’s law: what linear encoding gets wrong</a><ul>
+<li><a class="reference internal" href="#Recovering-Weber's-law-non-parametrically">Recovering Weber’s law non-parametrically</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#Fitting-MagnitudeComparisonModel-with-bauer">Fitting <code class="docutils literal notranslate"><span class="pre">MagnitudeComparisonModel</span></code> with bauer</a><ul>
+<li><a class="reference internal" href="#Why-use-bauer?">Why use bauer?</a></li>
+<li><a class="reference internal" href="#Why-hierarchical-modelling-is-essential">Why hierarchical modelling is essential</a></li>
+<li><a class="reference internal" href="#Hierarchical-parameter-structure-in-bauer">Hierarchical parameter structure in bauer</a></li>
+<li><a class="reference internal" href="#MCMC-sampling-and-posterior-summaries">MCMC sampling and posterior summaries</a></li>
+<li><a class="reference internal" href="#Group-level-posteriors">Group-level posteriors</a></li>
+<li><a class="reference internal" href="#Individual-subject-estimates-with-95-%-credible-intervals">Individual subject estimates with 95 % credible intervals</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#Posterior-predictive-check">Posterior predictive check</a></li>
+<li><a class="reference internal" href="#Summary">Summary</a></li>
 </ul>
 </li>
 </ul>

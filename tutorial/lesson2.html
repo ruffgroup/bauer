@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Lesson 3: Stake effects and presentation order — de Hollander et al. (2024)" href="lesson3.html"><link rel="prev" title="Lesson 1: Psychophysical Modelling" href="lesson1.html">
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv)" href="lesson3.html"><link rel="prev" title="Lesson 1: An Introduction to Psychophysical Modelling" href="lesson1.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Lesson 2: Risky Choice and the Key Correlations (Barreto-Garc:nbsphinx-math:`u0`0eda et al., 2023) - bauer 0.2.0 documentation</title>
+        <title>Lesson 2: Risky Choice — Psychometric Functions and the Noise–Risk Link - bauer 0.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -199,10 +199,10 @@
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="lesson1.html">Lesson 1: Psychophysical Modelling</a></li>
-<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Lesson 2: Risky Choice and the Key Correlations (Barreto-Garc:nbsphinx-math:`u0`0eda et al., 2023)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="lesson3.html">Lesson 3: Stake effects and presentation order — de Hollander et al. (2024)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="lesson4.html">Lesson 4: Flexible Noise Curves — the <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseRiskModel</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson1.html">Lesson 1: An Introduction to Psychophysical Modelling</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Lesson 2: Risky Choice — Psychometric Functions and the Noise–Risk Link</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson3.html">Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson4.html">Lesson 4: Flexible Noise Curves — <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseComparisonModel</span></code> and <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseRiskModel</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="lesson5.html">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</a></li>
 </ul>
 </li>
@@ -248,11 +248,11 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="Lesson-2:-Risky-Choice-and-the-Key-Correlations-(Barreto-Garc:nbsphinx-math:`u0`0eda-et-al.,-2023)">
-<h1>Lesson 2: Risky Choice and the Key Correlations (Barreto-Garc:nbsphinx-math:<a href="#id1"><span class="problematic" id="id2">`</span></a>u0`0eda et al., 2023)<a class="headerlink" href="#Lesson-2:-Risky-Choice-and-the-Key-Correlations-(Barreto-Garc:nbsphinx-math:`u0`0eda-et-al.,-2023)" title="Link to this heading">¶</a></h1>
-<section id="From-magnitude-to-risk">
-<h2>From magnitude to risk<a class="headerlink" href="#From-magnitude-to-risk" title="Link to this heading">¶</a></h2>
-<p>The same 64 participants also made risky choices <strong>outside</strong> the scanner. On each trial they chose between a <strong>sure payoff</strong> (<span class="math notranslate nohighlight">\(p_1 = 1.0\)</span>, <span class="math notranslate nohighlight">\(n_1 \in \{5,7,10,14,20,28\}\)</span>) and a <strong>risky gamble</strong> (<span class="math notranslate nohighlight">\(p_2 = 0.55\)</span>, <span class="math notranslate nohighlight">\(n_2\)</span> varying). Crucially, payoffs were shown in two <strong>formats</strong> across separate blocks:</p>
+          <section id="Lesson-2:-Risky-Choice-—-Psychometric-Functions-and-the-Noise–Risk-Link">
+<h1>Lesson 2: Risky Choice — Psychometric Functions and the Noise–Risk Link<a class="headerlink" href="#Lesson-2:-Risky-Choice-—-Psychometric-Functions-and-the-Noise–Risk-Link" title="Link to this heading">¶</a></h1>
+<section id="From-magnitude-comparison-to-risky-choice">
+<h2>From magnitude comparison to risky choice<a class="headerlink" href="#From-magnitude-comparison-to-risky-choice" title="Link to this heading">¶</a></h2>
+<p>The same 64 participants from Barreto-García et al. (2023) also made risky choices <strong>outside</strong> the scanner. On each trial they chose between a <strong>sure payoff</strong> (<span class="math notranslate nohighlight">\(p_\text{safe} = 1.0\)</span>, <span class="math notranslate nohighlight">\(n_\text{safe} \in \{5,7,10,14,20,28\}\)</span>) and a <strong>risky gamble</strong> (<span class="math notranslate nohighlight">\(p_\text{risky} = 0.55\)</span>, <span class="math notranslate nohighlight">\(n_\text{risky}\)</span> varying). Payoffs were shown in two <strong>formats</strong> across separate blocks:</p>
 <div class="table-wrapper docutils container">
 <table class="docutils align-default">
 <thead>
@@ -270,373 +270,611 @@
 </tbody>
 </table>
 </div>
-<p>The paper’s central argument: <strong>the same perceptual noise that limits magnitude discrimination also distorts the subjective value of risky gambles</strong>, producing risk aversion as a by-product of noisy numerical cognition.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<p>The paper’s central argument: <strong>the same perceptual noise that limits magnitude discrimination also distorts risky-choice behaviour</strong>, producing risk aversion as a by-product of noisy numerical cognition.</p>
+</section>
+<section id="Approach:-psychometric-functions">
+<h2>Approach: psychometric functions<a class="headerlink" href="#Approach:-psychometric-functions" title="Link to this heading">¶</a></h2>
+<p>Rather than building a full cognitive model (we will do that in lessons 3–4), we start with the simplest possible analysis: fit a <strong>psychometric function</strong> to each participant’s risky-choice data and extract two numbers:</p>
+<ol class="arabic simple">
+<li><p><strong>Noise</strong> (<span class="math notranslate nohighlight">\(\nu\)</span>) — how imprecise is the observer? Low <span class="math notranslate nohighlight">\(\nu\)</span> → steep curve → precise.</p></li>
+<li><p><strong>Indifference point</strong> (<span class="math notranslate nohighlight">\(\delta^*\)</span>, the <code class="docutils literal notranslate"><span class="pre">bias</span></code> parameter) — at what log-ratio does the observer switch from preferring safe to preferring risky?</p></li>
+</ol>
+<p>If noise drives risk aversion, then noisier observers (higher <span class="math notranslate nohighlight">\(\nu\)</span>, lower precision) should have a higher <span class="math notranslate nohighlight">\(\delta^*\)</span> (shifted rightward = more risk-averse).</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
 </pre></div>
 </div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>import warnings; warnings.filterwarnings(&#39;ignore&#39;)
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import arviz as az
-from scipy.stats import norm as scipy_norm, pearsonr
-from bauer.utils.data import load_garcia2022
-from bauer.models import RiskModel, RiskRegressionModel
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span><span class="p">;</span> <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">seaborn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sns</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.stats</span><span class="w"> </span><span class="kn">import</span> <span class="n">norm</span> <span class="k">as</span> <span class="n">scipy_norm</span><span class="p">,</span> <span class="n">spearmanr</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_garcia2022</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">PsychometricModel</span>
 
-data_risk = load_garcia2022(task=&#39;risk&#39;)
-print(f&quot;Subjects: {data_risk.index.get_level_values(&#39;subject&#39;).nunique()},  &quot;
-      f&quot;Trials: {len(data_risk)},  &quot;
-      f&quot;Formats: {data_risk.index.get_level_values(&#39;format&#39;).unique().tolist()}&quot;)
-data_risk.head()
+<span class="n">data_risk</span> <span class="o">=</span> <span class="n">load_garcia2022</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s1">&#39;risk&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Subjects: </span><span class="si">{</span><span class="n">data_risk</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span><span class="si">}</span><span class="s2">,  &quot;</span>
+      <span class="sa">f</span><span class="s2">&quot;Trials: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data_risk</span><span class="p">)</span><span class="si">}</span><span class="s2">,  &quot;</span>
+      <span class="sa">f</span><span class="s2">&quot;Formats: </span><span class="si">{</span><span class="n">data_risk</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;format&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Subjects: 64,  Trials: 30311,  Formats: [&#39;symbolic&#39;, &#39;non-symbolic&#39;]
+</pre></div></div>
 </div>
 </section>
 <section id="Visualise-risky-choice-data">
 <h2>Visualise risky-choice data<a class="headerlink" href="#Visualise-risky-choice-data" title="Link to this heading">¶</a></h2>
-<p>The dashed vertical line marks the <strong>risk-neutral expected-value threshold</strong> <span class="math notranslate nohighlight">\(\log(1/0.55) \approx 0.60\)</span>. A risk-neutral observer’s curve crosses 0.5 exactly there. Curves crossing to the right → risk aversion; to the left → risk seeking.</p>
-<p>Symbolic payoffs (Arabic numerals) produce a steeper, left-shifted curve, indicating lower noise and less risk aversion relative to non-symbolic coin clouds.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<p>We plot the proportion of risky choices as a function of the log-ratio <span class="math notranslate nohighlight">\(\log(n_\text{risky} / n_\text{safe})\)</span>. The dashed vertical line marks the <strong>risk-neutral threshold</strong> <span class="math notranslate nohighlight">\(\log(1/0.55) \approx 0.60\)</span> — the point where a risk-neutral observer is indifferent.</p>
+<ul class="simple">
+<li><p>Curve crosses 0.5 <strong>to the right</strong> of the dashed line → risk-averse</p></li>
+<li><p>Curve crosses 0.5 <strong>to the left</strong> → risk-seeking</p></li>
+</ul>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
 </pre></div>
 </div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>plot_data = data_risk.reset_index(level=&#39;format&#39;).copy()
-plot_data[&#39;log(risky/safe)&#39;] = np.log(plot_data[&#39;n2&#39;] / plot_data[&#39;n1&#39;])
-plot_data[&#39;bin&#39;] = (pd.cut(plot_data[&#39;log(risky/safe)&#39;], bins=12)
-                      .apply(lambda x: x.mid).astype(float))
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">plot_data</span> <span class="o">=</span> <span class="n">data_risk</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s1">&#39;format&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">plot_data</span><span class="p">[</span><span class="s1">&#39;log(risky/safe)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">plot_data</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="n">plot_data</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])</span>
+<span class="n">plot_data</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">cut</span><span class="p">(</span><span class="n">plot_data</span><span class="p">[</span><span class="s1">&#39;log(risky/safe)&#39;</span><span class="p">],</span> <span class="n">bins</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+                      <span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">mid</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">))</span>
 
-grouped = (plot_data.groupby([&#39;format&#39;, &#39;bin&#39;])[&#39;choice&#39;]
-                    .agg([&#39;mean&#39;, &#39;count&#39;]).reset_index()
-                    .query(&#39;count &gt;= 5&#39;))
+<span class="n">grouped</span> <span class="o">=</span> <span class="p">(</span><span class="n">plot_data</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">&#39;format&#39;</span><span class="p">,</span> <span class="s1">&#39;bin&#39;</span><span class="p">])[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span>
+                    <span class="o">.</span><span class="n">agg</span><span class="p">([</span><span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="s1">&#39;count&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+                    <span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;count &gt;= 5&#39;</span><span class="p">))</span>
 
-g = sns.FacetGrid(grouped, col=&#39;format&#39;, height=4.2, aspect=1.0,
-                  palette={&#39;non-symbolic&#39;: &#39;#d95f02&#39;, &#39;symbolic&#39;: &#39;#1f78b4&#39;})
-g.map(sns.lineplot, &#39;bin&#39;, &#39;mean&#39;, marker=&#39;o&#39;, markersize=5)
-for ax in g.axes.flat:
-    ax.axhline(.5,              ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
-    ax.axvline(np.log(1/.55),   ls=&#39;--&#39;, c=&#39;#d73027&#39;, lw=2, label=&#39;Risk-neutral threshold&#39;)
-    ax.set_ylim(-.05, 1.05)
-    ax.legend(fontsize=8)
-g.set_axis_labels(&#39;log(risky / safe)&#39;, &#39;P(chose risky gamble)&#39;)
-g.set_titles(&#39;Format: {col_name}&#39;)
-plt.tight_layout()
+<span class="n">g</span> <span class="o">=</span> <span class="n">sns</span><span class="o">.</span><span class="n">FacetGrid</span><span class="p">(</span><span class="n">grouped</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="s1">&#39;format&#39;</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mf">4.2</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+                  <span class="n">palette</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;non-symbolic&#39;</span><span class="p">:</span> <span class="s1">&#39;#d95f02&#39;</span><span class="p">,</span> <span class="s1">&#39;symbolic&#39;</span><span class="p">:</span> <span class="s1">&#39;#1f78b4&#39;</span><span class="p">})</span>
+<span class="n">g</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">sns</span><span class="o">.</span><span class="n">lineplot</span><span class="p">,</span> <span class="s1">&#39;bin&#39;</span><span class="p">,</span> <span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;o&#39;</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="n">g</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">flat</span><span class="p">:</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span>              <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mf">.55</span><span class="p">),</span>   <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;#d73027&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Risk-neutral threshold&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="o">-</span><span class="mf">.05</span><span class="p">,</span> <span class="mf">1.05</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+<span class="n">g</span><span class="o">.</span><span class="n">set_axis_labels</span><span class="p">(</span><span class="s1">&#39;log(risky / safe)&#39;</span><span class="p">,</span> <span class="s1">&#39;P(chose risky gamble)&#39;</span><span class="p">)</span>
+<span class="n">g</span><span class="o">.</span><span class="n">set_titles</span><span class="p">(</span><span class="s1">&#39;Format: </span><span class="si">{col_name}</span><span class="s1">&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson2_3_0.png" src="../_images/tutorial_lesson2_3_0.png" />
 </div>
 </div>
 </section>
-<section id="Risk-neutral-probability-and-the-indifference-point">
-<h2>Risk-neutral probability and the indifference point<a class="headerlink" href="#Risk-neutral-probability-and-the-indifference-point" title="Link to this heading">¶</a></h2>
-<p>In this experiment the risky option pays out with probability <span class="math notranslate nohighlight">\(p_\text{risky} = 0.55\)</span>. The <strong>risk-neutral probability</strong> (RNP) is simply that number: 55 % — it is the winning probability at which a risk-neutral, expected-value-maximising observer would make exactly the same choices as our model predicts.</p>
-<p>A risk-neutral observer is indifferent between the safe payoff <span class="math notranslate nohighlight">\(n_\text{safe}\)</span> and the risky payoff <span class="math notranslate nohighlight">\(n_\text{risky}\)</span> when their expected values are equal:</p>
+<section id="The-psychometric-function-for-risky-choice">
+<h2>The psychometric function for risky choice<a class="headerlink" href="#The-psychometric-function-for-risky-choice" title="Link to this heading">¶</a></h2>
+<p>bauer’s <code class="docutils literal notranslate"><span class="pre">PsychometricModel</span></code> fits:</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
-\[1.0 \times n_\text{safe} = 0.55 \times n_\text{risky}
-\;\Longrightarrow\;
-n_\text{risky} = \frac{n_\text{safe}}{0.55} = \frac{1}{0.55}\, n_\text{safe}\]</div>
+\[P(\text{chose risky}) = \Phi\!\left(\frac{\log(n_\text{risky}/n_\text{safe}) - \delta^*}{\sqrt{2}\,\nu}\right)\]</div>
 </div>
-<p>In log-ratio space the <strong>indifference point</strong> is therefore</p>
+<p>where <span class="math notranslate nohighlight">\(\Phi\)</span> is the standard-normal CDF. The two free parameters per subject are:</p>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>bauer name</p></th>
+<th class="head"><p>Interpretation</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><span class="math notranslate nohighlight">\(\nu\)</span></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nu</span></code></p></td>
+<td><p><strong>Noise</strong> — SD of the internal log-magnitude representation. Higher = noisier = shallower curve.</p></td>
+</tr>
+<tr class="row-odd"><td><p><span class="math notranslate nohighlight">\(\delta^*\)</span></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bias</span></code></p></td>
+<td><p><strong>Indifference point</strong> — the log-ratio at which P(chose risky) = 0.5. A risk-neutral observer has <span class="math notranslate nohighlight">\(\delta^* = \log(1/0.55) \approx 0.60\)</span>; larger values indicate risk aversion.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Note that <code class="docutils literal notranslate"><span class="pre">bias</span></code> is <strong>unconstrained</strong>: it can be positive (risk-averse), zero, or negative (risk-seeking). This is important — some participants genuinely prefer the risky option even when it has lower expected value, and the model can capture that.</p>
+<section id="Why-this-works">
+<h3>Why this works<a class="headerlink" href="#Why-this-works" title="Link to this heading">¶</a></h3>
+<p>On the log scale, choosing the risky option is optimal when:</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
-\[\delta^*_\text{risk-neutral} = \log\!\left(\frac{1}{0.55}\right) \approx 0.598\]</div>
+\[\log n_\text{risky} - \log n_\text{safe} &gt; \log(1/p_\text{risky})\]</div>
 </div>
-<p>This is the <span class="math notranslate nohighlight">\(x\)</span>-value at which the psychometric curve of a risk-neutral observer crosses <span class="math notranslate nohighlight">\(P = 0.5\)</span>. An observer with <span class="math notranslate nohighlight">\(\delta^* &gt; \log(1/0.55)\)</span> is <strong>risk-averse</strong> — they need the risky option to be even larger than the fair-expected-value threshold before they prefer it.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<p>i.e. when the risky payoff is large enough to compensate for the lower winning probability. But this comparison is done with <strong>noisy internal representations</strong>, and the observer may also have a <strong>bias</strong> toward or away from risk. The psychometric function captures both effects in a single curve.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
 </pre></div>
 </div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>log_r = np.linspace(-.3, 2.2, 400)
-ev_threshold = np.log(1/.55)
-slope = 1.6   # fixed for illustration
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Illustrate: how noise and bias shape the risky-choice curve</span>
+<span class="n">log_r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mf">.3</span><span class="p">,</span> <span class="mf">2.2</span><span class="p">,</span> <span class="mi">400</span><span class="p">)</span>
+<span class="n">ev_threshold</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mf">.55</span><span class="p">)</span>
 
-fig, ax = plt.subplots(figsize=(7, 4.5))
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mf">4.5</span><span class="p">))</span>
 
-for delta_star, label, c in [
-        (ev_threshold, f&#39;Risk-neutral  (δ* = log(1/0.55) ≈ {ev_threshold:.2f})&#39;, &#39;#4393c3&#39;),
-        (.95, &#39;Mildly risk-averse  (δ* = 0.95)&#39;, &#39;#1a9850&#39;),
-        (1.45, &#39;Strongly risk-averse  (δ* = 1.45)&#39;, &#39;#d73027&#39;)]:
-    p = scipy_norm.cdf((log_r - delta_star) * slope)
-    ax.plot(log_r, p, color=c, lw=2.5, label=label)
-    ax.axvline(delta_star, color=c, ls=&#39;:&#39;, lw=1.5, alpha=.7)
+<span class="c1"># Left: varying bias (indifference point) at fixed noise</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">delta_star</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">[</span>
+        <span class="p">(</span><span class="mf">0.3</span><span class="p">,</span>           <span class="s1">&#39;Risk-seeking  (δ* = 0.30)&#39;</span><span class="p">,</span> <span class="s1">&#39;#2166ac&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="n">ev_threshold</span><span class="p">,</span>  <span class="sa">f</span><span class="s1">&#39;Risk-neutral  (δ* = </span><span class="si">{</span><span class="n">ev_threshold</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">,</span> <span class="s1">&#39;#878787&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="mf">0.95</span><span class="p">,</span>          <span class="s1">&#39;Mildly risk-averse  (δ* = 0.95)&#39;</span><span class="p">,</span> <span class="s1">&#39;#f46d43&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="mf">1.45</span><span class="p">,</span>          <span class="s1">&#39;Strongly risk-averse  (δ* = 1.45)&#39;</span><span class="p">,</span> <span class="s1">&#39;#d73027&#39;</span><span class="p">)]:</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">scipy_norm</span><span class="o">.</span><span class="n">cdf</span><span class="p">((</span><span class="n">log_r</span> <span class="o">-</span> <span class="n">delta_star</span><span class="p">)</span> <span class="o">*</span> <span class="mf">1.6</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">log_r</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">ev_threshold</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;:&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.5</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;log(risky / safe)&#39;</span><span class="p">);</span> <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;P(chose risky)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Varying indifference point δ* (fixed noise)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mf">8.5</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
 
-ax.axhline(.5, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
-ax.set_xlabel(&#39;log(n_risky / n_safe)&#39;)
-ax.set_ylabel(&#39;P(chose risky gamble)&#39;)
-ax.set_title(&#39;δ* = indifference point (curve crosses P = 0.5); risk-neutral: δ* = log(1/0.55) ≈ 0.598&#39;)
-ax.set_ylim(-.04, 1.04); ax.legend(fontsize=9)
-sns.despine(); plt.tight_layout()
+<span class="c1"># Right: varying noise at fixed bias</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">nu</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">[</span>
+        <span class="p">(</span><span class="mf">0.25</span><span class="p">,</span> <span class="s1">&#39;Low noise (ν = 0.25) → steep&#39;</span><span class="p">,</span> <span class="s1">&#39;#2166ac&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="mf">0.50</span><span class="p">,</span> <span class="s1">&#39;Medium (ν = 0.50)&#39;</span><span class="p">,</span> <span class="s1">&#39;#878787&#39;</span><span class="p">),</span>
+        <span class="p">(</span><span class="mf">1.00</span><span class="p">,</span> <span class="s1">&#39;High noise (ν = 1.00) → flat&#39;</span><span class="p">,</span> <span class="s1">&#39;#d73027&#39;</span><span class="p">)]:</span>
+    <span class="n">sigma</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">nu</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">scipy_norm</span><span class="o">.</span><span class="n">cdf</span><span class="p">((</span><span class="n">log_r</span> <span class="o">-</span> <span class="mf">0.8</span><span class="p">)</span> <span class="o">/</span> <span class="n">sigma</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">log_r</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;log(risky / safe)&#39;</span><span class="p">);</span> <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;P(chose risky)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Varying noise ν (fixed δ* = 0.80)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mf">8.5</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Two parameters of the risky-choice psychometric function&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson2_5_0.png" src="../_images/tutorial_lesson2_5_0.png" />
 </div>
 </div>
 </section>
-<section id="KLW-model">
-<h2>KLW model<a class="headerlink" href="#KLW-model" title="Link to this heading">¶</a></h2>
-<p>The <strong>KLW (Khaw-Li-Woodford)</strong> model applies the same Bayesian-observer NLC framework to risky choice. Crucially, in Barreto-García et al. the safe and risky payoffs were shown <strong>simultaneously</strong> on screen, so there is no reason to expect different noise for the two options. We therefore use a <strong>single shared noise</strong> <span class="math notranslate nohighlight">\(\nu\)</span>:</p>
+</section>
+<section id="Fitting-psychometric-functions-—-separately-per-format">
+<h2>Fitting psychometric functions — separately per format<a class="headerlink" href="#Fitting-psychometric-functions-—-separately-per-format" title="Link to this heading">¶</a></h2>
+<p>Because symbolic and non-symbolic formats produce different noise levels, we fit <code class="docutils literal notranslate"><span class="pre">PsychometricModel</span></code> <strong>separately</strong> for each format. This gives us per-subject estimates of <span class="math notranslate nohighlight">\(\nu\)</span> (noise) and <span class="math notranslate nohighlight">\(\delta^*\)</span> (indifference point) within each format, which we can then correlate with each other and with magnitude-task precision.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Prepare data: x1 = log(safe), x2 = log(risky), split by format</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">prep_risk_data</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;x1&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">))</span>   <span class="c1"># log(safe)</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;x2&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">))</span>   <span class="c1"># log(risky)</span>
+    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">([</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">names</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">])</span>
+
+<span class="n">data_sym</span>    <span class="o">=</span> <span class="n">prep_risk_data</span><span class="p">(</span><span class="n">data_risk</span><span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="s1">&#39;symbolic&#39;</span><span class="p">,</span>     <span class="n">level</span><span class="o">=</span><span class="s1">&#39;format&#39;</span><span class="p">))</span>
+<span class="n">data_nonsym</span> <span class="o">=</span> <span class="n">prep_risk_data</span><span class="p">(</span><span class="n">data_risk</span><span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="s1">&#39;non-symbolic&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s1">&#39;format&#39;</span><span class="p">))</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Symbolic:      </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data_sym</span><span class="p">)</span><span class="si">}</span><span class="s2"> trials, &quot;</span>
+      <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_sym</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span><span class="si">}</span><span class="s2"> subjects&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Non-symbolic:  </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data_nonsym</span><span class="p">)</span><span class="si">}</span><span class="s2"> trials, &quot;</span>
+      <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_nonsym</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span><span class="si">}</span><span class="s2"> subjects&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Symbolic:      15161 trials, 64 subjects
+Non-symbolic:  15150 trials, 64 subjects
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Fit psychometric models — one per format</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">PsychometricModel</span>
+
+<span class="n">model_sym</span> <span class="o">=</span> <span class="n">PsychometricModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">data_sym</span><span class="p">)</span>
+<span class="n">model_sym</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data_sym</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">idata_sym</span> <span class="o">=</span> <span class="n">model_sym</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Symbolic fit done&quot;</span><span class="p">)</span>
+
+<span class="n">model_nonsym</span> <span class="o">=</span> <span class="n">PsychometricModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">data_nonsym</span><span class="p">)</span>
+<span class="n">model_nonsym</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data_nonsym</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">idata_nonsym</span> <span class="o">=</span> <span class="n">model_nonsym</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Non-symbolic fit done&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 4 jobs)
+NUTS: [nu_mu_untransformed, nu_sd, nu_offset, bias_mu, bias_sd, bias_offset]
+Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 59 seconds.
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Symbolic fit done
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 4 jobs)
+NUTS: [nu_mu_untransformed, nu_sd, nu_offset, bias_mu, bias_sd, bias_offset]
+Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 61 seconds.
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Non-symbolic fit done
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Group-level posteriors: compare formats</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="n">ev_threshold</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mf">.55</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="n">param</span><span class="p">,</span> <span class="n">title</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axes</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;nu_mu&#39;</span><span class="p">,</span> <span class="s1">&#39;bias_mu&#39;</span><span class="p">],</span>
+                             <span class="p">[</span><span class="s1">&#39;Noise  ν&#39;</span><span class="p">,</span> <span class="s1">&#39;Indifference point  δ*&#39;</span><span class="p">]):</span>
+    <span class="n">sym_vals</span>    <span class="o">=</span> <span class="n">idata_sym</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="n">param</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+    <span class="n">nonsym_vals</span> <span class="o">=</span> <span class="n">idata_nonsym</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="n">param</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+    <span class="n">az</span><span class="o">.</span><span class="n">plot_kde</span><span class="p">(</span><span class="n">sym_vals</span><span class="p">,</span>    <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Symbolic&#39;</span><span class="p">,</span>     <span class="n">plot_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;color&#39;</span><span class="p">:</span> <span class="s1">&#39;#1f78b4&#39;</span><span class="p">,</span> <span class="s1">&#39;lw&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+    <span class="n">az</span><span class="o">.</span><span class="n">plot_kde</span><span class="p">(</span><span class="n">nonsym_vals</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Non-symbolic&#39;</span><span class="p">,</span>  <span class="n">plot_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;color&#39;</span><span class="p">:</span> <span class="s1">&#39;#d95f02&#39;</span><span class="p">,</span> <span class="s1">&#39;lw&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">param</span> <span class="o">==</span> <span class="s1">&#39;bias_mu&#39;</span><span class="p">:</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">ev_threshold</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;:&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Risk-neutral&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">title</span><span class="p">);</span> <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">9</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Group-level posteriors by format&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson2_9_0.png" src="../_images/tutorial_lesson2_9_0.png" />
+</div>
+</div>
+<section id="Format-effect">
+<h3>Format effect<a class="headerlink" href="#Format-effect" title="Link to this heading">¶</a></h3>
+<p>Symbolic (Arabic numeral) payoffs produce <strong>lower noise</strong> and a <strong>lower indifference point</strong> — i.e. less risk aversion. This is exactly what the theory predicts: symbolic numbers are encoded more precisely, so there is less Bayesian shrinkage, and the perceived advantage of the risky option is less compressed.</p>
+</section>
+<section id="Difference-distributions">
+<h3>Difference distributions<a class="headerlink" href="#Difference-distributions" title="Link to this heading">¶</a></h3>
+<p>Overlaying two posteriors can be misleading: even when the marginals overlap substantially, the <strong>difference</strong> may be clearly non-zero. This is especially important when the two quantities are correlated (e.g. because they come from the same participants). Here the two formats are fitted as separate models, so the posteriors are independent — but showing the difference distribution is still clearer than eyeballing overlap.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Difference distributions: symbolic minus non-symbolic</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+
+<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="n">param</span><span class="p">,</span> <span class="n">title</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axes</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;nu_mu&#39;</span><span class="p">,</span> <span class="s1">&#39;bias_mu&#39;</span><span class="p">],</span>
+                             <span class="p">[</span><span class="s1">&#39;Noise difference  Δν&#39;</span><span class="p">,</span> <span class="s1">&#39;Indifference point difference  Δδ*&#39;</span><span class="p">]):</span>
+    <span class="n">sym_vals</span>    <span class="o">=</span> <span class="n">idata_sym</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="n">param</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+    <span class="n">nonsym_vals</span> <span class="o">=</span> <span class="n">idata_nonsym</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="n">param</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+    <span class="c1"># Sample from both and compute difference</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">sym_vals</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">nonsym_vals</span><span class="p">))</span>
+    <span class="n">diff</span> <span class="o">=</span> <span class="n">sym_vals</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span> <span class="o">-</span> <span class="n">nonsym_vals</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span>
+    <span class="n">az</span><span class="o">.</span><span class="n">plot_kde</span><span class="p">(</span><span class="n">diff</span><span class="p">,</span> <span class="n">plot_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;color&#39;</span><span class="p">:</span> <span class="s1">&#39;#333333&#39;</span><span class="p">,</span> <span class="s1">&#39;lw&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;#d73027&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;No difference&#39;</span><span class="p">)</span>
+    <span class="n">pct_below</span> <span class="o">=</span> <span class="p">(</span><span class="n">diff</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">title</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Symbolic − Non-symbolic&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="mf">0.03</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">pct_below</span><span class="si">:</span><span class="s1">.0f</span><span class="si">}</span><span class="s1">% &lt; 0&#39;</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="n">ax</span><span class="o">.</span><span class="n">transAxes</span><span class="p">,</span>
+            <span class="n">va</span><span class="o">=</span><span class="s1">&#39;top&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;#333333&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">9</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Format effect: posterior of symbolic − non-symbolic difference&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson2_11_0.png" src="../_images/tutorial_lesson2_11_0.png" />
+</div>
+</div>
+<p>For both parameters, the difference distribution sits almost entirely below zero: symbolic payoffs produce lower noise <em>and</em> a less risk-averse indifference point. The <code class="docutils literal notranslate"><span class="pre">RiskRegressionModel</span></code> at the end of this lesson tests this contrast within a single model, which is the cleanest approach.</p>
+</section>
+</section>
+<section id="Key-result:-noise-predicts-risk-aversion-(within-each-format)">
+<h2>Key result: noise predicts risk aversion (within each format)<a class="headerlink" href="#Key-result:-noise-predicts-risk-aversion-(within-each-format)" title="Link to this heading">¶</a></h2>
+<p>We extract each subject’s posterior mean for <code class="docutils literal notranslate"><span class="pre">nu</span></code> and <code class="docutils literal notranslate"><span class="pre">bias</span></code>, separately for each format, and test whether noisier observers are more risk-averse <strong>within</strong> each format.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">extract_subject_params</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">format_label</span><span class="p">):</span>
+    <span class="n">subjects</span> <span class="o">=</span> <span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;nu&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="s1">&#39;subject&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">nu_flat</span>   <span class="o">=</span> <span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;nu&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">subjects</span><span class="p">))</span>
+    <span class="n">bias_flat</span> <span class="o">=</span> <span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;bias&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">subjects</span><span class="p">))</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+        <span class="s1">&#39;subject&#39;</span><span class="p">:</span>   <span class="n">subjects</span><span class="p">,</span>
+        <span class="s1">&#39;format&#39;</span><span class="p">:</span>    <span class="n">format_label</span><span class="p">,</span>
+        <span class="s1">&#39;nu_mean&#39;</span><span class="p">:</span>   <span class="n">nu_flat</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+        <span class="s1">&#39;nu_lo&#39;</span><span class="p">:</span>     <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">nu_flat</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+        <span class="s1">&#39;nu_hi&#39;</span><span class="p">:</span>     <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">nu_flat</span><span class="p">,</span> <span class="mi">97</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+        <span class="s1">&#39;bias_mean&#39;</span><span class="p">:</span> <span class="n">bias_flat</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+        <span class="s1">&#39;bias_lo&#39;</span><span class="p">:</span>   <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">bias_flat</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+        <span class="s1">&#39;bias_hi&#39;</span><span class="p">:</span>   <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">bias_flat</span><span class="p">,</span> <span class="mi">97</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+    <span class="p">})</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;prec&#39;</span><span class="p">]</span>    <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;nu_mean&#39;</span><span class="p">]</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;prec_lo&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;nu_hi&#39;</span><span class="p">]</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;prec_hi&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;nu_lo&#39;</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">df</span>
+
+<span class="n">df_sym_params</span>    <span class="o">=</span> <span class="n">extract_subject_params</span><span class="p">(</span><span class="n">idata_sym</span><span class="p">,</span>    <span class="s1">&#39;symbolic&#39;</span><span class="p">)</span>
+<span class="n">df_nonsym_params</span> <span class="o">=</span> <span class="n">extract_subject_params</span><span class="p">(</span><span class="n">idata_nonsym</span><span class="p">,</span> <span class="s1">&#39;non-symbolic&#39;</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">df</span> <span class="ow">in</span> <span class="p">[(</span><span class="s1">&#39;Symbolic&#39;</span><span class="p">,</span> <span class="n">df_sym_params</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;Non-symbolic&#39;</span><span class="p">,</span> <span class="n">df_nonsym_params</span><span class="p">)]:</span>
+    <span class="n">rho</span><span class="p">,</span> <span class="n">p</span> <span class="o">=</span> <span class="n">spearmanr</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;nu_mean&#39;</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;bias_mean&#39;</span><span class="p">])</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">label</span><span class="si">:</span><span class="s2">15s</span><span class="si">}</span><span class="s2">  noise-bias ρ = </span><span class="si">{</span><span class="n">rho</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> (p = </span><span class="si">{</span><span class="n">p</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Symbolic         noise-bias ρ = -0.402 (p = 0.0010)
+Non-symbolic     noise-bias ρ = -0.383 (p = 0.0018)
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">scatter_hdi</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">xerr</span><span class="p">,</span> <span class="n">yerr</span><span class="p">,</span> <span class="n">color</span><span class="p">,</span> <span class="n">xlabel</span><span class="p">,</span> <span class="n">ylabel</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span>
+                <span class="n">hline</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">errorbar</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">xerr</span><span class="o">=</span><span class="n">xerr</span><span class="p">,</span> <span class="n">yerr</span><span class="o">=</span><span class="n">yerr</span><span class="p">,</span>
+                <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;o&#39;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.55</span><span class="p">,</span> <span class="n">elinewidth</span><span class="o">=</span><span class="mf">.7</span><span class="p">,</span> <span class="n">capsize</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+                <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">ecolor</span><span class="o">=</span><span class="n">color</span><span class="p">)</span>
+    <span class="n">rho</span><span class="p">,</span> <span class="n">p</span> <span class="o">=</span> <span class="n">spearmanr</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+    <span class="n">m</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polyfit</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">xs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="n">x</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="mi">100</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">m</span><span class="o">*</span><span class="n">xs</span> <span class="o">+</span> <span class="n">b</span><span class="p">,</span> <span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.8</span><span class="p">,</span>
+            <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;ρ = </span><span class="si">{</span><span class="n">rho</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1"> (p = </span><span class="si">{</span><span class="n">p</span><span class="si">:</span><span class="s1">.3f</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">hline</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">hline</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;:&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Risk-neutral&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="n">xlabel</span><span class="p">);</span> <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="n">ylabel</span><span class="p">);</span> <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">title</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">9</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="n">ev_threshold</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mf">.55</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">13</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+
+<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">color</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+        <span class="n">axes</span><span class="p">,</span>
+        <span class="p">[</span><span class="n">df_nonsym_params</span><span class="p">,</span> <span class="n">df_sym_params</span><span class="p">],</span>
+        <span class="p">[</span><span class="s1">&#39;Non-symbolic (coin clouds)&#39;</span><span class="p">,</span> <span class="s1">&#39;Symbolic (Arabic numerals)&#39;</span><span class="p">],</span>
+        <span class="p">[</span><span class="s1">&#39;#d95f02&#39;</span><span class="p">,</span> <span class="s1">&#39;#1f78b4&#39;</span><span class="p">]):</span>
+    <span class="n">scatter_hdi</span><span class="p">(</span>
+        <span class="n">ax</span><span class="p">,</span>
+        <span class="n">x</span>    <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;nu_mean&#39;</span><span class="p">],</span>
+        <span class="n">y</span>    <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;bias_mean&#39;</span><span class="p">],</span>
+        <span class="n">xerr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;nu_mean&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;nu_lo&#39;</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;nu_hi&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;nu_mean&#39;</span><span class="p">]]),</span>
+        <span class="n">yerr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;bias_mean&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;bias_lo&#39;</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;bias_hi&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;bias_mean&#39;</span><span class="p">]]),</span>
+        <span class="n">color</span>  <span class="o">=</span> <span class="n">color</span><span class="p">,</span>
+        <span class="n">xlabel</span> <span class="o">=</span> <span class="s1">&#39;Noise  ν&#39;</span><span class="p">,</span>
+        <span class="n">ylabel</span> <span class="o">=</span> <span class="s1">&#39;Indifference point  δ*&#39;</span><span class="p">,</span>
+        <span class="n">title</span>  <span class="o">=</span> <span class="n">label</span><span class="p">,</span>
+        <span class="n">hline</span>  <span class="o">=</span> <span class="n">ev_threshold</span><span class="p">,</span>
+    <span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Within-format: noise predicts risk aversion (bars = 94 % HDI)&#39;</span><span class="p">,</span>
+             <span class="n">fontsize</span><span class="o">=</span><span class="mi">13</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson2_15_0.png" src="../_images/tutorial_lesson2_15_0.png" />
+</div>
+</div>
+</section>
+<section id="Interpreting-the-indifference-point:-from-log-space-to-intuition">
+<h2>Interpreting the indifference point: from log-space to intuition<a class="headerlink" href="#Interpreting-the-indifference-point:-from-log-space-to-intuition" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">bias</span></code> parameter lives in <strong>log-ratio space</strong>, which is not immediately intuitive. Three reparameterisations make it more concrete:</p>
+<section id="1.-Indifference-ratio:-%22how-much-larger-must-the-risky-option-be?%22">
+<h3>1. Indifference ratio: “how much larger must the risky option be?”<a class="headerlink" href="#1.-Indifference-ratio:-%22how-much-larger-must-the-risky-option-be?%22" title="Link to this heading">¶</a></h3>
+<p>The indifference point is <span class="math notranslate nohighlight">\(\delta^* = -\text{bias}\)</span> in log-ratio space. Exponentiating gives the <strong>indifference ratio</strong>:</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
-\[\hat\mu_k = \gamma \log n_k + (1-\gamma)\mu_0, \quad
-\gamma = \frac{\sigma_0^2}{\sigma_0^2 + \nu^2}\]</div>
+\[R^* = e^{\delta^*} = e^{-\text{bias}}\]</div>
 </div>
-<p>The prior mean <span class="math notranslate nohighlight">\(\mu_0\)</span> is set to the objective batch mean of <span class="math notranslate nohighlight">\(\log n\)</span>. Higher noise → smaller <span class="math notranslate nohighlight">\(\gamma\)</span> → stronger prior pull → larger <span class="math notranslate nohighlight">\(\delta^*\)</span> → more risk aversion.</p>
-<p>Free parameters per subject: <code class="docutils literal notranslate"><span class="pre">evidence_sd</span></code> (<span class="math notranslate nohighlight">\(\nu\)</span>), <code class="docutils literal notranslate"><span class="pre">prior_sd</span></code> (<span class="math notranslate nohighlight">\(\sigma_0\)</span>).</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>model_klw = RiskModel(paradigm=data_risk, prior_estimate=&#39;klw&#39;,
-                      fit_seperate_evidence_sd=False)
-model_klw.build_estimation_model(data=data_risk, hierarchical=True, save_p_choice=True)
-idata_klw = model_klw.sample(draws=200, tune=200, chains=4, progressbar=True)
-</pre></div>
-</div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>az.plot_posterior(
-    idata_klw,
-    var_names=[&#39;evidence_sd_mu&#39;, &#39;prior_sd_mu&#39;],
-    figsize=(8, 3.5),
-)
-plt.suptitle(&#39;Group-level KLW posteriors&#39;, y=1.04)
-plt.tight_layout()
-</pre></div>
-</div>
-</div>
+<p>This is the factor by which the risky payoff must exceed the safe payoff for the observer to be indifferent. A risk-neutral observer (with <span class="math notranslate nohighlight">\(p_\text{risky} = 0.55\)</span>) has <span class="math notranslate nohighlight">\(R^* = 1/0.55 \approx 1.82\)</span> — the risky option must be about <strong>82 % larger</strong>. A risk-averse observer requires an even larger premium.</p>
 </section>
-<section id="Format-comparison:-symbolic-vs-non-symbolic">
-<h2>Format comparison: symbolic vs non-symbolic<a class="headerlink" href="#Format-comparison:-symbolic-vs-non-symbolic" title="Link to this heading">¶</a></h2>
-<p>We fit the KLW model separately to each format to isolate the noise difference.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>data_sym    = data_risk.xs(&#39;symbolic&#39;,     level=&#39;format&#39;)
-data_nonsym = data_risk.xs(&#39;non-symbolic&#39;, level=&#39;format&#39;)
-
-model_sym = RiskModel(paradigm=data_sym, prior_estimate=&#39;klw&#39;,
-                      fit_seperate_evidence_sd=False)
-model_sym.build_estimation_model(data=data_sym, hierarchical=True)
-idata_sym = model_sym.sample(draws=150, tune=150, chains=2, progressbar=True)
-
-model_nonsym = RiskModel(paradigm=data_nonsym, prior_estimate=&#39;klw&#39;,
-                         fit_seperate_evidence_sd=False)
-model_nonsym.build_estimation_model(data=data_nonsym, hierarchical=True)
-idata_nonsym = model_nonsym.sample(draws=150, tune=150, chains=2, progressbar=True)
-</pre></div>
-</div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># Compare group-level posteriors across formats
-fig, axes = plt.subplots(1, 2, figsize=(9, 4))
-params_compare = [&#39;evidence_sd&#39;, &#39;prior_sd&#39;]
-
-for ax, param in zip(axes, params_compare):
-    sym_vals    = idata_sym.posterior[f&#39;{param}_mu&#39;].values.ravel()
-    nonsym_vals = idata_nonsym.posterior[f&#39;{param}_mu&#39;].values.ravel()
-
-    df_comp = pd.DataFrame({
-        &#39;value&#39;:  np.concatenate([sym_vals, nonsym_vals]),
-        &#39;format&#39;: [&#39;symbolic&#39;]*len(sym_vals) + [&#39;non-symbolic&#39;]*len(nonsym_vals),
-    })
-    sns.violinplot(data=df_comp, x=&#39;format&#39;, y=&#39;value&#39;, cut=0,
-                   palette={&#39;symbolic&#39;: &#39;#1f78b4&#39;, &#39;non-symbolic&#39;: &#39;#d95f02&#39;},
-                   inner=&#39;box&#39;, ax=ax)
-    ax.set_title(f&#39;Group-level  {param}&#39;)
-    ax.set_xlabel(&#39;&#39;)
-    sns.despine(ax=ax)
-
-plt.suptitle(&#39;KLW model: symbolic vs non-symbolic&#39;, fontsize=13, y=1.02)
-plt.tight_layout()
-</pre></div>
-</div>
-</div>
-<section id="Regression-model:-format-effect-on-noise">
-<h3>Regression model: format effect on noise<a class="headerlink" href="#Regression-model:-format-effect-on-noise" title="Link to this heading">¶</a></h3>
-<p><code class="docutils literal notranslate"><span class="pre">RiskRegressionModel</span></code> with a patsy formula lets the shared noise <code class="docutils literal notranslate"><span class="pre">evidence_sd</span></code> vary trial-by-trial as a function of covariates — here, <code class="docutils literal notranslate"><span class="pre">C(format)</span></code>. This gives a direct posterior on the <strong>format effect on precision</strong>.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>data_reg = data_risk.reset_index(level=&#39;format&#39;)   # format as a column
-
-model_reg = RiskRegressionModel(
-    paradigm=data_reg,
-    regressors={&#39;evidence_sd&#39;: &#39;C(format)&#39;},
-    prior_estimate=&#39;klw&#39;,
-    fit_seperate_evidence_sd=False,
-)
-model_reg.build_estimation_model(data=data_reg, hierarchical=True)
-idata_reg = model_reg.sample(draws=150, tune=150, chains=2, progressbar=True)
-</pre></div>
-</div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># Posterior of evidence_sd at each format condition
-conditions = pd.DataFrame({&#39;format&#39;: [&#39;symbolic&#39;, &#39;non-symbolic&#39;]})
-pars_cond  = model_reg.get_conditionwise_parameters(idata_reg, conditions, group=True)
-
-sd_sym    = pars_cond.loc[&#39;evidence_sd&#39;][&#39;symbolic&#39;].values
-sd_nonsym = pars_cond.loc[&#39;evidence_sd&#39;][&#39;non-symbolic&#39;].values
-
-fig, ax = plt.subplots(figsize=(5.5, 4))
-for vals, label, c in [(sd_sym,    &#39;symbolic&#39;,    &#39;#1f78b4&#39;),
-                        (sd_nonsym, &#39;non-symbolic&#39;, &#39;#d95f02&#39;)]:
-    az.plot_kde(vals, label=label, plot_kwargs={&#39;color&#39;: c, &#39;lw&#39;: 2}, ax=ax)
-ax.set_xlabel(&#39;evidence_sd  (group level)&#39;)
-ax.set_ylabel(&#39;Posterior density&#39;)
-ax.set_title(&#39;Regression model: noise by format  (symbolic = lower noise)&#39;)
-ax.legend(); sns.despine(); plt.tight_layout()
-</pre></div>
-</div>
-</div>
-</section>
-</section>
-<section id="Key-result:-perceptual-noise-predicts-risk-aversion">
-<h2>Key result: perceptual noise predicts risk aversion<a class="headerlink" href="#Key-result:-perceptual-noise-predicts-risk-aversion" title="Link to this heading">¶</a></h2>
-<p>With a single shared noise <span class="math notranslate nohighlight">\(\nu\)</span> and prior SD <span class="math notranslate nohighlight">\(\sigma_0\)</span>, the implied indifference log-ratio simplifies to</p>
+<section id="2.-Risk-neutral-probability-(RNP)">
+<h3>2. Risk-neutral probability (RNP)<a class="headerlink" href="#2.-Risk-neutral-probability-(RNP)" title="Link to this heading">¶</a></h3>
+<p>The <strong>RNP</strong> answers: “at what winning probability would a risk-neutral agent make the same choices as this observer?”</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
-\[\delta^* = \frac{\log(1/p_\text{risky})}{\gamma}
-= \log(1/0.55)\cdot\frac{\sigma_0^2 + \nu^2}{\sigma_0^2}\]</div>
+\[\text{RNP} = e^{\text{bias}}\]</div>
 </div>
-<p>Noisier observers (high <span class="math notranslate nohighlight">\(\nu\)</span>) have a larger <span class="math notranslate nohighlight">\(\delta^*\)</span> and are more risk-averse. And because the single decision noise <span class="math notranslate nohighlight">\(\nu\)</span> (risk task) correlates with perceptual noise <span class="math notranslate nohighlight">\(\nu_2\)</span> (magnitude task), <strong>perceptual precision measured in the scanner predicts risk aversion in a separate behavioural session</strong> — the central result of Barreto-Garc:nbsphinx-math:<a href="#id3"><span class="problematic" id="id4">`</span></a>u0`0eda et al.</p>
-<p>We show 94 % HDI crossbars per subject.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<ul class="simple">
+<li><p>RNP = 0.55 → risk-neutral (the observer acts as if the gamble wins at its true rate)</p></li>
+<li><p>RNP &lt; 0.55 → risk-averse (acts as if the gamble wins <em>less</em> often than it actually does)</p></li>
+<li><p>RNP &gt; 0.55 → risk-seeking</p></li>
+</ul>
+<p>The RNP is simply the reciprocal of the indifference ratio scaled by the actual probability: <span class="math notranslate nohighlight">\(\text{RNP} = p_\text{risky} / R^* \times (1/p_\text{safe})\)</span>. But <span class="math notranslate nohighlight">\(e^{\text{bias}}\)</span> is the most direct computation.</p>
+</section>
+<section id="3.-Certainty-equivalent-discount">
+<h3>3. Certainty equivalent discount<a class="headerlink" href="#3.-Certainty-equivalent-discount" title="Link to this heading">¶</a></h3>
+<p>How many cents on the euro does the observer implicitly discount the risky option? <span class="math notranslate nohighlight">\(\text{CE discount} = 1 - \text{RNP} / p_\text{risky} = 1 - e^{\text{bias}} / 0.55\)</span>. A discount of 20 % means the observer treats every risky euro as worth only 80 cents.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
 </pre></div>
 </div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ── Helper: extract posterior mean and 94 % HDI per subject ──────────────────
-def posterior_summary(idata, var):
-    arr  = idata.posterior[var].values           # (chains, draws, subjects)
-    subj = idata.posterior[var].coords[&#39;subject&#39;].values
-    vals = arr.reshape(-1, len(subj))            # (samples, subjects)
-    return pd.DataFrame({
-        &#39;subject&#39;: subj,
-        &#39;mean&#39;: vals.mean(0),
-        &#39;lo&#39;:   np.percentile(vals, 3, 0),       # ≈ 94 % HDI lower
-        &#39;hi&#39;:   np.percentile(vals, 97, 0),      # ≈ 94 % HDI upper
-    })
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Posterior distributions of the reparameterised group-level bias</span>
+<span class="n">bias_sym</span>    <span class="o">=</span> <span class="n">idata_sym</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;bias_mu&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+<span class="n">bias_nonsym</span> <span class="o">=</span> <span class="n">idata_nonsym</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;bias_mu&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
 
-# ── Magnitude noise (n2 = perceptual noise, no WM contamination) ─────────────
-from bauer.utils.data import load_garcia2022
-data_mag = load_garcia2022(task=&#39;magnitude&#39;)
-from bauer.models import MagnitudeComparisonModel
-model_mag_l2 = MagnitudeComparisonModel(paradigm=data_mag)
-model_mag_l2.build_estimation_model(data=data_mag, hierarchical=True, save_p_choice=False)
-idata_mag_l2 = model_mag_l2.sample(draws=200, tune=200, chains=4, progressbar=True)
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
 
-df_nu_mag = posterior_summary(idata_mag_l2, &#39;n2_evidence_sd&#39;).rename(
-                columns={&#39;mean&#39;: &#39;nu_mag&#39;, &#39;lo&#39;: &#39;nu_mag_lo&#39;, &#39;hi&#39;: &#39;nu_mag_hi&#39;})
+<span class="c1"># 1. Indifference ratio R* = exp(-bias)</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">vals</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">[(</span><span class="n">bias_nonsym</span><span class="p">,</span> <span class="s1">&#39;Non-symbolic&#39;</span><span class="p">,</span> <span class="s1">&#39;#d95f02&#39;</span><span class="p">),</span>
+                        <span class="p">(</span><span class="n">bias_sym</span><span class="p">,</span>    <span class="s1">&#39;Symbolic&#39;</span><span class="p">,</span>     <span class="s1">&#39;#1f78b4&#39;</span><span class="p">)]:</span>
+    <span class="n">ratio</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">vals</span><span class="p">)</span>
+    <span class="n">az</span><span class="o">.</span><span class="n">plot_kde</span><span class="p">(</span><span class="n">ratio</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">,</span> <span class="n">plot_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;color&#39;</span><span class="p">:</span> <span class="n">c</span><span class="p">,</span> <span class="s1">&#39;lw&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mf">0.55</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;:&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Risk-neutral (1/0.55)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Indifference ratio  R* = exp(-bias)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;How much larger must risky be?&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">8</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
 
-# ── Decision noise (single evidence_sd from KLW) ─────────────────────────────
-df_nu_risk = posterior_summary(idata_klw, &#39;evidence_sd&#39;).rename(
-                columns={&#39;mean&#39;: &#39;nu_risk&#39;, &#39;lo&#39;: &#39;nu_risk_lo&#39;, &#39;hi&#39;: &#39;nu_risk_hi&#39;})
+<span class="c1"># 2. RNP = exp(bias)</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">vals</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">[(</span><span class="n">bias_nonsym</span><span class="p">,</span> <span class="s1">&#39;Non-symbolic&#39;</span><span class="p">,</span> <span class="s1">&#39;#d95f02&#39;</span><span class="p">),</span>
+                        <span class="p">(</span><span class="n">bias_sym</span><span class="p">,</span>    <span class="s1">&#39;Symbolic&#39;</span><span class="p">,</span>     <span class="s1">&#39;#1f78b4&#39;</span><span class="p">)]:</span>
+    <span class="n">rnp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+    <span class="n">az</span><span class="o">.</span><span class="n">plot_kde</span><span class="p">(</span><span class="n">rnp</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">,</span> <span class="n">plot_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;color&#39;</span><span class="p">:</span> <span class="n">c</span><span class="p">,</span> <span class="s1">&#39;lw&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mf">0.55</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;:&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Risk-neutral (0.55)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Risk-neutral probability  (RNP)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Implied winning probability&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">8</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
 
-# ── Implied δ* from KLW posterior ────────────────────────────────────────────
-nu_arr   = idata_klw.posterior[&#39;evidence_sd&#39;].values.reshape(-1, len(df_nu_risk))
-prsd_arr = idata_klw.posterior[&#39;prior_sd&#39;].values.reshape(-1, len(df_nu_risk))
+<span class="c1"># 3. CE discount = 1 - RNP/0.55</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">vals</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">[(</span><span class="n">bias_nonsym</span><span class="p">,</span> <span class="s1">&#39;Non-symbolic&#39;</span><span class="p">,</span> <span class="s1">&#39;#d95f02&#39;</span><span class="p">),</span>
+                        <span class="p">(</span><span class="n">bias_sym</span><span class="p">,</span>    <span class="s1">&#39;Symbolic&#39;</span><span class="p">,</span>     <span class="s1">&#39;#1f78b4&#39;</span><span class="p">)]:</span>
+    <span class="n">rnp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+    <span class="n">discount</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">rnp</span> <span class="o">/</span> <span class="mf">0.55</span>
+    <span class="n">az</span><span class="o">.</span><span class="n">plot_kde</span><span class="p">(</span><span class="n">discount</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">,</span> <span class="n">plot_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;color&#39;</span><span class="p">:</span> <span class="n">c</span><span class="p">,</span> <span class="s1">&#39;lw&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;:&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Risk-neutral&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;CE discount  (1 - RNP/0.55)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Certainty-equivalent discount&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">8</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
 
-gamma      = prsd_arr**2 / (prsd_arr**2 + nu_arr**2)
-delta_star = np.log(1/.55) / gamma
-
-df_delta = pd.DataFrame({
-    &#39;subject&#39;:    idata_klw.posterior[&#39;evidence_sd&#39;].coords[&#39;subject&#39;].values,
-    &#39;delta_mean&#39;: delta_star.mean(0),
-    &#39;delta_lo&#39;:   np.percentile(delta_star, 3, 0),
-    &#39;delta_hi&#39;:   np.percentile(delta_star, 97, 0),
-})
-
-# ── Merge on subject ──────────────────────────────────────────────────────────
-df_corr = (df_nu_mag
-           .merge(df_nu_risk, on=&#39;subject&#39;)
-           .merge(df_delta,   on=&#39;subject&#39;))
-print(f&quot;Aligned subjects: {len(df_corr)}&quot;)
-</pre></div>
-</div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>def scatter_hdi(ax, x, y, xerr, yerr, color, xlabel, ylabel, title, hline=None):
-    &quot;&quot;&quot;Scatter plot with HDI crossbars and a regression line.&quot;&quot;&quot;
-    ax.errorbar(x, y, xerr=xerr, yerr=yerr,
-                fmt=&#39;o&#39;, ms=4, alpha=.55, elinewidth=.7, capsize=2,
-                color=color, ecolor=color)
-    r, p = pearsonr(x, y)
-    m, b = np.polyfit(x, y, 1)
-    xs   = np.linspace(x.min(), x.max(), 100)
-    ax.plot(xs, m*xs + b, &#39;--&#39;, color=color, lw=1.5, alpha=.8,
-            label=f&#39;r = {r:.2f} (p={p:.3f})&#39;)
-    if hline is not None:
-        ax.axhline(hline, ls=&#39;:&#39;, c=&#39;gray&#39;, lw=1.5, label=&#39;Risk-neutral&#39;)
-    ax.set_xlabel(xlabel); ax.set_ylabel(ylabel); ax.set_title(title)
-    ax.legend(fontsize=9); sns.despine(ax=ax)
-
-fig, axes = plt.subplots(1, 3, figsize=(16, 5))
-
-# 1. Perceptual noise vs decision noise
-scatter_hdi(
-    axes[0],
-    x    = df_corr[&#39;nu_mag&#39;],
-    y    = df_corr[&#39;nu_risk&#39;],
-    xerr = np.array([df_corr[&#39;nu_mag&#39;]  - df_corr[&#39;nu_mag_lo&#39;],
-                     df_corr[&#39;nu_mag_hi&#39;] - df_corr[&#39;nu_mag&#39;]]),
-    yerr = np.array([df_corr[&#39;nu_risk&#39;]  - df_corr[&#39;nu_risk_lo&#39;],
-                     df_corr[&#39;nu_risk_hi&#39;] - df_corr[&#39;nu_risk&#39;]]),
-    color   = &#39;#4393c3&#39;,
-    xlabel  = &#39;Perceptual noise  ν₂  (magnitude task)&#39;,
-    ylabel  = &#39;Decision noise  ν  (risk task)&#39;,
-    title   = &#39;Perceptual ↔ decision noise&#39;,
-)
-
-# 2. Perceptual noise vs δ*
-scatter_hdi(
-    axes[1],
-    x    = df_corr[&#39;nu_mag&#39;],
-    y    = df_corr[&#39;delta_mean&#39;],
-    xerr = np.array([df_corr[&#39;nu_mag&#39;]   - df_corr[&#39;nu_mag_lo&#39;],
-                     df_corr[&#39;nu_mag_hi&#39;] - df_corr[&#39;nu_mag&#39;]]),
-    yerr = np.array([df_corr[&#39;delta_mean&#39;] - df_corr[&#39;delta_lo&#39;],
-                     df_corr[&#39;delta_hi&#39;]   - df_corr[&#39;delta_mean&#39;]]),
-    color  = &#39;#d6604d&#39;,
-    xlabel = &#39;Perceptual noise  ν₂  (magnitude task)&#39;,
-    ylabel = &#39;Implied risk aversion  δ*&#39;,
-    title  = &#39;Perceptual noise → risk aversion&#39;,
-    hline  = np.log(1/.55),
-)
-
-# 3. Decision noise vs δ*  (within-task)
-scatter_hdi(
-    axes[2],
-    x    = df_corr[&#39;nu_risk&#39;],
-    y    = df_corr[&#39;delta_mean&#39;],
-    xerr = np.array([df_corr[&#39;nu_risk&#39;]  - df_corr[&#39;nu_risk_lo&#39;],
-                     df_corr[&#39;nu_risk_hi&#39;] - df_corr[&#39;nu_risk&#39;]]),
-    yerr = np.array([df_corr[&#39;delta_mean&#39;] - df_corr[&#39;delta_lo&#39;],
-                     df_corr[&#39;delta_hi&#39;]   - df_corr[&#39;delta_mean&#39;]]),
-    color  = &#39;#1a9850&#39;,
-    xlabel = &#39;Decision noise  ν  (risk task)&#39;,
-    ylabel = &#39;Implied risk aversion  δ*&#39;,
-    title  = &#39;Decision noise → risk aversion  (within-task)&#39;,
-    hline  = np.log(1/.55),
-)
-
-plt.suptitle(&#39;Key result: noise predicts risk aversion (bars = 94 % HDI per subject)&#39;,
-             fontsize=13, y=1.02)
-plt.tight_layout()
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Group-level posteriors: three views of risk aversion&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson2_17_0.png" src="../_images/tutorial_lesson2_17_0.png" />
+</div>
+</div>
+</section>
+</section>
+<section id="Bonus:-RiskRegressionModel-for-the-format-effect">
+<h2>Bonus: RiskRegressionModel for the format effect<a class="headerlink" href="#Bonus:-RiskRegressionModel-for-the-format-effect" title="Link to this heading">¶</a></h2>
+<p>Instead of fitting two separate models, bauer’s <code class="docutils literal notranslate"><span class="pre">RiskRegressionModel</span></code> lets you test the format effect <em>within a single model</em> using a patsy formula. This gives a direct posterior on the format contrast — cleaner than comparing two separate fits.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">RiskRegressionModel</span>
+
+<span class="n">data_reg</span> <span class="o">=</span> <span class="n">data_risk</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s1">&#39;format&#39;</span><span class="p">)</span>
+<span class="n">model_reg</span> <span class="o">=</span> <span class="n">RiskRegressionModel</span><span class="p">(</span>
+    <span class="n">paradigm</span><span class="o">=</span><span class="n">data_reg</span><span class="p">,</span>
+    <span class="n">regressors</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;evidence_sd&#39;</span><span class="p">:</span> <span class="s1">&#39;C(format)&#39;</span><span class="p">},</span>
+    <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;klw&#39;</span><span class="p">,</span>
+    <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">model_reg</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data_reg</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">idata_reg</span> <span class="o">=</span> <span class="n">model_reg</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<span class="c1"># Posterior of evidence_sd at each format condition</span>
+<span class="n">conditions</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;format&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;symbolic&#39;</span><span class="p">,</span> <span class="s1">&#39;non-symbolic&#39;</span><span class="p">]})</span>
+<span class="n">pars_cond</span>  <span class="o">=</span> <span class="n">model_reg</span><span class="o">.</span><span class="n">get_conditionwise_parameters</span><span class="p">(</span><span class="n">idata_reg</span><span class="p">,</span> <span class="n">conditions</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">sd_sym</span>    <span class="o">=</span> <span class="n">pars_cond</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;evidence_sd&#39;</span><span class="p">][</span><span class="s1">&#39;symbolic&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+<span class="n">sd_nonsym</span> <span class="o">=</span> <span class="n">pars_cond</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;evidence_sd&#39;</span><span class="p">][</span><span class="s1">&#39;non-symbolic&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="n">az</span><span class="o">.</span><span class="n">plot_kde</span><span class="p">(</span><span class="n">sd_sym</span><span class="p">,</span>    <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Symbolic&#39;</span><span class="p">,</span>     <span class="n">plot_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;color&#39;</span><span class="p">:</span> <span class="s1">&#39;#1f78b4&#39;</span><span class="p">,</span> <span class="s1">&#39;lw&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">az</span><span class="o">.</span><span class="n">plot_kde</span><span class="p">(</span><span class="n">sd_nonsym</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Non-symbolic&#39;</span><span class="p">,</span>  <span class="n">plot_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;color&#39;</span><span class="p">:</span> <span class="s1">&#39;#d95f02&#39;</span><span class="p">,</span> <span class="s1">&#39;lw&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;evidence_sd  (group level)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Posterior density&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;RiskRegressionModel: format effect on noise&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">();</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">();</span> <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 4 jobs)
+NUTS: [evidence_sd_mu, evidence_sd_sd, evidence_sd_offset, prior_sd_mu, prior_sd_sd, prior_sd_offset]
+Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 929 seconds.
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson2_19_1.png" src="../_images/tutorial_lesson2_19_1.png" />
+</div>
+</div>
+</section>
+<section id="Why-noise-produces-risk-aversion:-the-KLW-mechanism">
+<h2>Why noise produces risk aversion: the KLW mechanism<a class="headerlink" href="#Why-noise-produces-risk-aversion:-the-KLW-mechanism" title="Link to this heading">¶</a></h2>
+<p>The correlation between noise and risk aversion is not a statistical accident — it has a mechanistic explanation. The <strong>KLW model</strong> (Khaw, Li &amp; Woodford, 2021) shows that a Bayesian observer with noisy magnitude representations will <em>systematically undervalue</em> risky prospects:</p>
+<ol class="arabic simple">
+<li><p>Both the safe and risky payoffs are perceived with noise <span class="math notranslate nohighlight">\(\nu\)</span> on the log scale.</p></li>
+<li><p>A Bayesian prior pulls both percepts toward the mean of the payoff distribution.</p></li>
+<li><p>Because the risky payoff is typically <em>larger</em> than the safe payoff, it gets pulled <em>down</em> more (toward the mean) than the safe payoff gets pulled <em>up</em>.</p></li>
+<li><p>This asymmetric compression shrinks the perceived advantage of the risky option, shifting the indifference point rightward — i.e. producing risk aversion.</p></li>
+</ol>
+<p>The amount of shrinkage is controlled by the ratio <span class="math notranslate nohighlight">\(\nu^2 / \sigma_0^2\)</span> (noise vs. prior width). More noise <span class="math notranslate nohighlight">\(\rightarrow\)</span> more shrinkage <span class="math notranslate nohighlight">\(\rightarrow\)</span> more risk aversion. This is exactly the correlation we see in the scatter plots above.</p>
+<p>Critically, risk aversion here is not a preference — it is a <strong>perceptual distortion</strong>. The observer is doing the best they can with noisy information, and the Bayesian-optimal strategy happens to look risk-averse from the outside.</p>
+</section>
+<section id="Summary">
+<h2>Summary<a class="headerlink" href="#Summary" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p>A <strong>psychometric function</strong> fitted to risky choices gives two parameters per subject: noise (<span class="math notranslate nohighlight">\(\nu\)</span>) and indifference point (<span class="math notranslate nohighlight">\(\delta^*\)</span>).</p></li>
+<li><p><strong>Format matters</strong>: symbolic payoffs produce lower noise and less risk aversion than non-symbolic coin clouds.</p></li>
+<li><p><strong>Within each format</strong>: noisier subjects have higher <span class="math notranslate nohighlight">\(\delta^*\)</span> (more risk-averse).</p></li>
+<li><p><strong>RiskRegressionModel</strong> provides a principled single-model test of the format effect.</p></li>
+<li><p>The <strong>KLW model</strong> explains <em>why</em>: Bayesian shrinkage under noise compresses the perceived advantage of risky options.</p></li>
+</ol>
+<p>In <a class="reference internal" href="lesson3.html"><span class="doc">Lesson 3</span></a> we move to a richer dataset (de Hollander et al., 2024, bioRxiv) where <strong>presentation order</strong> is randomised, allowing bauer’s <code class="docutils literal notranslate"><span class="pre">RiskModel</span></code> with separate <span class="math notranslate nohighlight">\(\nu_1, \nu_2\)</span> to capture striking order <span class="math notranslate nohighlight">\(\times\)</span> stake-size interactions.</p>
 </section>
 </section>
 
@@ -650,7 +888,7 @@ plt.tight_layout()
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Lesson 3: Stake effects and presentation order — de Hollander et al. (2024)</div>
+                <div class="title">Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv)</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -661,7 +899,7 @@ plt.tight_layout()
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Lesson 1: Psychophysical Modelling</div>
+                <div class="title">Lesson 1: An Introduction to Psychophysical Modelling</div>
                 
               </div>
             </a>
@@ -695,16 +933,29 @@ plt.tight_layout()
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Lesson 2: Risky Choice and the Key Correlations (Barreto-Garc:nbsphinx-math:`u0`0eda et al., 2023)</a><ul>
-<li><a class="reference internal" href="#From-magnitude-to-risk">From magnitude to risk</a></li>
+<li><a class="reference internal" href="#">Lesson 2: Risky Choice — Psychometric Functions and the Noise–Risk Link</a><ul>
+<li><a class="reference internal" href="#From-magnitude-comparison-to-risky-choice">From magnitude comparison to risky choice</a></li>
+<li><a class="reference internal" href="#Approach:-psychometric-functions">Approach: psychometric functions</a></li>
 <li><a class="reference internal" href="#Visualise-risky-choice-data">Visualise risky-choice data</a></li>
-<li><a class="reference internal" href="#Risk-neutral-probability-and-the-indifference-point">Risk-neutral probability and the indifference point</a></li>
-<li><a class="reference internal" href="#KLW-model">KLW model</a></li>
-<li><a class="reference internal" href="#Format-comparison:-symbolic-vs-non-symbolic">Format comparison: symbolic vs non-symbolic</a><ul>
-<li><a class="reference internal" href="#Regression-model:-format-effect-on-noise">Regression model: format effect on noise</a></li>
+<li><a class="reference internal" href="#The-psychometric-function-for-risky-choice">The psychometric function for risky choice</a><ul>
+<li><a class="reference internal" href="#Why-this-works">Why this works</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#Key-result:-perceptual-noise-predicts-risk-aversion">Key result: perceptual noise predicts risk aversion</a></li>
+<li><a class="reference internal" href="#Fitting-psychometric-functions-—-separately-per-format">Fitting psychometric functions — separately per format</a><ul>
+<li><a class="reference internal" href="#Format-effect">Format effect</a></li>
+<li><a class="reference internal" href="#Difference-distributions">Difference distributions</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#Key-result:-noise-predicts-risk-aversion-(within-each-format)">Key result: noise predicts risk aversion (within each format)</a></li>
+<li><a class="reference internal" href="#Interpreting-the-indifference-point:-from-log-space-to-intuition">Interpreting the indifference point: from log-space to intuition</a><ul>
+<li><a class="reference internal" href="#1.-Indifference-ratio:-%22how-much-larger-must-the-risky-option-be?%22">1. Indifference ratio: “how much larger must the risky option be?”</a></li>
+<li><a class="reference internal" href="#2.-Risk-neutral-probability-(RNP)">2. Risk-neutral probability (RNP)</a></li>
+<li><a class="reference internal" href="#3.-Certainty-equivalent-discount">3. Certainty equivalent discount</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#Bonus:-RiskRegressionModel-for-the-format-effect">Bonus: RiskRegressionModel for the format effect</a></li>
+<li><a class="reference internal" href="#Why-noise-produces-risk-aversion:-the-KLW-mechanism">Why noise produces risk aversion: the KLW mechanism</a></li>
+<li><a class="reference internal" href="#Summary">Summary</a></li>
 </ul>
 </li>
 </ul>
