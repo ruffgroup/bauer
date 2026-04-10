@@ -127,7 +127,7 @@ n2_linear = np.linspace(1, 60, 300)
 log_ratios = np.linspace(-1.8, 1.8, 300)
 
 fig, axes = plt.subplots(1, 2, figsize=(11, 4))
-pal = sns.color_palette('Blues_d', len(n1_vals))
+pal = sns.color_palette('YlOrRd', len(n1_vals))
 
 for (n1, c) in zip(n1_vals, pal):
     p_lin = scipy_norm.cdf(np.log(n2_linear / n1) / (np.sqrt(2) * nu))
@@ -315,30 +315,34 @@ nu2         = 0.3                # fixed perceptual noise on n2
 prior_sd    = 0.6                # moderate prior
 prior_mu    = 0.0                # centred (mean of log-stimulus distribution)
 
-fig, ax = plt.subplots(figsize=(8, 4.5))
+fig, axes = plt.subplots(1, 2, figsize=(13, 4.5))
 pal = sns.color_palette('Reds_d', len(nu1_values))
 
-for nu1, c in zip(nu1_values, pal):
-    gamma1 = prior_sd**2 / (prior_sd**2 + nu1**2)
-    gamma2 = prior_sd**2 / (prior_sd**2 + nu2**2)
-    # For log(n2/n1) = x, set log(n1) = 0  (representative reference)
-    log_n1 = 0.0
-    log_n2_vals = log_n1 + log_r_range   # varies the comparison
-    # Posterior means
-    mu1_hat = prior_mu + gamma1 * (log_n1     - prior_mu)
-    mu2_hat = prior_mu + gamma2 * (log_n2_vals - prior_mu)
-    sigma_total = np.sqrt(prior_sd**2 * nu1**2 / (prior_sd**2 + nu1**2)
-                        + prior_sd**2 * nu2**2 / (prior_sd**2 + nu2**2))
-    p = scipy_norm.cdf((mu2_hat - mu1_hat) / (np.sqrt(2) * sigma_total))
-    ax.plot(log_r_range, p, color=c, lw=2.5,
-            label=f'\u03bd\u2081={nu1:.1f}, \u03bd\u2082={nu2:.1f} (memory noise on n\u2081)')
+# Left: large n1 (above prior mean); Right: small n1 (below prior mean)
+for ax, log_n1, n1_label in zip(axes, [1.5, -1.5],
+        ['Large n\u2081 (above prior \u2192 compressed down)',
+         'Small n\u2081 (below prior \u2192 compressed up)']):
+    for nu1, c in zip(nu1_values, pal):
+        gamma1 = prior_sd**2 / (prior_sd**2 + nu1**2)
+        gamma2 = prior_sd**2 / (prior_sd**2 + nu2**2)
+        log_n2_vals = log_n1 + log_r_range
+        mu1_hat = prior_mu + gamma1 * (log_n1      - prior_mu)
+        mu2_hat = prior_mu + gamma2 * (log_n2_vals  - prior_mu)
+        sigma_total = np.sqrt(prior_sd**2 * nu1**2 / (prior_sd**2 + nu1**2)
+                            + prior_sd**2 * nu2**2 / (prior_sd**2 + nu2**2))
+        p = scipy_norm.cdf((mu2_hat - mu1_hat) / (np.sqrt(2) * sigma_total))
+        ax.plot(log_r_range, p, color=c, lw=2.5,
+                label=f'\u03bd\u2081={nu1:.1f}, \u03bd\u2082={nu2:.1f}')
+    ax.axhline(.5, ls='--', c='gray', lw=1)
+    ax.axvline(0,  ls='--', c='gray', lw=1)
+    ax.set_xlabel('log(n\u2082 / n\u2081)')
+    ax.set_ylabel('P(chose n\u2082)')
+    ax.set_title(n1_label)
+    ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
-ax.axhline(.5, ls='--', c='gray', lw=1)
-ax.axvline(0,  ls='--', c='gray', lw=1)
-ax.set_xlabel('log(n\u2082 / n\u2081)')
-ax.set_ylabel('P(chose n\u2082)')
-ax.set_title('Higher memory noise on n\u2081 shifts the curve — asymmetric prior compression')
-ax.legend(fontsize=9); sns.despine(); plt.tight_layout()
+plt.suptitle('Asymmetric noise + prior: curve shift depends on reference magnitude',
+             fontsize=12, y=1.02)
+plt.tight_layout()
 """),
 
 md("""## Barreto-Garc\u00eda et al. (2023): Magnitude comparison task
@@ -371,27 +375,35 @@ code("""\
 # Compute log-ratio for each trial and bin for plotting
 data['log(n2/n1)'] = np.log(data['n2'] / data['n1'])
 data['bin'] = (pd.cut(data['log(n2/n1)'], bins=12)
-                 .apply(lambda x: x.mid).astype(float))
+                 .map(lambda x: x.mid).astype(float))
 
 grouped = (data.groupby(['n1', 'bin'])['choice']
                .agg(['mean', 'count']).reset_index()
                .query('count >= 5'))
 
-g = sns.FacetGrid(grouped, col='n1', col_wrap=3, height=3.2, aspect=1.1)
-g.map(plt.scatter, 'bin', 'mean', s=25, alpha=.8, color='#2166ac')
-g.map(sns.lineplot,  'bin', 'mean', color='#2166ac', lw=1.5)
-for ax in g.axes.flat:
-    ax.axhline(.5, ls='--', c='gray', lw=1)
-    ax.axvline(.0, ls='--', c='gray', lw=1)
-    ax.set_ylim(-.05, 1.05)
-g.set_axis_labels('log(n2 / n1)', 'P(chose n2)')
-g.set_titles('n1 = {col_name}')
-plt.suptitle('Group-averaged psychometric curves — scale invariance confirmed', y=1.02)
-plt.tight_layout()
+n1_unique = sorted(grouped['n1'].unique())
+pal_n1 = sns.color_palette('YlOrRd', len(n1_unique))
+n1_colors = dict(zip(n1_unique, pal_n1))
+
+fig, ax = plt.subplots(figsize=(7, 5))
+for n1_val in n1_unique:
+    d = grouped[grouped['n1'] == n1_val]
+    ax.plot(d['bin'], d['mean'], 'o-', ms=5, lw=1.5,
+            color=n1_colors[n1_val], label=f'n\u2081 = {n1_val}')
+ax.axhline(.5, ls='--', c='gray', lw=1)
+ax.axvline(.0, ls='--', c='gray', lw=1)
+ax.set_ylim(-.05, 1.05)
+ax.set_xlabel('log(n\u2082 / n\u2081)')
+ax.set_ylabel('P(chose n\u2082)')
+ax.set_title('Log-ratio scale: all n\u2081 curves collapse (scale invariance)')
+ax.legend(title='Reference n\u2081', fontsize=9)
+sns.despine(); plt.tight_layout()
 """),
 
-md(r"""The curves collapse beautifully when plotted against $\log(n_2/n_1)$ — consistent
-with the NLC model's prediction.  Compare this with the natural-scale plots below.
+md(r"""The curves collapse when plotted against $\log(n_2/n_1)$, confirming the NLC
+model's scale-invariance prediction.  The overlap is not perfect — small $n_1$ (5, 7)
+produce slightly steeper curves, hinting at a mild departure from strict Weber's law
+at low magnitudes.  Compare this with the natural-scale plots below.
 
 ## Weber's law: what linear encoding gets wrong
 
@@ -404,7 +416,7 @@ a clear pattern: **steeper curves for small $n_1$, shallower for large $n_1$**. 
 code("""\
 # Natural-space psychometric curves: slope and indifference point shift with n1
 n1_unique = sorted(data['n1'].unique())
-pal_n1 = sns.color_palette('Blues_d', len(n1_unique))
+pal_n1 = sns.color_palette('YlOrRd', len(n1_unique))
 
 fig, axes = plt.subplots(2, 3, figsize=(12, 7.5), sharey=True)
 axes = axes.flatten()
@@ -676,14 +688,14 @@ ppc_ll  = ppc_df.xs('ll_bernoulli', level='variable')   # trials \u00d7 posterio
 
 ppc_flat = ppc_ll.reset_index()
 ppc_flat['bin'] = (pd.cut(-ppc_flat['log(n1/n2)'], 12)
-                     .apply(lambda x: x.mid).astype(float))
+                     .map(lambda x: x.mid).astype(float))
 
 g_ppc = summarize_ppc_group(ppc_flat, condition_cols=['n1', 'bin'])
 g_ppc = g_ppc.rename(columns={'p_predicted': 'p_mean', 'hdi025': 'p_lo', 'hdi975': 'p_hi'})
 
 data_copy = data.reset_index()
 data_copy['bin'] = (pd.cut(-data_copy['log(n1/n2)'], 12)
-                      .apply(lambda x: x.mid).astype(float))
+                      .map(lambda x: x.mid).astype(float))
 obs = (data_copy.groupby(['subject', 'n1', 'bin'])['choice'].mean()
                 .groupby(['n1', 'bin']).mean())
 g_ppc['choice'] = obs
@@ -721,6 +733,28 @@ g.figure.suptitle('Posterior predictive check — MagnitudeComparisonModel',
 g.figure.tight_layout()
 """),
 
+code("""\
+# PPC overlay: all n1 values in one panel (hue = n1)
+n1_pal = sns.color_palette('YlOrRd', g_ppc['n1'].nunique())
+n1_colors = dict(zip(sorted(g_ppc['n1'].unique()), n1_pal))
+
+fig, ax = plt.subplots(figsize=(8, 5))
+for n1_val in sorted(g_ppc['n1'].unique()):
+    d = g_ppc[g_ppc['n1'] == n1_val].sort_values('bin')
+    c = n1_colors[n1_val]
+    ax.fill_between(d['bin'], d['p_lo'], d['p_hi'], alpha=.15, color=c)
+    ax.plot(d['bin'], d['p_mean'], lw=2, color=c, label=f'n\u2081 = {n1_val}')
+    ax.scatter(d['bin'], d['choice'], s=20, color=c, zorder=5)
+ax.axhline(.5, ls='--', c='gray', lw=1)
+ax.axvline(0,  ls='--', c='gray', lw=1)
+ax.set_ylim(-.05, 1.05)
+ax.set_xlabel('log(n\u2082 / n\u2081)')
+ax.set_ylabel('P(chose n\u2082)')
+ax.set_title('PPC overlay: model predictions (bands) vs data (dots) by n\u2081')
+ax.legend(title='Reference n\u2081', fontsize=9)
+sns.despine(); plt.tight_layout()
+"""),
+
 md(r"""## Summary
 
 In this lesson we built up the NLC model from first principles:
@@ -746,19 +780,20 @@ write_if_changed(nb1, 'lesson1.ipynb')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Lesson 2 — Risky Choice: KLW, Format Comparison, and Key Correlations
+# Lesson 2 — Risky Choice: Psychometric Functions and the Noise–Risk Link
 # ─────────────────────────────────────────────────────────────────────────────
 
 nb2 = nbf.v4.new_notebook()
 nb2.cells = [
 
-md(r"""# Lesson 2: Risky Choice and the Key Correlations (Barreto-Garc\u00eda et al., 2023)
+md(r"""# Lesson 2: Risky Choice — Psychometric Functions and the Noise–Risk Link
 
-## From magnitude to risk
+## From magnitude comparison to risky choice
 
-The same 64 participants also made risky choices **outside** the scanner.  On each trial
-they chose between a **sure payoff** ($p_1 = 1.0$, $n_1 \in \{5,7,10,14,20,28\}$) and a
-**risky gamble** ($p_2 = 0.55$, $n_2$ varying).  Crucially, payoffs were shown in two
+The same 64 participants from Barreto-García et al. (2023) also made risky choices
+**outside** the scanner.  On each trial they chose between a **sure payoff**
+($p_\text{safe} = 1.0$, $n_\text{safe} \in \{5,7,10,14,20,28\}$) and a **risky gamble**
+($p_\text{risky} = 0.55$, $n_\text{risky}$ varying).  Payoffs were shown in two
 **formats** across separate blocks:
 
 | Format | Representation |
@@ -767,8 +802,21 @@ they chose between a **sure payoff** ($p_1 = 1.0$, $n_1 \in \{5,7,10,14,20,28\}$
 | `symbolic` | Arabic numerals |
 
 The paper's central argument: **the same perceptual noise that limits magnitude
-discrimination also distorts the subjective value of risky gambles**, producing risk
-aversion as a by-product of noisy numerical cognition.
+discrimination also distorts risky-choice behaviour**, producing risk aversion as a
+by-product of noisy numerical cognition.
+
+## Approach: psychometric functions
+
+Rather than building a full cognitive model (we will do that in lessons 3–4), we start
+with the simplest possible analysis: fit a **psychometric function** to each participant's
+risky-choice data and extract two numbers:
+
+1. **Noise** ($\nu$) — how imprecise is the observer?  Low $\nu$ → steep curve → precise.
+2. **Indifference point** ($\delta^*$, the `bias` parameter) — at what log-ratio does the
+   observer switch from preferring safe to preferring risky?
+
+If noise drives risk aversion, then noisier observers (higher $\nu$, lower precision)
+should have a higher $\delta^*$ (shifted rightward = more risk-averse).
 """),
 
 code("""\
@@ -780,30 +828,30 @@ import seaborn as sns
 import arviz as az
 from scipy.stats import norm as scipy_norm, spearmanr
 from bauer.utils.data import load_garcia2022
-from bauer.models import RiskModel, RiskRegressionModel
+from bauer.models import PsychometricModel
 
 data_risk = load_garcia2022(task='risk')
 print(f"Subjects: {data_risk.index.get_level_values('subject').nunique()},  "
       f"Trials: {len(data_risk)},  "
       f"Formats: {data_risk.index.get_level_values('format').unique().tolist()}")
-data_risk.head()
 """),
 
 md(r"""## Visualise risky-choice data
 
-The dashed vertical line marks the **risk-neutral expected-value threshold**
-$\log(1/0.55) \approx 0.60$.  A risk-neutral observer's curve crosses 0.5 exactly there.
-Curves crossing to the right → risk aversion; to the left → risk seeking.
+We plot the proportion of risky choices as a function of the log-ratio
+$\log(n_\text{risky} / n_\text{safe})$.  The dashed vertical line marks the
+**risk-neutral threshold** $\log(1/0.55) \approx 0.60$ — the point where a
+risk-neutral observer is indifferent.
 
-Symbolic payoffs (Arabic numerals) produce a steeper, left-shifted curve, indicating
-lower noise and less risk aversion relative to non-symbolic coin clouds.
+- Curve crosses 0.5 **to the right** of the dashed line → risk-averse
+- Curve crosses 0.5 **to the left** → risk-seeking
 """),
 
 code("""\
 plot_data = data_risk.reset_index(level='format').copy()
 plot_data['log(risky/safe)'] = np.log(plot_data['n2'] / plot_data['n1'])
 plot_data['bin'] = (pd.cut(plot_data['log(risky/safe)'], bins=12)
-                      .apply(lambda x: x.mid).astype(float))
+                      .map(lambda x: x.mid).astype(float))
 
 grouped = (plot_data.groupby(['format', 'bin'])['choice']
                     .agg(['mean', 'count']).reset_index()
@@ -822,153 +870,352 @@ g.set_titles('Format: {col_name}')
 plt.tight_layout()
 """),
 
-md(r"""## Risk-neutral probability and the indifference point
+md(r"""## The psychometric function for risky choice
 
-In this experiment the risky option pays out with probability $p_\text{risky} = 0.55$.
-The **risk-neutral probability** (RNP) is simply that number: 55 % — it is the winning
-probability at which a risk-neutral, expected-value-maximising observer would make exactly
-the same choices as our model predicts.
+bauer's `PsychometricModel` fits:
 
-A risk-neutral observer is indifferent between the safe payoff $n_\text{safe}$ and the
-risky payoff $n_\text{risky}$ when their expected values are equal:
+$$P(\text{chose risky}) = \Phi\!\left(\frac{\log(n_\text{risky}/n_\text{safe}) - \delta^*}{\sqrt{2}\,\nu}\right)$$
 
-$$1.0 \times n_\text{safe} = 0.55 \times n_\text{risky}
-\;\Longrightarrow\;
-n_\text{risky} = \frac{n_\text{safe}}{0.55} = \frac{1}{0.55}\, n_\text{safe}$$
+where $\Phi$ is the standard-normal CDF.  The two free parameters per subject are:
 
-In log-ratio space the **indifference point** is therefore
+| Parameter | bauer name | Interpretation |
+|-----------|-----------|----------------|
+| $\nu$ | `nu` | **Noise** — SD of the internal log-magnitude representation.  Higher = noisier = shallower curve. |
+| $\delta^*$ | `bias` | **Indifference point** — the log-ratio at which P(chose risky) = 0.5.  A risk-neutral observer has $\delta^* = \log(1/0.55) \approx 0.60$; larger values indicate risk aversion. |
 
-$$\delta^*_\text{risk-neutral} = \log\!\left(\frac{1}{0.55}\right) \approx 0.598$$
+Note that `bias` is **unconstrained**: it can be positive (risk-averse), zero, or negative
+(risk-seeking).  This is important — some participants genuinely prefer the risky option
+even when it has lower expected value, and the model can capture that.
 
-This is the $x$-value at which the psychometric curve of a risk-neutral observer crosses
-$P = 0.5$.  An observer with $\delta^* > \log(1/0.55)$ is **risk-averse** — they need
-the risky option to be even larger than the fair-expected-value threshold before they
-prefer it.
+### Why this works
+
+On the log scale, choosing the risky option is optimal when:
+
+$$\log n_\text{risky} - \log n_\text{safe} > \log(1/p_\text{risky})$$
+
+i.e. when the risky payoff is large enough to compensate for the lower winning probability.
+But this comparison is done with **noisy internal representations**, and the observer may
+also have a **bias** toward or away from risk.  The psychometric function captures both
+effects in a single curve.
 """),
 
 code("""\
+# Illustrate: how noise and bias shape the risky-choice curve
 log_r = np.linspace(-.3, 2.2, 400)
 ev_threshold = np.log(1/.55)
-slope = 1.6   # fixed for illustration
 
-fig, ax = plt.subplots(figsize=(7, 4.5))
+fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
 
+# Left: varying bias (indifference point) at fixed noise
+ax = axes[0]
 for delta_star, label, c in [
-        (ev_threshold, f'Risk-neutral  (\u03b4* = log(1/0.55) \u2248 {ev_threshold:.2f})', '#4393c3'),
-        (.95, 'Mildly risk-averse  (\u03b4* = 0.95)', '#1a9850'),
-        (1.45, 'Strongly risk-averse  (\u03b4* = 1.45)', '#d73027')]:
-    p = scipy_norm.cdf((log_r - delta_star) * slope)
+        (0.3,           'Risk-seeking  (\u03b4* = 0.30)', '#2166ac'),
+        (ev_threshold,  f'Risk-neutral  (\u03b4* = {ev_threshold:.2f})', '#878787'),
+        (0.95,          'Mildly risk-averse  (\u03b4* = 0.95)', '#f46d43'),
+        (1.45,          'Strongly risk-averse  (\u03b4* = 1.45)', '#d73027')]:
+    p = scipy_norm.cdf((log_r - delta_star) * 1.6)
     ax.plot(log_r, p, color=c, lw=2.5, label=label)
-    ax.axvline(delta_star, color=c, ls=':', lw=1.5, alpha=.7)
-
 ax.axhline(.5, ls='--', c='gray', lw=1)
-ax.set_xlabel('log(n_risky / n_safe)')
-ax.set_ylabel('P(chose risky gamble)')
-ax.set_title('\u03b4* = indifference point (curve crosses P = 0.5); risk-neutral: \u03b4* = log(1/0.55) \u2248 0.598')
-ax.set_ylim(-.04, 1.04); ax.legend(fontsize=9)
-sns.despine(); plt.tight_layout()
-"""),
+ax.axvline(ev_threshold, ls=':', c='gray', lw=1.5, alpha=.5)
+ax.set_xlabel('log(risky / safe)'); ax.set_ylabel('P(chose risky)')
+ax.set_title('Varying indifference point \u03b4* (fixed noise)')
+ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
-md(r"""## KLW model
+# Right: varying noise at fixed bias
+ax = axes[1]
+for nu, label, c in [
+        (0.25, 'Low noise (\u03bd = 0.25) \u2192 steep', '#2166ac'),
+        (0.50, 'Medium (\u03bd = 0.50)', '#878787'),
+        (1.00, 'High noise (\u03bd = 1.00) \u2192 flat', '#d73027')]:
+    sigma = np.sqrt(2) * nu
+    p = scipy_norm.cdf((log_r - 0.8) / sigma)
+    ax.plot(log_r, p, color=c, lw=2.5, label=label)
+ax.axhline(.5, ls='--', c='gray', lw=1)
+ax.set_xlabel('log(risky / safe)'); ax.set_ylabel('P(chose risky)')
+ax.set_title('Varying noise \u03bd (fixed \u03b4* = 0.80)')
+ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
-The **KLW (Khaw-Li-Woodford)** model applies the same Bayesian-observer NLC framework
-to risky choice.  Crucially, in Barreto-García et al. the safe and risky payoffs were
-shown **simultaneously** on screen, so there is no reason to expect different noise
-for the two options.  We therefore use a **single shared noise** $\nu$:
-
-$$\hat\mu_k = \gamma \log n_k + (1-\gamma)\mu_0, \quad
-\gamma = \frac{\sigma_0^2}{\sigma_0^2 + \nu^2}$$
-
-The prior mean $\mu_0$ is set to the objective batch mean of $\log n$.  The **shrinkage
-factor** $\gamma$ (always in $[0, 1]$) controls how much the brain trusts its noisy
-sensory measurement vs. its prior belief about typical magnitudes:
-
-- $\gamma \approx 1$ (low noise, wide prior): the internal representation tracks the
-  true log magnitude closely — the observer is nearly rational.
-- $\gamma \approx 0$ (high noise or narrow prior): all representations are pulled toward
-  the prior mean — every option looks the same, which produces *risk aversion* because
-  the expected gain from the risky option is systematically underestimated.
-
-This is the **central mechanism**: risk aversion in the KLW model is not a separate
-utility parameter but emerges naturally from perceptual noise shrinking magnitude
-representations toward the mean.
-
-Free parameters per subject: `evidence_sd` ($\nu$), `prior_sd` ($\sigma_0$).
-A smaller `prior_sd` (narrow prior) increases shrinkage and thus predicted risk aversion;
-higher `evidence_sd` (more noise) has the same direction of effect.
-"""),
-
-code("""\
-model_klw = RiskModel(paradigm=data_risk, prior_estimate='klw',
-                      fit_seperate_evidence_sd=False)
-model_klw.build_estimation_model(data=data_risk, hierarchical=True, save_p_choice=True)
-idata_klw = model_klw.sample(draws=200, tune=200, chains=4, progressbar=False)
-"""),
-
-code("""\
-az.plot_posterior(
-    idata_klw,
-    var_names=['evidence_sd_mu', 'prior_sd_mu'],
-    figsize=(8, 3.5),
-)
-plt.suptitle('Group-level KLW posteriors', y=1.04)
+plt.suptitle('Two parameters of the risky-choice psychometric function', fontsize=12, y=1.02)
 plt.tight_layout()
 """),
 
-md("""## Format comparison: symbolic vs non-symbolic
+md(r"""## Fitting psychometric functions — separately per format
 
-We fit the KLW model separately to each format to isolate the noise difference.
+Because symbolic and non-symbolic formats produce different noise levels, we fit
+`PsychometricModel` **separately** for each format.  This gives us per-subject estimates
+of $\nu$ (noise) and $\delta^*$ (indifference point) within each format, which we can
+then correlate with each other and with magnitude-task precision.
 """),
 
 code("""\
-data_sym    = data_risk.xs('symbolic',     level='format')
-data_nonsym = data_risk.xs('non-symbolic', level='format')
+# Prepare data: x1 = log(safe), x2 = log(risky), split by format
+def prep_risk_data(data):
+    df = data.reset_index()
+    df['x1'] = np.log(df['n1'].astype(float))   # log(safe)
+    df['x2'] = np.log(df['n2'].astype(float))   # log(risky)
+    return df.set_index([c for c in data.index.names if c in df.columns])
 
-model_sym = RiskModel(paradigm=data_sym, prior_estimate='klw',
-                      fit_seperate_evidence_sd=False)
+data_sym    = prep_risk_data(data_risk.xs('symbolic',     level='format'))
+data_nonsym = prep_risk_data(data_risk.xs('non-symbolic', level='format'))
+
+print(f"Symbolic:      {len(data_sym)} trials, "
+      f"{data_sym.index.get_level_values('subject').nunique()} subjects")
+print(f"Non-symbolic:  {len(data_nonsym)} trials, "
+      f"{data_nonsym.index.get_level_values('subject').nunique()} subjects")
+"""),
+
+code("""\
+# Fit psychometric models — one per format
+from bauer.models import PsychometricModel
+
+model_sym = PsychometricModel(paradigm=data_sym)
 model_sym.build_estimation_model(data=data_sym, hierarchical=True)
-idata_sym = model_sym.sample(draws=150, tune=150, chains=2, progressbar=False)
+idata_sym = model_sym.sample(draws=500, tune=500, chains=4, progressbar=False)
+print("Symbolic fit done")
 
-model_nonsym = RiskModel(paradigm=data_nonsym, prior_estimate='klw',
-                         fit_seperate_evidence_sd=False)
+model_nonsym = PsychometricModel(paradigm=data_nonsym)
 model_nonsym.build_estimation_model(data=data_nonsym, hierarchical=True)
-idata_nonsym = model_nonsym.sample(draws=150, tune=150, chains=2, progressbar=False)
+idata_nonsym = model_nonsym.sample(draws=500, tune=500, chains=4, progressbar=False)
+print("Non-symbolic fit done")
 """),
 
 code("""\
-# Compare group-level posteriors across formats
-fig, axes = plt.subplots(1, 2, figsize=(9, 4))
-params_compare = ['evidence_sd', 'prior_sd']
+# Group-level posteriors: compare formats
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+ev_threshold = np.log(1/.55)
 
-for ax, param in zip(axes, params_compare):
-    sym_vals    = idata_sym.posterior[f'{param}_mu'].values.ravel()
-    nonsym_vals = idata_nonsym.posterior[f'{param}_mu'].values.ravel()
+for ax, param, title in zip(axes, ['nu_mu', 'bias_mu'],
+                             ['Noise  \u03bd', 'Indifference point  \u03b4*']):
+    sym_vals    = idata_sym.posterior[param].values.ravel()
+    nonsym_vals = idata_nonsym.posterior[param].values.ravel()
+    az.plot_kde(sym_vals,    label='Symbolic',     plot_kwargs={'color': '#1f78b4', 'lw': 2}, ax=ax)
+    az.plot_kde(nonsym_vals, label='Non-symbolic',  plot_kwargs={'color': '#d95f02', 'lw': 2}, ax=ax)
+    if param == 'bias_mu':
+        ax.axvline(ev_threshold, ls=':', c='gray', lw=1.5, label='Risk-neutral')
+    ax.set_title(title); ax.legend(fontsize=9); sns.despine(ax=ax)
 
-    df_comp = pd.DataFrame({
-        'value':  np.concatenate([sym_vals, nonsym_vals]),
-        'format': ['symbolic']*len(sym_vals) + ['non-symbolic']*len(nonsym_vals),
-    })
-    sns.violinplot(data=df_comp, x='format', y='value', cut=0,
-                   palette={'symbolic': '#1f78b4', 'non-symbolic': '#d95f02'},
-                   inner='box', ax=ax)
-    ax.set_title(f'Group-level  {param}')
-    ax.set_xlabel('')
-    sns.despine(ax=ax)
-
-plt.suptitle('KLW model: symbolic vs non-symbolic', fontsize=13, y=1.02)
+plt.suptitle('Group-level posteriors by format', fontsize=12, y=1.02)
 plt.tight_layout()
 """),
 
-md(r"""### Regression model: format effect on noise
+md(r"""### Format effect
 
-`RiskRegressionModel` with a patsy formula lets the shared noise `evidence_sd` vary
-trial-by-trial as a function of covariates — here, `C(format)`.  This gives a direct
-posterior on the **format effect on precision**.
+Symbolic (Arabic numeral) payoffs produce **lower noise** and a **lower indifference
+point** — i.e. less risk aversion.  This is exactly what the theory predicts: symbolic
+numbers are encoded more precisely, so there is less Bayesian shrinkage, and the
+perceived advantage of the risky option is less compressed.
+
+### Difference distributions
+
+Overlaying two posteriors can be misleading: even when the marginals overlap substantially,
+the **difference** may be clearly non-zero.  This is especially important when the two
+quantities are correlated (e.g. because they come from the same participants).  Here the
+two formats are fitted as separate models, so the posteriors are independent — but showing
+the difference distribution is still clearer than eyeballing overlap.
 """),
 
 code("""\
-data_reg = data_risk.reset_index(level='format')   # format as a column
+# Difference distributions: symbolic minus non-symbolic
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
 
+for ax, param, title in zip(axes, ['nu_mu', 'bias_mu'],
+                             ['Noise difference  \u0394\u03bd', 'Indifference point difference  \u0394\u03b4*']):
+    sym_vals    = idata_sym.posterior[param].values.ravel()
+    nonsym_vals = idata_nonsym.posterior[param].values.ravel()
+    # Sample from both and compute difference
+    n = min(len(sym_vals), len(nonsym_vals))
+    diff = sym_vals[:n] - nonsym_vals[:n]
+    az.plot_kde(diff, plot_kwargs={'color': '#333333', 'lw': 2}, ax=ax)
+    ax.axvline(0, ls='--', c='#d73027', lw=1.5, label='No difference')
+    pct_below = (diff < 0).mean() * 100
+    ax.set_title(title)
+    ax.set_xlabel('Symbolic \u2212 Non-symbolic')
+    ax.text(0.03, 0.95, f'{pct_below:.0f}% < 0', transform=ax.transAxes,
+            va='top', fontsize=10, color='#333333')
+    ax.legend(fontsize=9); sns.despine(ax=ax)
+
+plt.suptitle('Format effect: posterior of symbolic \u2212 non-symbolic difference', fontsize=12, y=1.02)
+plt.tight_layout()
+"""),
+
+md(r"""For both parameters, the difference distribution sits almost entirely below zero:
+symbolic payoffs produce lower noise *and* a less risk-averse indifference point.
+The `RiskRegressionModel` at the end of this lesson tests this contrast within a single
+model, which is the cleanest approach.
+"""),
+
+md(r"""## Key result: noise predicts risk aversion (within each format)
+
+We extract each subject's posterior mean for `nu` and `bias`, separately for each format,
+and test whether noisier observers are more risk-averse **within** each format.
+"""),
+
+code("""\
+def extract_subject_params(idata, format_label):
+    subjects = idata.posterior['nu'].coords['subject'].values
+    nu_flat   = idata.posterior['nu'].values.reshape(-1, len(subjects))
+    bias_flat = idata.posterior['bias'].values.reshape(-1, len(subjects))
+    df = pd.DataFrame({
+        'subject':   subjects,
+        'format':    format_label,
+        'nu_mean':   nu_flat.mean(0),
+        'nu_lo':     np.percentile(nu_flat, 3, 0),
+        'nu_hi':     np.percentile(nu_flat, 97, 0),
+        'bias_mean': bias_flat.mean(0),
+        'bias_lo':   np.percentile(bias_flat, 3, 0),
+        'bias_hi':   np.percentile(bias_flat, 97, 0),
+    })
+    df['prec']    = 1 / df['nu_mean']
+    df['prec_lo'] = 1 / df['nu_hi']
+    df['prec_hi'] = 1 / df['nu_lo']
+    return df
+
+df_sym_params    = extract_subject_params(idata_sym,    'symbolic')
+df_nonsym_params = extract_subject_params(idata_nonsym, 'non-symbolic')
+
+for label, df in [('Symbolic', df_sym_params), ('Non-symbolic', df_nonsym_params)]:
+    rho, p = spearmanr(df['nu_mean'], df['bias_mean'])
+    print(f"{label:15s}  noise-bias \u03c1 = {rho:.3f} (p = {p:.4f})")
+"""),
+
+code("""\
+def scatter_hdi(ax, x, y, xerr, yerr, color, xlabel, ylabel, title,
+                hline=None):
+    ax.errorbar(x, y, xerr=xerr, yerr=yerr,
+                fmt='o', ms=4, alpha=.55, elinewidth=.7, capsize=2,
+                color=color, ecolor=color)
+    rho, p = spearmanr(x, y)
+    m, b = np.polyfit(x, y, 1)
+    xs = np.linspace(x.min(), x.max(), 100)
+    ax.plot(xs, m*xs + b, '--', color=color, lw=1.5, alpha=.8,
+            label=f'\u03c1 = {rho:.2f} (p = {p:.3f})')
+    if hline is not None:
+        ax.axhline(hline, ls=':', c='gray', lw=1.5, label='Risk-neutral')
+    ax.set_xlabel(xlabel); ax.set_ylabel(ylabel); ax.set_title(title)
+    ax.legend(fontsize=9); sns.despine(ax=ax)
+
+ev_threshold = np.log(1/.55)
+fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+
+for ax, df, label, color in zip(
+        axes,
+        [df_nonsym_params, df_sym_params],
+        ['Non-symbolic (coin clouds)', 'Symbolic (Arabic numerals)'],
+        ['#d95f02', '#1f78b4']):
+    scatter_hdi(
+        ax,
+        x    = df['nu_mean'],
+        y    = df['bias_mean'],
+        xerr = np.array([df['nu_mean'] - df['nu_lo'], df['nu_hi'] - df['nu_mean']]),
+        yerr = np.array([df['bias_mean'] - df['bias_lo'], df['bias_hi'] - df['bias_mean']]),
+        color  = color,
+        xlabel = 'Noise  \u03bd',
+        ylabel = 'Indifference point  \u03b4*',
+        title  = label,
+        hline  = ev_threshold,
+    )
+
+plt.suptitle('Within-format: noise predicts risk aversion (bars = 94\u202f% HDI)',
+             fontsize=13, y=1.02)
+plt.tight_layout()
+"""),
+
+
+md(r"""## Interpreting the indifference point: from log-space to intuition
+
+The `bias` parameter lives in **log-ratio space**, which is not immediately intuitive.
+Three reparameterisations make it more concrete:
+
+### 1. Indifference ratio: "how much larger must the risky option be?"
+
+The indifference point is $\delta^* = -\text{bias}$ in log-ratio space.  Exponentiating
+gives the **indifference ratio**:
+
+$$R^* = e^{\delta^*} = e^{-\text{bias}}$$
+
+This is the factor by which the risky payoff must exceed the safe payoff for the observer
+to be indifferent.  A risk-neutral observer (with $p_\text{risky} = 0.55$) has
+$R^* = 1/0.55 \approx 1.82$ — the risky option must be about **82 % larger**.  A
+risk-averse observer requires an even larger premium.
+
+### 2. Risk-neutral probability (RNP)
+
+The **RNP** answers: "at what winning probability would a risk-neutral agent make the same
+choices as this observer?"
+
+$$\text{RNP} = e^{\text{bias}}$$
+
+- RNP = 0.55 → risk-neutral (the observer acts as if the gamble wins at its true rate)
+- RNP < 0.55 → risk-averse (acts as if the gamble wins *less* often than it actually does)
+- RNP > 0.55 → risk-seeking
+
+The RNP is simply the reciprocal of the indifference ratio scaled by the actual probability:
+$\text{RNP} = p_\text{risky} / R^* \times (1/p_\text{safe})$.  But $e^{\text{bias}}$ is
+the most direct computation.
+
+### 3. Certainty equivalent discount
+
+How many cents on the euro does the observer implicitly discount the risky option?
+$\text{CE discount} = 1 - \text{RNP} / p_\text{risky} = 1 - e^{\text{bias}} / 0.55$.
+A discount of 20 % means the observer treats every risky euro as worth only 80 cents.
+"""),
+
+code("""\
+# Posterior distributions of the reparameterised group-level bias
+bias_sym    = idata_sym.posterior['bias_mu'].values.ravel()
+bias_nonsym = idata_nonsym.posterior['bias_mu'].values.ravel()
+
+fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+
+# 1. Indifference ratio R* = exp(-bias)
+ax = axes[0]
+for vals, label, c in [(bias_nonsym, 'Non-symbolic', '#d95f02'),
+                        (bias_sym,    'Symbolic',     '#1f78b4')]:
+    ratio = np.exp(-vals)
+    az.plot_kde(ratio, label=label, plot_kwargs={'color': c, 'lw': 2}, ax=ax)
+ax.axvline(1/0.55, ls=':', c='gray', lw=1.5, label='Risk-neutral (1/0.55)')
+ax.set_xlabel('Indifference ratio  R* = exp(-bias)')
+ax.set_title('How much larger must risky be?')
+ax.legend(fontsize=8); sns.despine(ax=ax)
+
+# 2. RNP = exp(bias)
+ax = axes[1]
+for vals, label, c in [(bias_nonsym, 'Non-symbolic', '#d95f02'),
+                        (bias_sym,    'Symbolic',     '#1f78b4')]:
+    rnp = np.exp(vals)
+    az.plot_kde(rnp, label=label, plot_kwargs={'color': c, 'lw': 2}, ax=ax)
+ax.axvline(0.55, ls=':', c='gray', lw=1.5, label='Risk-neutral (0.55)')
+ax.set_xlabel('Risk-neutral probability  (RNP)')
+ax.set_title('Implied winning probability')
+ax.legend(fontsize=8); sns.despine(ax=ax)
+
+# 3. CE discount = 1 - RNP/0.55
+ax = axes[2]
+for vals, label, c in [(bias_nonsym, 'Non-symbolic', '#d95f02'),
+                        (bias_sym,    'Symbolic',     '#1f78b4')]:
+    rnp = np.exp(vals)
+    discount = 1 - rnp / 0.55
+    az.plot_kde(discount, label=label, plot_kwargs={'color': c, 'lw': 2}, ax=ax)
+ax.axvline(0, ls=':', c='gray', lw=1.5, label='Risk-neutral')
+ax.set_xlabel('CE discount  (1 - RNP/0.55)')
+ax.set_title('Certainty-equivalent discount')
+ax.legend(fontsize=8); sns.despine(ax=ax)
+
+plt.suptitle('Group-level posteriors: three views of risk aversion', fontsize=12, y=1.02)
+plt.tight_layout()
+"""),
+
+md(r"""## Bonus: RiskRegressionModel for the format effect
+
+Instead of fitting two separate models, bauer's `RiskRegressionModel` lets you test the
+format effect *within a single model* using a patsy formula.  This gives a direct posterior
+on the format contrast — cleaner than comparing two separate fits.
+"""),
+
+code("""\
+from bauer.models import RiskRegressionModel
+
+data_reg = data_risk.reset_index(level='format')
 model_reg = RiskRegressionModel(
     paradigm=data_reg,
     regressors={'evidence_sd': 'C(format)'},
@@ -976,10 +1223,8 @@ model_reg = RiskRegressionModel(
     fit_seperate_evidence_sd=False,
 )
 model_reg.build_estimation_model(data=data_reg, hierarchical=True)
-idata_reg = model_reg.sample(draws=150, tune=150, chains=2, progressbar=False)
-"""),
+idata_reg = model_reg.sample(draws=500, tune=500, chains=4, progressbar=False)
 
-code("""\
 # Posterior of evidence_sd at each format condition
 conditions = pd.DataFrame({'format': ['symbolic', 'non-symbolic']})
 pars_cond  = model_reg.get_conditionwise_parameters(idata_reg, conditions, group=True)
@@ -987,209 +1232,68 @@ pars_cond  = model_reg.get_conditionwise_parameters(idata_reg, conditions, group
 sd_sym    = pars_cond.loc['evidence_sd']['symbolic'].values
 sd_nonsym = pars_cond.loc['evidence_sd']['non-symbolic'].values
 
-fig, ax = plt.subplots(figsize=(5.5, 4))
-for vals, label, c in [(sd_sym,    'symbolic',    '#1f78b4'),
-                        (sd_nonsym, 'non-symbolic', '#d95f02')]:
-    az.plot_kde(vals, label=label, plot_kwargs={'color': c, 'lw': 2}, ax=ax)
+fig, ax = plt.subplots(figsize=(6, 4))
+az.plot_kde(sd_sym,    label='Symbolic',     plot_kwargs={'color': '#1f78b4', 'lw': 2}, ax=ax)
+az.plot_kde(sd_nonsym, label='Non-symbolic',  plot_kwargs={'color': '#d95f02', 'lw': 2}, ax=ax)
 ax.set_xlabel('evidence_sd  (group level)')
 ax.set_ylabel('Posterior density')
-ax.set_title('Regression model: noise by format  (symbolic = lower noise)')
+ax.set_title('RiskRegressionModel: format effect on noise')
 ax.legend(); sns.despine(); plt.tight_layout()
 """),
 
-md(r"""## Key result: perceptual noise predicts risk aversion
+md(r"""## Why noise produces risk aversion: the KLW mechanism
 
-With a single shared noise $\nu$ and prior SD $\sigma_0$, the implied indifference
-log-ratio simplifies to
+The correlation between noise and risk aversion is not a statistical accident — it has a
+mechanistic explanation.  The **KLW model** (Khaw, Li & Woodford, 2021) shows that a
+Bayesian observer with noisy magnitude representations will *systematically undervalue*
+risky prospects:
 
-$$\delta^* = \frac{\log(1/p_\text{risky})}{\gamma}
-= \log(1/0.55)\cdot\frac{\sigma_0^2 + \nu^2}{\sigma_0^2}$$
+1. Both the safe and risky payoffs are perceived with noise $\nu$ on the log scale.
+2. A Bayesian prior pulls both percepts toward the mean of the payoff distribution.
+3. Because the risky payoff is typically *larger* than the safe payoff, it gets pulled
+   *down* more (toward the mean) than the safe payoff gets pulled *up*.
+4. This asymmetric compression shrinks the perceived advantage of the risky option,
+   shifting the indifference point rightward — i.e. producing risk aversion.
 
-Noisier observers (high $\nu$) have a larger $\delta^*$ and are more risk-averse.
-We report this as the **risk-neutral probability (RNP)** $= e^{-\delta^*}$: the
-equivalent winning probability at which a risk-neutral decision-maker would
-make the same choices.  A risk-neutral observer has $\text{RNP} = 0.55$; lower
-values indicate risk aversion.
+The amount of shrinkage is controlled by the ratio $\nu^2 / \sigma_0^2$ (noise vs.
+prior width).  More noise $\rightarrow$ more shrinkage $\rightarrow$ more risk aversion.
+This is exactly the correlation we see in the scatter plots above.
 
-Because the single decision noise $\nu$ (risk task) correlates with perceptual
-noise $\nu$ (magnitude task, also fit with a single shared noise for comparability),
-**perceptual precision measured in the scanner predicts risk aversion in a separate
-behavioural session** — the central result of Barreto-Garc\u00eda et al.
+Critically, risk aversion here is not a preference — it is a **perceptual distortion**.
+The observer is doing the best they can with noisy information, and the Bayesian-optimal
+strategy happens to look risk-averse from the outside.
 
-We show 94 % HDI crossbars per subject.
+## Summary
+
+1. A **psychometric function** fitted to risky choices gives two parameters per subject:
+   noise ($\nu$) and indifference point ($\delta^*$).
+2. **Format matters**: symbolic payoffs produce lower noise and less risk aversion than
+   non-symbolic coin clouds.
+3. **Within each format**: noisier subjects have higher $\delta^*$ (more risk-averse).
+4. **RiskRegressionModel** provides a principled single-model test of the format effect.
+5. The **KLW model** explains *why*: Bayesian shrinkage under noise compresses the
+   perceived advantage of risky options.
+
+In [Lesson 3](lesson3.ipynb) we move to a richer dataset (de Hollander et al., 2024, bioRxiv) where
+**presentation order** is randomised, allowing bauer's `RiskModel` with separate
+$\nu_1, \nu_2$ to capture striking order $\times$ stake-size interactions.
 """),
 
-code("""\
-# ── Helper: extract posterior mean and 94 % HDI per subject ──────────────────
-def posterior_summary(idata, var):
-    arr  = idata.posterior[var].values           # (chains, draws, subjects)
-    subj = idata.posterior[var].coords['subject'].values
-    vals = arr.reshape(-1, len(subj))            # (samples, subjects)
-    return pd.DataFrame({
-        'subject': subj,
-        'mean': vals.mean(0),
-        'lo':   np.percentile(vals, 3, 0),       # ≈ 94 % HDI lower
-        'hi':   np.percentile(vals, 97, 0),      # ≈ 94 % HDI upper
-    })
-
-# ── Magnitude noise (single evidence_sd for cross-task comparison) ───────────
-from bauer.utils.data import load_garcia2022
-data_mag = load_garcia2022(task='magnitude')
-from bauer.models import MagnitudeComparisonModel
-model_mag_l2 = MagnitudeComparisonModel(paradigm=data_mag, fit_seperate_evidence_sd=False)
-model_mag_l2.build_estimation_model(data=data_mag, hierarchical=True, save_p_choice=False)
-idata_mag_l2 = model_mag_l2.sample(draws=200, tune=200, chains=4, progressbar=False)
-
-df_nu_mag = posterior_summary(idata_mag_l2, 'evidence_sd').rename(
-                columns={'mean': 'nu_mag', 'lo': 'nu_mag_lo', 'hi': 'nu_mag_hi'})
-
-# ── Decision noise (single evidence_sd from KLW) ─────────────────────────────
-df_nu_risk = posterior_summary(idata_klw, 'evidence_sd').rename(
-                columns={'mean': 'nu_risk', 'lo': 'nu_risk_lo', 'hi': 'nu_risk_hi'})
-
-# ── Implied δ* from KLW posterior ────────────────────────────────────────────
-nu_arr   = idata_klw.posterior['evidence_sd'].values.reshape(-1, len(df_nu_risk))
-prsd_arr = idata_klw.posterior['prior_sd'].values.reshape(-1, len(df_nu_risk))
-
-gamma      = prsd_arr**2 / (prsd_arr**2 + nu_arr**2)
-delta_star = np.log(1/.55) / gamma
-# RNP (risk-neutral accepting probability) = exp(-delta_star) = 0.55 for risk-neutral
-# Interpretation: equivalent winning probability that a risk-neutral DM would need
-# to be indifferent.  Higher delta_star (more risk-averse) -> lower RNP.
-rnp = np.exp(-delta_star)
-
-df_delta = pd.DataFrame({
-    'subject':  idata_klw.posterior['evidence_sd'].coords['subject'].values,
-    'rnp_mean': rnp.mean(0),
-    'rnp_lo':   np.percentile(rnp, 3, 0),
-    'rnp_hi':   np.percentile(rnp, 97, 0),
-})
-
-# ── Merge on subject ──────────────────────────────────────────────────────────
-df_corr = (df_nu_mag
-           .merge(df_nu_risk, on='subject')
-           .merge(df_delta,   on='subject'))
-print(f"Aligned subjects: {len(df_corr)}  |  "
-      f"median RNP: {df_corr['rnp_mean'].median():.3f}  "
-      f"(risk-neutral baseline: 0.55)")
-"""),
-
-code("""\
-def scatter_hdi(ax, x, y, xerr, yerr, color, xlabel, ylabel, title,
-                hline=None, xlim=None, ylim=None):
-    \"\"\"Scatter plot with HDI crossbars and a Spearman regression line.\"\"\"
-    ax.errorbar(x, y, xerr=xerr, yerr=yerr,
-                fmt='o', ms=4, alpha=.55, elinewidth=.7, capsize=2,
-                color=color, ecolor=color)
-    rho, p = spearmanr(x, y)
-    m, b = np.polyfit(x, y, 1)
-    xs   = np.linspace(x.min(), x.max(), 100)
-    ax.plot(xs, m*xs + b, '--', color=color, lw=1.5, alpha=.8,
-            label=f'\u03c1 = {rho:.2f} (p={p:.3f})')
-    if hline is not None:
-        ax.axhline(hline, ls=':', c='gray', lw=1.5, label='Risk-neutral')
-    if xlim is not None:
-        ax.set_xlim(*xlim)
-    if ylim is not None:
-        ax.set_ylim(*ylim)
-    ax.set_xlabel(xlabel); ax.set_ylabel(ylabel); ax.set_title(title)
-    ax.legend(fontsize=9); sns.despine(ax=ax)
-
-fig, axes = plt.subplots(1, 3, figsize=(16, 5))
-
-# Precision = 1/noise (more interpretable: higher = better)
-df_corr['prec_mag']    = 1 / df_corr['nu_mag']
-df_corr['prec_mag_lo'] = 1 / df_corr['nu_mag_hi']   # inverted bounds
-df_corr['prec_mag_hi'] = 1 / df_corr['nu_mag_lo']
-df_corr['prec_risk']    = 1 / df_corr['nu_risk']
-df_corr['prec_risk_lo'] = 1 / df_corr['nu_risk_hi']
-df_corr['prec_risk_hi'] = 1 / df_corr['nu_risk_lo']
-
-# 1. Perceptual precision vs decision precision
-scatter_hdi(
-    axes[0],
-    x    = df_corr['prec_mag'],
-    y    = df_corr['prec_risk'],
-    xerr = np.array([df_corr['prec_mag']  - df_corr['prec_mag_lo'],
-                     df_corr['prec_mag_hi'] - df_corr['prec_mag']]),
-    yerr = np.array([df_corr['prec_risk']  - df_corr['prec_risk_lo'],
-                     df_corr['prec_risk_hi'] - df_corr['prec_risk']]),
-    color   = '#4393c3',
-    xlabel  = 'Perceptual precision  1/\u03bd  (magnitude task)',
-    ylabel  = 'Decision precision  1/\u03bd  (risk task)',
-    title   = 'Perceptual \u2194 decision precision',
-)
-
-# 2. Perceptual precision vs RNP
-scatter_hdi(
-    axes[1],
-    x    = df_corr['prec_mag'],
-    y    = df_corr['rnp_mean'],
-    xerr = np.array([df_corr['prec_mag']   - df_corr['prec_mag_lo'],
-                     df_corr['prec_mag_hi'] - df_corr['prec_mag']]),
-    yerr = np.array([df_corr['rnp_mean'] - df_corr['rnp_lo'],
-                     df_corr['rnp_hi']   - df_corr['rnp_mean']]),
-    color  = '#d6604d',
-    xlabel = 'Perceptual precision  1/\u03bd  (magnitude task)',
-    ylabel = 'Risk-neutral prob.  RNP',
-    title  = 'Lower precision \u2192 more risk aversion',
-    hline  = 0.55,
-)
-
-# 3. Decision precision vs RNP (within-task)
-scatter_hdi(
-    axes[2],
-    x    = df_corr['prec_risk'],
-    y    = df_corr['rnp_mean'],
-    xerr = np.array([df_corr['prec_risk']  - df_corr['prec_risk_lo'],
-                     df_corr['prec_risk_hi'] - df_corr['prec_risk']]),
-    yerr = np.array([df_corr['rnp_mean'] - df_corr['rnp_lo'],
-                     df_corr['rnp_hi']   - df_corr['rnp_mean']]),
-    color  = '#1a9850',
-    xlabel = 'Decision precision  1/\u03bd  (risk task)',
-    ylabel = 'Risk-neutral prob.  RNP',
-    title  = 'Decision precision \u2192 risk aversion  (within-task)',
-    hline  = 0.55,
-)
-
-plt.suptitle('Key result: lower precision predicts risk aversion (bars = 94\u202f% HDI per subject)',
-             fontsize=13, y=1.02)
-plt.tight_layout()
-"""),
-
-md(r"""## Summary
-
-In this lesson we established the link from **perceptual noise to economic risk aversion**:
-
-1. The **KLW model** extends the NLC framework to risky choice: the same Bayesian
-   prior that compresses magnitude representations also shifts the indifference point
-   $\delta^*$ upward, producing risk aversion.
-2. **Format matters**: symbolic (Arabic numeral) payoffs are encoded with lower noise
-   than non-symbolic coin clouds, leading to less risk aversion.
-3. bauer's `RiskRegressionModel` makes it trivial to test format effects via patsy
-   formulas without fitting separate models.
-4. **Perceptual noise predicts risk aversion** across individuals — subjects with noisier
-   magnitude representations are more risk-averse, connecting perception and decision-making.
-
-In [Lesson 3](lesson3.ipynb) we move to a richer design that randomises *presentation
-order* across trials, allowing the model to tease apart first- vs second-option noise and
-explain striking **presentation-order × stake-size interactions** that standard models cannot
-capture.
-"""),
 
 ]
 
 write_if_changed(nb2, 'lesson2.ipynb')
 
 
+
 # ─────────────────────────────────────────────────────────────────────────────
-# Lesson 3 — de Hollander et al. (2024): EU vs KLW vs full prior
+# Lesson 3 — de Hollander et al. (2024, bioRxiv): EU vs KLW vs full prior
 # ─────────────────────────────────────────────────────────────────────────────
 
 nb3 = nbf.v4.new_notebook()
 nb3.cells = [
 
-md(r"""# Lesson 3: Stake effects and presentation order — de Hollander et al. (2024)
+md(r"""# Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv)
 
 ## Background
 
@@ -1259,7 +1363,7 @@ def prep_df(df):
     df['risky_first'] = risky_first
     df['order']       = np.where(risky_first, 'Risky first', 'Safe first')
     df['log_ratio_bin'] = (pd.cut(df['log_ratio'], bins=10)
-                             .apply(lambda x: x.mid).astype(float))
+                             .map(lambda x: x.mid).astype(float))
     _, bins = pd.qcut(n_safe, q=3, retbins=True, duplicates='drop')
     stake_labels = [
         f'Low ({bins[0]:.0f}–{bins[1]:.0f})',
@@ -1274,7 +1378,7 @@ df_sym_p, sym_stake_labels = prep_df(df_sym)
 
 # Sequential (light→dark) palette for stake sizes — hue in existing order\u00d7stake plots
 def make_stake_pal(labels):
-    cols = sns.color_palette('Blues', 3)   # three blues: light, mid, dark
+    cols = sns.color_palette('YlOrRd', len(labels))   # yellow → orange → red
     return dict(zip(labels, cols))
 
 dot_stake_pal = make_stake_pal(dot_stake_labels)
@@ -1364,14 +1468,16 @@ plt.tight_layout()
 
 md("""## Fit three models — dot-cloud data
 
-Hierarchical MCMC, 100 draws / 100 tune / 2 chains.
+Hierarchical MCMC, 100 draws / 100 tune / 2 chains.  We store log-likelihoods
+(`log_likelihood=True`) for ELPD model comparison later.
 """),
 
 code("""\
 # ── 1. Expected Utility ──────────────────────────────────────────────────────
 model_eu = ExpectedUtilityRiskModel(paradigm=df_dot)
 model_eu.build_estimation_model(data=df_dot, hierarchical=True, save_p_choice=True)
-idata_eu = model_eu.sample(draws=100, tune=100, chains=2, progressbar=False)
+idata_eu = model_eu.sample(draws=100, tune=100, chains=2, progressbar=False,
+                            idata_kwargs={'log_likelihood': True})
 """),
 
 code("""\
@@ -1379,7 +1485,8 @@ code("""\
 model_klw = RiskModel(paradigm=df_dot, prior_estimate='klw',
                       fit_seperate_evidence_sd=False)
 model_klw.build_estimation_model(data=df_dot, hierarchical=True, save_p_choice=True)
-idata_klw = model_klw.sample(draws=100, tune=100, chains=2, progressbar=False)
+idata_klw = model_klw.sample(draws=100, tune=100, chains=2, progressbar=False,
+                              idata_kwargs={'log_likelihood': True})
 """),
 
 code("""\
@@ -1387,7 +1494,8 @@ code("""\
 model_full = RiskModel(paradigm=df_dot, prior_estimate='full',
                        fit_seperate_evidence_sd=True)
 model_full.build_estimation_model(data=df_dot, hierarchical=True, save_p_choice=True)
-idata_full = model_full.sample(draws=100, tune=100, chains=2, progressbar=False)
+idata_full = model_full.sample(draws=100, tune=100, chains=2, progressbar=False,
+                                idata_kwargs={'log_likelihood': True})
 """),
 
 md("""## Posterior predictives — dot-cloud data
@@ -1416,7 +1524,7 @@ def add_model_ppc(df_orig, df_prepped, model, idata, model_name, stake_labels):
         np.where(risky_first, ppc_flat['n1'], ppc_flat['n2']) /
         np.where(risky_first, ppc_flat['n2'], ppc_flat['n1']))
     ppc_flat['log_ratio_bin'] = (pd.cut(pd.Series(log_ratio), bins=10)
-                                   .apply(lambda x: x.mid).astype(float).values)
+                                   .map(lambda x: x.mid).astype(float).values)
     n_safe = np.where(risky_first, ppc_flat['n2'], ppc_flat['n1'])
     ppc_flat['n_safe_bin'] = pd.qcut(n_safe, q=3, labels=stake_labels, duplicates='drop')
 
@@ -1518,7 +1626,8 @@ code("""\
 # ── 1. EU ────────────────────────────────────────────────────────────────────
 model_eu_sym = ExpectedUtilityRiskModel(paradigm=df_sym)
 model_eu_sym.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
-idata_eu_sym = model_eu_sym.sample(draws=100, tune=100, chains=2, progressbar=False)
+idata_eu_sym = model_eu_sym.sample(draws=100, tune=100, chains=2, progressbar=False,
+                                        idata_kwargs={'log_likelihood': True})
 """),
 
 code("""\
@@ -1526,7 +1635,8 @@ code("""\
 model_klw_sym = RiskModel(paradigm=df_sym, prior_estimate='klw',
                            fit_seperate_evidence_sd=False)
 model_klw_sym.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
-idata_klw_sym = model_klw_sym.sample(draws=100, tune=100, chains=2, progressbar=False)
+idata_klw_sym = model_klw_sym.sample(draws=100, tune=100, chains=2, progressbar=False,
+                                          idata_kwargs={'log_likelihood': True})
 """),
 
 code("""\
@@ -1534,7 +1644,8 @@ code("""\
 model_full_sym = RiskModel(paradigm=df_sym, prior_estimate='full',
                             fit_seperate_evidence_sd=True)
 model_full_sym.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
-idata_full_sym = model_full_sym.sample(draws=100, tune=100, chains=2, progressbar=False)
+idata_full_sym = model_full_sym.sample(draws=100, tune=100, chains=2, progressbar=False,
+                                            idata_kwargs={'log_likelihood': True})
 """),
 
 md("""## Posterior predictives — symbolic data
@@ -1628,23 +1739,245 @@ plt.suptitle('Subject-level noise estimates from PMCM (error bars = 94 % HDI)'
 plt.tight_layout()
 """),
 
+md(r"""## Individual differences in noise asymmetry
+
+The group average $\nu_1 > \nu_2$ suggests a **memory effect**: the first-presented option
+is noisier because it must be held in working memory.  But this is only part of the story.
+
+In the **symbolic** task, the picture is more nuanced.  Not every participant shows a memory
+effect — some appear to show an **attentional primacy** effect where they focus *more* on
+the first option ($\nu_1 < \nu_2$).  The distribution of $\nu_1 - \nu_2$ across
+participants reveals this heterogeneity.
+"""),
+
+code("""\
+# ── ν₁ − ν₂ difference per subject ──────────────────────────────────────────
+from bauer.utils.math import softplus_np
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+for ax, (idat, task_label) in zip(axes,
+        [(idata_full, 'Dot clouds'), (idata_full_sym, 'Symbolic')]):
+    n_subj = idat.posterior['n1_evidence_sd'].shape[-1]
+    s1 = softplus_np(idat.posterior['n1_evidence_sd'].values.reshape(-1, n_subj))
+    s2 = softplus_np(idat.posterior['n2_evidence_sd'].values.reshape(-1, n_subj))
+    diff = s1 - s2   # positive = memory effect (ν₁ > ν₂)
+
+    diff_mean = diff.mean(0)
+    diff_lo   = np.percentile(diff, 3, 0)
+    diff_hi   = np.percentile(diff, 97, 0)
+
+    sort_idx = np.argsort(diff_mean)
+    x = np.arange(n_subj)
+
+    ax.errorbar(x, diff_mean[sort_idx],
+                yerr=[diff_mean[sort_idx] - diff_lo[sort_idx],
+                      diff_hi[sort_idx] - diff_mean[sort_idx]],
+                fmt='o', ms=4, elinewidth=0.7, capsize=1.5, alpha=.7,
+                color='#4393c3', ecolor='#aec7e8')
+    ax.axhline(0, ls='--', c='#d73027', lw=1.5, label='\u03bd\u2081 = \u03bd\u2082')
+    ax.set_xlabel('Subject (sorted by \u03bd\u2081 \u2212 \u03bd\u2082)')
+    ax.set_ylabel('\u03bd\u2081 \u2212 \u03bd\u2082')
+    ax.set_title(f'{task_label}')
+    n_mem = (diff_lo[sort_idx] > 0).sum()
+    n_att = (diff_hi[sort_idx] < 0).sum()
+    ax.text(0.02, 0.98, f'Memory effect (\u03bd\u2081>\u03bd\u2082): {n_mem}\\nAttention primacy (\u03bd\u2081<\u03bd\u2082): {n_att}',
+            transform=ax.transAxes, va='top', fontsize=9,
+            bbox=dict(boxstyle='round', fc='white', alpha=.8))
+    ax.legend(fontsize=9); sns.despine(ax=ax)
+
+plt.suptitle('Individual noise asymmetry: \u03bd\u2081 \u2212 \u03bd\u2082 (94\u202f% HDI per subject)',
+             fontsize=12, y=1.02)
+plt.tight_layout()
+"""),
+
+md(r"""### Interpreting the heterogeneity
+
+For **dot clouds**, most participants show $\nu_1 > \nu_2$ (memory effect) — consistent with
+the sequential presentation degrading the first option in working memory.
+
+For **symbolic (Arabic numeral)** stimuli, the pattern is more mixed:
+- Some participants still show a memory effect ($\nu_1 > \nu_2$)
+- Others show the opposite: $\nu_1 < \nu_2$ — as if they allocate more **attention** to the
+  first-presented option and less to the second
+
+This suggests that with symbolic stimuli (which are faster to encode than dot clouds), the
+bottleneck shifts from working memory to **attentional allocation**, and different participants
+adopt different strategies.
+"""),
+
+md(r"""## Subject-level PPCs: do the models capture individual strategies?
+
+Group-level PPCs can look fine while hiding poor fits for individual participants.
+We pick three subjects — one with a strong memory effect ($\nu_1 \gg \nu_2$), one
+balanced, and one with an attentional-primacy effect ($\nu_1 < \nu_2$) — and show
+their individual posterior predictives under the three models.
+"""),
+
+code("""\
+# Identify 5 most extreme subjects in each direction (symbolic task)
+from bauer.utils.math import softplus_np
+n_subj_sym = idata_full_sym.posterior['n1_evidence_sd'].shape[-1]
+s1_sym = softplus_np(idata_full_sym.posterior['n1_evidence_sd'].values.reshape(-1, n_subj_sym))
+s2_sym = softplus_np(idata_full_sym.posterior['n2_evidence_sd'].values.reshape(-1, n_subj_sym))
+diff_sym = (s1_sym - s2_sym).mean(0)
+sym_subjects = idata_full_sym.posterior['n1_evidence_sd'].coords['subject'].values
+
+rank = np.argsort(diff_sym)
+top5_memory    = sym_subjects[rank[-5:]]   # highest \u03bd\u2081 - \u03bd\u2082
+top5_attention = sym_subjects[rank[:5]]    # lowest \u03bd\u2081 - \u03bd\u2082
+print(f"Memory-effect subjects:    {top5_memory}  (mean \u0394\u03bd = {diff_sym[rank[-5:]].mean():.3f})")
+print(f"Attention-primacy subjects: {top5_attention}  (mean \u0394\u03bd = {diff_sym[rank[:5]].mean():.3f})")
+"""),
+
+code("""\
+# Subject-group PPCs using model probability (p), not binary ll_bernoulli
+# Average P(chose risky) over 5 extreme subjects per group
+
+def subgroup_ppc(model, idata, df_raw, df_prepped, subject_ids, group_label):
+    # Get model-predicted P(chose option 2) for all subjects
+    ppc_df = model.ppc(df_raw, idata, var_names=['p'])
+    ppc_p = ppc_df.xs('p', level='variable')
+    sample_cols = ppc_p.columns.tolist()
+
+    rows = []
+    for subj in subject_ids:
+        ppc_subj = ppc_p.xs(subj, level='subject').reset_index()
+        obs_subj = df_raw.xs(subj, level='subject').reset_index()
+
+        risky_first = ppc_subj['p1'] == 0.55
+        # P(chose risky): flip when risky is option 1
+        pred_risky = ppc_subj[sample_cols].values.copy()
+        pred_risky[risky_first] = 1 - pred_risky[risky_first]
+
+        obs_choice = obs_subj['choice'].values.astype(float)
+        obs_risky = np.where(risky_first, 1 - obs_choice, obs_choice)
+
+        order = np.where(risky_first, 'Risky first', 'Safe first')
+        n_safe = np.where(risky_first, obs_subj['n2'], obs_subj['n1'])
+        n_safe_bin = np.array(pd.qcut(n_safe, q=3, labels=['Low', 'Mid', 'High']))
+
+        for trial_i in range(len(obs_subj)):
+            rows.append({
+                'subject': subj, 'order': order[trial_i],
+                'n_safe_bin': str(n_safe_bin[trial_i]),
+                'obs': obs_risky[trial_i],
+                **{s: pred_risky[trial_i, j] for j, s in enumerate(sample_cols)},
+            })
+    
+    df_all = pd.DataFrame(rows)
+    # Average over subjects within group, then by order x stake
+    grouped = df_all.groupby(['order', 'n_safe_bin'])
+    obs_mean = grouped['obs'].mean()
+    pred_vals = grouped[sample_cols].mean()  # mean over subjects+trials per sample
+    pred_mean = pred_vals.mean(1)
+    pred_lo   = pred_vals.quantile(0.025, axis=1)
+    pred_hi   = pred_vals.quantile(0.975, axis=1)
+    return obs_mean, pred_mean, pred_lo, pred_hi
+
+fig, axes = plt.subplots(3, 2, figsize=(12, 13))
+groups = [
+    ('Memory effect (top 5)', top5_memory),
+    ('Attention primacy (top 5)', top5_attention),
+]
+model_list = [
+    (model_eu_sym,   idata_eu_sym,   'EU'),
+    (model_klw_sym,  idata_klw_sym,  'KLW'),
+    (model_full_sym, idata_full_sym, 'PMCM'),
+]
+order_colors = {'Safe first': '#4393c3', 'Risky first': '#d73027'}
+
+for col, (group_label, subj_ids) in enumerate(groups):
+    for row, (model, idat, model_name) in enumerate(model_list):
+        ax = axes[row, col]
+        obs, pred, pred_lo, pred_hi = subgroup_ppc(
+            model, idat, df_sym, df_sym_p, subj_ids, group_label)
+
+        pos = 0
+        x_pos, x_labels = [], []
+        for order in ['Safe first', 'Risky first']:
+            for stake in ['Low', 'Mid', 'High']:
+                if (order, stake) not in obs.index:
+                    continue
+                x_pos.append(pos)
+                x_labels.append(f'{order[0]}:{stake[0]}')
+                c = order_colors[order]
+                ax.bar(pos, obs.loc[(order, stake)], width=0.35,
+                       color=c, alpha=0.4, edgecolor=c)
+                ax.errorbar(pos, pred.loc[(order, stake)],
+                           yerr=[[pred.loc[(order, stake)] - pred_lo.loc[(order, stake)]],
+                                 [pred_hi.loc[(order, stake)] - pred.loc[(order, stake)]]],
+                           fmt='s', ms=7, color='black', elinewidth=1.5, capsize=3, zorder=5)
+                pos += 1
+            pos += 0.5
+
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels(x_labels, fontsize=8)
+        ax.set_ylim(0, 1.05)
+        ax.axhline(0.5, ls=':', c='gray', lw=1)
+        if col == 0: ax.set_ylabel('P(chose risky)')
+        ax.set_title(f'{model_name} \u2014 {group_label}', fontsize=10)
+        sns.despine(ax=ax)
+
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
+legend_elements = [
+    Patch(facecolor='#4393c3', alpha=0.4, label='Data: safe first'),
+    Patch(facecolor='#d73027', alpha=0.4, label='Data: risky first'),
+    Line2D([0], [0], marker='s', color='black', lw=0, ms=7, label='Model (95 % CI)'),
+]
+fig.legend(handles=legend_elements, loc='lower center', ncol=3, fontsize=10,
+           bbox_to_anchor=(0.5, -0.02))
+plt.suptitle('Subgroup PPCs (symbolic): 5 memory-effect vs 5 attention-primacy subjects',
+             fontsize=12, y=1.01)
+plt.tight_layout()
+"""),
+
+
+
+md(r"""## ELPD model comparison
+
+ELPD (via PSIS-LOO) formally ranks the three models.  Since we stored log-likelihoods
+during sampling, `az.compare` works directly.
+"""),
+
+code("""\
+import arviz as az
+
+print("=== Dot clouds ===")
+compare_dot = az.compare({'EU': idata_eu, 'KLW': idata_klw, 'PMCM': idata_full})
+print(compare_dot[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())
+
+print("\\n=== Symbolic ===")
+compare_sym = az.compare({'EU': idata_eu_sym, 'KLW': idata_klw_sym, 'PMCM': idata_full_sym})
+print(compare_sym[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())
+"""),
+
+code("""\
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+az.plot_compare(compare_dot, ax=axes[0])
+axes[0].set_title('Dot clouds — ELPD comparison')
+az.plot_compare(compare_sym, ax=axes[1])
+axes[1].set_title('Symbolic — ELPD comparison')
+plt.tight_layout()
+"""),
+
 md(r"""## Summary
 
-In this lesson we saw how bauer's **full-prior NLC model** (PMCM) handles a richer
-experimental design:
-
-1. **Presentation order** creates asymmetric noise: $\nu_1 > \nu_2$ because the
-   first-presented option is degraded in working memory by the time the second appears.
-2. This asymmetry, combined with a Bayesian prior, produces a distinctive
-   **order × stake-size interaction** that standard models (EU, KLW) cannot explain.
-3. The PMCM fits this interaction well for **dot-cloud** stimuli.  For **symbolic** Arabic
-   numerals the interaction is weaker — potentially because symbolic noise is less
-   magnitude-dependent.
-4. bauer makes fitting three competing models in parallel and comparing their predictives
-   straightforward.
+1. **Presentation order** creates asymmetric noise ($\nu_1 \neq \nu_2$), but the direction
+   and magnitude of the asymmetry varies across participants.
+2. For **dot clouds**: most participants show a memory effect ($\nu_1 > \nu_2$).  The PMCM
+   captures the resulting order × stake-size interaction that EU and KLW cannot.
+3. For **symbolic stimuli**: the pattern is more heterogeneous.  Some participants show
+   memory effects, others show **attentional primacy** ($\nu_1 < \nu_2$) — as if they
+   attend more to the first option when the encoding bottleneck is less severe.
+4. **Individual PPCs** reveal whether the group-level fit hides poor individual fits —
+   PMCM's separate $\nu_1, \nu_2$ can accommodate both strategies, while KLW and EU cannot.
+5. **ELPD comparison** formally ranks the models: PMCM should dominate for dot clouds
+   where the order effect is strong.
 
 In [Lesson 4](lesson4.ipynb) we go one step further: instead of assuming a fixed
-log-space noise, we let the noise curve $\nu(n)$ vary **freely** across magnitudes using
+log-space noise, we let the noise curve $\nu(n)$ vary freely across magnitudes using
 B-splines — and test whether Weber's law holds statistically via ELPD model comparison.
 """),
 
@@ -1764,7 +2097,7 @@ df_mag = load_garcia2022(task='magnitude')
 print(f"Garcia magnitude  |  subjects: {df_mag.index.get_level_values('subject').nunique()},  "
       f"trials: {len(df_mag)}")
 
-# de Hollander et al. (2024) — Arabic-numeral gambles
+# de Hollander et al. (2024, bioRxiv) — Arabic-numeral gambles
 df_sym = load_dehollander2024(task='symbolic')
 print(f"Arabic numerals   |  subjects: {df_sym.index.get_level_values('subject').nunique()},  "
       f"trials: {len(df_sym)}")
@@ -1984,7 +2317,7 @@ if 'AffineNoise' in compare_mag.index and 'FlexNoise' in compare_mag.index:
             print("   Genuine nonlinearity in the noise function is needed.")
 """),
 
-md(r"""## Part B: Arabic-numeral risky choice (de Hollander et al. 2024)
+md(r"""## Part B: Arabic-numeral risky choice (de Hollander et al., 2024, bioRxiv)
 
 Arabic numerals are **symbolic**: participants read a printed digit rather than
 estimating numerosity from a visual display.  The internal noise on symbolic
@@ -2007,7 +2340,7 @@ def prep_df(df):
     df['risky_first']   = risky_first
     df['order']         = np.where(risky_first, 'Risky first', 'Safe first')
     df['log_ratio_bin'] = (pd.cut(df['log_ratio'], bins=10)
-                             .apply(lambda x: x.mid).astype(float))
+                             .map(lambda x: x.mid).astype(float))
     df['n_safe_bin']    = pd.qcut(df['n_safe'], q=3,
                                    labels=['Low stakes', 'Mid stakes', 'High stakes'])
     return df
@@ -2100,7 +2433,7 @@ We overlay both models' predictions against the observed presentation-order
 
 code("""\
 from bauer.utils import summarize_ppc_group
-stake_pal = {'Low stakes': '#4C72B0', 'Mid stakes': '#DD8452', 'High stakes': '#55A868'}
+stake_pal = dict(zip(['Low stakes', 'Mid stakes', 'High stakes'], sns.color_palette('YlOrRd', 3)))
 
 def add_model_ppc(df_orig, df_prepped, model, idata, model_name):
     \"\"\"Two-step PPC via summarize_ppc_group.\"\"\"
@@ -2120,7 +2453,7 @@ def add_model_ppc(df_orig, df_prepped, model, idata, model_name):
         np.where(risky_first, ppc_flat['n1'], ppc_flat['n2']) /
         np.where(risky_first, ppc_flat['n2'], ppc_flat['n1']))
     ppc_flat['log_ratio_bin'] = (pd.cut(pd.Series(log_ratio), bins=10)
-                                   .apply(lambda x: x.mid).astype(float).values)
+                                   .map(lambda x: x.mid).astype(float).values)
     n_safe = np.where(risky_first, ppc_flat['n2'], ppc_flat['n1'])
     ppc_flat['n_safe_bin'] = pd.qcut(n_safe, q=3,
                                       labels=['Low stakes', 'Mid stakes', 'High stakes'])
@@ -2228,7 +2561,7 @@ md(r"""## Take-aways
   two — the MCM's strictly linear noise curve is not quite right.  The recovered
   $\nu(n)$ is roughly linear but deviates, suggesting a mild departure from perfect
   Weber's law in perceptual dot-array numerosity.
-- **Arabic numerals (de Hollander et al. 2024):** $|\Delta\text{ELPD}| / \text{SE} < 2$,
+- **Arabic numerals (de Hollander et al., 2024, bioRxiv):** $|\Delta\text{ELPD}| / \text{SE} < 2$,
   so there is *no statistically distinguishable difference* in this dataset.  Weber's law
   (PMCM) is adequate for symbolic numbers here.  This may seem counterintuitive — but
   with only ~250 trials per subject, the data are simply not powerful enough to detect
@@ -2269,11 +2602,17 @@ MLE/MAP estimates are:
 
 - **Noisy** — refit the same subject on a different random half of their data and you get
   a substantially different answer.
-- **Biased at the boundaries** — noise parameters can hit zero or explode; lapse rates
-  can rail at 0 or 1.
-- **Worse for complex models** — every additional parameter multiplies the noise.  The
-  most theoretically interesting models (KLW, FlexibleNoise) are exactly the ones that
-  suffer most.
+- **Biased at the boundaries** — with few trials, the likelihood surface is broad and
+  the optimiser can land at extreme values.  Noise parameters ($\nu$) may converge to
+  near-zero (the model "explains" every trial perfectly by overfitting) or explode to
+  very large values (flat psychometric curve, no discrimination at all).  Lapse-rate
+  parameters can rail at 0 or 1.  These boundary estimates are not meaningful — they
+  reflect the instability of the optimisation, not the participant's true noise level.
+- **Worse for complex models** — every additional parameter increases the volume of
+  the parameter space that the optimiser must search.  The most theoretically interesting
+  models (KLW with prior $\sigma_0$, FlexibleNoise with spline coefficients) are exactly
+  the ones that suffer most, because they have more parameters per subject and more
+  opportunities for the likelihood to be flat.
 
 **Hierarchical Bayesian estimation** avoids all three problems.  By sharing statistical
 strength across participants, the group prior acts as an *adaptive regulariser*: subjects
@@ -2294,7 +2633,7 @@ We compare:
 | **MLE** | `model.fit_map_individual(flat_prior=True)` — each subject fitted alone with flat priors | None — pure maximum likelihood |
 | **Hierarchical Bayes** | `model.sample()` with `hierarchical=True` — full MCMC posterior | Adaptive group prior, posterior averaging |
 
-at increasing trial counts (50, 108, 150, 216 per half).  The Garcia et al. magnitude
+at increasing trial counts (25, 50, 108 per half).  The Garcia et al. magnitude
 data have 216 trials per subject, so 108 per half is the natural split.
 """),
 
@@ -2329,27 +2668,43 @@ half_b_full = df_mag.iloc[half_b_rows]
 print(f"Half A: {len(half_a_full)} trials,  Half B: {len(half_b_full)} trials")
 """),
 
-md(r"""## Fitting at different trial counts
+md(r"""## Split-half analysis: 10 random splits $\times$ 5 trial counts
 
-For each trial count we subsample from each half (keeping the first *k* trials per
-subject), then fit both MAP (individual) and hierarchical Bayes.  We extract the
-posterior mean of `n1_evidence_sd` per subject as our reliability target — this is the
-key noise parameter that drives all downstream predictions.
+For each trial count (25, 50, 108) we:
+1. Randomly split each subject's data into two halves
+2. Subsample *k* trials per half
+3. Fit MLE and hierarchical Bayes on each half
+4. Correlate the parameter estimates across halves
+
+We repeat this 10 times with different random splits to get a stable estimate of
+reliability.  Three correlation metrics are shown: Spearman $\rho$, Pearson $r$,
+and $R^2$.
 """),
 
 code("""\
+from scipy.stats import pearsonr
+
 def subsample(df, k):
-    # Take the first k trials per subject from an already-shuffled DataFrame
     return df.groupby(level='subject').head(k)
 
+def split_data(df_mag, seed):
+    # Random split of each subject's trials into two halves
+    rng = np.random.default_rng(seed)
+    a_rows, b_rows = [], []
+    for subj in df_mag.index.get_level_values('subject').unique():
+        mask = df_mag.index.get_level_values('subject') == subj
+        iloc = np.where(mask)[0]
+        perm = rng.permutation(len(iloc))
+        mid = len(iloc) // 2
+        a_rows.extend(iloc[perm[:mid]])
+        b_rows.extend(iloc[perm[mid:]])
+    return df_mag.iloc[a_rows], df_mag.iloc[b_rows]
+
 def fit_mle(data):
-    # MLE: each subject fitted alone with flat priors (sigma=100).
-    # This is maximum likelihood — no regularisation whatsoever.
     model = MagnitudeComparisonModel(paradigm=data, fit_seperate_evidence_sd=True)
     return model.fit_map_individual(data=data, flat_prior=True)
 
 def fit_hierarchical(data, draws=500, tune=500, chains=2):
-    # Hierarchical Bayes: full MCMC with adaptive group prior.
     model = MagnitudeComparisonModel(paradigm=data, fit_seperate_evidence_sd=True)
     model.build_estimation_model(data=data, hierarchical=True)
     idata = model.sample(draws=draws, tune=tune, chains=chains, progressbar=False)
@@ -2359,58 +2714,74 @@ def fit_hierarchical(data, draws=500, tune=500, chains=2):
     return pd.DataFrame({'n1_evidence_sd': n1, 'n2_evidence_sd': n2},
                          index=pd.Index(data.index.unique(level='subject'), name='subject'))
 
-trial_counts = [25, 50, 75, 108]
-methods = {
-    'MLE (flat prior)':   fit_mle,
-    'Hierarchical Bayes': fit_hierarchical,
-}
+trial_counts = [25, 50, 108]
+n_splits = 3
+methods = {'MLE': fit_mle, 'Hierarchical Bayes': fit_hierarchical}
 results = []
 
-for k in trial_counts:
-    print(f"\\n=== {k} trials per half ===")
-    a_sub = subsample(half_a_full, k)
-    b_sub = subsample(half_b_full, k)
-
-    estimates = {}
-    for method_name, fit_fn in methods.items():
-        print(f"  {method_name}...")
-        estimates[method_name] = (fit_fn(a_sub), fit_fn(b_sub))
-
-    for param in ['n1_evidence_sd', 'n2_evidence_sd']:
-        line = f"  {param}:"
-        for method_name in methods:
-            est_a, est_b = estimates[method_name]
-            rho, _ = spearmanr(est_a[param], est_b[param])
-            r2 = rho**2
-            results.append({'trials_per_half': k, 'parameter': param,
-                            'method': method_name, 'R2': r2})
-            line += f"  {method_name}={r2:.3f}"
-        print(line)
+for split_i in range(n_splits):
+    half_a, half_b = split_data(df_mag, seed=split_i)
+    for k in trial_counts:
+        a_sub = subsample(half_a, k)
+        b_sub = subsample(half_b, k)
+        for method_name, fit_fn in methods.items():
+            est_a = fit_fn(a_sub)
+            est_b = fit_fn(b_sub)
+            # Also compute sum of both noise params
+            est_a['total_sd'] = est_a['n1_evidence_sd'] + est_a['n2_evidence_sd']
+            est_b['total_sd'] = est_b['n1_evidence_sd'] + est_b['n2_evidence_sd']
+            for param in ['n1_evidence_sd', 'n2_evidence_sd', 'total_sd']:
+                rho_s, _ = spearmanr(est_a[param], est_b[param])
+                rho_p, _ = pearsonr(est_a[param], est_b[param])
+                results.append({
+                    'split': split_i, 'k': k, 'method': method_name,
+                    'parameter': param,
+                    'Spearman \\u03c1': rho_s, 'Pearson r': rho_p, 'R\\u00b2': rho_s**2,
+                })
+    print(f"Split {split_i+1}/{n_splits} done")
 
 results_df = pd.DataFrame(results)
+print(f"\\nTotal fits: {len(results_df)}")
 """),
 
 code("""\
-# ── Split-half reliability plot ──────────────────────────────────────────────
-fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
-pal = {'MLE (flat prior)': '#d73027', 'Hierarchical Bayes': '#4393c3'}
+# ── Reliability vs trial count: 3 metrics x 3 parameters ─────────────────────
+metrics = ['Spearman \\u03c1', 'Pearson r', 'R\\u00b2']
+params = ['n1_evidence_sd', 'n2_evidence_sd', 'total_sd']
+param_labels = {'n1_evidence_sd': '\\u03bd\\u2081 (first option)',
+                'n2_evidence_sd': '\\u03bd\\u2082 (second option)',
+                'total_sd': '\\u03bd\\u2081 + \\u03bd\\u2082 (total)'}
+pal = {'MLE': '#d73027', 'Hierarchical Bayes': '#4393c3'}
 
-for ax, param in zip(axes, ['n1_evidence_sd', 'n2_evidence_sd']):
-    sub = results_df[results_df['parameter'] == param]
-    for method in ['MLE (flat prior)', 'Hierarchical Bayes']:
-        d = sub[sub['method'] == method]
-        ax.plot(d['trials_per_half'], d['R2'], 'o-', lw=2.5, ms=8,
-                color=pal[method], label=method)
-    ax.set_xlabel('Trials per half')
-    ax.set_ylabel('Split-half reliability  R\\u00b2  (= \\u03c1\\u00b2)')
-    ax.set_title(param.replace('_', ' '))
-    ax.set_ylim(-0.05, 1.05)
-    ax.axhline(0, ls=':', c='gray', lw=1)
-    ax.legend(fontsize=10)
-    sns.despine(ax=ax)
+fig, axes = plt.subplots(len(metrics), len(params),
+                          figsize=(5 * len(params), 3.5 * len(metrics)),
+                          sharex=True, sharey='row')
 
-plt.suptitle('Split-half reliability (R\\u00b2): hierarchical Bayes vs individual MAP',
-             fontsize=13, y=1.02)
+for row, metric in enumerate(metrics):
+    for col, param in enumerate(params):
+        ax = axes[row, col]
+        sub = results_df[results_df['parameter'] == param]
+        for i_m, method in enumerate(['MLE', 'Hierarchical Bayes']):
+            d = sub[sub['method'] == method]
+            mean_by_k = d.groupby('k')[metric].mean()
+            se_by_k   = d.groupby('k')[metric].std() / np.sqrt(n_splits)
+            offset = (i_m - 0.5) * 1.5  # slight x-offset to avoid overlap
+            ax.errorbar(mean_by_k.index + offset, mean_by_k,
+                        yerr=1.96 * se_by_k,
+                        fmt='o-', lw=2, ms=6, capsize=4, capthick=1.5,
+                        color=pal[method], ecolor=pal[method], label=method)
+        ax.axhline(0, ls=':', c='gray', lw=1)
+        if row == 0:
+            ax.set_title(param_labels[param])
+        if row == len(metrics) - 1:
+            ax.set_xlabel('Trials per half')
+        if col == 0:
+            ax.set_ylabel(metric)
+        ax.legend(fontsize=8)
+        sns.despine(ax=ax)
+
+plt.suptitle(f'Split-half reliability (mean \\u00b1 95% CI over {n_splits} splits)',
+             fontsize=13, y=1.01)
 plt.tight_layout()
 """),
 
@@ -2459,37 +2830,42 @@ this reason.
 """),
 
 code("""\
-# ── Scatter: half A vs half B for all 3 methods at lowest trial count ────────
-k_show = trial_counts[0]
-a_sub = subsample(half_a_full, k_show)
-b_sub = subsample(half_b_full, k_show)
+# ── Scatter: half A vs half B at every trial count, all 3 params ─────────────
+half_a, half_b = split_data(df_mag, seed=0)
+scatter_colors = {'MLE': '#d73027', 'Hierarchical Bayes': '#4393c3'}
 
-scatter_ests = {name: (fn(a_sub), fn(b_sub)) for name, fn in methods.items()}
-scatter_colors = {'MLE (flat prior)': '#d73027', 'Hierarchical Bayes': '#4393c3'}
+for param, param_label in param_labels.items():
+    n_k = len(trial_counts)
+    fig, axes = plt.subplots(2, n_k, figsize=(3.5 * n_k, 7), sharey='row', sharex='row')
 
-fig, axes = plt.subplots(2, 2, figsize=(10, 10))
-param_labels = {'n1_evidence_sd': '\\u03bd\\u2081 (first option noise)',
-                'n2_evidence_sd': '\\u03bd\\u2082 (second option noise)'}
+    for col, k in enumerate(trial_counts):
+        a_sub = subsample(half_a, k)
+        b_sub = subsample(half_b, k)
+        ests = {}
+        for name, fn in methods.items():
+            ea, eb = fn(a_sub), fn(b_sub)
+            ea['total_sd'] = ea['n1_evidence_sd'] + ea['n2_evidence_sd']
+            eb['total_sd'] = eb['n1_evidence_sd'] + eb['n2_evidence_sd']
+            ests[name] = (ea, eb)
+        for row, method in enumerate(['MLE', 'Hierarchical Bayes']):
+            ax = axes[row, col]
+            est_a, est_b = ests[method]
+            rho, _ = spearmanr(est_a[param], est_b[param])
+            ax.scatter(est_a[param], est_b[param], s=25, alpha=.6,
+                       color=scatter_colors[method])
+            lims = [0, max(est_a[param].max(), est_b[param].max()) * 1.1]
+            ax.plot(lims, lims, '--', color='gray', lw=1)
+            ax.set_xlim(lims); ax.set_ylim(lims)
+            ax.set_title(f'{method}, k={k}  (R\\u00b2={rho**2:.2f})', fontsize=9)
+            if col == 0:
+                ax.set_ylabel(f'Half B')
+            if row == 1:
+                ax.set_xlabel(f'Half A')
+            sns.despine(ax=ax)
 
-for col, param in enumerate(['n1_evidence_sd', 'n2_evidence_sd']):
-    for row, method in enumerate(['MLE (flat prior)', 'Hierarchical Bayes']):
-        ax = axes[row, col]
-        est_a, est_b = scatter_ests[method]
-        rho, p = spearmanr(est_a[param], est_b[param])
-        ax.scatter(est_a[param], est_b[param], s=30, alpha=.7,
-                   color=scatter_colors[method])
-        lims = [min(est_a[param].min(), est_b[param].min()) * 0.9,
-                max(est_a[param].max(), est_b[param].max()) * 1.1]
-        ax.plot(lims, lims, '--', color='gray', lw=1)
-        ax.set_xlim(lims); ax.set_ylim(lims)
-        ax.set_xlabel(f'Half A  {param_labels[param]}')
-        ax.set_ylabel(f'Half B  {param_labels[param]}')
-        ax.set_title(f'{method}  (R\\u00b2 = {rho**2:.2f}, k = {k_show})', fontsize=10)
-        sns.despine(ax=ax)
-
-plt.suptitle(f'Split-half scatter at {k_show} trials: MLE (top) vs Hierarchical Bayes (bottom)',
-             fontsize=12, y=1.01)
-plt.tight_layout()
+    plt.suptitle(f'Split-half scatter: {param_label}  (MLE top, Hierarchical bottom)',
+                 fontsize=12, y=1.01)
+    plt.tight_layout()
 """),
 
 md(r"""## Take-aways
