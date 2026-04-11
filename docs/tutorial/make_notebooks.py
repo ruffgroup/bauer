@@ -2643,7 +2643,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.stats import spearmanr
 from bauer.utils.data import load_garcia2022
 from bauer.models import MagnitudeComparisonModel
 
@@ -2731,12 +2730,15 @@ for split_i in range(n_splits):
             est_a['total_sd'] = est_a['n1_evidence_sd'] + est_a['n2_evidence_sd']
             est_b['total_sd'] = est_b['n1_evidence_sd'] + est_b['n2_evidence_sd']
             for param in ['n1_evidence_sd', 'n2_evidence_sd', 'total_sd']:
-                rho_s, _ = spearmanr(est_a[param], est_b[param])
                 rho_p, _ = pearsonr(est_a[param], est_b[param])
+                # Count boundary-collapsed estimates (noise near zero)
+                n_zero_a = (est_a[param] < 0.01).sum()
+                n_zero_b = (est_b[param] < 0.01).sum()
                 results.append({
                     'split': split_i, 'k': k, 'method': method_name,
                     'parameter': param,
-                    'Spearman \\u03c1': rho_s, 'Pearson r': rho_p, 'R\\u00b2': rho_s**2,
+                    'Pearson r': rho_p, 'R\\u00b2': rho_p**2,
+                    'n_collapsed': n_zero_a + n_zero_b,
                 })
     print(f"Split {split_i+1}/{n_splits} done")
 
@@ -2745,8 +2747,8 @@ print(f"\\nTotal fits: {len(results_df)}")
 """),
 
 code("""\
-# ── Reliability vs trial count: 3 metrics x 3 parameters ─────────────────────
-metrics = ['Spearman \\u03c1', 'Pearson r', 'R\\u00b2']
+# ── Reliability vs trial count: Pearson r and R² x 3 parameters ──────────────
+metrics = ['Pearson r', 'R\\u00b2']
 params = ['n1_evidence_sd', 'n2_evidence_sd', 'total_sd']
 param_labels = {'n1_evidence_sd': '\\u03bd\\u2081 (first option)',
                 'n2_evidence_sd': '\\u03bd\\u2082 (second option)',
@@ -2782,6 +2784,47 @@ for row, metric in enumerate(metrics):
 
 plt.suptitle(f'Split-half reliability (mean \\u00b1 95% CI over {n_splits} splits)',
              fontsize=13, y=1.01)
+plt.tight_layout()
+"""),
+
+md(r"""### The boundary-collapse problem
+
+Why does MLE do so poorly on Pearson $r$ (which measures linear agreement) even when
+Spearman $\rho$ (which only checks rank order) looks acceptable?  The answer is
+**boundary collapse**: with few trials, the MLE optimiser can push noise parameters
+$\nu_1$ or $\nu_2$ to near-zero, meaning the model "explains" every trial perfectly by
+overfitting the noise away.  These zero-estimates are meaningless — they do not reflect
+a participant with perfect perception, they reflect an optimiser that ran out of data.
+
+The plot below shows how many subjects (out of $N \times 2$ halves) have $\nu < 0.01$
+at each trial count:
+"""),
+
+code("""\
+# ── Boundary collapse diagnostic ─────────────────────────────────────────────
+fig, axes = plt.subplots(1, 3, figsize=(14, 4), sharey=True)
+for col, param in enumerate(params):
+    ax = axes[col]
+    sub = results_df[results_df['parameter'] == param]
+    for i_m, method in enumerate(['MLE', 'Hierarchical Bayes']):
+        d = sub[sub['method'] == method]
+        mean_col = d.groupby('k')['n_collapsed'].mean()
+        se_col   = d.groupby('k')['n_collapsed'].std() / np.sqrt(n_splits)
+        offset = (i_m - 0.5) * 1.5
+        ax.errorbar(mean_col.index + offset, mean_col,
+                    yerr=1.96 * se_col,
+                    fmt='o-', lw=2, ms=6, capsize=4, capthick=1.5,
+                    color=pal[method], ecolor=pal[method], label=method)
+    ax.axhline(0, ls=':', c='gray', lw=1)
+    ax.set_title(param_labels[param])
+    ax.set_xlabel('Trials per half')
+    if col == 0:
+        ax.set_ylabel('Subjects with \\u03bd < 0.01\\n(out of 2 \\u00d7 N halves)')
+    ax.legend(fontsize=8)
+    sns.despine(ax=ax)
+
+plt.suptitle('Boundary collapse: MLE pushes noise to zero when data are scarce',
+             fontsize=12, y=1.02)
 plt.tight_layout()
 """),
 
@@ -2850,13 +2893,13 @@ for param, param_label in param_labels.items():
         for row, method in enumerate(['MLE', 'Hierarchical Bayes']):
             ax = axes[row, col]
             est_a, est_b = ests[method]
-            rho, _ = spearmanr(est_a[param], est_b[param])
+            rho_p, _ = pearsonr(est_a[param], est_b[param])
             ax.scatter(est_a[param], est_b[param], s=25, alpha=.6,
                        color=scatter_colors[method])
             lims = [0, max(est_a[param].max(), est_b[param].max()) * 1.1]
             ax.plot(lims, lims, '--', color='gray', lw=1)
             ax.set_xlim(lims); ax.set_ylim(lims)
-            ax.set_title(f'{method}, k={k}  (R\\u00b2={rho**2:.2f})', fontsize=9)
+            ax.set_title(f'{method}, k={k}  (R\\u00b2={rho_p**2:.2f})', fontsize=9)
             if col == 0:
                 ax.set_ylabel(f'Half B')
             if row == 1:
