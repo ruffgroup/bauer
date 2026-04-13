@@ -408,7 +408,7 @@ class BaseModel(object):
     def get_subjectwise_parameter_estimates(self, idata=None, parameters=None):
 
         idata = self._get_idata(idata)
-        parameters = self._get_parameters(parameters)#.keys()
+        parameters = list(self._get_parameters(parameters).keys())
 
         pars = idata.posterior[parameters].to_dataframe()
         pars.columns.name = 'parameter'
