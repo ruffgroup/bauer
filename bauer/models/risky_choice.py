@@ -1467,8 +1467,6 @@ class SafeVsRiskyModel(BaseModel):
         fix_prior_mus: fix prior means to data statistics (default False)
         fix_prior_sds: fix prior sds to 1.0 (default False)
         separate_evidence_sd: separate evidence noise for n1 vs n2 (default True)
-        noise_per_role: add role-based noise for risky vs safe (default False)
-        weber_noise: noise scales with log-magnitude (default False)
     """
 
     paradigm_keys = ['n1', 'n2', 'p1', 'p2']
@@ -1476,8 +1474,7 @@ class SafeVsRiskyModel(BaseModel):
     def __init__(self, data=None, domain='gain',
                  separate_priors=True,
                  fix_prior_mus=False, fix_prior_sds=False,
-                 separate_evidence_sd=True, noise_per_role=False,
-                 weber_noise=False):
+                 separate_evidence_sd=True):
 
         assert domain in ('gain', 'loss'), "domain must be 'gain' or 'loss'"
 
@@ -1486,8 +1483,6 @@ class SafeVsRiskyModel(BaseModel):
         self.fix_prior_mus = fix_prior_mus
         self.fix_prior_sds = fix_prior_sds
         self.separate_evidence_sd = separate_evidence_sd
-        self.noise_per_role = noise_per_role
-        self.weber_noise = weber_noise
 
         super().__init__(data)
 
@@ -1518,13 +1513,6 @@ class SafeVsRiskyModel(BaseModel):
             free['evidence_sd_n2'] = {**noise_spec}
         else:
             free['evidence_sd'] = {**noise_spec}
-
-        if self.noise_per_role:
-            free['evidence_sd_risky'] = {**noise_spec}
-            free['evidence_sd_safe'] = {**noise_spec}
-
-        if self.weber_noise:
-            free['evidence_sd_weber'] = {**noise_spec}
 
         return free
 
@@ -1569,14 +1557,6 @@ class SafeVsRiskyModel(BaseModel):
             noise2 = parameters['evidence_sd_n2']
         else:
             noise1 = noise2 = parameters['evidence_sd']
-
-        if self.noise_per_role:
-            noise1 = noise1 + pt.where(risky_first, parameters['evidence_sd_risky'], parameters['evidence_sd_safe'])
-            noise2 = noise2 + pt.where(risky_first, parameters['evidence_sd_safe'], parameters['evidence_sd_risky'])
-
-        if self.weber_noise:
-            noise1 = noise1 + parameters['evidence_sd_weber'] * logn1
-            noise2 = noise2 + parameters['evidence_sd_weber'] * logn2
 
         return {
             'prior_mu_risky': prior_mu_risky, 'prior_sd_risky': prior_sd_risky,
