@@ -1447,3 +1447,197 @@ class PowerLawNoiseRiskRegressionModel(RegressionModel, PowerLawNoiseRiskModel):
         RegressionModel.__init__(self, regressors)
         PowerLawNoiseRiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd,
                                         save_trialwise_n_estimates, memory_model)
+
+
+class SafeVsRiskyModel(BaseModel):
+    """Bayesian observer model for risky choice between a safe and a risky option.
+
+    The observer forms posterior beliefs about each option's log-magnitude
+    via Bayesian updating of a prior with noisy evidence, then compares
+    expected values (incorporating probability) to make a choice.
+
+    Data format:
+        - n1, n2: magnitudes (positive for gains, negative for losses)
+        - p1, p2: probabilities (risky option has p < 1, safe has p = 1)
+        - choice: True = chose the risky option
+
+    Args:
+        domain: 'gain' or 'loss' (required)
+        separate_priors: separate prior mu/sd for risky vs safe (default True)
+        fix_prior_mus: fix prior means to data statistics (default False)
+        fix_prior_sds: fix prior sds to 1.0 (default False)
+        separate_evidence_sd: separate evidence noise for n1 vs n2 (default True)
+        noise_per_role: add role-based noise for risky vs safe (default False)
+        weber_noise: noise scales with log-magnitude (default False)
+    """
+
+    paradigm_keys = ['n1', 'n2', 'p1', 'p2']
+
+    def __init__(self, data=None, domain='gain',
+                 separate_priors=True,
+                 fix_prior_mus=False, fix_prior_sds=False,
+                 separate_evidence_sd=True, noise_per_role=False,
+                 weber_noise=False):
+
+        assert domain in ('gain', 'loss'), "domain must be 'gain' or 'loss'"
+
+        self.domain = domain
+        self.separate_priors = separate_priors
+        self.fix_prior_mus = fix_prior_mus
+        self.fix_prior_sds = fix_prior_sds
+        self.separate_evidence_sd = separate_evidence_sd
+        self.noise_per_role = noise_per_role
+        self.weber_noise = weber_noise
+
+        super().__init__(data)
+
+    # ── free parameters ──────────────────────────────────────────────
+
+    def get_free_parameters(self):
+        free = {}
+        mu_spec = {'mu_intercept': np.log(20.), 'sigma_intercept': np.log(20.) / 4., 'transform': 'softplus'}
+        sd_spec = {'mu_intercept': 1., 'transform': 'softplus'}
+        noise_spec = {'mu_intercept': -1., 'transform': 'softplus'}
+
+        if not self.fix_prior_mus:
+            if self.separate_priors:
+                free['prior_mu_risky'] = {**mu_spec}
+                free['prior_mu_safe'] = {**mu_spec}
+            else:
+                free['prior_mu'] = {**mu_spec}
+
+        if not self.fix_prior_sds:
+            if self.separate_priors:
+                free['prior_sd_risky'] = {**sd_spec}
+                free['prior_sd_safe'] = {**sd_spec}
+            else:
+                free['prior_sd'] = {**sd_spec}
+
+        if self.separate_evidence_sd:
+            free['evidence_sd_n1'] = {**noise_spec}
+            free['evidence_sd_n2'] = {**noise_spec}
+        else:
+            free['evidence_sd'] = {**noise_spec}
+
+        if self.noise_per_role:
+            free['evidence_sd_risky'] = {**noise_spec}
+            free['evidence_sd_safe'] = {**noise_spec}
+
+        if self.weber_noise:
+            free['evidence_sd_weber'] = {**noise_spec}
+
+        return free
+
+    # ── model inputs ─────────────────────────────────────────────────
+
+    def get_model_inputs(self, parameters):
+        model = pm.Model.get_context()
+
+        n1, n2 = model['n1'], model['n2']
+        p1, p2 = model['p1'], model['p2']
+        logn1 = pt.log(pt.abs(n1))
+        logn2 = pt.log(pt.abs(n2))
+        risky_first = (p1 < p2)
+
+        # --- Priors (in role-space: risky / safe) ---
+        if self.fix_prior_mus:
+            if self.separate_priors:
+                risky_n = pt.where(risky_first, n1, n2)
+                safe_n = pt.where(risky_first, n2, n1)
+                prior_mu_risky = pt.mean(pt.log(pt.abs(risky_n)))
+                prior_mu_safe = pt.mean(pt.log(pt.abs(safe_n)))
+            else:
+                prior_mu_risky = prior_mu_safe = (pt.sum(logn1) + pt.sum(logn2)) / (2 * pt.sum(pt.ones_like(logn1)))
+        else:
+            if self.separate_priors:
+                prior_mu_risky = parameters['prior_mu_risky']
+                prior_mu_safe = parameters['prior_mu_safe']
+            else:
+                prior_mu_risky = prior_mu_safe = parameters['prior_mu']
+
+        if self.fix_prior_sds:
+            prior_sd_risky = prior_sd_safe = 1.0
+        elif self.separate_priors:
+            prior_sd_risky = parameters['prior_sd_risky']
+            prior_sd_safe = parameters['prior_sd_safe']
+        else:
+            prior_sd_risky = prior_sd_safe = parameters['prior_sd']
+
+        # --- Evidence noise (built in position-space, then mapped) ---
+        if self.separate_evidence_sd:
+            noise1 = parameters['evidence_sd_n1']
+            noise2 = parameters['evidence_sd_n2']
+        else:
+            noise1 = noise2 = parameters['evidence_sd']
+
+        if self.noise_per_role:
+            noise1 = noise1 + pt.where(risky_first, parameters['evidence_sd_risky'], parameters['evidence_sd_safe'])
+            noise2 = noise2 + pt.where(risky_first, parameters['evidence_sd_safe'], parameters['evidence_sd_risky'])
+
+        if self.weber_noise:
+            noise1 = noise1 + parameters['evidence_sd_weber'] * logn1
+            noise2 = noise2 + parameters['evidence_sd_weber'] * logn2
+
+        return {
+            'prior_mu_risky': prior_mu_risky, 'prior_sd_risky': prior_sd_risky,
+            'prior_mu_safe': prior_mu_safe, 'prior_sd_safe': prior_sd_safe,
+            'logn1': logn1, 'logn2': logn2,
+            'ev_sd1': noise1, 'ev_sd2': noise2,
+            'p1': p1, 'p2': p2,
+            'risky_first': risky_first,
+        }
+
+    # ── choice predictions ───────────────────────────────────────────
+
+    def _get_choice_predictions(self, mi):
+        risky_first = mi['risky_first']
+
+        # Map priors: position → role
+        mu1 = pt.where(risky_first, mi['prior_mu_risky'], mi['prior_mu_safe'])
+        mu2 = pt.where(risky_first, mi['prior_mu_safe'], mi['prior_mu_risky'])
+        sd1 = pt.where(risky_first, mi['prior_sd_risky'], mi['prior_sd_safe'])
+        sd2 = pt.where(risky_first, mi['prior_sd_safe'], mi['prior_sd_risky'])
+
+        # Bayesian posterior per option (position-space)
+        post1_mu, post1_sd = get_posterior(mu1, sd1, mi['logn1'], mi['ev_sd1'])
+        post2_mu, post2_sd = get_posterior(mu2, sd2, mi['logn2'], mi['ev_sd2'])
+
+        # Map posteriors: position → role
+        risky_post = pt.where(risky_first, post1_mu, post2_mu)
+        safe_post = pt.where(risky_first, post2_mu, post1_mu)
+
+        # Decision noise per option: β·ν = post_sd² / evidence_sd
+        # (see Khaw, Li & Woodford 2020, eq. 2.5)
+        decision_sd1 = post1_sd**2 / mi['ev_sd1']
+        decision_sd2 = post2_sd**2 / mi['ev_sd2']
+        risky_decision_sd = pt.where(risky_first, decision_sd1, decision_sd2)
+        safe_decision_sd = pt.where(risky_first, decision_sd2, decision_sd1)
+
+        # Decision variable: always risky − safe
+        diff_mu = risky_post - safe_post
+        diff_sd = pt.sqrt(risky_decision_sd**2 + safe_decision_sd**2)
+
+        # Probability threshold
+        safe_prob = pt.where(risky_first, mi['p2'], mi['p1'])
+        risky_prob = pt.where(risky_first, mi['p1'], mi['p2'])
+        threshold = pt.log(safe_prob / risky_prob)
+
+        # Gains: choose risky when perceived risky > safe (accounting for probability)
+        #   → p_risky = P(diff > threshold)
+        # Losses: choose risky when perceived risky loss isn't too big
+        #   → p_risky = P(diff < threshold)
+        if self.domain == 'gain':
+            p_risky = 1.0 - cumulative_normal(threshold, diff_mu, diff_sd)
+        else:
+            p_risky = cumulative_normal(threshold, diff_mu, diff_sd)
+
+        return p_risky
+
+
+class SafeVsRiskyRegressionModel(RegressionModel, SafeVsRiskyModel):
+    def __init__(self, data=None, regressors=None, **kwargs):
+        SafeVsRiskyModel.__init__(self, data=data, **kwargs)
+        RegressionModel.__init__(self, regressors=regressors)
+
+    def get_trialwise_variable(self, key):
+        return super().get_trialwise_variable(key)
