@@ -6,7 +6,7 @@ from .utils.bayes import cumulative_normal, get_posterior, get_diff_dist
 from .utils.math import inverse_softplus, softplus_np, inverse_softplus_np, logit_derivative, gaussian_pdf
 from pymc.math import logit, invlogit
 import pytensor.tensor as pt
-from pytensor import scan    
+from pytensor import scan
 from patsy import dmatrix
 from .core import BaseModel, LapseModel, RegressionModel
 from .utils.plotting import plot_prediction
@@ -24,12 +24,12 @@ class PsychometricModel(BaseModel):
         super().__init__(paradigm)
 
     def get_free_parameters(self):
-            
+
             free_parameters = {}
 
             free_parameters['nu'] = {'mu_intercept': inverse_softplus_np(1.), 'sigma_intercept': 10., 'transform': 'softplus'}
             free_parameters['bias'] = {'mu_intercept': 0, 'sigma_intercept': 10., 'transform': 'identity'}
-    
+
             return free_parameters
 
     def _get_choice_predictions(self, model_inputs):
@@ -47,7 +47,7 @@ class PsychometricLapseModel(LapseModel, PsychometricModel):
     ...
 
 class PsychometricRegressionModel(RegressionModel, PsychometricModel):
-    
+
         def __init__(self, paradigm, regressors, save_trialwise_estimates=False):
             RegressionModel.__init__(self, regressors)
             PsychometricModel.__init__(self, paradigm)
@@ -121,7 +121,7 @@ class MagnitudeComparisonModel(BaseModel):
             elif self.memory_model == 'shared_perceptual_noise':
                 free_parameters['perceptual_noise_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
                 free_parameters['memory_noise_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
-        
+
         else:
             free_parameters['evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
 
@@ -155,7 +155,7 @@ class MagnitudeComparisonModel(BaseModel):
         paradigm = pd.DataFrame({'n1':n1, 'n2':n2})
 
         return paradigm
-        
+
 class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonModel):
 
     def __init__(self, paradigm, regressors, fit_prior=False, fit_seperate_evidence_sd=True, memory_model = 'independent',save_trialwise_estimates=False):
@@ -175,7 +175,7 @@ class RiskModelProbabilityDistortion(BaseModel):
                  fix_magnitude_prior_sd=False, fix_probabiliy_prior_sd=False,
                  estimate_magnitude_prior_mu=False):
 
-        assert magnitude_prior_estimate in ['objective'], 'Only objective prior is currently supported' 
+        assert magnitude_prior_estimate in ['objective'], 'Only objective prior is currently supported'
 
         self.magnitude_prior_estimate = magnitude_prior_estimate
         self.n_prospects = n_prospects
@@ -265,7 +265,7 @@ class RiskModelProbabilityDistortion(BaseModel):
             n1_hat_mean, n1_hat_sd = get_posterior(model_inputs[f'n{ix+1}_evidence_mu'], model_inputs[f'n{ix+1}_evidence_sd'], model_inputs[f'n{ix+1}_prior_mu'], model_inputs[f'n{ix+1}_prior_sd'])
 
             ix = 1
-            n2_hat_mean, n2_hat_sd = get_posterior(model_inputs[f'n{ix+1}_evidence_mu'], model_inputs[f'n{ix+1}_evidence_sd'], model_inputs[f'n{ix+1}_prior_mu'], model_inputs[f'n{ix+1}_prior_sd']) 
+            n2_hat_mean, n2_hat_sd = get_posterior(model_inputs[f'n{ix+1}_evidence_mu'], model_inputs[f'n{ix+1}_evidence_sd'], model_inputs[f'n{ix+1}_prior_mu'], model_inputs[f'n{ix+1}_prior_sd'])
 
         if self.distort_magnitudes & self.distort_probabilities:
 
@@ -380,7 +380,7 @@ class RiskModelProbabilityDistortion(BaseModel):
 
 class ProspectTheoryModel(BaseModel):
 
-    paradigm_keys = ['gain', 'loss', 'prob_gain']
+    paradigm_keys = ['gain', 'loss', 'p']
     base_parameters = ['alpha', 'beta', 'lambda']
 
     def __init__(self, paradigm, save_trialwise_n_estimates=False):
@@ -395,46 +395,29 @@ class ProspectTheoryModel(BaseModel):
 
         return free_parameters
 
-    def _get_choice_predictions(self, model_inputs):
 
-        p = model_inputs['prob_gain']
-        gain = model_inputs['gain']
-        loss = model_inputs['loss']
-        
-        utility = p * gain ** model_inputs['alpha'] - (1-p) * model_inputs['lambda'] * loss ** model_inputs['beta']
-        
-        p_choose = cumulative_normal(utility, 0.0, 1.0)
 
-        return p_choose
-    
-    def get_model_inputs(self, parameters):
-        model = pm.Model.get_context()
-
-        model_inputs = {}
-
-        for key in self.base_parameters:
-            model_inputs[key] = parameters[key]
-        
-        for key in self.paradigm_keys:
-            model_inputs[key] = model[key]
-
-        return model_inputs
 
 class LossAversionModel(BaseModel):
 
-    base_parameters = ['prior_mu_gains', 'prior_mu_losses', 'evidence_sd_gains', 'evidence_sd_losses', 'prior_sd_gains', 'prior_sd_losses']
+    #base_parameters = ['prior_mu_gains', 'prior_mu_losses', 'evidence_sd_gains', 'evidence_sd_losses', 'prior_sd_gains', 'prior_sd_losses', 'prior_correlation']
+    base_parameters = ['prior_mu_gains', 'prior_mu_losses', 'prior_mu', 'evidence_sd_gains', 'evidence_sd_losses', 'evidence_sd', 'prior_sd_gains', 'prior_sd_losses', 'evidence_sd_first', 'evidence_sd_second']
+    #base_parameters = ['prior_mu_gains', 'prior_mu_losses', 'evidence_sd', 'prior_sd_gains', 'prior_sd_losses']
 
-    def __init__(self, paradigm=None, save_trialwise_n_estimates=False, 
+    def __init__(self, data=None, save_trialwise_n_estimates=False,
                  magnitude_grid=None,
                  ev_diff_grid=None,
-                 lapse_rate=0.01, 
+                 lapse_rate=0.01,
                  normalize_likelihoods=True,
-                 paradigm_type='mixed_vs_mixed',# mixed_vs_mixed or mixed_vs_0
+                 paradigm_type='mixed_vs_mixed',# mixed_vs_mixed or mixed_vs_0 or mixed_vs_0_approx
                  fix_prior_sds=True,
-                 prior_for_noise='numerosity'): #numerosity or number
+                 fix_prior_mus=False,
+                 prior_for_noise='numerosity',
+                 model_type='full',
+                 order=True): # full or common_prior or common_noise or common_prior_and_noise or only_priors
 
         if magnitude_grid is None:
-            self.magnitude_grid = np.linspace(1, 100, 50) 
+            self.magnitude_grid = np.linspace(1, 100, 50)
         else:
             self.magnitude_grid = magnitude_grid
 
@@ -445,36 +428,70 @@ class LossAversionModel(BaseModel):
 
         self.lapse_rate = lapse_rate
         self.fix_prior_sds = fix_prior_sds
+        self.fix_prior_mus = fix_prior_mus
+
+        self.order = order
 
         self.normalize_likelihoods = normalize_likelihoods
-
         self.prior_for_noise = prior_for_noise
+
+        self.model_type = model_type
 
         if paradigm_type == 'mixed_vs_mixed':
             self.paradigm_keys = ['p1', 'p2', 'gain1', 'gain2', 'loss1', 'loss2']
-        elif paradigm_type == 'mixed_vs_0':
+        elif (paradigm_type == 'mixed_vs_0') and order:
+            self.paradigm_keys = ['gain', 'loss', 'Order']
+        elif (paradigm_type == 'mixed_vs_0') and not order:
             self.paradigm_keys = ['gain', 'loss']
         else:
-            raise ValueError('paradigm_type should be either "mixed_vs_mixed" or "mixed_vs_0"')
+            raise ValueError('paradigm_type should be either "mixed_vs_mixed" or "mixed_vs_0" or "mixed_vs_0_approx"')
 
         self.paradigm_type = paradigm_type
 
-        super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
+        super().__init__(data, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
 
     def get_free_parameters(self):
 
         free_parameters = {}
-        
-        free_parameters['prior_mu_gains'] = {'mu_intercept': np.log(10.), 'sigma_intercept':np.log(10)/2., 'transform': 'identity'}
-        free_parameters['prior_mu_losses'] = {'mu_intercept': np.log(10.), 'sigma_intercept':np.log(10)/2., 'transform': 'identity'}
-        
-        if self.prior_for_noise == 'numerosity':
-            free_parameters['evidence_sd_gains'] = {'mu_intercept': -1., 'transform': 'softplus'}
-            free_parameters['evidence_sd_losses'] = {'mu_intercept': -1., 'transform': 'softplus'}
-        else:
-            free_parameters['evidence_sd_gains'] = {'mu_intercept': -2., 'transform': 'softplus'}
-            free_parameters['evidence_sd_losses'] = {'mu_intercept': -2., 'transform': 'softplus'}
+        '''
+        if self.model_type == 'full' or self.model_type == 'common_noise':
+            free_parameters['prior_mu_gains'] = {'mu_intercept': np.log(10.), 'sigma_intercept':np.log(10)/2., 'transform': 'identity'}
+            free_parameters['prior_mu_losses'] = {'mu_intercept': np.log(10.), 'sigma_intercept':np.log(10)/2., 'transform': 'identity'}
+        elif self.model_type == 'common_prior' or self.model_type == 'common_prior_and_noise':
+            free_parameters['prior_mu'] = {'mu_intercept': np.log(10.), 'sigma_intercept':np.log(10)/2., 'transform': 'identity'}
+        '''
+
+        if not self.fix_prior_mus:
+            if self.model_type == 'full' or self.model_type == 'common_noise' or self.model_type == 'only_priors':
+                free_parameters['prior_mu_gains'] = {'mu_intercept': np.log(20.), 'sigma_intercept':np.log(20)/4., 'transform': 'softplus'}
+                free_parameters['prior_mu_losses'] = {'mu_intercept': np.log(20.), 'sigma_intercept':np.log(20)/4., 'transform': 'softplus'}
+            elif self.model_type == 'common_prior' or self.model_type == 'common_prior_and_noise':
+                free_parameters['prior_mu'] = {'mu_intercept': np.log(20.), 'sigma_intercept':np.log(20)/4., 'transform': 'softplus'}
+            #free_parameters['correlation'] = {'mu_intercept': 0., 'sigma_intercept': 0.5, 'lower_bound': -1, 'upper_bound': 1, 'transform': 'bounded'}
+
+        if self.model_type == 'full' or self.model_type == 'common_prior':
+            if self.prior_for_noise == 'numerosity':
+                free_parameters['evidence_sd_gains'] = {'mu_intercept': -1., 'transform': 'softplus'}
+                free_parameters['evidence_sd_losses'] = {'mu_intercept': -1., 'transform': 'softplus'}
+                #free_parameters['evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+            else:
+                free_parameters['evidence_sd_gains'] = {'mu_intercept': -2., 'transform': 'softplus'}
+                free_parameters['evidence_sd_losses'] = {'mu_intercept': -2., 'transform': 'softplus'}
+                #free_parameters['evidence_sd'] = {'mu_intercept': -2., 'transform': 'softplus'}
+        elif self.model_type == 'common_noise' or self.model_type == 'common_prior_and_noise':
+            if self.prior_for_noise == 'numerosity':
+                free_parameters['evidence_sd_first'] = {'mu_intercept': -1., 'transform': 'softplus'}
+                free_parameters['evidence_sd_second'] = {'mu_intercept': -1., 'transform': 'softplus'}
+            else:
+                free_parameters['evidence_sd_first'] = {'mu_intercept': -2., 'transform': 'softplus'}
+                free_parameters['evidence_sd_second'] = {'mu_intercept': -2., 'transform': 'softplus'}
+
+        elif self.model_type == 'only_priors':
+            if self.prior_for_noise == 'numerosity':
+                free_parameters['evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+            else:
+                free_parameters['evidence_sd'] = {'mu_intercept': -2., 'transform': 'softplus'}
 
         if not self.fix_prior_sds:
             free_parameters['prior_sd_gains'] = {'mu_intercept': 1., 'sigma_intercept':1., 'transform': 'softplus'}
@@ -551,9 +568,9 @@ class LossAversionModel(BaseModel):
 
             # Distribution o er expecrtations of the expected value of first option (n_trials x n_diff_grid)
             # ev1_pdf, _ = scan(lambda bin_index, evs1, ev_diff_grid, joint_pdf1: pt.sum(joint_pdf1 * ((evs1 >= ev_diff_grid[bin_index]) & (evs1 < ev_diff_grid[bin_index+1]) ), axis=[-2, -1]),
-            #                 sequences=[pt.arange(len(ev_diff_grid)-1, dtype=int)], 
+            #                 sequences=[pt.arange(len(ev_diff_grid)-1, dtype=int)],
             #                 non_sequences=[evs1, ev_diff_grid, joint_pdf1])
-            
+
             ev1_pdf, _ = scan(lambda ev_diff_mapping_, joint_pdf1: pt.sum(joint_pdf1 * ev_diff_mapping_, axis=[-2, -1]),
                             sequences=[ev1_diff_mapping],
                             non_sequences=[joint_pdf1])
@@ -565,7 +582,7 @@ class LossAversionModel(BaseModel):
                                     non_sequences=[evs2, ev_diff_grid])
 
             # ev2_pdf, _ = scan(lambda bin_index, evs2, ev_diff_grid, joint_pdf2: pt.sum(joint_pdf2 * ((evs2 >= ev_diff_grid[bin_index]) & (evs2 < ev_diff_grid[bin_index+1]) ), axis=[-2, -1]),
-            #                 sequences=[pt.arange(len(ev_diff_grid)-1, dtype=int)], 
+            #                 sequences=[pt.arange(len(ev_diff_grid)-1, dtype=int)],
             #                 non_sequences=[evs2, ev_diff_grid, joint_pdf2])
 
             ev2_pdf, _ = scan(lambda ev_diff_mapping_, joint_pdf2: pt.sum(joint_pdf2 * ev_diff_mapping_, axis=[-2, -1]),
@@ -590,12 +607,54 @@ class LossAversionModel(BaseModel):
 
             gains = model_inputs['gain']
             losses = model_inputs['loss']
+            if self.order:
+                Order = model_inputs['Order']
 
-            expectations_gains_mu_log, expectations_gains_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains), model_inputs['evidence_sd_gains'])
-            expectations_losses_mu_log, expectations_losses_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses), model_inputs['evidence_sd_losses'])
-
-            diff_mu, diff_sd = get_diff_dist(p * expectations_gains_mu_log, p * model_inputs['evidence_sd_gains'],
+            if self.model_type == 'full':
+                expectations_gains_mu_log, expectations_gains_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains), model_inputs['evidence_sd_gains'])
+                expectations_losses_mu_log, expectations_losses_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses), model_inputs['evidence_sd_losses'])
+                diff_mu, diff_sd = get_diff_dist(p * expectations_gains_mu_log, p * model_inputs['evidence_sd_gains'],
                                              (1-p) * expectations_losses_mu_log, (1-p) * model_inputs['evidence_sd_losses'])
+
+            elif self.model_type == 'common_prior':
+                expectations_gains_mu_log, expectations_gains_sd_log = get_posterior(model_inputs['prior_mu'], model_inputs['prior_sd_gains'], pt.log(gains), model_inputs['evidence_sd_gains'])
+                expectations_losses_mu_log, expectations_losses_sd_log = get_posterior(model_inputs['prior_mu'], model_inputs['prior_sd_losses'], pt.log(losses), model_inputs['evidence_sd_losses'])
+                diff_mu, diff_sd = get_diff_dist(p * expectations_gains_mu_log, p * model_inputs['evidence_sd_gains'],
+                                             (1-p) * expectations_losses_mu_log, (1-p) * model_inputs['evidence_sd_losses'])
+
+            elif self.model_type == 'common_noise':
+                evidence_sd_gain = np.where(model_inputs['Order'] == 0, model_inputs['evidence_sd_first'], model_inputs['evidence_sd_second'])
+                evidence_sd_loss = np.where(model_inputs['Order'] == 0, model_inputs['evidence_sd_second'], model_inputs['evidence_sd_first'])
+
+                expectations_gains_mu_log, expectations_gains_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains), evidence_sd_gain)
+                expectations_losses_mu_log, expectations_losses_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses), evidence_sd_loss)
+                diff_mu, diff_sd = get_diff_dist(p * expectations_gains_mu_log, p * evidence_sd_gain,
+                                             (1-p) * expectations_losses_mu_log, (1-p) * evidence_sd_loss)
+
+            elif self.model_type == 'common_prior_and_noise':
+                evidence_sd_gain = np.where(model_inputs['Order'] == 0, model_inputs['evidence_sd_first'], model_inputs['evidence_sd_second'])
+                evidence_sd_loss = np.where(model_inputs['Order'] == 0, model_inputs['evidence_sd_second'], model_inputs['evidence_sd_first'])
+
+                expectations_gains_mu_log, expectations_gains_sd_log = get_posterior(model_inputs['prior_mu'], model_inputs['prior_sd_gains'], pt.log(gains), evidence_sd_gain)
+                expectations_losses_mu_log, expectations_losses_sd_log = get_posterior(model_inputs['prior_mu'], model_inputs['prior_sd_losses'], pt.log(losses), evidence_sd_loss)
+                diff_mu, diff_sd = get_diff_dist(p * expectations_gains_mu_log, p * evidence_sd_gain,
+                                             (1-p) * expectations_losses_mu_log, (1-p) * evidence_sd_loss)
+                
+            elif self.model_type == 'only_priors':
+                expectations_gains_mu_log, expectations_gains_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains), model_inputs['evidence_sd'])
+                expectations_losses_mu_log, expectations_losses_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses), model_inputs['evidence_sd'])
+                diff_mu, diff_sd = get_diff_dist(p * expectations_gains_mu_log, p * model_inputs['evidence_sd'],
+                                             (1-p) * expectations_losses_mu_log, (1-p) * model_inputs['evidence_sd'])
+
+            #expectations_gains_mu_log, expectations_gains_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains), model_inputs['evidence_sd_gains'])
+            #expectations_losses_mu_log, expectations_losses_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses), model_inputs['evidence_sd_losses'])
+            #expectations_gains_mu_log, expectations_gains_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains), model_inputs['evidence_sd'])
+            #expectations_losses_mu_log, expectations_losses_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses), model_inputs['evidence_sd'])
+
+            #diff_mu, diff_sd = get_diff_dist(p * expectations_gains_mu_log, p * expectations_gains_sd_log,
+            #                                 (1-p) * expectations_losses_mu_log, (1-p) * expectations_losses_sd_log)
+
+
 
             p_choose2 = cumulative_normal(0.0, diff_mu, diff_sd)
 
@@ -628,7 +687,7 @@ class LossAversionModel(BaseModel):
             # ev_grids: n_grid
             gains_ev_grid = p*n_grid
             losses_ev_grid = (1-p)*n_grid
-            
+
             # evs: n_grid (gains) x n_grid (losses)
             evs = gains_ev_grid[:, np.newaxis] - losses_ev_grid[np.newaxis, :]
 
@@ -639,6 +698,30 @@ class LossAversionModel(BaseModel):
 
         return p_choose2
 
+
+    def compute_correlated_priors(self, prior_mu_gains, prior_mu_losses, correlation):
+
+        corr_expanded = np.array(correlation)[:, None]
+
+
+        # correlated_priors_list = []
+        mean = pm.math.stack([prior_mu_gains, prior_mu_losses], axis=1)
+
+        #corr_expanded = np.array(correlation)[:, None]
+        ones = pm.math.ones_like(corr_expanded)
+        covariance = pm.math.stack([
+            pm.math.concatenate([ones, corr_expanded], axis=1),
+            pm.math.concatenate([corr_expanded, ones], axis=1)
+        ], axis=1)
+        correlated_priors = pm.MvNormal(f'correlated_priors', mu=mean, cov=covariance, shape=(100, 2))
+
+        # Stack the results to create a single tensor
+        # correlated_priors_stacked = pm.math.stack(correlated_priors_list, axis=0)
+
+        return correlated_priors[:, 0], correlated_priors[:, 1]
+
+
+
     def get_model_inputs(self, parameters):
         model = pm.Model.get_context()
 
@@ -646,14 +729,28 @@ class LossAversionModel(BaseModel):
 
         for key in self.base_parameters:
             if key in parameters:
+                if 'correlation' in parameters and 'prior_mu_gains' in parameters and 'prior_mu_losses' in parameters:
+                    model_inputs['prior_mu_gains'], model_inputs['prior_mu_losses'] = self.compute_correlated_priors(parameters['prior_mu_gains'], parameters['prior_mu_losses'], parameters['correlation'])
+                elif 'prior_mu_gains' in parameters and 'prior_mu_losses' in parameters:
+                    model_inputs['prior_mu_gains'], model_inputs['prior_mu_losses'] = parameters['prior_mu_gains'], parameters['prior_mu_losses']
+                elif 'prior_mu' in parameters:
+                    model_inputs['prior_mu'] = parameters['prior_mu']
+
                 model_inputs[key] = parameters[key]
-            
+
         if self.fix_prior_sds:
             for key in ['prior_sd_gains', 'prior_sd_losses']:
                 if key not in parameters:
                     model_inputs['prior_sd_gains'] = 1.
                     model_inputs['prior_sd_losses'] = 1.
-        
+
+        if self.fix_prior_mus:
+            for key in ['prior_mu_gains', 'prior_mu_losses']:
+                if key not in parameters:
+                    model_inputs['prior_mu_gains'] = np.log(23.)
+                    model_inputs['prior_mu_losses'] = np.log(15.)
+                    model_inputs['prior_mu'] = np.log(19.)
+
         for key in self.paradigm_keys:
             model_inputs[key] = model[key]
 
@@ -661,9 +758,552 @@ class LossAversionModel(BaseModel):
 
 class LossAversionRegressionModel(RegressionModel, LossAversionModel):
 
-    def __init__(self, paradigm=None, save_trialwise_n_estimates=False, magnitude_grid=None, ev_diff_grid=None, lapse_rate=0.01, normalize_likelihoods=True, paradigm_type='mixed_vs_mixed', fix_prior_sds=True, regressors=None):
-        LossAversionModel.__init__(self, paradigm=paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates, magnitude_grid=magnitude_grid, ev_diff_grid=ev_diff_grid, lapse_rate=lapse_rate, normalize_likelihoods=normalize_likelihoods, paradigm_type=paradigm_type, fix_prior_sds=fix_prior_sds)
+    def __init__(self, data=None, save_trialwise_n_estimates=False, magnitude_grid=None, ev_diff_grid=None, lapse_rate=0.01, normalize_likelihoods=True, paradigm_type='mixed_vs_mixed', fix_prior_sds=True, fix_prior_mus=False, prior_for_noise='numerosity', model_type='full', order=True, regressors=None):
+        LossAversionModel.__init__(self, data=data, save_trialwise_n_estimates=save_trialwise_n_estimates, magnitude_grid=magnitude_grid, ev_diff_grid=ev_diff_grid, lapse_rate=lapse_rate, normalize_likelihoods=normalize_likelihoods, paradigm_type=paradigm_type, fix_prior_sds=fix_prior_sds, fix_prior_mus=fix_prior_mus, prior_for_noise=prior_for_noise, model_type=model_type, order=order)
         RegressionModel.__init__(self, regressors=regressors)
+
+
+
+class SafeVsRiskyModel(BaseModel):
+
+    base_parameters = [
+        'prior_mu_risky', 'prior_mu_safe', 'prior_mu_gain', 'prior_mu_loss', 'prior_mu',
+        'prior_mu_gain_risky', 'prior_mu_gain_safe', 'prior_mu_loss_risky', 'prior_mu_loss_safe',
+        'evidence_sd_gain', 'evidence_sd_loss', 'evidence_sd_n1', 'evidence_sd_n2', 'evidence_sd',
+        'prior_sd_risky', 'prior_sd_safe', 'prior_sd_gain', 'prior_sd_loss', 'prior_sd',
+        'prior_sd_gain_risky', 'prior_sd_gain_safe', 'prior_sd_loss_risky', 'prior_sd_loss_safe',
+        'evidence_sd_risky', 'evidence_sd_safe'
+    ]
+
+    def __init__(
+        self,
+        data=None,
+        fix_prior_sds=False,
+        fix_prior_mus=False,
+        model_type='full',
+        prior_for_noise='numerosity',
+        order=True,
+        incorporate_probability='after_inference',
+        common_prior_sep_domain = False, 
+        noise_risky_safe = False,
+        weber_slope = False
+    ):
+        self.fix_prior_sds = fix_prior_sds
+        self.fix_prior_mus = fix_prior_mus
+        self.model_type = model_type
+        self.prior_for_noise = prior_for_noise
+        self.order = order
+        self.incorporate_probability = incorporate_probability
+        self.common_prior_sep_domain = common_prior_sep_domain
+        self.noise_risky_safe = noise_risky_safe
+        self.weber_slope = weber_slope
+        if self.model_type in ('loss_only', 'gain_only'):
+            if self.order:
+                self.paradigm_keys = ['n1', 'n2', 'p1', 'p2']
+            else:
+                self.paradigm_keys = ['c', 'x', 'p']
+        else:
+            self.paradigm_keys = ['n1', 'n2', 'p1', 'p2']
+        super().__init__(data)
+
+    def get_free_parameters(self):
+        free_parameters = {}
+        # Prior Means
+        if not self.fix_prior_mus:
+            if self.model_type == 'full' or self.model_type == 'common_noise' or self.model_type == 'common_noise_order' or self.model_type == 'common_noise_valence':
+                for key in ['prior_mu_gain_risky', 'prior_mu_gain_safe','prior_mu_loss_risky', 'prior_mu_loss_safe']:
+                    free_parameters[key] = {'mu_intercept': np.log(20.), 'sigma_intercept': np.log(20.)/4., 'transform': 'softplus'}
+            elif self.model_type == 'common_prior_valence':
+                for key in ['prior_mu_risky', 'prior_mu_safe']:
+                    free_parameters[key] = {'mu_intercept': np.log(20.), 'sigma_intercept': np.log(20.)/4., 'transform': 'softplus'}
+            elif self.model_type == 'common_prior_risk':
+                for key in ['prior_mu_gain', 'prior_mu_loss']:
+                    free_parameters[key] = {'mu_intercept': np.log(20.), 'sigma_intercept': np.log(20.)/4., 'transform': 'softplus'}
+            elif self.model_type == 'common_prior':
+                free_parameters['prior_mu'] = {'mu_intercept': np.log(20.), 'sigma_intercept': np.log(20.)/4., 'transform': 'softplus'}
+            elif self.model_type in ('loss_only', 'gain_only'):
+                if self.common_prior_sep_domain:
+                    free_parameters['prior_mu'] = {'mu_intercept': np.log(20.), 'sigma_intercept': np.log(20.)/4., 'transform': 'softplus'}
+                else:
+                    for key in ['prior_mu_risky', 'prior_mu_safe']:
+                        free_parameters[key] = {'mu_intercept': np.log(20.), 'sigma_intercept': np.log(20.)/4., 'transform': 'softplus'}
+        # Prior SDs
+        if not self.fix_prior_sds:
+            if self.model_type == 'full':
+                for key in ['prior_sd_gain_risky', 'prior_sd_gain_safe', 'prior_sd_loss_risky', 'prior_sd_loss_safe']:
+                    free_parameters[key] = {'mu_intercept': 1., 'transform': 'softplus'}
+            elif self.model_type == 'common_prior_valence':
+                for key in ['prior_sd_risky', 'prior_sd_safe']:
+                    free_parameters[key] = {'mu_intercept': 1., 'transform': 'softplus'}
+            elif self.model_type == 'common_prior_risk':
+                for key in ['prior_sd_gain', 'prior_sd_loss']:
+                    free_parameters[key] = {'mu_intercept': 1., 'transform': 'softplus'}
+            elif self.model_type == 'common_prior':
+                free_parameters['prior_sd'] = {'mu_intercept': 1., 'transform': 'softplus'}
+            elif self.model_type in ('loss_only', 'gain_only'):
+                for key in ['prior_sd_risky', 'prior_sd_safe']:
+                    free_parameters[key] = {'mu_intercept': 1., 'transform': 'softplus'}
+        # Evidence noise
+        val = -1. if self.prior_for_noise == 'numerosity' else -2.
+        if self.model_type == 'full' or self.model_type == 'common_prior' or self.model_type == 'common_prior_valence' or self.model_type == 'common_prior_risk':
+            for key in ['evidence_sd_gain', 'evidence_sd_loss', 'evidence_sd_n1', 'evidence_sd_n2']:
+                free_parameters[key] = {'mu_intercept': val, 'transform': 'softplus'}
+        elif self.model_type == 'common_noise_order':
+            for key in ['evidence_sd_gain', 'evidence_sd_loss']:
+                free_parameters[key] = {'mu_intercept': val, 'transform': 'softplus'}
+        elif self.model_type == 'common_noise_valence':
+            for key in ['evidence_sd_n1', 'evidence_sd_n2']:
+                free_parameters[key] = {'mu_intercept': val, 'transform': 'softplus'}
+        elif self.model_type == 'common_noise':
+            free_parameters['evidence_sd'] = {'mu_intercept': val, 'transform': 'softplus'}
+        elif self.model_type in ('loss_only', 'gain_only'):
+            if self.order:
+                for key in ['evidence_sd_n1', 'evidence_sd_n2']:
+                    free_parameters[key] = {'mu_intercept': val, 'transform': 'softplus'}
+                if self.weber_slope:
+                    slope_key = 'evidence_sd_gain' if self.model_type == 'gain_only' else 'evidence_sd_loss'
+                    free_parameters[slope_key] = {'mu_intercept': val, 'transform': 'softplus'}
+
+                if self.noise_risky_safe:
+                    for key in ['evidence_sd_risky', 'evidence_sd_safe']:
+                        free_parameters[key] = {'mu_intercept': val, 'transform': 'softplus'}
+            else:
+                free_parameters['evidence_sd'] = {'mu_intercept': val, 'transform': 'softplus'}
+                if self.noise_risky_safe:
+                    for key in ['evidence_sd_risky', 'evidence_sd_safe']:
+                        free_parameters[key] = {'mu_intercept': val, 'transform': 'softplus'}
+                if self.weber_slope:
+                    slope_key = 'evidence_sd_gain' if self.model_type == 'gain_only' else 'evidence_sd_loss'
+                    free_parameters[slope_key] = {'mu_intercept': val, 'transform': 'softplus'}
+
+            #free_parameters['evidence_sd'] = {'mu_intercept': val, 'transform': 'softplus'}
+        return free_parameters
+
+    def get_model_inputs(self, parameters):
+        model = pm.Model.get_context()
+        model_inputs = {}
+
+        # Map provided parameters
+        for key in self.base_parameters:
+            if key in parameters:
+                model_inputs[key] = parameters[key]
+
+        # Add trial inputs
+        for key in self.paradigm_keys:
+            model_inputs[key] = model[key]
+
+        if self.model_type in ('loss_only', 'gain_only'):
+            if not self.order:
+                log_safe = pt.log(pt.abs(model_inputs['c']))
+                log_risky = pt.log(pt.abs(model_inputs['x']))
+                if self.fix_prior_mus:
+                    if self.common_prior_sep_domain:
+                        ones_safe  = pt.ones_like(log_safe)
+                        ones_risky = pt.ones_like(log_risky)
+                        prior_mu_default = (pt.sum(log_safe) + pt.sum(log_risky)) / (pt.sum(ones_safe) + pt.sum(ones_risky))
+                        mu_safe  = prior_mu_default
+                        mu_risky = prior_mu_default
+                    else:
+                        mu_safe = pt.mean(log_safe)
+                        mu_risky = pt.mean(log_risky)
+                else:
+                    if self.common_prior_sep_domain:
+                        mu_shared = parameters['prior_mu']
+                        mu_safe = mu_risky = mu_shared
+                    else:
+                        mu_safe = parameters['prior_mu_safe']
+                        mu_risky = parameters['prior_mu_risky']
+
+                model_inputs['prior_mu_safe'] = mu_safe
+                model_inputs['prior_mu_risky'] = mu_risky
+
+                if self.fix_prior_sds:
+                    for key in ['prior_sd_safe', 'prior_sd_risky']:
+                        model_inputs.setdefault(key, 1.)
+                if self.incorporate_probability == 'before_inference':
+                    model_inputs['risky_evidence_mu'] = log_risky + pt.log(model_inputs['p'])
+                    model_inputs['safe_evidence_mu']  = log_safe
+                    model_inputs['threshold'] = 0.0
+                else:  # 'after_inference'
+                    model_inputs['risky_evidence_mu'] = log_risky
+                    model_inputs['safe_evidence_mu']  = log_safe
+                    model_inputs['threshold'] = pt.log(1.0 / model_inputs['p'])
+            
+                #slope = parameters['evidence_sd_gain'] if self.model_type == 'gain_only' else parameters['evidence_sd_loss']
+                common_noise = parameters.get('evidence_sd', 0.0)
+                role_risky = parameters.get('evidence_sd_risky', 0.0) if self.noise_risky_safe else 0.0
+                role_safe = parameters.get('evidence_sd_safe', 0.0) if self.noise_risky_safe else 0.0
+                slope = parameters.get('evidence_sd_gain' if self.model_type == 'gain_only' else 'evidence_sd_loss', 0.0) if self.weber_slope else 0.0
+
+                #model_inputs['ev_sd_risky'] = common_noise + role_risky + slope * log_risky
+                #model_inputs['ev_sd_safe']  = common_noise + role_safe  + slope * log_safe
+                #model_inputs['ev_sd_risky'] = common_noise + role_risky
+                #model_inputs['ev_sd_safe']  = common_noise + role_safe
+                model_inputs['ev_sd_risky'] = common_noise + role_risky + slope * log_risky
+                model_inputs['ev_sd_safe'] = common_noise + role_safe + slope * log_safe    
+
+                return model_inputs
+            else:
+                n1, n2 = model_inputs['n1'], model_inputs['n2']
+                p1, p2 = model_inputs['p1'], model_inputs['p2']
+                risky_first = (p1 < p2)  # define order → which option is the lottery
+
+                logn1 = pt.log(pt.abs(n1))
+                logn2 = pt.log(pt.abs(n2))
+                
+                if self.fix_prior_mus:
+                    if self.common_prior_sep_domain:
+                        prior_mu_default = (pt.sum(logn1) + pt.sum(logn2)) / (pt.sum(pt.ones_like(logn1)) + pt.sum(pt.ones_like(logn2)))
+                        mu_risky = mu_safe = prior_mu_default
+                    else:
+                        risky_n = pt.where(risky_first, n1, n2)
+                        safe_n  = pt.where(risky_first, n2, n1)
+                        mu_risky = pt.mean(pt.log(pt.abs(risky_n)))
+                        mu_safe  = pt.mean(pt.log(pt.abs(safe_n)))
+                else:
+                    if self.common_prior_sep_domain:
+                        mu_shared = parameters['prior_mu']
+                        mu_risky = mu_safe = mu_shared
+                    else:
+                        mu_risky = parameters['prior_mu_risky']
+                        mu_safe  = parameters['prior_mu_safe']
+                model_inputs['prior_mu_risky'] = mu_risky
+                model_inputs['prior_mu_safe'] = mu_safe
+
+                if self.fix_prior_sds:
+                    model_inputs.setdefault('prior_sd_risky', 1.)
+                    model_inputs.setdefault('prior_sd_safe',  1.)
+
+                mem1 = model_inputs.get('evidence_sd_n1', 0.0)
+                mem2 = model_inputs.get('evidence_sd_n2', 0.0)
+                common_noise = model_inputs.get('evidence_sd', 0.0)
+                #slope = model_inputs.get('evidence_sd_gain' if self.model_type == 'gain_only' else 'evidence_sd_loss', 0.0)
+
+                role_risky = model_inputs.get('evidence_sd_risky', 0.0) if self.noise_risky_safe else 0.0
+                role_safe = model_inputs.get('evidence_sd_safe', 0.0) if self.noise_risky_safe else 0.0
+
+                risky_first = (p1 < p2)
+                role1 = pt.where(risky_first, role_risky, role_safe)
+                role2 = pt.where(risky_first, role_safe,  role_risky)
+
+                slope = model_inputs.get('evidence_sd_gain' if self.model_type == 'gain_only' else 'evidence_sd_loss', 0.0) if self.weber_slope else 0.0
+
+                #model_inputs['ev_sd1'] = common_noise + mem1 + role1 + slope * logn1
+                #model_inputs['ev_sd2'] = common_noise + mem2 + role2 + slope * logn2
+                model_inputs['ev_sd1'] = common_noise + mem1 + role1 + slope * logn1
+                model_inputs['ev_sd2'] = common_noise + mem2 + role2 + slope * logn2
+                model_inputs['risky_first'] = risky_first
+                return model_inputs
+        
+        else:
+
+            # Defaults for fixed sds
+            if self.fix_prior_sds:
+                for key in ['prior_sd_gain_risky', 'prior_sd_gain_safe', 'prior_sd_loss_risky', 'prior_sd_loss_safe', 'prior_sd']:
+                    model_inputs.setdefault(key, 1.)
+            # Defaults for fixed mus
+            if self.fix_prior_mus:
+                risky_first = model_inputs['p1'] < model_inputs['p2']
+                n1_vals = model_inputs['n1']
+                n2_vals = model_inputs['n2']
+                # magnitudes of risky and safe options
+                risky_n = pt.where(risky_first, n1_vals, n2_vals)
+                safe_n = pt.where(risky_first, n2_vals, n1_vals)
+                prior_mu_risky_default = pt.mean(pt.log(pt.abs(risky_n)))
+                prior_mu_safe_default = pt.mean(pt.log(pt.abs(safe_n)))
+                #prior_mu_default = pt.mean(pt.log(pt.stack([model_inputs['n1'], model_inputs['n2']])))
+
+                log_n1 = pt.log(pt.abs(n1_vals))
+                log_n2 = pt.log(pt.abs(n2_vals))
+
+                sum_logs = pt.sum(log_n1) + pt.sum(log_n2)
+                count = pt.sum(pt.ones_like(log_n1)) + pt.sum(pt.ones_like(log_n2))
+                prior_mu_default = sum_logs / count
+
+                is_gain = ((n1_vals > 0) & (n2_vals > 0)).astype("float64")
+                is_loss = ((n1_vals < 0) & (n2_vals < 0)).astype("float64")
+                
+
+                sum_gain_logs = pt.sum(log_n1 * is_gain) + pt.sum(log_n2 * is_gain)
+                count_gain = 2 * pt.sum(is_gain)
+                prior_mu_gain_default = sum_gain_logs / count_gain
+
+                sum_loss_logs = pt.sum(log_n1 * is_loss) + pt.sum(log_n2 * is_loss)
+                count_loss = 2 * pt.sum(is_loss)
+                prior_mu_loss_default = sum_loss_logs / count_loss
+
+                defaults = {
+                    'prior_mu_gain_risky': prior_mu_gain_default,
+                    'prior_mu_gain_safe': prior_mu_gain_default,
+                    'prior_mu_loss_risky': prior_mu_loss_default,
+                    'prior_mu_loss_safe': prior_mu_loss_default,
+                    'prior_mu': prior_mu_default
+                }
+                for key, val in defaults.items():
+                    model_inputs.setdefault(key, val)
+
+            n1 = model_inputs['n1']
+            n2 = model_inputs['n2']
+            logn1  = pt.log(pt.abs(n1))
+            logn2  = pt.log(pt.abs(n2))
+
+            #slope_gain = model_inputs['evidence_sd_gain']
+            #slope_loss = model_inputs['evidence_sd_loss']
+            mem1 = model_inputs.get('evidence_sd_n1', 0.0)
+            mem2 = model_inputs.get('evidence_sd_n2', 0.0)
+            is_gain = (n1 > 0)
+            dom_noise = pt.where(is_gain,
+                        model_inputs['evidence_sd_gain'],
+                        model_inputs['evidence_sd_loss'])
+            
+            slope_gain = model_inputs.get('evidence_sd_gain', 0.0)
+            slope_loss = model_inputs.get('evidence_sd_loss', 0.0)
+
+            common_noise = model_inputs.get('evidence_sd', 0.0)
+            #slope1 = pt.where(is_gain, slope_gain, slope_loss)
+            #slope2 = pt.where(is_gain, slope_gain, slope_loss)
+
+            #model_inputs['ev_sd1'] = mem1 + dom_noise
+            #model_inputs['ev_sd2'] = mem2 + dom_noise
+
+            
+            # 1) memory noise per position
+            #mem1 = model_inputs['evidence_sd_n1']   # noise on the first‐presented option
+            #mem2 = model_inputs['evidence_sd_n2']   # noise on the second‐presented option
+
+            # 2) valence‐noise slopes
+            '''
+            slope1 = pt.where(n1 > 0,
+                            model_inputs['evidence_sd_gain'],
+                            model_inputs['evidence_sd_loss'])
+            slope2 = pt.where(n2 > 0,
+                            model_inputs['evidence_sd_gain'],
+                            model_inputs['evidence_sd_loss'])
+            '''
+            slope1 = pt.where(n1 > 0, slope_gain, slope_loss)
+            slope2 = pt.where(n2 > 0, slope_gain, slope_loss)
+            # 3) combine them *with* the log‐n factor
+            #model_inputs['ev_sd1'] = mem1 + slope1 * logn1
+            #model_inputs['ev_sd2'] = mem2 + slope2 * logn2
+
+            model_inputs['ev_sd1'] = common_noise + mem1 + slope1 * logn1
+            model_inputs['ev_sd2'] = common_noise + mem2 + slope2 * logn2
+
+            
+
+            return model_inputs
+
+    def _get_choice_predictions(self, model_inputs):
+
+        if self.model_type in ('loss_only', 'gain_only'):
+            if not self.order:
+                risky_mean_post, risky_sd_post = get_posterior(model_inputs['prior_mu_risky'], model_inputs['prior_sd_risky'], model_inputs['risky_evidence_mu'], model_inputs['evidence_sd_risky'])
+                safe_mean_post, safe_sd_post = get_posterior(model_inputs['prior_mu_safe'], model_inputs['prior_sd_safe'], model_inputs['safe_evidence_mu'], model_inputs['evidence_sd_safe'])
+
+                diff_mu = (risky_mean_post - safe_mean_post) if (self.model_type == 'gain_only') else (safe_mean_post  - risky_mean_post)
+                diff_sd = pt.sqrt(risky_sd_post**2 + safe_sd_post**2)
+
+                p_risky = 1.0 - cumulative_normal(model_inputs['threshold'], diff_mu, diff_sd)
+                return p_risky
+            else:
+                n1, n2 = model_inputs['n1'], model_inputs['n2']
+                p1, p2 = model_inputs['p1'], model_inputs['p2']
+
+                risky_first = (p1 < p2)
+                n1_log = pt.log(pt.abs(n1))
+                n2_log = pt.log(pt.abs(n2))
+
+                mu1 = pt.where(risky_first, model_inputs['prior_mu_risky'], model_inputs['prior_mu_safe'])
+                mu2 = pt.where(risky_first, model_inputs['prior_mu_safe'],  model_inputs['prior_mu_risky'])
+
+                prior_sd1 = pt.where(risky_first, model_inputs['prior_sd_risky'], model_inputs['prior_sd_safe'])
+                prior_sd2 = pt.where(risky_first, model_inputs['prior_sd_safe'],  model_inputs['prior_sd_risky'])
+
+                ev_sd1 = model_inputs['ev_sd1']
+                ev_sd2 = model_inputs['ev_sd2']
+
+                mean1_post, sd1_post = get_posterior(mu1, prior_sd1, n1_log, ev_sd1)
+                mean2_post, sd2_post = get_posterior(mu2, prior_sd2, n2_log, ev_sd2)
+
+                if self.incorporate_probability == 'before_inference':
+                    mean1_post = mean1_post + pt.log(p1)
+                    mean2_post = mean2_post + pt.log(p2)
+
+                diff_mu = (mean2_post - mean1_post) if (self.model_type == 'gain_only') else (mean1_post - mean2_post)
+                diff_sd = pt.sqrt(sd1_post**2 + sd2_post**2)
+
+                if self.incorporate_probability == 'after_inference':
+                    safe_prob  = pt.where(risky_first, p2, p1)
+                    risky_prob = pt.where(risky_first, p1, p2)
+                    threshold  = pt.log(safe_prob / risky_prob)
+                else:
+                    threshold = 0.0
+
+                p_choose2 = 1 - cumulative_normal(threshold, diff_mu, diff_sd)
+                p_risky = pt.where(risky_first, 1.0 - p_choose2, p_choose2)
+
+                return p_risky
+
+        else:
+
+            n1, n2 = model_inputs['n1'], model_inputs['n2']
+            p1, p2 = model_inputs['p1'], model_inputs['p2']
+
+            is_gain = (n1 > 0)
+            risky_first = (p1 < p2)
+
+            n1_log = pt.log(pt.abs(n1))
+            n2_log = pt.log(pt.abs(n2))
+
+
+            # Determine prior mus for both options
+            mu1 = pt.switch(
+                is_gain & risky_first, model_inputs['prior_mu_gain_risky'],
+                pt.switch(
+                    is_gain & ~risky_first, model_inputs['prior_mu_gain_safe'],
+                    pt.switch(
+                        ~is_gain & risky_first, model_inputs['prior_mu_loss_risky'],
+                        model_inputs['prior_mu_loss_safe']
+                    )
+                )
+            )
+
+            mu2 = pt.switch(
+                is_gain & ~risky_first, model_inputs['prior_mu_gain_risky'],
+                pt.switch(
+                    is_gain & risky_first, model_inputs['prior_mu_gain_safe'],
+                    pt.switch(
+                        ~is_gain & ~risky_first, model_inputs['prior_mu_loss_risky'],
+                        model_inputs['prior_mu_loss_safe']
+                    )
+                )
+            )
+
+            if not self.fix_prior_sds:
+                prior_sd1 = pt.switch(
+                    is_gain & risky_first, model_inputs['prior_sd_gain_risky'],
+                    pt.switch(
+                        is_gain & ~risky_first, model_inputs['prior_sd_gain_safe'],
+                        pt.switch(
+                            ~is_gain & risky_first, model_inputs['prior_sd_loss_risky'],
+                            model_inputs['prior_sd_loss_safe']
+                        )
+                    )
+                )
+
+                prior_sd2 = pt.switch(
+                    is_gain & ~risky_first, model_inputs['prior_sd_gain_risky'],
+                    pt.switch(
+                        is_gain & risky_first, model_inputs['prior_sd_gain_safe'],
+                        pt.switch(
+                            ~is_gain & ~risky_first, model_inputs['prior_sd_loss_risky'],
+                            model_inputs['prior_sd_loss_safe']
+                        )
+                    )
+                )
+            else:
+                prior_sd1 = model_inputs['prior_sd']
+                prior_sd2 = model_inputs['prior_sd']
+
+            '''
+            # combine priors
+            mu_risk1 = pt.where(risky_first,model_inputs['prior_mu_risky'],model_inputs['prior_mu_safe'])
+            mu_val1  = pt.where(is_gain,model_inputs['prior_mu_gain'],model_inputs['prior_mu_loss'])
+            mu1 = mu_risk1 + mu_val1
+            mu_risk2 = pt.where(~risky_first,model_inputs['prior_mu_risky'],model_inputs['prior_mu_safe'])
+            mu2 = mu_risk2 + mu_val1
+
+            if not self.fix_prior_sds:
+                sd_risk1=pt.where(risky_first,model_inputs['prior_sd_risky'],model_inputs['prior_sd_safe'])
+                sd_val1 =pt.where(is_gain,model_inputs['prior_sd_gain'],model_inputs['prior_sd_loss'])
+                prior_sd1=pt.sqrt(sd_risk1**2+sd_val1**2)
+                sd_risk2=pt.where(~risky_first,model_inputs['prior_sd_risky'],model_inputs['prior_sd_safe'])
+                prior_sd2=pt.sqrt(sd_risk2**2+sd_val1**2)
+            else:
+                prior_sd1=model_inputs['prior_sd']; prior_sd2=model_inputs['prior_sd']
+            
+            
+            ev_sd_val = pt.where(is_gain, model_inputs.get('evidence_sd_gain',  0.), model_inputs.get('evidence_sd_loss',  0.))
+            ev_sd1 = ev_sd_val + model_inputs.get('evidence_sd_n1', model_inputs.get('evidence_sd', 0.))
+            ev_sd2 = ev_sd_val + model_inputs.get('evidence_sd_n2', model_inputs.get('evidence_sd', 0.))
+            '''
+            ev_sd1 = model_inputs['ev_sd1']
+            ev_sd2 = model_inputs['ev_sd2']
+
+
+            mean1_post, sd1_post = get_posterior(mu1, prior_sd1, n1_log, ev_sd1)
+            mean2_post, sd2_post = get_posterior(mu2, prior_sd2, n2_log, ev_sd2)
+
+            if self.incorporate_probability == 'before_inference':
+                mean1_post = mean1_post + pt.log(p1)
+                mean2_post = mean2_post + pt.log(p2)
+            
+            diff_mu = pt.switch(
+                is_gain,
+                mean2_post - mean1_post, 
+                mean1_post - mean2_post   
+            )
+            
+            #diff_mu = mean2_post - mean1_post
+
+            diff_sd = pt.sqrt(sd1_post**2 + sd2_post**2)
+
+            #if self.incorporate_probability == 'after_inference':
+            #    threshold = pt.log(p2 / p1)
+            #else:
+            #    threshold = 0.0
+
+            if self.incorporate_probability == 'after_inference':
+                safe_prob  = pt.where(risky_first, p2, p1)
+                risky_prob = pt.where(risky_first, p1, p2)
+                threshold  = pt.log(safe_prob / risky_prob)
+            else:
+                threshold = 0.0
+
+            p_choose2 = 1 - cumulative_normal(threshold, diff_mu, diff_sd)
+
+            risky_first = (model_inputs['p1'] < model_inputs['p2'])
+            p_risky = pt.where(risky_first, 1.0 - p_choose2, p_choose2)
+
+            return p_risky
+
+class SafeVsRiskyRegressionModel(RegressionModel, SafeVsRiskyModel):
+    def __init__(
+        self,
+        data=None,
+        regressors=None,
+        fix_prior_sds=False,
+        fix_prior_mus=False,
+        model_type='full',
+        prior_for_noise='numerosity',
+        order=True,
+        incorporate_probability='after_inference',
+        common_prior_sep_domain=False,
+        noise_risky_safe=False,
+        weber_slope=False
+    ):
+        SafeVsRiskyModel.__init__(
+            self,
+            data=data,
+            fix_prior_sds=fix_prior_sds,
+            fix_prior_mus=fix_prior_mus,
+            model_type=model_type,
+            prior_for_noise=prior_for_noise,
+            order=order,
+            incorporate_probability=incorporate_probability, 
+            common_prior_sep_domain=common_prior_sep_domain, 
+            noise_risky_safe=noise_risky_safe,
+            weber_slope=weber_slope
+        )
+        RegressionModel.__init__(self, regressors=regressors)
+
+    def get_trialwise_variable(self, key):
+        return super().get_trialwise_variable(key)
+
+
+
+
+
 
 class RiskModel(BaseModel):
 
@@ -686,7 +1326,7 @@ class RiskModel(BaseModel):
         model = pm.Model.get_context()
 
         model_inputs = {}
-        
+
         model_inputs['n1_evidence_mu'] = pt.log(model['n1']) #self.get_trialwise_variable('n1_evidence_mu', transform='identity') #at.log(model['n1'])
         model_inputs['n2_evidence_mu'] = pt.log(model['n2'])
 
@@ -757,7 +1397,7 @@ class RiskModel(BaseModel):
             risky_prior_sd = parameters['risky_prior_sd']
 
             safe_prior_mu = parameters['safe_prior_mu']
-            
+
             if self.prior_estimate == 'full_normed':
                 safe_prior_sd = 1.
             else:
@@ -1019,7 +1659,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         if ~fit_seperate_evidence_sd and (memory_model != 'independent'):
             raise ValueError('Single evidence_sd can only be used with memory_model=independent')
-        
+
         if (type(polynomial_order) is int) and fit_seperate_evidence_sd:
             polynomial_order = polynomial_order, polynomial_order
 
@@ -1030,7 +1670,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
         super().__init__(paradigm)
 
     def build_estimation_model(self, paradigm=None, coords=None, hierarchical=True, save_p_choice=False):
-        
+
         coords = {}
 
         if paradigm is None:
@@ -1077,7 +1717,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         if self.fit_seperate_evidence_sd:
             key1, key2 = self._get_evidence_sd_labels()
-            
+
             for n in range(1, self.polynomial_order[0]+1):
                 free_parameters[f'{key1}_spline{n}'] = {'mu_intercept': 5., 'sigma_intercept': 5., 'transform': 'identity'}
 
@@ -1111,7 +1751,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
         else:
             labels = [f'evidence_sd_spline{n}' for n in range(1, self.polynomial_order+1)]
             return labels, labels
-        
+
     def _get_evidence_sd_labels(self):
         if self.memory_model == 'independent':
             key1 = 'n1_evidence_sd'
@@ -1173,7 +1813,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         if (idata is None) and (pars is None):
             raise ValueError('Either idata or pars must be provided.')
-        
+
         if (idata is not None) and (pars is not None):
             raise ValueError('Only one of idata or pars must be provided.')
 
@@ -1345,13 +1985,13 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
                  regressors,
                  fit_seperate_evidence_sd=True,
                  fit_prior=False,
-                 polynomial_order=5, 
+                 polynomial_order=5,
                  memory_model='independent'):
 
         if (type(polynomial_order) is int) and fit_seperate_evidence_sd:
-            polynomial_order = polynomial_order, polynomial_order 
+            polynomial_order = polynomial_order, polynomial_order
 
-        
+
         for key in list(regressors.keys()):
 
             if key in ['evidence_sd', 'n1_evidence_sd', 'memory_noise', 'n2_evidence_sd', 'perceptual_noise']:
@@ -1369,7 +2009,7 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
                     regressors[f'{key}_spline{i}'] = regressors[key]
 
                 regressors.pop(key)
-            
+
 
         RegressionModel.__init__(self, regressors)
         FlexibleNoiseComparisonModel.__init__(self, paradigm, fit_seperate_evidence_sd, fit_prior,
@@ -1378,7 +2018,7 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
 class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
 
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, polynomial_order=5, 
+                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, polynomial_order=5,
                  representational_noise='payoff',
                  memory_model='independent'):
 
@@ -1412,7 +2052,7 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
             risky_prior_mu = parameters['risky_prior_mu']
             risky_prior_sd = parameters['risky_prior_sd']
             safe_prior_mu = parameters['safe_prior_mu']
-            
+
             if self.prior_estimate == 'full_normed':
                 safe_prior_sd = 1.
             else:
@@ -1450,35 +2090,35 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
     def _get_choice_predictions(self, model_inputs):
 
         if self.representational_noise == 'payoff':
-            post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'], 
-                                                model_inputs['n1_prior_sd'], 
-                                                model_inputs['n1_evidence_mu'], 
+            post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'],
+                                                model_inputs['n1_prior_sd'],
+                                                model_inputs['n1_evidence_mu'],
                                                 model_inputs['n1_evidence_sd']
                                                 )
 
             post_n2_mu, post_n2_sd = get_posterior(model_inputs['n2_prior_mu'],
                                                 model_inputs['n2_prior_sd'],
-                                                model_inputs['n2_evidence_mu'], 
+                                                model_inputs['n2_evidence_mu'],
                                                 model_inputs['n2_evidence_sd'])
 
-                                               
+
             diff_mu, diff_sd = get_diff_dist(post_n2_mu * model_inputs['p2'], model_inputs['n2_evidence_sd'],
                                              post_n1_mu * model_inputs['p1'], model_inputs['n1_evidence_sd'])
 
         elif self.representational_noise == 'ev':
 
-            post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'], 
-                                                model_inputs['n1_prior_sd'], 
-                                                model_inputs['n1_evidence_mu'], 
+            post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'],
+                                                model_inputs['n1_prior_sd'],
+                                                model_inputs['n1_evidence_mu'],
                                                 model_inputs['n1_evidence_sd']
                                                 )
 
             post_n2_mu, post_n2_sd = get_posterior(model_inputs['n2_prior_mu'],
                                                 model_inputs['n2_prior_sd'],
-                                                model_inputs['n2_evidence_mu'], 
+                                                model_inputs['n2_evidence_mu'],
                                                 model_inputs['n2_evidence_sd'])
 
-                                               
+
             diff_mu, diff_sd = get_diff_dist(post_n2_mu * model_inputs['p2'], model_inputs['n2_evidence_sd'] * model_inputs['p2'],
                                              post_n1_mu * model_inputs['p1'], model_inputs['n1_evidence_sd'] * model_inputs['p1'])
 
@@ -1519,7 +2159,7 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
 
             if self.prior_estimate == 'full':
                 free_parameters['safe_prior_sd'] = {'mu_intercept':safe_prior_sd, 'transform':'softplus'}
-        
+
         elif self.prior_estimate == 'fix_prior_sd': # only mus estimated but prior sd fixed
             risky_n = np.where(self.paradigm['p1'] != 1.0, self.paradigm['n1'], self.paradigm['n2'])
             safe_n = np.where(self.paradigm['p2'] != 1.0, self.paradigm['n2'], self.paradigm['n1'])
@@ -1550,14 +2190,14 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
     def __init__(self, paradigm,
                  regressors,
                  prior_estimate='full',
-                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, polynomial_order=5, 
+                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, polynomial_order=5,
                  representational_noise='payoff',
                  memory_model='independent'):
 
         if (type(polynomial_order) is int) and fit_seperate_evidence_sd:
-            polynomial_order = polynomial_order, polynomial_order 
+            polynomial_order = polynomial_order, polynomial_order
 
-        
+
         for key in list(regressors.keys()):
 
             if key in ['evidence_sd', 'n1_evidence_sd', 'memory_noise_sd', 'n2_evidence_sd', 'perceptual_noise_sd']:
@@ -1573,7 +2213,7 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
                     regressors[f'{key}_spline{i}'] = regressors[key]
 
                 regressors.pop(key)
-            
+
 
         RegressionModel.__init__(self, regressors)
         FlexibleNoiseRiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd, save_trialwise_n_estimates,
@@ -1630,7 +2270,7 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
 
         pars = conditionwise_parameters[labels]
         output = softplus_np(pars.dot(dm.T))
-        
+
         output.columns = x
         output.columns.name = 'x'
 
@@ -1638,7 +2278,7 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
         output.columns.name = 'variable'
 
         return output
-    
+
 class ExpectedUtilityRiskModel(BaseModel):
 
     paradigm_keys = ['n1', 'n2', 'p1', 'p2']

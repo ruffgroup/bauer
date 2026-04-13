@@ -397,6 +397,28 @@ class BaseModel(object):
             return sample_pars
         else:
             return samples_pars
+    
+    def sample_parameters_from_prior_samples(self, n_subjects=None, n_samples=1):
+        samples_pars = {}
+        for key, pars in self.free_parameters.items():
+
+            mu_intercept = pars.get('mu_intercept', 0)
+            sigma_intercept = pars.get('sigma_intercept', 1)
+            transform = pars.get('transform', 'identity')
+
+
+            samples = np.random.normal(mu_intercept, sigma_intercept, (n_subjects, n_samples))
+            if transform == 'softplus':
+                samples = np.log1p(np.exp(samples))
+            elif transform == 'logistic':
+                samples = 1 / (1 + np.exp(-samples))
+            samples_pars[key] = samples.flatten()
+
+        index = pd.MultiIndex.from_product([range(1, n_subjects + 1), range(1, n_samples + 1)], names=['subject', 'sample'])
+        sample_pars = pd.DataFrame(samples_pars, index=index)
+        sample_pars.columns.name = 'parameter'
+
+        return sample_pars
 
     def forward_transform(self, data, parameter):
         transform = self.free_parameters[parameter]['transform']
@@ -430,8 +452,10 @@ class BaseModel(object):
         model = pm.Model.get_context()
 
         model_inputs = {}
+        #model_inputs['nu'] = softplus_np(1.0)
 
         for key in self.base_parameters:
+            #if key != 'nu':
             model_inputs[key] = parameters[key]
         
         for key in self.paradigm_keys:
@@ -681,6 +705,36 @@ class RegressionModel(BaseModel):
             return pd.DataFrame(samples_pars, index=pd.Index(np.arange(1, n_subjects+1), name='subject'))
         else:
             return samples_pars
+        
+    def sample_parameters_from_prior_samples(self, paradigm, n_subjects=None, n_samples=1):
+
+        samples_pars = {}
+
+        for par_key, pars in self.free_parameters.items():
+            dm = self.build_design_matrix(paradigm, par_key)
+            dm_keys = dm.design_info.column_names
+
+            for dm_key in dm_keys:
+                key = (par_key, dm_key)
+                mu = pars['mu_intercept'] if 'mu_intercept' in pars else 0
+                sigma = pars.get('sigma_intercept', 1.0)  # Default sigma if not specified
+
+                # Handling Intercept specifically or generally depending on presence in design matrix
+                if 'Intercept' in dm_keys and dm_key == 'Intercept':
+                    samples_pars[key] = np.random.normal(mu, sigma, (n_subjects, n_samples)).flatten()
+                else:
+                    # For non-intercept terms defaulting mean to 0
+                    samples_pars[key] = np.random.normal(0, 1, (n_subjects, n_samples)).flatten()
+
+    # Creating a DataFrame from the samples
+        if n_subjects:
+            index = pd.MultiIndex.from_product([range(1, n_subjects + 1), range(1, n_samples + 1)],
+                                            names=['subject', 'sample'])
+            sample_pars = pd.DataFrame(samples_pars, index=index)
+            return sample_pars
+        else:
+            return samples_pars
+        
 
     def get_conditionwise_parameters(self, idata, conditions, group=True):
 
