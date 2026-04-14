@@ -1449,6 +1449,42 @@ class PowerLawNoiseRiskRegressionModel(RegressionModel, PowerLawNoiseRiskModel):
                                         save_trialwise_n_estimates, memory_model)
 
 
+class SafeVsRiskyFlexibleNoiseModel(FlexibleNoiseRiskModel):
+    """FlexibleNoiseRiskModel adapted for safe-vs-risky paradigm with gains OR losses.
+
+    Wraps FlexibleNoiseRiskModel by:
+      - taking abs(n) of magnitudes (so losses work),
+      - adding a `domain` parameter ('gain' or 'loss'),
+      - returning P(choose risky) instead of P(choose option 2).
+
+    Data format:
+        - n1, n2: signed magnitudes (positive=gains, negative=losses)
+        - p1, p2: probabilities (risky has p<1, safe has p=1)
+        - choice: True = chose risky
+    """
+
+    def __init__(self, paradigm, domain='gain', **kwargs):
+        assert domain in ('gain', 'loss'), "domain must be 'gain' or 'loss'"
+        self.domain = domain
+        if paradigm is not None:
+            paradigm = paradigm.copy()
+            paradigm['n1'] = np.abs(paradigm['n1'])
+            paradigm['n2'] = np.abs(paradigm['n2'])
+        super().__init__(paradigm, **kwargs)
+
+    def _get_choice_predictions(self, model_inputs):
+        # Underlying RiskModel returns P(choose option 2) assuming higher value is better.
+        # That's correct for gains; for losses we want lower magnitude = better, so flip.
+        p_choose2 = super()._get_choice_predictions(model_inputs)
+        if self.domain == 'loss':
+            p_choose2 = 1 - p_choose2
+
+        # Convert P(option 2) -> P(risky) given which position is risky
+        model = pm.Model.get_context()
+        risky_first = model['p1'] < model['p2']
+        return pt.where(risky_first, 1 - p_choose2, p_choose2)
+
+
 class SafeVsRiskyModel(BaseModel):
     """Bayesian observer model for risky choice between a safe and a risky option.
 
