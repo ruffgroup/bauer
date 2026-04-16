@@ -1942,6 +1942,121 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_trialwise_variable</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">get_trialwise_variable</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+    
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SafeVsRiskyMemoryModel</span><span class="p">(</span><span class="n">SafeVsRiskyModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Safe-vs-risky model with encoding noise shared across both options</span>
+<span class="sd">    and an extra working-memory noise term on option 1 only.</span>
+
+<span class="sd">    memory_model:</span>
+<span class="sd">        - &#39;independent&#39;: same as original SafeVsRiskyModel</span>
+<span class="sd">        - &#39;shared_perceptual_noise&#39;: option1 = encoding + memory, option2 = encoding</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">domain</span><span class="o">=</span><span class="s2">&quot;gain&quot;</span><span class="p">,</span>
+        <span class="n">separate_priors</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">fix_prior_mus</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fix_prior_sds</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">memory_model</span><span class="o">=</span><span class="s2">&quot;shared_perceptual_noise&quot;</span><span class="p">,</span> <span class="n">combine_noise</span><span class="o">=</span><span class="s2">&quot;add_sd&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">=</span> <span class="n">memory_model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">combine_noise</span> <span class="o">=</span> <span class="n">combine_noise</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">domain</span><span class="o">=</span><span class="n">domain</span><span class="p">,</span> <span class="n">separate_priors</span><span class="o">=</span><span class="n">separate_priors</span><span class="p">,</span>
+                         <span class="n">fix_prior_mus</span><span class="o">=</span><span class="n">fix_prior_mus</span><span class="p">,</span> <span class="n">fix_prior_sds</span><span class="o">=</span><span class="n">fix_prior_sds</span><span class="p">,</span> <span class="n">separate_evidence_sd</span><span class="o">=</span><span class="n">separate_evidence_sd</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_free_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">free</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">mu_spec</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mu_intercept&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mf">20.</span><span class="p">),</span> <span class="s2">&quot;sigma_intercept&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mf">20.</span><span class="p">)</span> <span class="o">/</span> <span class="mf">4.</span><span class="p">,</span> <span class="s2">&quot;transform&quot;</span><span class="p">:</span> <span class="s2">&quot;softplus&quot;</span><span class="p">}</span>
+        <span class="n">sd_spec</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mu_intercept&quot;</span><span class="p">:</span> <span class="mf">1.</span><span class="p">,</span> <span class="s2">&quot;transform&quot;</span><span class="p">:</span> <span class="s2">&quot;softplus&quot;</span><span class="p">}</span>
+        <span class="n">noise_spec</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mu_intercept&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mf">1.</span><span class="p">,</span> <span class="s2">&quot;transform&quot;</span><span class="p">:</span> <span class="s2">&quot;softplus&quot;</span><span class="p">}</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_mus</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
+                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_mu_risky&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
+                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_mu_safe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_mu&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_sds</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
+                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_sd_risky&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
+                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_sd_safe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_sd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
+
+        <span class="c1"># evidence / memory parameters</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s2">&quot;independent&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_evidence_sd</span><span class="p">:</span>
+                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;evidence_sd_n1&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
+                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;evidence_sd_n2&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;evidence_sd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s2">&quot;shared_perceptual_noise&quot;</span><span class="p">:</span>
+            <span class="n">free</span><span class="p">[</span><span class="s2">&quot;encoding_noise_sd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
+            <span class="n">free</span><span class="p">[</span><span class="s2">&quot;memory_noise_sd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown memory_model: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">free</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_model_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span>
+
+        <span class="n">n1</span><span class="p">,</span> <span class="n">n2</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s2">&quot;n1&quot;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s2">&quot;n2&quot;</span><span class="p">]</span>
+        <span class="n">p1</span><span class="p">,</span> <span class="n">p2</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s2">&quot;p1&quot;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s2">&quot;p2&quot;</span><span class="p">]</span>
+        <span class="n">logn1</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">n1</span><span class="p">))</span>
+        <span class="n">logn2</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">n2</span><span class="p">))</span>
+        <span class="n">risky_first</span> <span class="o">=</span> <span class="p">(</span><span class="n">p1</span> <span class="o">&lt;</span> <span class="n">p2</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_mus</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
+                <span class="n">risky_n</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">n1</span><span class="p">,</span> <span class="n">n2</span><span class="p">)</span>
+                <span class="n">safe_n</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">n2</span><span class="p">,</span> <span class="n">n1</span><span class="p">)</span>
+                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">risky_n</span><span class="p">)))</span>
+                <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">safe_n</span><span class="p">)))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">logn1</span><span class="p">)</span> <span class="o">+</span> <span class="n">pt</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">logn2</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">pt</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">logn1</span><span class="p">)))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
+                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_mu_risky&quot;</span><span class="p">]</span>
+                <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_mu_safe&quot;</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_mu&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_sds</span><span class="p">:</span>
+            <span class="n">prior_sd_risky</span> <span class="o">=</span> <span class="n">prior_sd_safe</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
+            <span class="n">prior_sd_risky</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_sd_risky&quot;</span><span class="p">]</span>
+            <span class="n">prior_sd_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_sd_safe&quot;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">prior_sd_risky</span> <span class="o">=</span> <span class="n">prior_sd_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_sd&quot;</span><span class="p">]</span>
+
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s2">&quot;independent&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_evidence_sd</span><span class="p">:</span>
+                <span class="n">noise1</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;evidence_sd_n1&quot;</span><span class="p">]</span>
+                <span class="n">noise2</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;evidence_sd_n2&quot;</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">noise1</span> <span class="o">=</span> <span class="n">noise2</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;evidence_sd&quot;</span><span class="p">]</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s2">&quot;shared_perceptual_noise&quot;</span><span class="p">:</span>
+            <span class="n">enc</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;encoding_noise_sd&quot;</span><span class="p">]</span>
+            <span class="n">mem</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;memory_noise_sd&quot;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">combine_noise</span> <span class="o">==</span> <span class="s2">&quot;add_sd&quot;</span><span class="p">:</span>
+                <span class="n">noise1</span> <span class="o">=</span> <span class="n">enc</span> <span class="o">+</span> <span class="n">mem</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">combine_noise</span> <span class="o">==</span> <span class="s2">&quot;variance&quot;</span><span class="p">:</span>
+                <span class="n">noise1</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">enc</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">mem</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;combine_noise must be &#39;add_sd&#39; or &#39;variance&#39;&quot;</span><span class="p">)</span>
+
+            <span class="n">noise2</span> <span class="o">=</span> <span class="n">enc</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown memory_model: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;prior_mu_risky&quot;</span><span class="p">:</span> <span class="n">prior_mu_risky</span><span class="p">,</span> <span class="s2">&quot;prior_sd_risky&quot;</span><span class="p">:</span> <span class="n">prior_sd_risky</span><span class="p">,</span> <span class="s2">&quot;prior_mu_safe&quot;</span><span class="p">:</span> <span class="n">prior_mu_safe</span><span class="p">,</span> <span class="s2">&quot;prior_sd_safe&quot;</span><span class="p">:</span> <span class="n">prior_sd_safe</span><span class="p">,</span>
+                <span class="s2">&quot;logn1&quot;</span><span class="p">:</span> <span class="n">logn1</span><span class="p">,</span> <span class="s2">&quot;logn2&quot;</span><span class="p">:</span> <span class="n">logn2</span><span class="p">,</span> <span class="s2">&quot;ev_sd1&quot;</span><span class="p">:</span> <span class="n">noise1</span><span class="p">,</span> <span class="s2">&quot;ev_sd2&quot;</span><span class="p">:</span> <span class="n">noise2</span><span class="p">,</span> <span class="s2">&quot;p1&quot;</span><span class="p">:</span> <span class="n">p1</span><span class="p">,</span> <span class="s2">&quot;p2&quot;</span><span class="p">:</span> <span class="n">p2</span><span class="p">,</span> <span class="s2">&quot;risky_first&quot;</span><span class="p">:</span> <span class="n">risky_first</span><span class="p">}</span>
 </pre></div>
         </article>
       </div>
