@@ -1657,3 +1657,118 @@ class SafeVsRiskyRegressionModel(RegressionModel, SafeVsRiskyModel):
 
     def get_trialwise_variable(self, key):
         return super().get_trialwise_variable(key)
+    
+
+class SafeVsRiskyMemoryModel(SafeVsRiskyModel):
+    """Safe-vs-risky model with encoding noise shared across both options
+    and an extra working-memory noise term on option 1 only.
+
+    memory_model:
+        - 'independent': same as original SafeVsRiskyModel
+        - 'shared_perceptual_noise': option1 = encoding + memory, option2 = encoding
+    """
+
+    def __init__(self, data=None, domain="gain",
+        separate_priors=True, fix_prior_mus=False, fix_prior_sds=False,
+        separate_evidence_sd=True, memory_model="shared_perceptual_noise", combine_noise="add_sd"):
+        self.memory_model = memory_model
+        self.combine_noise = combine_noise
+
+        super().__init__(data=data, domain=domain, separate_priors=separate_priors,
+                         fix_prior_mus=fix_prior_mus, fix_prior_sds=fix_prior_sds, separate_evidence_sd=separate_evidence_sd)
+
+    def get_free_parameters(self):
+        free = {}
+        mu_spec = {"mu_intercept": np.log(20.), "sigma_intercept": np.log(20.) / 4., "transform": "softplus"}
+        sd_spec = {"mu_intercept": 1., "transform": "softplus"}
+        noise_spec = {"mu_intercept": -1., "transform": "softplus"}
+
+        if not self.fix_prior_mus:
+            if self.separate_priors:
+                free["prior_mu_risky"] = {**mu_spec}
+                free["prior_mu_safe"] = {**mu_spec}
+            else:
+                free["prior_mu"] = {**mu_spec}
+
+        if not self.fix_prior_sds:
+            if self.separate_priors:
+                free["prior_sd_risky"] = {**sd_spec}
+                free["prior_sd_safe"] = {**sd_spec}
+            else:
+                free["prior_sd"] = {**sd_spec}
+
+        # evidence / memory parameters
+        if self.memory_model == "independent":
+            if self.separate_evidence_sd:
+                free["evidence_sd_n1"] = {**noise_spec}
+                free["evidence_sd_n2"] = {**noise_spec}
+            else:
+                free["evidence_sd"] = {**noise_spec}
+
+        elif self.memory_model == "shared_perceptual_noise":
+            free["encoding_noise_sd"] = {**noise_spec}
+            free["memory_noise_sd"] = {**noise_spec}
+
+        else:
+            raise ValueError(f"Unknown memory_model: {self.memory_model}")
+
+        return free
+
+    def get_model_inputs(self, parameters):
+        model = pm.Model.get_context()
+
+        n1, n2 = model["n1"], model["n2"]
+        p1, p2 = model["p1"], model["p2"]
+        logn1 = pt.log(pt.abs(n1))
+        logn2 = pt.log(pt.abs(n2))
+        risky_first = (p1 < p2)
+
+        if self.fix_prior_mus:
+            if self.separate_priors:
+                risky_n = pt.where(risky_first, n1, n2)
+                safe_n = pt.where(risky_first, n2, n1)
+                prior_mu_risky = pt.mean(pt.log(pt.abs(risky_n)))
+                prior_mu_safe = pt.mean(pt.log(pt.abs(safe_n)))
+            else:
+                prior_mu_risky = prior_mu_safe = (pt.sum(logn1) + pt.sum(logn2)) / (2 * pt.sum(pt.ones_like(logn1)))
+        else:
+            if self.separate_priors:
+                prior_mu_risky = parameters["prior_mu_risky"]
+                prior_mu_safe = parameters["prior_mu_safe"]
+            else:
+                prior_mu_risky = prior_mu_safe = parameters["prior_mu"]
+
+        if self.fix_prior_sds:
+            prior_sd_risky = prior_sd_safe = 1.0
+        elif self.separate_priors:
+            prior_sd_risky = parameters["prior_sd_risky"]
+            prior_sd_safe = parameters["prior_sd_safe"]
+        else:
+            prior_sd_risky = prior_sd_safe = parameters["prior_sd"]
+
+
+        if self.memory_model == "independent":
+            if self.separate_evidence_sd:
+                noise1 = parameters["evidence_sd_n1"]
+                noise2 = parameters["evidence_sd_n2"]
+            else:
+                noise1 = noise2 = parameters["evidence_sd"]
+
+        elif self.memory_model == "shared_perceptual_noise":
+            enc = parameters["encoding_noise_sd"]
+            mem = parameters["memory_noise_sd"]
+
+            if self.combine_noise == "add_sd":
+                noise1 = enc + mem
+            elif self.combine_noise == "variance":
+                noise1 = pt.sqrt(enc**2 + mem**2)
+            else:
+                raise ValueError("combine_noise must be 'add_sd' or 'variance'")
+
+            noise2 = enc
+
+        else:
+            raise ValueError(f"Unknown memory_model: {self.memory_model}")
+
+        return {"prior_mu_risky": prior_mu_risky, "prior_sd_risky": prior_sd_risky, "prior_mu_safe": prior_mu_safe, "prior_sd_safe": prior_sd_safe,
+                "logn1": logn1, "logn2": logn2, "ev_sd1": noise1, "ev_sd2": noise2, "p1": p1, "p2": p2, "risky_first": risky_first}
