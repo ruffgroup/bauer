@@ -19,4 +19,5 @@ from .risky_choice import (
     PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
     SafeVsRiskyModel, SafeVsRiskyRegressionModel,
     SafeVsRiskyFlexibleNoiseModel,
+    AffineNoiseRiskModel,
 )

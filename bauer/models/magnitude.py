@@ -537,26 +537,30 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
 class PowerLawNoiseComparisonModel(BaseModel):
     """Magnitude-comparison model with power-law magnitude-dependent noise.
 
-    Evidence is represented in **natural (linear) space**.  The noise standard
-    deviation follows a power law in magnitude:
+    The key parameter is ``noise_exponent``, which characterises the geometry
+    of the individual's internal number representation.  It is related to the
+    Stevens encoding exponent ``alpha`` (where ``r = n^alpha``) via:
+
+        noise_exponent = 1 - alpha
+
+    Assuming noise is constant in representation space, error propagation gives
+    ``SD_stimulus ∝ n^(1-alpha)``, so ``noise_exponent`` directly indexes scale
+    compression:
+
+    * ``noise_exponent ≈ 0`` (``alpha ≈ 1``): **linear scale** — constant absolute
+      noise, equal absolute differences are equally discriminable everywhere
+    * ``noise_exponent ≈ 1`` (``alpha ≈ 0``): **logarithmic scale** — Weber's law,
+      noise grows with magnitude, equal ratio differences are equally discriminable
+
+    Formally, noise SD follows a power law in magnitude:
 
         SD_k(n) = exp(log_sd_intercept_k) · n^noise_exponent
 
-    In terms of variance this is equivalent to:
-
-        log Var_k(n) = 2·log_sd_intercept_k + 2·noise_exponent · log(n)
-
-    so the ``param`` in ``log(Var) = param·log(n) + c`` equals
-    ``2 * noise_exponent``.  Special cases:
-
-    * ``noise_exponent = 0`` (param = 0): constant absolute noise (no Weber scaling)
-    * ``noise_exponent = 1`` (param = 2): Weber's law (SD ∝ n)
-
-    The exponent is **shared** across n1 and n2 — it characterises the geometry
-    of the representational space — while separate log-scale intercepts allow
-    different overall noise levels for the two stimuli.  Because ``noise_exponent``
-    is a standard free parameter it can vary across subjects and serve as the
-    target of regressors in :class:`PowerLawNoiseComparisonRegressionModel`.
+    The exponent is **shared** across n1 and n2 — it characterises representational
+    geometry — while separate log-scale intercepts allow different overall noise
+    levels for the two stimuli.  Because ``noise_exponent`` is a standard free
+    parameter it can vary across subjects and serve as the target of regressors
+    in :class:`PowerLawNoiseComparisonRegressionModel`.
 
     Parameters
     ----------

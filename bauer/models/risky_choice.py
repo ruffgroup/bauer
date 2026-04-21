@@ -1657,3 +1657,29 @@ class SafeVsRiskyRegressionModel(RegressionModel, SafeVsRiskyModel):
 
     def get_trialwise_variable(self, key):
         return super().get_trialwise_variable(key)
+
+
+class AffineNoiseRiskModel(FlexibleNoiseRiskModel):
+    """Risky-choice model with affine (intercept + linear) noise.
+
+    The noise curve is parameterised as:
+
+        ν_k(n) = softplus(β_{k,0} + β_{k,1} · n̂)
+
+    where n̂ = (n − n_min) / (n_max − n_min).
+    """
+
+    def __init__(self, paradigm, prior_estimate='full',
+                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False,
+                 memory_model='independent'):
+        super().__init__(paradigm, prior_estimate=prior_estimate,
+                         fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+                         save_trialwise_n_estimates=save_trialwise_n_estimates,
+                         polynomial_order=2,
+                         memory_model=memory_model)
+
+    def make_dm(self, x, variable='n1_evidence_sd'):
+        min_n = self.paradigm[['n1', 'n2']].min().min()
+        max_n = self.paradigm[['n1', 'n2']].max().max()
+        x_norm = (np.asarray(x, dtype=float) - min_n) / (max_n - min_n)
+        return np.column_stack([np.ones_like(x_norm), x_norm])
