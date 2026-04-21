@@ -733,9 +733,136 @@ class PowerLawNoiseComparisonRegressionModel(RegressionModel, PowerLawNoiseCompa
                                               fit_prior, memory_model, save_trialwise_n_estimates)
 
 
-class PowerLawNoiseComparisonLapseModel(LapseModel, PowerLawNoiseComparisonModel):
-    ...
+
+class PowerLawEncodingComparisonModel(BaseModel):
+    """Magnitude-comparison model with a direct power-law encoding transformation.
+
+    The internal representation of magnitude n is:
+
+        r = n^alpha
+
+    with **constant** additive Gaussian noise in representation space.  This directly
+    implements Stevens' power law rather than approximating it via error propagation.
+
+    The encoding exponent ``alpha`` characterises representational geometry:
+
+    * ``alpha = 1``: **linear scale** — d' ∝ n, discrimination improves with magnitude
+    * ``0 < alpha < 1``: between linear and log — discrimination still improves, but
+      more slowly
+    * ``alpha → 0``: approaches **logarithmic scale** / Weber's law — d' constant for
+      fixed ratio (use :class:`MagnitudeComparisonModel` for the pure log-space case)
+    * ``alpha < 0``: sub-logarithmic — discrimination gets worse at larger magnitudes
+
+    Discriminability for a fixed ratio R = n2/n1 at magnitude n:
+
+        d' ∝ n2^alpha - n1^alpha = n^alpha · (R^alpha - 1)
+
+    which grows with n for alpha > 0 and shrinks for alpha < 0.
+
+    Unlike :class:`PowerLawNoiseComparisonModel`, there is no approximation: the
+    comparison happens directly in representation space with additive noise, so
+    ``alpha`` is always identifiable and has a clean geometric interpretation.
+
+    Parameters
+    ----------
+    paradigm : pd.DataFrame
+        Must contain columns ``n1``, ``n2``, ``choice``.
+    fit_seperate_evidence_sd : bool
+        If True (default), fit separate noise SDs for n1 and n2 in representation space.
+        Useful when n1 is held in memory (adding memory noise).
+    fit_prior : bool
+        If True, estimate the prior mean and SD in representation space as free parameters.
+        If False, the prior is set to the empirical distribution of n^alpha.
+    """
+
+    def __init__(self, paradigm=None, fit_seperate_evidence_sd=True,
+                 fit_prior=False, save_trialwise_n_estimates=False):
+        self.fit_prior = fit_prior
+        self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
+        super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
+
+    def get_model_inputs(self, parameters):
+
+        model = pm.Model.get_context()
+        model_inputs = {}
+
+        alpha = parameters['alpha']
+
+        n1_rep = model['n1'] ** alpha
+        n2_rep = model['n2'] ** alpha
+
+        if self.fit_prior:
+            prior_mu = parameters['prior_mu']
+            prior_sd = parameters['prior_sd']
+        else:
+            all_rep = pt.concatenate([n1_rep, n2_rep])
+            prior_mu = pt.mean(all_rep)
+            prior_sd = pt.std(all_rep)
+
+        model_inputs['n1_prior_mu'] = prior_mu
+        model_inputs['n2_prior_mu'] = prior_mu
+        model_inputs['n1_prior_sd'] = prior_sd
+        model_inputs['n2_prior_sd'] = prior_sd
+        model_inputs['threshold'] = 0.0
+
+        model_inputs['n1_evidence_mu'] = n1_rep
+        model_inputs['n2_evidence_mu'] = n2_rep
+
+        if self.fit_seperate_evidence_sd:
+            model_inputs['n1_evidence_sd'] = parameters['n1_evidence_sd']
+            model_inputs['n2_evidence_sd'] = parameters['n2_evidence_sd']
+        else:
+            model_inputs['n1_evidence_sd'] = parameters['evidence_sd']
+            model_inputs['n2_evidence_sd'] = parameters['evidence_sd']
+
+        return model_inputs
+
+    def get_free_parameters(self):
+
+        free_parameters = {}
+
+        free_parameters['alpha'] = {'mu_intercept': 0.5, 'sigma_intercept': 1., 'transform': 'identity'}
+
+        if self.fit_seperate_evidence_sd:
+            free_parameters['n1_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+            free_parameters['n2_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+        else:
+            free_parameters['evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+
+        if self.fit_prior:
+            if self.paradigm is not None:
+                all_n = np.concatenate([self.paradigm['n1'].values, self.paradigm['n2'].values])
+                objective_mu = float(np.mean(all_n ** 0.5))
+                objective_sd = float(np.std(all_n ** 0.5))
+            else:
+                objective_mu = 5.
+                objective_sd = 2.
+            free_parameters['prior_mu'] = {'mu_intercept': objective_mu, 'transform': 'identity'}
+            free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
+
+        return free_parameters
+
+    def _get_paradigm(self, paradigm=None):
+        paradigm_ = super()._get_paradigm(paradigm)
+        paradigm_['n1'] = paradigm['n1'].values
+        paradigm_['n2'] = paradigm['n2'].values
+        return paradigm_
+
+    def _get_example_paradigm(self, n_fractions=5):
+        base_ns = np.array([5, 7, 10, 14, 20, 28])
+        fractions = np.exp(np.linspace(np.log(.5), np.log(2.), n_fractions))
+        n1 = np.repeat(base_ns, len(fractions))
+        n2 = (base_ns[:, None] * fractions[None, :]).ravel()
+        return pd.DataFrame({'n1': n1, 'n2': n2})
 
 
-class PowerLawNoiseComparisonLapseRegressionModel(LapseModel, PowerLawNoiseComparisonRegressionModel):
-    ...
+class PowerLawEncodingComparisonRegressionModel(RegressionModel, PowerLawEncodingComparisonModel):
+    """PowerLawEncodingComparisonModel with patsy formula regression on any free parameter."""
+
+    def __init__(self, paradigm, regressors, fit_seperate_evidence_sd=True,
+                 fit_prior=False, save_trialwise_n_estimates=False):
+        RegressionModel.__init__(self, regressors)
+        PowerLawEncodingComparisonModel.__init__(self, paradigm, fit_seperate_evidence_sd,
+                                                 fit_prior, save_trialwise_n_estimates)
+
+
