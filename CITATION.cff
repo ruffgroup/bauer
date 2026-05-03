@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "bauer: Bayesian Estimation of Perceptual, Numerical and Risky Choice"
+abstract: >-
+  bauer is a PyMC-based Python library for fitting hierarchical Bayesian
+  cognitive models to behavioural decision-making data, covering magnitude
+  comparison, psychometric functions, and risky choice tasks.
+type: software
+license: MIT
+repository-code: "https://github.com/ruffgroup/bauer"
+url: "https://ruffgroup.github.io/bauer/"
+version: "0.2.0"
+authors:
+  - family-names: "de Hollander"
+    given-names: "Gilles"
+    orcid: "https://orcid.org/0000-0003-1988-5091"
+    affiliation: "University of Zurich"
+  - family-names: "Renkert"
+    given-names: "Maike"
+    orcid: "https://orcid.org/0000-0002-4809-4216"
+    affiliation: "University of Zurich"
+  - family-names: "Davydova"
+    given-names: "Alina"
+    affiliation: "University of Zurich"
+  - family-names: "Ruff"
+    given-names: "Christian C."
+    orcid: "https://orcid.org/0000-0002-4712-3206"
+    affiliation: "University of Zurich"
