@@ -1,0 +1,29 @@
+{
+  "title": "bauer: Bayesian Estimation of Perceptual, Numerical and Risky Choice",
+  "description": "<p><strong>bauer</strong> is a PyMC-based Python library for fitting hierarchical Bayesian cognitive models to behavioural decision-making data. It covers three families of forced-choice tasks: magnitude comparison (\"which set of dots is more numerous?\"), psychometric functions (general two-alternative sensitivity models), and risky choice (\"take the safe option or gamble?\").</p><p>All models are fitted hierarchically by default: each participant gets their own parameters, regularised by a shared group-level distribution, which is essential at the trial counts typical of psychophysics experiments (100–250 per condition). The package provides composable model variants with patsy-formula regression on any parameter, optional lapse rates, posterior predictive checks, MAP and full MCMC fitting, simulation, and example data from Garcia et al. (2022).</p><p>Model families included:</p><ul><li><strong>Psychometric</strong>: <code>PsychometricModel</code> and <code>*Lapse</code>/<code>*Regression</code> variants</li><li><strong>Magnitude comparison</strong>: <code>MagnitudeComparisonModel</code>, <code>FlexibleNoiseComparisonModel</code>, <code>AffineNoiseComparisonModel</code></li><li><strong>Risky choice</strong>: <code>RiskModel</code>, <code>ProspectTheoryModel</code>, <code>LossAversionModel</code>, <code>RNPModel</code>, <code>FlexibleNoiseRiskModel</code>, <code>ExpectedUtilityRiskModel</code></li></ul><p>Documentation and tutorials: <a href=\"https://ruffgroup.github.io/bauer/\">https://ruffgroup.github.io/bauer/</a></p>",
+  "creators": [
+    {"name": "de Hollander, Gilles", "orcid": "0000-0003-1988-5091", "affiliation": "University of Zurich"},
+    {"name": "Renkert, Maike", "orcid": "0000-0002-4809-4216", "affiliation": "University of Zurich"},
+    {"name": "Davydova, Alina", "affiliation": "University of Zurich"},
+    {"name": "Ruff, Christian C.", "orcid": "0000-0002-4712-3206", "affiliation": "University of Zurich"}
+  ],
+  "keywords": [
+    "bayesian inference",
+    "pymc",
+    "cognitive modelling",
+    "psychophysics",
+    "risky choice",
+    "hierarchical models",
+    "magnitude comparison",
+    "decision making",
+    "psychometric function"
+  ],
+  "license": "MIT",
+  "upload_type": "software",
+  "access_right": "open",
+  "related_identifiers": [
+    {"identifier": "https://ruffgroup.github.io/bauer/", "relation": "isDocumentedBy", "resource_type": "publication-other"},
+    {"identifier": "https://github.com/ruffgroup/bauer", "relation": "isSupplementedBy", "resource_type": "software"},
+    {"identifier": "10.5281/zenodo.10778413", "relation": "isRelatedTo", "resource_type": "software"}
+  ]
+}
