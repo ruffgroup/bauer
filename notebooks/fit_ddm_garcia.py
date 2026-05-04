@@ -20,7 +20,11 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from bauer.utils.data import load_garcia2022
-from bauer.models import MagnitudeComparisonModel, DDMMagnitudeComparisonModel
+from bauer.models import (
+    MagnitudeComparisonModel,
+    DDMMagnitudeComparisonModel,
+    RaceDiffusionMagnitudeComparisonModel,
+)
 
 
 HERE = op.dirname(op.abspath(__file__))
@@ -57,6 +61,8 @@ def main():
     parser.add_argument('--chains', type=int, default=2)
     parser.add_argument('--cores', type=int, default=2)
     parser.add_argument('--output-dir', type=str, default=None)
+    parser.add_argument('--skip-existing', action='store_true',
+                        help='Skip fits whose .nc file already exists in output dir.')
     args = parser.parse_args()
 
     if args.full:
@@ -81,25 +87,47 @@ def main():
 
     choice_path = op.join(out_dir, 'garcia_choice_idata.nc')
     ddm_path = op.join(out_dir, 'garcia_ddm_idata.nc')
+    race_path = op.join(out_dir, 'garcia_race_idata.nc')
 
     sample_kwargs = dict(draws=args.draws, tune=args.tune,
                          chains=args.chains, cores=args.cores,
                          progressbar=False, callback=_progress)
 
-    print('\n=== choice-only model ===', flush=True)
-    m_choice = MagnitudeComparisonModel(paradigm=df, fit_seperate_evidence_sd=True)
-    m_choice.build_estimation_model(data=df, hierarchical=True)
-    idata_choice = m_choice.sample(target_accept=0.9, random_seed=0, **sample_kwargs)
-    _safe_to_netcdf(idata_choice, choice_path)
-    print(f'saved -> {choice_path}', flush=True)
+    if args.skip_existing and op.exists(choice_path):
+        print(f'\n=== choice-only: SKIPPED (exists at {choice_path}) ===', flush=True)
+    else:
+        print('\n=== choice-only model ===', flush=True)
+        m_choice = MagnitudeComparisonModel(paradigm=df, fit_seperate_evidence_sd=True)
+        m_choice.build_estimation_model(data=df, hierarchical=True)
+        idata_choice = m_choice.sample(target_accept=0.9, random_seed=0, **sample_kwargs)
+        _safe_to_netcdf(idata_choice, choice_path)
+        print(f'saved -> {choice_path}', flush=True)
 
-    print('\n=== DDM model (v_scale fixed to 1) ===', flush=True)
-    m_ddm = DDMMagnitudeComparisonModel(paradigm=df, fit_seperate_evidence_sd=True,
-                                         fit_v_scale=False)
-    m_ddm.build_estimation_model(data=df, hierarchical=True)
-    idata_ddm = m_ddm.sample(target_accept=0.95, random_seed=0, **sample_kwargs)
-    _safe_to_netcdf(idata_ddm, ddm_path)
-    print(f'saved -> {ddm_path}', flush=True)
+    if args.skip_existing and op.exists(ddm_path):
+        print(f'\n=== DDM: SKIPPED (exists at {ddm_path}) ===', flush=True)
+    else:
+        print('\n=== DDM model (v_scale fixed to 1) ===', flush=True)
+        m_ddm = DDMMagnitudeComparisonModel(paradigm=df, fit_seperate_evidence_sd=True,
+                                             fit_v_scale=False)
+        m_ddm.build_estimation_model(data=df, hierarchical=True)
+        idata_ddm = m_ddm.sample(target_accept=0.95, random_seed=0, **sample_kwargs)
+        _safe_to_netcdf(idata_ddm, ddm_path)
+        print(f'saved -> {ddm_path}', flush=True)
+
+    if args.skip_existing and op.exists(race_path):
+        print(f'\n=== race: SKIPPED (exists at {race_path}) ===', flush=True)
+        print('\nDone.')
+        return
+
+    print('\n=== Race-diffusion model (fit_prior=True, v_scale fixed to 1) ===', flush=True)
+    m_race = RaceDiffusionMagnitudeComparisonModel(
+        paradigm=df, fit_seperate_evidence_sd=True, fit_v_scale=False,
+        fit_prior=True,
+    )
+    m_race.build_estimation_model(data=df, hierarchical=True)
+    idata_race = m_race.sample(target_accept=0.95, random_seed=0, **sample_kwargs)
+    _safe_to_netcdf(idata_race, race_path)
+    print(f'saved -> {race_path}', flush=True)
 
     print('\nDone.')
 

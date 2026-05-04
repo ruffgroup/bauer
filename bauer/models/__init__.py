@@ -31,3 +31,10 @@ try:
     )
 except ImportError:
     pass
+
+from .race import (
+    RaceMixin,
+    RaceDiffusionMagnitudeComparisonModel,
+    RaceDiffusionFlexibleNoiseComparisonModel,
+    logp_race_diffusion_2,
+)

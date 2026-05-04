@@ -39,6 +39,61 @@ except ImportError:
     _ssms_simulator = None
 
 
+def _attach_log_likelihood(model_obj, idata, paradigm=None, var_name='ll'):
+    """Compute per-trial log-likelihood for a fitted DDMMixin/RaceMixin model
+    and attach to ``idata.log_likelihood``. Reuses ``build_loglik_model`` to
+    construct a graph with parameters as ``pm.Data`` and the per-trial logp as
+    a ``Deterministic``, then loops over posterior samples.
+    """
+    import pytensor
+    import xarray as xr
+    if paradigm is None:
+        paradigm = model_obj.paradigm
+
+    n_chain = idata.posterior.sizes['chain']
+    n_draw = idata.posterior.sizes['draw']
+    param_names = list(model_obj.free_parameters.keys())
+
+    # Determine shape of each parameter (per-subject vs scalar)
+    hierarchical = 'subject' in idata.posterior[param_names[0]].dims
+    if hierarchical:
+        n_subjects = idata.posterior.sizes['subject']
+        placeholder = {name: np.zeros(n_subjects) for name in param_names}
+    else:
+        placeholder = {name: 0.0 for name in param_names}
+
+    model_obj.build_loglik_model(paradigm, placeholder)
+    pmodel = model_obj.loglik_model
+    per_trial_var = pmodel['per_trial_ll']
+    fn = pytensor.function([], per_trial_var, on_unused_input='ignore')
+
+    n_trials = len(paradigm)
+    out = np.zeros((n_chain, n_draw, n_trials), dtype=np.float64)
+    for c in range(n_chain):
+        for d in range(n_draw):
+            for name in param_names:
+                vals = idata.posterior[name].isel(chain=c, draw=d).values
+                if hierarchical:
+                    pmodel[name].set_value(np.asarray(vals, dtype=float))
+                else:
+                    pmodel[name].set_value(float(vals))
+            out[c, d, :] = fn()
+
+    da = xr.DataArray(
+        out, dims=['chain', 'draw', 'observation'],
+        coords={'chain': idata.posterior.chain.values,
+                'draw': idata.posterior.draw.values,
+                'observation': np.arange(n_trials)},
+    )
+    ll_ds = xr.Dataset({var_name: da})
+    if 'log_likelihood' in idata:
+        # arviz won't replace cleanly; build new InferenceData group
+        idata.log_likelihood = ll_ds
+    else:
+        idata.add_groups(log_likelihood=ll_ds)
+    return idata
+
+
 class DDMMixin:
     """Swaps the static cumulative-normal likelihood for an HSSM Wiener WFPT.
 
@@ -148,6 +203,37 @@ class DDMMixin:
             pm.Deterministic('a_t', params['a'])
             pm.Deterministic('z_t', params['z'])
             pm.Deterministic('t0_t', params['t0'])
+
+    def build_loglik_model(self, paradigm, parameters):
+        """Build a PyMC model that exposes per-trial log-likelihood as a
+        Deterministic. Used by ``compute_log_likelihood`` for post-hoc model
+        comparison via PSIS-LOO / WAIC.
+        """
+        if isinstance(parameters, pd.DataFrame):
+            parameters = parameters.to_dict(orient='list')
+        with pm.Model() as self.loglik_model:
+            paradigm_ = self._get_paradigm(paradigm=paradigm)
+            self.set_paradigm(paradigm_)
+            for key, value in parameters.items():
+                pm.Data(key, value)
+            params = self.get_parameter_values()
+            model_inputs = self.get_model_inputs(params)
+            v = self._get_drift(model_inputs, params)
+            a, z, t0 = params['a'], params['z'], params['t0']
+            mc = pm.Model.get_context()
+            signed = pt.switch(mc['choice'], 1.0, -1.0)
+            data = pt.stack([mc['rt'], signed], axis=1)
+            per_trial = logp_ddm(data, v, a, z, t0)
+            pm.Deterministic('per_trial_ll', per_trial)
+
+    def compute_log_likelihood(self, idata, paradigm=None, var_name='ll_ddm'):
+        """Compute per-trial log-likelihood post-hoc and attach to
+        ``idata.log_likelihood`` so ``az.compare`` works for model selection.
+
+        Returns the modified idata in-place. Stored variable is named ``var_name``
+        (default ``ll_ddm``).
+        """
+        return _attach_log_likelihood(self, idata, paradigm=paradigm, var_name=var_name)
 
     def predict(self, paradigm, parameters):
         """Return per-trial drift, P(upper boundary), and mean RT — all analytical.
