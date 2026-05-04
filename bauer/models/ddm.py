@@ -149,34 +149,37 @@ class DDMMixin:
             pm.Deterministic('z_t', params['z'])
             pm.Deterministic('t0_t', params['t0'])
 
-    def predict(self, paradigm, parameters, n_samples=500, random_seed=0):
-        """Return per-trial drift, P(upper), mean RT, and median RT.
+    def predict(self, paradigm, parameters):
+        """Return per-trial drift, P(upper boundary), and mean RT — all analytical.
 
-        ``drift`` is computed analytically (deterministic). The remaining
-        statistics are estimated by simulating ``n_samples`` (rt, choice)
-        pairs per trial via ssm-simulators, since closed-form expressions
-        for mean RT under biased start are messy. ``P(upper)`` from the
-        simulation matches the analytical Wiener first-passage probability
-        in the limit of large ``n_samples``.
+        For DDM with drift ``v``, half-boundary ``a``, normalized start ``z``,
+        non-decision time ``t0`` (HSSM convention; full boundary = 2a):
+
+            P(upper) = (1 - exp(-4*v*a*z)) / (1 - exp(-4*v*a))
+            E[RT]    = t0 + (2a / v) * (P(upper) - z)        (v ≠ 0)
+            E[RT]    = t0 + 4*a^2 * z * (1-z)                 (v = 0)
+
+        Median RT has no clean closed form; use ``simulate`` and take the
+        median across draws if you need it.
         """
         self.build_prediction_model(paradigm, parameters)
         v = self.prediction_model['drift'].eval()
+        a = self.prediction_model['a_t'].eval()
+        z = self.prediction_model['z_t'].eval()
+        t0 = self.prediction_model['t0_t'].eval()
 
-        sim = self.simulate(paradigm, parameters, n_samples=n_samples,
-                            random_seed=random_seed)
-        # Aggregate simulation stats per trial (across the 'sample' level)
-        trial_levels = list(paradigm.index.names)
-        if 'subject' in paradigm.columns and 'subject' not in trial_levels:
-            trial_levels = ['subject'] + trial_levels
-        by_trial = sim.groupby(level=trial_levels, sort=False)
-        p_upper = by_trial['simulated_choice'].mean().reindex(paradigm.index).values
-        mean_rt = by_trial['simulated_rt'].mean().reindex(paradigm.index).values
-        median_rt = by_trial['simulated_rt'].median().reindex(paradigm.index).values
+        with np.errstate(over='ignore', invalid='ignore'):
+            num = 1.0 - np.exp(-4.0 * v * a * z)
+            den = 1.0 - np.exp(-4.0 * v * a)
+            p_upper = np.where(np.abs(v) < 1e-9, z, num / den)
+            mean_rt = np.where(
+                np.abs(v) < 1e-9,
+                t0 + 4.0 * a * a * z * (1.0 - z),
+                t0 + (2.0 * a / np.where(np.abs(v) < 1e-9, 1.0, v)) * (p_upper - z),
+            )
 
-        out = pd.DataFrame({
-            'drift': v, 'p_upper': p_upper,
-            'mean_rt': mean_rt, 'median_rt': median_rt,
-        }, index=paradigm.index)
+        out = pd.DataFrame({'drift': v, 'p_upper': p_upper, 'mean_rt': mean_rt},
+                           index=paradigm.index)
         return out.join(paradigm)
 
     def simulate(self, paradigm, parameters, n_samples=1, random_seed=None):
@@ -246,10 +249,16 @@ class DDMMixin:
 
         return out_df
 
-    def ppc(self, paradigm, idata, n_posterior_samples=200, random_seed=None,
-            progressbar=True):
+    def ppc(self, paradigm, idata, n_posterior_samples=200, inner_samples=1,
+            random_seed=None, progressbar=True):
         """Posterior predictive simulation: draw (rt, choice) per trial for
         ``n_posterior_samples`` posterior draws.
+
+        ``inner_samples`` controls how many independent (rt, choice) draws are
+        simulated per real trial per posterior sample. ``1`` is the canonical
+        choice (one fake dataset per posterior draw); higher values average out
+        the per-trial Bernoulli/RT-noise within each posterior sample, giving
+        a tighter PPC band that more cleanly reflects parameter uncertainty.
 
         Returns a long-format DataFrame indexed by trial × ppc_sample with
         columns ``simulated_rt`` and ``simulated_choice``.
@@ -280,20 +289,23 @@ class DDMMixin:
         for k in iterator:
             ci, di = int(chain_idx[k]), int(draw_idx[k])
             if hierarchical:
-                # Per-subject parameter values for this posterior draw
                 subjects = post.coords['subject'].values
-                par_dict = {}
-                for name in param_names:
-                    par_dict[name] = post[name].isel(chain=ci, draw=di).values
+                par_dict = {name: post[name].isel(chain=ci, draw=di).values
+                            for name in param_names}
                 pars_df = pd.DataFrame(par_dict, index=pd.Index(subjects, name='subject'))
-                sim = self.simulate(paradigm, pars_df, n_samples=1,
+                sim = self.simulate(paradigm, pars_df, n_samples=inner_samples,
                                     random_seed=int(rng.integers(0, 2**31 - 1)))
             else:
                 par_dict = {name: float(post[name].isel(chain=ci, draw=di).values)
                             for name in param_names}
-                sim = self.simulate(paradigm, par_dict, n_samples=1,
+                sim = self.simulate(paradigm, par_dict, n_samples=inner_samples,
                                     random_seed=int(rng.integers(0, 2**31 - 1)))
-            sim = sim.reset_index(level='sample', drop=True)
+            # Average over the 'sample' level so each posterior draw produces
+            # one row per real trial.
+            trial_levels = [n for n in sim.index.names if n != 'sample']
+            sim = sim.groupby(level=trial_levels, observed=True)[
+                ['simulated_rt', 'simulated_choice']
+            ].mean()
             sim['ppc_sample'] = k
             results.append(sim[['simulated_rt', 'simulated_choice', 'ppc_sample']])
 
