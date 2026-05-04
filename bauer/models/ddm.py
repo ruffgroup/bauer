@@ -1,0 +1,402 @@
+"""Drift-diffusion-model variants of bauer's choice models.
+
+These models replace the static cumulative-normal choice rule with a Wiener
+first-passage-time likelihood (HSSM's analytic Navarro-Fuss implementation),
+so they fit reaction times jointly with choices.
+
+The cognitive front-end (Bayesian observer with priors, asymmetric noise,
+memory model, etc.) is reused unchanged from the static models. The same
+``(diff_mu, diff_sd)`` that the static model feeds to the cumulative normal
+becomes the DDM drift signal: ``v = v_scale * diff_mu / diff_sd``. This is
+the subjective signal-to-noise ratio of the perceived evidence — order
+effects from asymmetric n1/n2 noise propagate into drift via differential
+prior pulling, exactly as in the static model.
+
+HSSM convention (used here):
+    a   half boundary separation (>0)
+    z   normalized starting point in [0, 1]; 0.5 = unbiased
+    t0  non-decision time, in seconds
+    rt  reaction time, in seconds — must be > 0
+"""
+
+import numpy as np
+import pandas as pd
+import pymc as pm
+import pytensor.tensor as pt
+
+from .magnitude import MagnitudeComparisonModel, FlexibleNoiseComparisonModel
+from ..utils.bayes import get_posterior
+from ..utils.math import inverse_softplus_np
+
+try:
+    from hssm.likelihoods import logp_ddm
+except ImportError:
+    logp_ddm = None
+
+try:
+    from ssms.basic_simulators import simulator as _ssms_simulator
+except ImportError:
+    _ssms_simulator = None
+
+
+class DDMMixin:
+    """Swaps the static cumulative-normal likelihood for an HSSM Wiener WFPT.
+
+    Subclasses implement ``_get_drift(model_inputs, parameters)`` returning a
+    per-trial drift signal computed from the cognitive model.
+
+    Adds three free DDM parameters: ``a`` (half boundary separation), ``z``
+    (normalized start point), ``t0`` (non-decision time). Optionally adds
+    ``v_scale``, the drift coefficient, when ``fit_v_scale=True`` (default).
+
+    Note on ``v_scale`` identifiability: the drift formula is
+    ``v = v_scale * (post_n2_mu - post_n1_mu) / sqrt(sd1^2 + sd2^2)``. With a
+    flat prior, scaling all ``evidence_sd`` by ``c`` is exactly equivalent to
+    scaling ``v_scale`` by ``1/c`` — perfect degeneracy. With an informative
+    prior, scaling ``evidence_sd`` also changes prior-pulling weights, which
+    breaks the degeneracy non-linearly. RT shape adds further information
+    (drift sets accumulation speed). Empirically the two parameters fit cleanly
+    in our tests, but they remain strongly correlated. Set ``fit_v_scale=False``
+    to fix ``v_scale=1`` and let ``evidence_sd`` absorb the drift scale.
+    """
+
+    fit_v_scale = False
+
+    def get_free_parameters(self):
+        pars = super().get_free_parameters()
+        if self.fit_v_scale:
+            pars['v_scale'] = {'mu_intercept': 1.0, 'sigma_intercept': 1.0,
+                               'transform': 'identity'}
+        pars['a'] = {'mu_intercept': inverse_softplus_np(1.0),
+                     'sigma_intercept': 0.5, 'transform': 'softplus'}
+        pars['z'] = {'mu_intercept': 0.0, 'sigma_intercept': 0.5,
+                     'transform': 'logistic'}
+        pars['t0'] = {'mu_intercept': inverse_softplus_np(0.2),
+                      'sigma_intercept': 0.5, 'transform': 'softplus'}
+        return pars
+
+    def _get_paradigm(self, paradigm=None, subject_mapping=None):
+        # MagnitudeComparisonModel._get_paradigm doesn't accept subject_mapping;
+        # try with the kwarg, fall back to positional for older overrides.
+        try:
+            p = super()._get_paradigm(paradigm, subject_mapping=subject_mapping)
+        except TypeError:
+            p = super()._get_paradigm(paradigm)
+        # rt is required for fitting but optional for prediction/simulation.
+        if 'rt' in paradigm.columns:
+            rt = np.asarray(paradigm['rt'].values, dtype=float)
+            if np.any(rt <= 0) or np.any(np.isnan(rt)):
+                n_bad = int((rt <= 0).sum() + np.isnan(rt).sum())
+                raise ValueError(
+                    f"Found {n_bad} trial(s) with rt <= 0 or NaN. "
+                    "Filter non-responses and convert RT to seconds before fitting."
+                )
+            p['rt'] = rt
+        return p
+
+    def build_likelihood(self, parameters, save_p_choice=False):
+        if logp_ddm is None:
+            raise ImportError(
+                "DDM models require hssm. Install with: pip install bauer[ddm]"
+            )
+        model = pm.Model.get_context()
+        if 'rt' not in [v.name for v in model.value_vars + list(model.named_vars.values())]:
+            raise ValueError(
+                "DDM models require an 'rt' column in the paradigm for fitting."
+            )
+        model_inputs = self.get_model_inputs(parameters)
+
+        v = self._get_drift(model_inputs, parameters)
+        if save_p_choice:
+            pm.Deterministic('drift', v)
+
+        a = parameters['a']
+        z = parameters['z']
+        t0 = parameters['t0']
+
+        signed = pt.switch(model['choice'], 1.0, -1.0)
+        data = pt.stack([model['rt'], signed], axis=1)
+
+        pm.Potential('ll_ddm', logp_ddm(data, v=v, a=a, z=z, t=t0))
+
+    def build_prediction_model(self, paradigm, parameters):
+        """Build a PyMC model that exposes per-trial drift + (a, z, t0) as
+        Deterministic nodes — no likelihood. Used by ``simulate`` and ``predict``.
+        """
+        if isinstance(parameters, pd.DataFrame):
+            parameter_subjects = (parameters['subject'] if 'subject' in parameters
+                                  else parameters.index.get_level_values('subject'))
+            if 'subject' in paradigm.index.names:
+                assert np.array_equal(paradigm.index.unique(level='subject'),
+                                      parameter_subjects), \
+                    "Subjects in paradigm don't match subjects in parameters."
+            elif 'subject' in paradigm.columns:
+                assert np.array_equal(paradigm.subject.unique(), parameter_subjects), \
+                    "Subjects in paradigm don't match subjects in parameters."
+            parameters = parameters.to_dict(orient='list')
+
+        with pm.Model() as self.prediction_model:
+            paradigm_ = self._get_paradigm(paradigm=paradigm)
+            self.set_paradigm(paradigm_)
+            for key, value in parameters.items():
+                pm.Data(key, value)
+            params = self.get_parameter_values()
+            model_inputs = self.get_model_inputs(params)
+            v = self._get_drift(model_inputs, params)
+            pm.Deterministic('drift', v)
+            # Also expose (a, z, t0) tiled to per-trial shape for simulate.
+            pm.Deterministic('a_t', params['a'])
+            pm.Deterministic('z_t', params['z'])
+            pm.Deterministic('t0_t', params['t0'])
+
+    def predict(self, paradigm, parameters, n_samples=500, random_seed=0):
+        """Return per-trial drift, P(upper), mean RT, and median RT.
+
+        ``drift`` is computed analytically (deterministic). The remaining
+        statistics are estimated by simulating ``n_samples`` (rt, choice)
+        pairs per trial via ssm-simulators, since closed-form expressions
+        for mean RT under biased start are messy. ``P(upper)`` from the
+        simulation matches the analytical Wiener first-passage probability
+        in the limit of large ``n_samples``.
+        """
+        self.build_prediction_model(paradigm, parameters)
+        v = self.prediction_model['drift'].eval()
+
+        sim = self.simulate(paradigm, parameters, n_samples=n_samples,
+                            random_seed=random_seed)
+        # Aggregate simulation stats per trial (across the 'sample' level)
+        trial_levels = list(paradigm.index.names)
+        if 'subject' in paradigm.columns and 'subject' not in trial_levels:
+            trial_levels = ['subject'] + trial_levels
+        by_trial = sim.groupby(level=trial_levels, sort=False)
+        p_upper = by_trial['simulated_choice'].mean().reindex(paradigm.index).values
+        mean_rt = by_trial['simulated_rt'].mean().reindex(paradigm.index).values
+        median_rt = by_trial['simulated_rt'].median().reindex(paradigm.index).values
+
+        out = pd.DataFrame({
+            'drift': v, 'p_upper': p_upper,
+            'mean_rt': mean_rt, 'median_rt': median_rt,
+        }, index=paradigm.index)
+        return out.join(paradigm)
+
+    def simulate(self, paradigm, parameters, n_samples=1, random_seed=None):
+        """Simulate (rt, choice) draws via ssm-simulators.
+
+        Parameters
+        ----------
+        paradigm : DataFrame
+            Trial-level paradigm. Must have stimulus columns; ``rt`` is ignored.
+        parameters : dict or DataFrame
+            Parameter values (per-subject DataFrame for hierarchical, dict for
+            single-subject).
+        n_samples : int
+            Number of independent simulated datasets per trial.
+        random_seed : int or None
+            Forwarded to ``ssms.basic_simulators.simulator``.
+
+        Returns
+        -------
+        pd.DataFrame
+            Indexed like ``paradigm`` (with a ``sample`` level), columns
+            ``simulated_rt`` and ``simulated_choice`` (bool, ``True`` = upper).
+        """
+        if _ssms_simulator is None:
+            raise ImportError(
+                "DDM simulate requires ssm-simulators. "
+                "Install with: pip install bauer[ddm]"
+            )
+        self.build_prediction_model(paradigm, parameters)
+        with self.prediction_model:
+            v = self.prediction_model['drift'].eval()
+            a = self.prediction_model['a_t'].eval()
+            z = self.prediction_model['z_t'].eval()
+            t0 = self.prediction_model['t0_t'].eval()
+        # Per-trial theta = [v, a, z, t]
+        theta = np.column_stack([v, a, z, t0])
+        out = _ssms_simulator.simulator(
+            theta=theta, model='ddm', n_samples=n_samples,
+            random_state=random_seed,
+        )
+        # ssms output shape: (n_trials, 1) when n_samples=1; otherwise
+        # (n_samples, n_trials, 1). Squeeze and reshape to (n_trials, n_samples).
+        rts = np.asarray(out['rts']).squeeze(-1)
+        choices = np.asarray(out['choices']).squeeze(-1)
+        if n_samples > 1:
+            rts = rts.T          # (n_trials, n_samples)
+            choices = choices.T
+
+        if not paradigm.index.name:
+            paradigm.index.name = 'trial'
+
+        rt_df = pd.DataFrame(
+            rts, index=paradigm.index,
+            columns=pd.Index(np.arange(n_samples) + 1, name='sample'),
+        ).stack().to_frame('simulated_rt')
+        choice_df = pd.DataFrame(
+            choices, index=paradigm.index,
+            columns=pd.Index(np.arange(n_samples) + 1, name='sample'),
+        ).stack().to_frame('simulated_choice')
+        # ssms convention: +1 = upper, -1 = lower; map to bool (True = upper)
+        choice_df['simulated_choice'] = choice_df['simulated_choice'] > 0
+        out_df = rt_df.join(choice_df).join(paradigm)
+
+        if 'subject' in paradigm.columns:
+            out_df = out_df.set_index('subject', append=True)
+            out_df = out_df.reorder_levels(['subject'] + list(out_df.index.names)[:-1])
+
+        return out_df
+
+    def ppc(self, paradigm, idata, n_posterior_samples=200, random_seed=None,
+            progressbar=True):
+        """Posterior predictive simulation: draw (rt, choice) per trial for
+        ``n_posterior_samples`` posterior draws.
+
+        Returns a long-format DataFrame indexed by trial × ppc_sample with
+        columns ``simulated_rt`` and ``simulated_choice``.
+        """
+        if _ssms_simulator is None:
+            raise ImportError(
+                "DDM ppc requires ssm-simulators. Install with: pip install bauer[ddm]"
+            )
+        rng = np.random.default_rng(random_seed)
+        post = idata.posterior
+        n_chain, n_draw = post.sizes['chain'], post.sizes['draw']
+        flat_idx = rng.choice(n_chain * n_draw, n_posterior_samples, replace=False)
+        chain_idx = flat_idx // n_draw
+        draw_idx = flat_idx % n_draw
+
+        param_names = list(self.free_parameters.keys())
+        hierarchical = 'subject' in post[param_names[0]].dims
+
+        results = []
+        iterator = range(n_posterior_samples)
+        if progressbar:
+            try:
+                from tqdm.auto import tqdm
+                iterator = tqdm(iterator, desc='PPC')
+            except ImportError:
+                pass
+
+        for k in iterator:
+            ci, di = int(chain_idx[k]), int(draw_idx[k])
+            if hierarchical:
+                # Per-subject parameter values for this posterior draw
+                subjects = post.coords['subject'].values
+                par_dict = {}
+                for name in param_names:
+                    par_dict[name] = post[name].isel(chain=ci, draw=di).values
+                pars_df = pd.DataFrame(par_dict, index=pd.Index(subjects, name='subject'))
+                sim = self.simulate(paradigm, pars_df, n_samples=1,
+                                    random_seed=int(rng.integers(0, 2**31 - 1)))
+            else:
+                par_dict = {name: float(post[name].isel(chain=ci, draw=di).values)
+                            for name in param_names}
+                sim = self.simulate(paradigm, par_dict, n_samples=1,
+                                    random_seed=int(rng.integers(0, 2**31 - 1)))
+            sim = sim.reset_index(level='sample', drop=True)
+            sim['ppc_sample'] = k
+            results.append(sim[['simulated_rt', 'simulated_choice', 'ppc_sample']])
+
+        out = pd.concat(results)
+        out = out.set_index('ppc_sample', append=True)
+        return out
+
+    def _get_drift(self, model_inputs, parameters):  # noqa: ARG002
+        raise NotImplementedError(
+            "DDM subclasses must implement _get_drift(model_inputs, parameters)."
+        )
+
+
+def _drift_from_snr(model_inputs, v_scale=None):
+    """Drift = (post_n2_mu - post_n1_mu) / sqrt(sd1^2 + sd2^2). Scales by v_scale if given.
+
+    Shared by every DDM model whose cognitive front-end produces the standard
+    ``n{1,2}_prior_mu/sd`` and ``n{1,2}_evidence_mu/sd`` keys in model_inputs.
+    """
+    post_n1_mu, _ = get_posterior(
+        model_inputs['n1_prior_mu'], model_inputs['n1_prior_sd'],
+        model_inputs['n1_evidence_mu'], model_inputs['n1_evidence_sd'],
+    )
+    post_n2_mu, _ = get_posterior(
+        model_inputs['n2_prior_mu'], model_inputs['n2_prior_sd'],
+        model_inputs['n2_evidence_mu'], model_inputs['n2_evidence_sd'],
+    )
+    diff_mu = post_n2_mu - post_n1_mu
+    diff_sd = pt.sqrt(model_inputs['n1_evidence_sd'] ** 2 +
+                      model_inputs['n2_evidence_sd'] ** 2)
+    v = diff_mu / diff_sd
+    if v_scale is not None:
+        v = v_scale * v
+    return v
+
+
+class DDMMagnitudeComparisonModel(DDMMixin, MagnitudeComparisonModel):
+    """DDM variant of MagnitudeComparisonModel.
+
+    Drift is the subjective signal-to-noise of the perceived log-magnitude
+    difference: ``v = v_scale * (post_n2_mu - post_n1_mu) / sqrt(sd1^2 + sd2^2)``.
+    Positive drift drives the upper boundary, which corresponds to ``choice=True``
+    (i.e. choosing option 2). All cognitive parameters
+    (``n1_evidence_sd``, ``n2_evidence_sd``, ``prior_mu``, ``prior_sd``,
+    memory model) are inherited unchanged.
+
+    Paradigm columns required: ``n1``, ``n2``, ``choice`` (bool), ``rt`` (seconds).
+
+    Parameters
+    ----------
+    fit_v_scale : bool
+        If True, fit ``v_scale`` as a free parameter. Default ``False`` fixes
+        ``v_scale = 1`` and lets ``evidence_sd`` absorb the drift scale (see
+        DDMMixin docstring for the identifiability discussion). The default is
+        ``False`` because ``v_scale`` and ``evidence_sd`` are strongly correlated;
+        fixing one removes a degeneracy that bloats posterior intervals.
+    """
+
+    def __init__(self, paradigm=None, fit_prior=False,
+                 fit_seperate_evidence_sd=True, memory_model='independent',
+                 save_trialwise_n_estimates=False, fit_v_scale=False):
+        self.fit_v_scale = fit_v_scale
+        super().__init__(paradigm=paradigm, fit_prior=fit_prior,
+                         fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+                         memory_model=memory_model,
+                         save_trialwise_n_estimates=save_trialwise_n_estimates)
+
+    def _get_drift(self, model_inputs, parameters):
+        v_scale = parameters['v_scale'] if self.fit_v_scale else None
+        return _drift_from_snr(model_inputs, v_scale=v_scale)
+
+
+class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
+    """DDM variant of FlexibleNoiseComparisonModel.
+
+    Drift uses the same SNR-of-perceived-difference formula as
+    :class:`DDMMagnitudeComparisonModel`, but ``n1_evidence_sd`` and
+    ``n2_evidence_sd`` are stimulus-dependent splines (polynomial B-spline of
+    log-magnitude) rather than scalar parameters per subject. This lets
+    discrimination noise vary smoothly with stimulus size.
+
+    Paradigm columns required: ``n1``, ``n2``, ``choice`` (bool), ``rt`` (seconds).
+
+    Parameters
+    ----------
+    fit_v_scale : bool
+        See :class:`DDMMagnitudeComparisonModel`. Default ``False``.
+    polynomial_order, fit_seperate_evidence_sd, fit_prior, memory_model :
+        Forwarded to :class:`FlexibleNoiseComparisonModel`.
+    """
+
+    def __init__(self, paradigm, fit_seperate_evidence_sd=True,
+                 fit_prior=False, polynomial_order=5,
+                 memory_model='independent', fit_v_scale=False):
+        self.fit_v_scale = fit_v_scale
+        FlexibleNoiseComparisonModel.__init__(
+            self, paradigm,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_prior=fit_prior,
+            polynomial_order=polynomial_order,
+            memory_model=memory_model,
+        )
+
+    def _get_drift(self, model_inputs, parameters):
+        v_scale = parameters['v_scale'] if self.fit_v_scale else None
+        return _drift_from_snr(model_inputs, v_scale=v_scale)

@@ -36,6 +36,9 @@ dev = [
     "pytest",
     "coverage",
 ]
+ddm = [
+    "hssm>=0.2",
+]
 
 [project.urls]
 Homepage = "https://github.com/ruffgroup/bauer"

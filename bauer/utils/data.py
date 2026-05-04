@@ -4,15 +4,30 @@ import os.path as op
 import pandas as pd
 import numpy as np
 
-def load_garcia2022(task='magnitude', remove_non_responses=True):
+def load_garcia2022(task='magnitude', remove_non_responses=True, min_rt=0.15,
+                    max_rt=None):
     """Return behavioral data from Barreto Garcia et al. (2022) as a multi-indexed DataFrame.
+
+    For the magnitude task, the raw CSV stores ``rt`` in milliseconds with
+    ``-1`` as a non-response sentinel. This loader converts ``rt`` to seconds
+    and (when ``remove_non_responses=True``) drops trials with ``rt <= 0`` so
+    the column is directly consumable by DDM models. Implausibly fast trials
+    (RT < 150 ms by default) are also dropped — these are typically motor
+    anticipations / fast guesses that distort DDM non-decision-time estimates.
 
     Parameters
     ----------
     task : {'magnitude', 'risk'}
         Which task dataset to load.
     remove_non_responses : bool
-        If True, drop trials with missing choices and cast the ``choice`` column to bool.
+        If True, drop trials with missing choices (and, for magnitude, with
+        ``rt <= 0`` or RTs outside ``[min_rt, max_rt]``) and cast ``choice``
+        to bool.
+    min_rt : float
+        Minimum RT in seconds (default 0.15). Trials faster than this are
+        dropped. Set to ``0`` to disable.
+    max_rt : float or None
+        Maximum RT in seconds. If None (default), no upper cut.
     """
 
     if task == 'magnitude':
@@ -23,11 +38,19 @@ def load_garcia2022(task='magnitude', remove_non_responses=True):
     with (files(__package__) / f'../data/{fn}').open('rb') as f:
         df = pd.read_csv(f, index_col=[0, 1, 2, 3])
 
+    if 'rt' in df.columns:
+        if remove_non_responses:
+            df = df[df['rt'] > 0]
+        df['rt'] = df['rt'] / 1000.0  # ms -> s
+        if remove_non_responses:
+            if min_rt is not None and min_rt > 0:
+                df = df[df['rt'] >= min_rt]
+            if max_rt is not None:
+                df = df[df['rt'] <= max_rt]
+
     if remove_non_responses:
         df = df[~df['choice'].isnull()]
         df['choice'] = df['choice'].astype(bool)
-    # df['log(n2/n1)'] = np.log(df['n2'] / df['n1'])
-    # df['trial_nr'] = df.groupby(['subject'], group_keys=False).apply(lambda d: pd.Series(np.arange(len(d))+1, index=d.index))
     return df
 
 

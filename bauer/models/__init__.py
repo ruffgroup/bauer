@@ -17,9 +17,17 @@ from .risky_choice import (
     FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
     ExpectedUtilityRiskModel, ExpectedUtilityRiskRegressionModel,
     PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
-    PowerLawEncodingRiskModel, PowerLawEncodingRiskRegressionModel,
     SafeVsRiskyModel, SafeVsRiskyRegressionModel,
     SafeVsRiskyMemoryModel, JointSafeVsRiskyModel,
     SafeVsRiskyFlexibleNoiseModel,
     AffineNoiseRiskModel,
 )
+
+try:
+    from .ddm import (
+        DDMMixin,
+        DDMMagnitudeComparisonModel,
+        DDMFlexibleNoiseComparisonModel,
+    )
+except ImportError:
+    pass
