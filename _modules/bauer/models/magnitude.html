@@ -248,7 +248,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">seaborn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sns</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="kn">import</span> <span class="n">hdi</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">patsy</span><span class="w"> </span><span class="kn">import</span> <span class="n">dmatrix</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">patsy</span><span class="w"> </span><span class="kn">import</span> <span class="n">dmatrix</span><span class="p">,</span> <span class="n">build_design_matrices</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">warnings</span><span class="w"> </span><span class="kn">import</span> <span class="n">warn</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">..core</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">LapseModel</span><span class="p">,</span> <span class="n">RegressionModel</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">..utils.bayes</span><span class="w"> </span><span class="kn">import</span> <span class="n">cumulative_normal</span><span class="p">,</span> <span class="n">get_posterior</span><span class="p">,</span> <span class="n">get_diff_dist</span>
@@ -442,6 +442,68 @@
 
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">paradigm</span><span class="p">)</span>
 
+        <span class="c1"># Build spline design_info ONCE, at construction time, anchored to the</span>
+        <span class="c1"># paradigm columns. Every later call to make_dm reuses this design_info,</span>
+        <span class="c1"># so the knot positions are fully determined by the paradigm given at</span>
+        <span class="c1"># construction and don&#39;t depend on what x is passed to make_dm later.</span>
+        <span class="c1"># This rules out the silent-misuse mode where the spline coefficients</span>
+        <span class="c1"># were fit with one set of knots and then evaluated against a different</span>
+        <span class="c1"># set. Knot ranges and per-variable polynomial_order are recorded here</span>
+        <span class="c1"># for transparency.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dm_design_infos</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">paradigm</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_initialize_design_infos</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_spline_x_for</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">variable</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Which paradigm column anchors the basis for a given spline variable.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">variable</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;memory_noise_sd&#39;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+        <span class="k">if</span> <span class="n">variable</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;perceptual_noise_sd&#39;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+        <span class="k">if</span> <span class="n">variable</span> <span class="o">==</span> <span class="s1">&#39;evidence_sd&#39;</span><span class="p">:</span>
+            <span class="c1"># Single shared spline: anchor to both columns combined.</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+                                   <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">])</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown spline variable </span><span class="si">{</span><span class="n">variable</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_polynomial_order_for</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">variable</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">polynomial_order</span>
+        <span class="k">if</span> <span class="n">variable</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;perceptual_noise_sd&#39;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">polynomial_order</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">variable</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;memory_noise_sd&#39;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">polynomial_order</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown spline variable </span><span class="si">{</span><span class="n">variable</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_initialize_design_infos</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Eagerly build and cache spline design_info for each variable this</span>
+<span class="sd">        model will use, anchored to the paradigm columns.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s1">&#39;independent&#39;</span><span class="p">:</span>
+                <span class="n">variables</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s1">&#39;shared_perceptual_noise&#39;</span><span class="p">:</span>
+                <span class="n">variables</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;memory_noise_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;perceptual_noise_sd&#39;</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unknown memory_model </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span><span class="si">!r}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">variables</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;evidence_sd&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">variable</span> <span class="ow">in</span> <span class="n">variables</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_build_and_cache_design_info</span><span class="p">(</span><span class="n">variable</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_and_cache_design_info</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">variable</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_spline_x_for</span><span class="p">(</span><span class="n">variable</span><span class="p">)</span>
+        <span class="n">polynomial_order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_polynomial_order_for</span><span class="p">(</span><span class="n">variable</span><span class="p">)</span>
+        <span class="n">min_n</span><span class="p">,</span> <span class="n">max_n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">polynomial_order</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">formula</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s2">&quot;bs(x, degree=3, df=</span><span class="si">{</span><span class="n">polynomial_order</span><span class="si">}</span><span class="s2">, &quot;</span>
+                       <span class="sa">f</span><span class="s2">&quot;include_intercept=True, lower_bound=</span><span class="si">{</span><span class="n">min_n</span><span class="si">}</span><span class="s2">, &quot;</span>
+                       <span class="sa">f</span><span class="s2">&quot;upper_bound=</span><span class="si">{</span><span class="n">max_n</span><span class="si">}</span><span class="s2">) - 1&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">formula</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s2">&quot;bs(x, degree=0, df=0, include_intercept=False, &quot;</span>
+                       <span class="sa">f</span><span class="s2">&quot;lower_bound=</span><span class="si">{</span><span class="n">min_n</span><span class="si">}</span><span class="s2">, upper_bound=</span><span class="si">{</span><span class="n">max_n</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+        <span class="n">dm</span> <span class="o">=</span> <span class="n">dmatrix</span><span class="p">(</span><span class="n">formula</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">x</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dm_design_infos</span><span class="p">[</span><span class="n">variable</span><span class="p">]</span> <span class="o">=</span> <span class="n">dm</span><span class="o">.</span><span class="n">design_info</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">build_estimation_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coords</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_p_choice</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 
         <span class="n">coords</span> <span class="o">=</span> <span class="p">{}</span>
@@ -464,8 +526,10 @@
         <span class="n">model_inputs</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_prior</span><span class="p">:</span>
-            <span class="n">prior_mu</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;prior_mu&#39;</span><span class="p">]</span>
-            <span class="n">prior_sd</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span>
+            <span class="c1"># Use trialwise variables (expanded per subject) so per-trial shapes</span>
+            <span class="c1"># broadcast correctly with model[&#39;n1&#39;]/model[&#39;n2&#39;].</span>
+            <span class="n">prior_mu</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_mu&#39;</span><span class="p">]</span>
+            <span class="n">prior_sd</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">prior_mu</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
             <span class="n">prior_sd</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
@@ -537,51 +601,66 @@
         <span class="k">return</span> <span class="n">key1</span><span class="p">,</span> <span class="n">key2</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_trialwise_evidence_sd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Evaluate per-trial spline noise at the n1/n2 of the *current* model</span>
+<span class="sd">        (i.e. of whatever paradigm was passed to build_estimation_model or</span>
+<span class="sd">        build_prediction_model), NOT of ``self.paradigm`` (the training paradigm).</span>
 
+<span class="sd">        The spline knots themselves are still anchored to ``self.paradigm`` via</span>
+<span class="sd">        the cached design_info, so the basis is fixed; only the evaluation</span>
+<span class="sd">        points change with the active paradigm. This is what allows the same</span>
+<span class="sd">        model object to be evaluated on out-of-sample paradigms, and is also</span>
+<span class="sd">        what was buggy before — the dm was pinned to the training paradigm&#39;s</span>
+<span class="sd">        n column, which mismatched ``parameters`` (per-trial via the active</span>
+<span class="sd">        paradigm&#39;s subject_ix) any time the active paradigm differed from the</span>
+<span class="sd">        training one (or even silently produced row-misaligned values when</span>
+<span class="sd">        shapes happened to match).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">model</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span>
+        <span class="c1"># Read the current paradigm&#39;s stimulus columns directly from the model&#39;s</span>
+        <span class="c1"># SharedVariables (set via pm.Data in set_paradigm).</span>
+        <span class="n">current_n1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get_value</span><span class="p">())</span>
+        <span class="n">current_n2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">get_value</span><span class="p">())</span>
 
         <span class="n">key1</span><span class="p">,</span> <span class="n">key2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_evidence_sd_labels</span><span class="p">()</span>
         <span class="n">labels1</span><span class="p">,</span> <span class="n">labels2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_evidence_sd_spline_par_labels</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s1">&#39;independent&#39;</span><span class="p">:</span>
-                <span class="n">dm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_dm</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="n">variable</span><span class="o">=</span><span class="n">key1</span><span class="p">)</span>
+                <span class="n">dm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_dm</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">current_n1</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="n">key1</span><span class="p">)</span>
                 <span class="n">spline_pars</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">parameters</span><span class="p">[</span><span class="n">l1</span><span class="p">]</span> <span class="k">for</span> <span class="n">l1</span> <span class="ow">in</span> <span class="n">labels1</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
             <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s1">&#39;shared_perceptual_noise&#39;</span><span class="p">:</span>
-                <span class="n">dm1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_dm</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="n">variable</span><span class="o">=</span><span class="n">key1</span><span class="p">)</span>
+                <span class="n">dm1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_dm</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">current_n1</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="n">key1</span><span class="p">)</span>
                 <span class="n">spline_pars1</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">parameters</span><span class="p">[</span><span class="n">l1</span><span class="p">]</span> <span class="k">for</span> <span class="n">l1</span> <span class="ow">in</span> <span class="n">labels1</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-                <span class="n">dm2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_dm</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="n">variable</span><span class="o">=</span><span class="n">key2</span><span class="p">)</span>
+                <span class="n">dm2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_dm</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">current_n1</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="n">key2</span><span class="p">)</span>
                 <span class="n">spline_pars2</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">parameters</span><span class="p">[</span><span class="n">l2</span><span class="p">]</span> <span class="k">for</span> <span class="n">l2</span> <span class="ow">in</span> <span class="n">labels2</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
                 <span class="k">return</span> <span class="n">pt</span><span class="o">.</span><span class="n">softplus</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">spline_pars1</span> <span class="o">*</span> <span class="n">dm1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">pt</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">spline_pars2</span> <span class="o">*</span> <span class="n">dm2</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
 
         <span class="k">elif</span> <span class="n">key</span> <span class="o">==</span> <span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">:</span>
-            <span class="n">dm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_dm</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">],</span> <span class="n">variable</span><span class="o">=</span><span class="n">key2</span><span class="p">)</span>
+            <span class="n">dm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_dm</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">current_n2</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="n">key2</span><span class="p">)</span>
             <span class="n">spline_pars</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">parameters</span><span class="p">[</span><span class="n">l2</span><span class="p">]</span> <span class="k">for</span> <span class="n">l2</span> <span class="ow">in</span> <span class="n">labels2</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">pt</span><span class="o">.</span><span class="n">softplus</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">spline_pars</span> <span class="o">*</span> <span class="n">dm</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
 
+<div class="viewcode-block" id="FlexibleNoiseComparisonModel.make_dm">
+<a class="viewcode-back" href="../../../api_reference.html#bauer.models.FlexibleNoiseComparisonModel.make_dm">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">make_dm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Evaluate the spline basis at ``x`` using the design_info that was</span>
+<span class="sd">        fixed at construction time (anchored to the paradigm column for this</span>
+<span class="sd">        variable). Knot positions DO NOT depend on ``x`` — they were determined</span>
+<span class="sd">        once when the model was instantiated. Pass any x array (training data,</span>
+<span class="sd">        a linspace for plotting, a few selected points for tabulation) and</span>
+<span class="sd">        you&#39;ll get the basis evaluated against the same fixed knots.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">variable</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dm_design_infos</span><span class="p">:</span>
+            <span class="c1"># Defensive fallback: paradigm-anchored init may not have run if the</span>
+            <span class="c1"># subclass set up state in an unusual order. Build now from the</span>
+            <span class="c1"># paradigm column.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_build_and_cache_design_info</span><span class="p">(</span><span class="n">variable</span><span class="p">)</span>
+        <span class="n">dm</span> <span class="o">=</span> <span class="n">build_design_matrices</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">_dm_design_infos</span><span class="p">[</span><span class="n">variable</span><span class="p">]],</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">x</span><span class="p">})[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dm</span><span class="p">)</span></div>
 
-        <span class="n">min_n</span><span class="p">,</span> <span class="n">max_n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">variable</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;perceptual_noise_sd&#39;</span><span class="p">]:</span>
-                <span class="n">polynomial_order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">polynomial_order</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-            <span class="k">elif</span> <span class="n">variable</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;memory_noise_sd&#39;</span><span class="p">]:</span>
-                <span class="n">polynomial_order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">polynomial_order</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">polynomial_order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">polynomial_order</span>
-
-        <span class="k">if</span> <span class="n">polynomial_order</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="n">dm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dmatrix</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;bs(x, degree=3, df=</span><span class="si">{</span><span class="n">polynomial_order</span><span class="si">}</span><span class="s2">, include_intercept=True, lower_bound=</span><span class="si">{</span><span class="n">min_n</span><span class="si">}</span><span class="s2">, upper_bound=</span><span class="si">{</span><span class="n">max_n</span><span class="si">}</span><span class="s2">) - 1&quot;</span><span class="p">,</span>
-                            <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">x</span><span class="p">}))</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">dm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dmatrix</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;bs(x, degree=0, df=0, include_intercept=False, lower_bound=</span><span class="si">{</span><span class="n">min_n</span><span class="si">}</span><span class="s2">, upper_bound=</span><span class="si">{</span><span class="n">max_n</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">,</span>
-                            <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">x</span><span class="p">}))</span>
-
-        <span class="k">return</span> <span class="n">dm</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_sd_curve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idata</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pars</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 

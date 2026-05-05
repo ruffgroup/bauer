@@ -393,6 +393,17 @@ function of log-magnitude, allowing the noise level to vary smoothly with stimul
 </ul>
 </dd>
 </dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="bauer.models.FlexibleNoiseComparisonModel.make_dm">
+<span class="sig-name descname"><span class="pre">make_dm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variable</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'n1_evidence_sd'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/magnitude.html#FlexibleNoiseComparisonModel.make_dm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.FlexibleNoiseComparisonModel.make_dm" title="Link to this definition">¶</a></dt>
+<dd><p>Evaluate the spline basis at <code class="docutils literal notranslate"><span class="pre">x</span></code> using the design_info that was
+fixed at construction time (anchored to the paradigm column for this
+variable). Knot positions DO NOT depend on <code class="docutils literal notranslate"><span class="pre">x</span></code> — they were determined
+once when the model was instantiated. Pass any x array (training data,
+a linspace for plotting, a few selected points for tabulation) and
+you’ll get the basis evaluated against the same fixed knots.</p>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="py class">
@@ -774,7 +785,10 @@ draw a dashed horizontal line at the group-mean posterior mean.</p></li>
 <li><a class="reference internal" href="#bauer.models.MagnitudeComparisonLapseModel"><code class="docutils literal notranslate"><span class="pre">MagnitudeComparisonLapseModel</span></code></a></li>
 <li><a class="reference internal" href="#bauer.models.MagnitudeComparisonRegressionModel"><code class="docutils literal notranslate"><span class="pre">MagnitudeComparisonRegressionModel</span></code></a></li>
 <li><a class="reference internal" href="#bauer.models.MagnitudeComparisonLapseRegressionModel"><code class="docutils literal notranslate"><span class="pre">MagnitudeComparisonLapseRegressionModel</span></code></a></li>
-<li><a class="reference internal" href="#bauer.models.FlexibleNoiseComparisonModel"><code class="docutils literal notranslate"><span class="pre">FlexibleNoiseComparisonModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.FlexibleNoiseComparisonModel"><code class="docutils literal notranslate"><span class="pre">FlexibleNoiseComparisonModel</span></code></a><ul>
+<li><a class="reference internal" href="#bauer.models.FlexibleNoiseComparisonModel.make_dm"><code class="docutils literal notranslate"><span class="pre">FlexibleNoiseComparisonModel.make_dm()</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#bauer.models.FlexibleNoiseComparisonRegressionModel"><code class="docutils literal notranslate"><span class="pre">FlexibleNoiseComparisonRegressionModel</span></code></a></li>
 </ul>
 </li>
