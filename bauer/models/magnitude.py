@@ -5,7 +5,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from arviz import hdi
-from patsy import dmatrix
+from patsy import dmatrix, build_design_matrices
 from warnings import warn
 from ..core import BaseModel, LapseModel, RegressionModel
 from ..utils.bayes import cumulative_normal, get_posterior, get_diff_dist
@@ -185,6 +185,68 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         super().__init__(paradigm)
 
+        # Build spline design_info ONCE, at construction time, anchored to the
+        # paradigm columns. Every later call to make_dm reuses this design_info,
+        # so the knot positions are fully determined by the paradigm given at
+        # construction and don't depend on what x is passed to make_dm later.
+        # This rules out the silent-misuse mode where the spline coefficients
+        # were fit with one set of knots and then evaluated against a different
+        # set. Knot ranges and per-variable polynomial_order are recorded here
+        # for transparency.
+        self._dm_design_infos = {}
+        if paradigm is not None:
+            self._initialize_design_infos()
+
+    def _spline_x_for(self, variable):
+        """Which paradigm column anchors the basis for a given spline variable."""
+        if variable in ('n1_evidence_sd', 'memory_noise_sd'):
+            return self.paradigm['n1'].values
+        if variable in ('n2_evidence_sd', 'perceptual_noise_sd'):
+            return self.paradigm['n2'].values
+        if variable == 'evidence_sd':
+            # Single shared spline: anchor to both columns combined.
+            return np.concatenate([self.paradigm['n1'].values,
+                                   self.paradigm['n2'].values])
+        raise ValueError(f"Unknown spline variable {variable!r}")
+
+    def _polynomial_order_for(self, variable):
+        if not self.fit_seperate_evidence_sd:
+            return self.polynomial_order
+        if variable in ('n1_evidence_sd', 'perceptual_noise_sd'):
+            return self.polynomial_order[0]
+        if variable in ('n2_evidence_sd', 'memory_noise_sd'):
+            return self.polynomial_order[1]
+        raise ValueError(f"Unknown spline variable {variable!r}")
+
+    def _initialize_design_infos(self):
+        """Eagerly build and cache spline design_info for each variable this
+        model will use, anchored to the paradigm columns."""
+        if self.fit_seperate_evidence_sd:
+            if self.memory_model == 'independent':
+                variables = ['n1_evidence_sd', 'n2_evidence_sd']
+            elif self.memory_model == 'shared_perceptual_noise':
+                variables = ['memory_noise_sd', 'perceptual_noise_sd']
+            else:
+                raise ValueError(f'Unknown memory_model {self.memory_model!r}')
+        else:
+            variables = ['evidence_sd']
+        for variable in variables:
+            self._build_and_cache_design_info(variable)
+
+    def _build_and_cache_design_info(self, variable):
+        x = self._spline_x_for(variable)
+        polynomial_order = self._polynomial_order_for(variable)
+        min_n, max_n = self.paradigm[['n1', 'n2']].min().min(), self.paradigm[['n1', 'n2']].max().max()
+        if polynomial_order > 1:
+            formula = (f"bs(x, degree=3, df={polynomial_order}, "
+                       f"include_intercept=True, lower_bound={min_n}, "
+                       f"upper_bound={max_n}) - 1")
+        else:
+            formula = (f"bs(x, degree=0, df=0, include_intercept=False, "
+                       f"lower_bound={min_n}, upper_bound={max_n})")
+        dm = dmatrix(formula, {"x": x})
+        self._dm_design_infos[variable] = dm.design_info
+
     def build_estimation_model(self, paradigm=None, coords=None, hierarchical=True, save_p_choice=False):
 
         coords = {}
@@ -207,8 +269,10 @@ class FlexibleNoiseComparisonModel(BaseModel):
         model_inputs = {}
 
         if self.fit_prior:
-            prior_mu = model['prior_mu']
-            prior_sd = model['prior_sd']
+            # Use trialwise variables (expanded per subject) so per-trial shapes
+            # broadcast correctly with model['n1']/model['n2'].
+            prior_mu = parameters['prior_mu']
+            prior_sd = parameters['prior_sd']
         else:
             prior_mu = pt.mean(pt.stack([model['n1'], model['n2']], axis=1), 1)
             prior_sd = pt.std(pt.stack([model['n1'], model['n2']], axis=1), 1)
@@ -280,51 +344,63 @@ class FlexibleNoiseComparisonModel(BaseModel):
         return key1, key2
 
     def _get_trialwise_evidence_sd(self, key, parameters):
+        """Evaluate per-trial spline noise at the n1/n2 of the *current* model
+        (i.e. of whatever paradigm was passed to build_estimation_model or
+        build_prediction_model), NOT of ``self.paradigm`` (the training paradigm).
 
+        The spline knots themselves are still anchored to ``self.paradigm`` via
+        the cached design_info, so the basis is fixed; only the evaluation
+        points change with the active paradigm. This is what allows the same
+        model object to be evaluated on out-of-sample paradigms, and is also
+        what was buggy before — the dm was pinned to the training paradigm's
+        n column, which mismatched ``parameters`` (per-trial via the active
+        paradigm's subject_ix) any time the active paradigm differed from the
+        training one (or even silently produced row-misaligned values when
+        shapes happened to match).
+        """
         model = pm.Model.get_context()
+        # Read the current paradigm's stimulus columns directly from the model's
+        # SharedVariables (set via pm.Data in set_paradigm).
+        current_n1 = np.asarray(model['n1'].get_value())
+        current_n2 = np.asarray(model['n2'].get_value())
 
         key1, key2 = self._get_evidence_sd_labels()
         labels1, labels2 = self._get_evidence_sd_spline_par_labels()
 
         if key == 'n1_evidence_sd':
             if self.memory_model == 'independent':
-                dm = self.make_dm(x=self.paradigm['n1'], variable=key1)
+                dm = self.make_dm(x=current_n1, variable=key1)
                 spline_pars = pt.stack([parameters[l1] for l1 in labels1], axis=1)
 
             elif self.memory_model == 'shared_perceptual_noise':
-                dm1 = self.make_dm(x=self.paradigm['n1'], variable=key1)
+                dm1 = self.make_dm(x=current_n1, variable=key1)
                 spline_pars1 = pt.stack([parameters[l1] for l1 in labels1], axis=1)
-                dm2 = self.make_dm(x=self.paradigm['n1'], variable=key2)
+                dm2 = self.make_dm(x=current_n1, variable=key2)
                 spline_pars2 = pt.stack([parameters[l2] for l2 in labels2], axis=1)
 
                 return pt.softplus(pt.sum(spline_pars1 * dm1, 1) + pt.sum(spline_pars2 * dm2, 1))
 
         elif key == 'n2_evidence_sd':
-            dm = self.make_dm(x=self.paradigm['n2'], variable=key2)
+            dm = self.make_dm(x=current_n2, variable=key2)
             spline_pars = pt.stack([parameters[l2] for l2 in labels2], axis=1)
 
         return pt.softplus(pt.sum(spline_pars * dm, 1))
 
     def make_dm(self, x, variable='n1_evidence_sd'):
-
-        min_n, max_n = self.paradigm[['n1', 'n2']].min().min(), self.paradigm[['n1', 'n2']].max().max()
-
-        if self.fit_seperate_evidence_sd:
-            if variable in ['n1_evidence_sd', 'perceptual_noise_sd']:
-                polynomial_order = self.polynomial_order[0]
-            elif variable in ['n2_evidence_sd', 'memory_noise_sd']:
-                polynomial_order = self.polynomial_order[1]
-        else:
-            polynomial_order = self.polynomial_order
-
-        if polynomial_order > 1:
-            dm = np.asarray(dmatrix(f"bs(x, degree=3, df={polynomial_order}, include_intercept=True, lower_bound={min_n}, upper_bound={max_n}) - 1",
-                            {"x": x}))
-        else:
-            dm = np.asarray(dmatrix(f"bs(x, degree=0, df=0, include_intercept=False, lower_bound={min_n}, upper_bound={max_n})",
-                            {"x": x}))
-
-        return dm
+        """Evaluate the spline basis at ``x`` using the design_info that was
+        fixed at construction time (anchored to the paradigm column for this
+        variable). Knot positions DO NOT depend on ``x`` — they were determined
+        once when the model was instantiated. Pass any x array (training data,
+        a linspace for plotting, a few selected points for tabulation) and
+        you'll get the basis evaluated against the same fixed knots.
+        """
+        if variable not in self._dm_design_infos:
+            # Defensive fallback: paradigm-anchored init may not have run if the
+            # subclass set up state in an unusual order. Build now from the
+            # paradigm column.
+            self._build_and_cache_design_info(variable)
+        dm = build_design_matrices([self._dm_design_infos[variable]], {"x": x})[0]
+        return np.asarray(dm)
 
     def get_sd_curve(self, idata=None, pars=None, x=None, variable='n1_evidence_sd', group=True, hierarchical=True, data=None):
 

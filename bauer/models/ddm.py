@@ -147,6 +147,11 @@ class DDMMixin:
                     "Filter non-responses and convert RT to seconds before fitting."
                 )
             p['rt'] = rt
+            # Pre-compute the (n, 2) HSSM-format data array for the WFPT/race
+            # likelihood: column 0 = |rt|, column 1 = signed response (+1 = upper).
+            if 'choice' in paradigm.columns:
+                signed = np.where(paradigm['choice'].astype(bool).values, 1.0, -1.0)
+                p['_rt_choice_data'] = np.column_stack([np.abs(rt), signed])
         return p
 
     def build_likelihood(self, parameters, save_p_choice=False):
@@ -155,9 +160,9 @@ class DDMMixin:
                 "DDM models require hssm. Install with: pip install bauer[ddm]"
             )
         model = pm.Model.get_context()
-        if 'rt' not in [v.name for v in model.value_vars + list(model.named_vars.values())]:
+        if '_rt_choice_data' not in model.named_vars:
             raise ValueError(
-                "DDM models require an 'rt' column in the paradigm for fitting."
+                "DDM models require 'rt' and 'choice' columns in the paradigm."
             )
         model_inputs = self.get_model_inputs(parameters)
 
@@ -169,10 +174,13 @@ class DDMMixin:
         z = parameters['z']
         t0 = parameters['t0']
 
-        signed = pt.switch(model['choice'], 1.0, -1.0)
-        data = pt.stack([model['rt'], signed], axis=1)
-
-        pm.Potential('ll_ddm', logp_ddm(data, v=v, a=a, z=z, t=t0))
+        # CustomDist with the (rt, signed) data array as observed: gives clean
+        # PyMC observed-RV semantics, so pm.compute_log_likelihood works for
+        # PSIS-LOO model comparison without any post-hoc helper.
+        observed = model['_rt_choice_data'].get_value()
+        pm.CustomDist('ll', v, a, z, t0,
+                      logp=lambda value, v_, a_, z_, t_: logp_ddm(value, v_, a_, z_, t_),
+                      observed=observed)
 
     def build_prediction_model(self, paradigm, parameters):
         """Build a PyMC model that exposes per-trial drift + (a, z, t0) as

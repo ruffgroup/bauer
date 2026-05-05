@@ -96,8 +96,9 @@ def main():
     if args.skip_existing and op.exists(choice_path):
         print(f'\n=== choice-only: SKIPPED (exists at {choice_path}) ===', flush=True)
     else:
-        print('\n=== choice-only model ===', flush=True)
-        m_choice = MagnitudeComparisonModel(paradigm=df, fit_seperate_evidence_sd=True)
+        print('\n=== choice-only model (fit_prior=True) ===', flush=True)
+        m_choice = MagnitudeComparisonModel(paradigm=df, fit_seperate_evidence_sd=True,
+                                             fit_prior=True)
         m_choice.build_estimation_model(data=df, hierarchical=True)
         idata_choice = m_choice.sample(target_accept=0.9, random_seed=0, **sample_kwargs)
         _safe_to_netcdf(idata_choice, choice_path)
@@ -106,9 +107,9 @@ def main():
     if args.skip_existing and op.exists(ddm_path):
         print(f'\n=== DDM: SKIPPED (exists at {ddm_path}) ===', flush=True)
     else:
-        print('\n=== DDM model (v_scale fixed to 1) ===', flush=True)
+        print('\n=== DDM model (fit_prior=True, v_scale fixed to 1) ===', flush=True)
         m_ddm = DDMMagnitudeComparisonModel(paradigm=df, fit_seperate_evidence_sd=True,
-                                             fit_v_scale=False)
+                                             fit_v_scale=False, fit_prior=True)
         m_ddm.build_estimation_model(data=df, hierarchical=True)
         idata_ddm = m_ddm.sample(target_accept=0.95, random_seed=0, **sample_kwargs)
         _safe_to_netcdf(idata_ddm, ddm_path)

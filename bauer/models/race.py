@@ -173,12 +173,15 @@ class RaceMixin:
                     "Filter non-responses and convert RT to seconds before fitting."
                 )
             p['rt'] = rt
+            if 'choice' in paradigm.columns:
+                signed = np.where(paradigm['choice'].astype(bool).values, 1.0, -1.0)
+                p['_rt_choice_data'] = np.column_stack([np.abs(rt), signed])
         return p
 
     def build_likelihood(self, parameters, save_p_choice=False):
         model = pm.Model.get_context()
-        if 'rt' not in [v.name for v in model.value_vars + list(model.named_vars.values())]:
-            raise ValueError("Race models require an 'rt' column in the paradigm for fitting.")
+        if '_rt_choice_data' not in model.named_vars:
+            raise ValueError("Race models require 'rt' and 'choice' columns in the paradigm.")
         model_inputs = self.get_model_inputs(parameters)
 
         v1, v2, sigma1, sigma2 = self._get_drifts(model_inputs, parameters)
@@ -190,10 +193,11 @@ class RaceMixin:
 
         a = parameters['a']
         t0 = parameters['t0']
-        signed = pt.switch(model['choice'], 1.0, -1.0)
-        data = pt.stack([model['rt'], signed], axis=1)
-
-        pm.Potential('ll_race', logp_race_diffusion_2(data, v1, v2, sigma1, sigma2, a, t0))
+        observed = model['_rt_choice_data'].get_value()
+        pm.CustomDist('ll', v1, v2, sigma1, sigma2, a, t0,
+                      logp=lambda value, v1_, v2_, s1_, s2_, a_, t_:
+                          logp_race_diffusion_2(value, v1_, v2_, s1_, s2_, a_, t_),
+                      observed=observed)
 
     def build_prediction_model(self, paradigm, parameters):
         if isinstance(parameters, pd.DataFrame):
