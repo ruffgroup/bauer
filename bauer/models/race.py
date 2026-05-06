@@ -42,7 +42,7 @@ from .risky_choice import (
     RiskModel, FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
     PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
 )
-from ..utils.bayes import get_posterior
+from ..utils.bayes import get_posterior, posterior_mean_sd
 from ..utils.math import inverse_softplus_np
 
 
@@ -391,12 +391,21 @@ def _drifts_from_post_and_prior(model_inputs, parameters, advantage=True,
     posterior == evidence, and the centering baseline ``mu_p`` is set to 0
     (no privileged baseline under an improper-flat prior). The advantage
     decomposition then operates directly on the evidence values.
+
+    Within-trial diffusion noise: SD[μ_post | true V] = w · σ_e (per accumulator),
+    where w = σ²_p/(σ²_p + σ²_e). Under flat prior w=1, so σ_within = σ_e.
+    Under shrinkage, σ_within < σ_e because the posterior-mean estimate is
+    pulled toward the prior. This is the principled noise driving the race
+    accumulators (Bogacz/Drugowitsch sequential-evidence-stream view).
     """
     if flat_observer_prior:
         post_n1_mu = model_inputs['n1_evidence_mu']
         post_n2_mu = model_inputs['n2_evidence_mu']
         mu_p1 = pt.zeros_like(post_n1_mu)
         mu_p2 = pt.zeros_like(post_n2_mu)
+        # w = 1 under flat prior, so σ_within = σ_e directly.
+        sigma1 = model_inputs['n1_evidence_sd']
+        sigma2 = model_inputs['n2_evidence_sd']
     else:
         post_n1_mu, _ = get_posterior(
             model_inputs['n1_prior_mu'], model_inputs['n1_prior_sd'],
@@ -406,6 +415,10 @@ def _drifts_from_post_and_prior(model_inputs, parameters, advantage=True,
             model_inputs['n2_evidence_mu'], model_inputs['n2_evidence_sd'])
         mu_p1 = model_inputs['n1_prior_mu']
         mu_p2 = model_inputs['n2_prior_mu']
+        sigma1 = posterior_mean_sd(model_inputs['n1_prior_sd'],
+                                     model_inputs['n1_evidence_sd'])
+        sigma2 = posterior_mean_sd(model_inputs['n2_prior_sd'],
+                                     model_inputs['n2_evidence_sd'])
     if 'p1' in model_inputs and 'p2' in model_inputs:
         log_p1, log_p2 = pt.log(model_inputs['p1']), pt.log(model_inputs['p2'])
         post_n1_mu = post_n1_mu + log_p1
@@ -428,7 +441,11 @@ def _drifts_from_post_and_prior(model_inputs, parameters, advantage=True,
     # Positivity guard (Wald requires v > 0; informative w_0 prior keeps this slack).
     v1 = pt.maximum(v1, 1e-3)
     v2 = pt.maximum(v2, 1e-3)
-    return v1, v2, pt.ones_like(v1), pt.ones_like(v2)
+    # Floor the within-trial diffusion noise to avoid degenerate σ → 0
+    # (which makes the Wald likelihood pathological).
+    sigma1 = pt.maximum(sigma1, 1e-3)
+    sigma2 = pt.maximum(sigma2, 1e-3)
+    return v1, v2, sigma1, sigma2
 
 
 class RaceDiffusionFlexibleNoiseComparisonModel(RaceMixin, FlexibleNoiseComparisonModel):

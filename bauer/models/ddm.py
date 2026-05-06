@@ -32,7 +32,7 @@ from .risky_choice import (
     RiskModel, FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
     PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
 )
-from ..utils.bayes import get_posterior
+from ..utils.bayes import get_posterior, posterior_mean_sd
 from ..utils.math import inverse_softplus_np
 
 try:
@@ -454,6 +454,9 @@ def _drift_from_snr(model_inputs, v_scale=None, flat_observer_prior=False):
     if flat_observer_prior:
         post_n1_mu = model_inputs['n1_evidence_mu']
         post_n2_mu = model_inputs['n2_evidence_mu']
+        # w = 1 ⇒ SD[μ_post|V] = σ_e per accumulator; matches the legacy formula.
+        sigma1 = model_inputs['n1_evidence_sd']
+        sigma2 = model_inputs['n2_evidence_sd']
     else:
         post_n1_mu, _ = get_posterior(
             model_inputs['n1_prior_mu'], model_inputs['n1_prior_sd'],
@@ -463,10 +466,18 @@ def _drift_from_snr(model_inputs, v_scale=None, flat_observer_prior=False):
             model_inputs['n2_prior_mu'], model_inputs['n2_prior_sd'],
             model_inputs['n2_evidence_mu'], model_inputs['n2_evidence_sd'],
         )
+        # SD[μ_post|V] = w·σ_e per accumulator. Under shrinkage prior, w<1 so
+        # diff_sd shrinks vs the legacy "raw evidence_sd" formula. This is the
+        # principled DDM diffusion noise — it tracks how variable the
+        # posterior-mean signal feeding the accumulator actually is, given a
+        # fixed true V.
+        sigma1 = posterior_mean_sd(model_inputs['n1_prior_sd'],
+                                     model_inputs['n1_evidence_sd'])
+        sigma2 = posterior_mean_sd(model_inputs['n2_prior_sd'],
+                                     model_inputs['n2_evidence_sd'])
     threshold = model_inputs.get('threshold', 0.0)
     diff_mu = (post_n2_mu - post_n1_mu) + threshold
-    diff_sd = pt.sqrt(model_inputs['n1_evidence_sd'] ** 2 +
-                      model_inputs['n2_evidence_sd'] ** 2)
+    diff_sd = pt.sqrt(sigma1 ** 2 + sigma2 ** 2)
     v = diff_mu / diff_sd
     if v_scale is not None:
         v = v_scale * v
