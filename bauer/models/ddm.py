@@ -484,21 +484,17 @@ class DDMMagnitudeComparisonModel(DDMMixin, MagnitudeComparisonModel):
         fixing one removes a degeneracy that bloats posterior intervals.
     """
 
-    def __init__(self, paradigm=None, fit_prior=False,
-                 fit_seperate_evidence_sd=True, memory_model='independent',
-                 save_trialwise_n_estimates=False, fit_v_scale=False,
-                 fix_z=True):
+    def __init__(self, paradigm=None, fit_v_scale=False, fix_z=True, **kwargs):
+        # Forward all cognitive-front-end kwargs (fit_prior, memory_model,
+        # flat_observer_prior, etc.) to MagnitudeComparisonModel via super().
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
-        super().__init__(paradigm=paradigm, fit_prior=fit_prior,
-                         fit_seperate_evidence_sd=fit_seperate_evidence_sd,
-                         memory_model=memory_model,
-                         save_trialwise_n_estimates=save_trialwise_n_estimates)
+        super().__init__(paradigm=paradigm, **kwargs)
 
     def _get_drift(self, model_inputs, parameters):
         v_scale = parameters['v_scale'] if self.fit_v_scale else None
         return _drift_from_snr(model_inputs, v_scale=v_scale,
-                               flat_observer_prior=self.flat_observer_prior)
+                               flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
@@ -538,7 +534,7 @@ class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
     def _get_drift(self, model_inputs, parameters):
         v_scale = parameters['v_scale'] if self.fit_v_scale else None
         return _drift_from_snr(model_inputs, v_scale=v_scale,
-                               flat_observer_prior=self.flat_observer_prior)
+                               flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 class DDMRiskModel(DDMMixin, RiskModel):
