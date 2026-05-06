@@ -116,10 +116,13 @@ def main():
         sampler = sample_numpyro_nuts if args.backend == 'numpyro' \
                                        else sample_blackjax_nuts
         with m.estimation_model:
+            nuts_kwargs = dict(getattr(m, 'recommended_nuts_kwargs', {}))
+            print(f'  nuts_kwargs: {nuts_kwargs or "(numpyro defaults)"}', flush=True)
             idata = sampler(
                 draws=args.draws, tune=args.tune, chains=args.chains,
                 target_accept=args.target_accept, random_seed=args.seed,
                 chain_method='vectorized',
+                nuts_kwargs=nuts_kwargs or None,
                 progressbar=True,
             )
 

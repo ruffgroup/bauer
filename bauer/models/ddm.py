@@ -125,6 +125,14 @@ class DDMMixin:
     fit_v_scale = False
     fix_z = True
 
+    # Recommended numpyro NUTS kwargs for this model class. Used by
+    # bauer/scripts/fit_*.py to set dense_mass=True automatically — the DDM
+    # posterior has strong v_scale × evidence_sd × a correlations that
+    # diagonal mass cannot navigate (step-size collapses, tree-depth maxes,
+    # one chain in four reliably gets stuck). For pymc backend, the
+    # equivalent is `pm.sample(init='adapt_full')`.
+    recommended_nuts_kwargs = {'dense_mass': True}
+
     def get_free_parameters(self):
         pars = super().get_free_parameters()
         if self.fit_v_scale:

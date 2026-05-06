@@ -148,7 +148,12 @@ def main():
         sampler = sample_numpyro_nuts if args.backend == 'numpyro' \
                                        else sample_blackjax_nuts
         with m.estimation_model:
-            nuts_kwargs = {'dense_mass': True} if args.dense_mass else None
+            # Start from the model class's recommended NUTS kwargs (e.g.
+            # DDMMixin / RaceMixin set dense_mass=True) and let CLI override.
+            nuts_kwargs = dict(getattr(m, 'recommended_nuts_kwargs', {}))
+            if args.dense_mass:
+                nuts_kwargs['dense_mass'] = True
+            print(f'  nuts_kwargs: {nuts_kwargs or "(numpyro defaults)"}', flush=True)
             idata = sampler(
                 draws=args.draws, tune=args.tune, chains=args.chains,
                 target_accept=args.target_accept, random_seed=args.seed,
@@ -156,7 +161,7 @@ def main():
                 # chains run in parallel). 'parallel' would shard chains
                 # across devices and fall back to sequential on 1-device hosts.
                 chain_method=args.chain_method,
-                nuts_kwargs=nuts_kwargs,
+                nuts_kwargs=nuts_kwargs or None,
                 progressbar=True,
             )
 

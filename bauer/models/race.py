@@ -153,6 +153,11 @@ class RaceMixin:
     """
     advantage = True
 
+    # See DDMMixin.recommended_nuts_kwargs for rationale. The race model has
+    # the same multiplicative w_0 × tilde_μ structure (and w_d × tilde_diff
+    # when advantage=True), so dense mass helps for the same reasons.
+    recommended_nuts_kwargs = {'dense_mass': True}
+
     def get_free_parameters(self):
         pars = super().get_free_parameters()
         pars['w_0'] = {'mu_intercept': inverse_softplus_np(2.5),

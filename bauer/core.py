@@ -11,6 +11,14 @@ class BaseModel(object):
 
     paradigm_keys = []
 
+    # Per-model-class hints for the JAX-NUTS sampler. Subclasses with
+    # strongly-correlated posteriors (DDM/RDM) override this with
+    # ``{'dense_mass': True}``. The CLI fit scripts apply this automatically
+    # when ``--backend numpyro|blackjax`` is set, so users don't have to
+    # remember a flag for every problematic model. Empty default = use
+    # numpyro's built-in defaults (diagonal mass, etc.).
+    recommended_nuts_kwargs: dict = {}
+
     def __init__(self, paradigm, save_trialwise_n_estimates=False):
         """
         data should contain ['n1', 'n2'] and 'choice'.
