@@ -270,6 +270,38 @@
     <span class="k">return</span> <span class="n">mu2</span> <span class="o">-</span> <span class="n">mu1</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">sd1</span><span class="o">**</span><span class="mi">2</span><span class="o">+</span><span class="n">sd2</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span></div>
 
 
+
+<span class="k">def</span><span class="w"> </span><span class="nf">posterior_mean_sd</span><span class="p">(</span><span class="n">prior_sd</span><span class="p">,</span> <span class="n">evidence_sd</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;SD of the posterior mean conditional on the true latent value.</span>
+
+<span class="sd">    For a Gaussian observer with prior V ~ N(μ_p, σ_p²) and a single noisy</span>
+<span class="sd">    observation x | V ~ N(V, σ_e²), the posterior mean μ_post(x) =</span>
+<span class="sd">    σ_p²/(σ_p²+σ_e²) · x + σ_e²/(σ_p²+σ_e²) · μ_p is a linear function of x.</span>
+<span class="sd">    Treating x as random under fixed true V, the marginal SD of μ_post is::</span>
+
+<span class="sd">        SD[μ_post | true V] = w · σ_e,    where  w = σ_p² / (σ_p² + σ_e²)</span>
+
+<span class="sd">    Limits:</span>
+<span class="sd">      * Flat prior (σ_p → ∞):    w → 1 ⇒ returns ``evidence_sd`` (no shrinkage).</span>
+<span class="sd">      * Strong shrinkage (σ_p → 0): w → 0 ⇒ returns 0 (μ_post pinned to μ_p).</span>
+
+<span class="sd">    This is the principled within-trial diffusion noise for both DDM and RDM</span>
+<span class="sd">    accumulators when they integrate posterior-mean evidence over time</span>
+<span class="sd">    (Bogacz/Drugowitsch sequential-evidence-stream interpretation).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">var_p</span> <span class="o">=</span> <span class="n">prior_sd</span> <span class="o">**</span> <span class="mi">2</span>
+    <span class="n">var_e</span> <span class="o">=</span> <span class="n">evidence_sd</span> <span class="o">**</span> <span class="mi">2</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">var_p</span> <span class="o">/</span> <span class="p">(</span><span class="n">var_p</span> <span class="o">+</span> <span class="n">var_e</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">w</span> <span class="o">*</span> <span class="n">evidence_sd</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">posterior_mean_sd_np</span><span class="p">(</span><span class="n">prior_sd</span><span class="p">,</span> <span class="n">evidence_sd</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;NumPy version of :func:`posterior_mean_sd`.&quot;&quot;&quot;</span>
+    <span class="n">var_p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">prior_sd</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
+    <span class="n">var_e</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">evidence_sd</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">var_p</span> <span class="o">/</span> <span class="p">(</span><span class="n">var_p</span> <span class="o">+</span> <span class="n">var_e</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">w</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">evidence_sd</span><span class="p">)</span>
+
 <div class="viewcode-block" id="cumulative_normal">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.bayes.cumulative_normal">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">cumulative_normal</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">mu</span><span class="p">,</span> <span class="n">sd</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="n">pt</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mf">2.</span><span class="p">)):</span>
