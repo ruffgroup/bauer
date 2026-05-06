@@ -29,6 +29,7 @@ LOGFILE="$HOME/logs/${JOBNAME}_${SLURM_JOB_ID}.txt"
 mkdir -p "$(dirname "$LOGFILE")"
 exec >"$LOGFILE" 2>&1
 
+T_START=$(date +%s)
 echo "================================================================"
 echo "  job: $JOBNAME (id=$SLURM_JOB_ID) on $(hostname)"
 echo "  start: $(date)"
@@ -53,6 +54,19 @@ cd "$HOME/git/bauer"
 $PY -u -m "$MODULE" "$@"
 rc=$?
 
+T_END=$(date +%s)
+ELAPSED=$((T_END - T_START))
+H=$((ELAPSED / 3600)); M=$(((ELAPSED % 3600) / 60)); S=$((ELAPSED % 60))
 echo "================================================================"
-echo "  end: $(date)  exit=$rc"
+echo "  end:     $(date)  exit=$rc"
+printf "  elapsed: %dh %dm %ds (%d s total)\n" "$H" "$M" "$S" "$ELAPSED"
+echo "================================================================"
+
+# Also append a one-line summary to ~/logs/bauer_runtimes.tsv for easy comparison
+SUMMARY="$HOME/logs/bauer_runtimes.tsv"
+if [ ! -f "$SUMMARY" ]; then
+  echo -e "job_id\tjob_name\thost\tenv\telapsed_sec\texit\tstart\tend\tcmd" > "$SUMMARY"
+fi
+echo -e "${SLURM_JOB_ID}\t${JOBNAME}\t$(hostname)\t${ENV_NAME}\t${ELAPSED}\t${rc}\t$(date -d @${T_START} '+%F %T')\t$(date -d @${T_END} '+%F %T')\t${MODULE} $*" >> "$SUMMARY"
+
 exit $rc
