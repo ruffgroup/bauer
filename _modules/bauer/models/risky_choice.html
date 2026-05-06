@@ -1056,6 +1056,12 @@
                            <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="n">fit_seperate_evidence_sd</span><span class="p">,</span>
                            <span class="n">prior_estimate</span><span class="o">=</span><span class="n">prior_estimate</span><span class="p">,</span>
                            <span class="n">memory_model</span><span class="o">=</span><span class="n">memory_model</span><span class="p">)</span>
+        <span class="c1"># FlexibleNoiseComparisonModel.__init__ is skipped by the explicit</span>
+        <span class="c1"># RiskModel.__init__ call above (sibling in the MRO), so the spline</span>
+        <span class="c1"># design-info setup never runs. Restore it here.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dm_design_infos</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">paradigm</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_initialize_design_infos</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_model_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
 
