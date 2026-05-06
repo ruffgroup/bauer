@@ -53,16 +53,19 @@ class BaseModel(object):
         return paradigm_
 
     def _get_choice_predictions(self, model_inputs):
-        post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'], 
-                                               model_inputs['n1_prior_sd'], 
-                                               model_inputs['n1_evidence_mu'], 
-                                               model_inputs['n1_evidence_sd']
-                                               )
-
-        post_n2_mu, post_n2_sd = get_posterior(model_inputs['n2_prior_mu'],
-                                               model_inputs['n2_prior_sd'],
-                                               model_inputs['n2_evidence_mu'], 
-                                               model_inputs['n2_evidence_sd'])
+        if getattr(self, 'flat_observer_prior', False):
+            # Flat improper prior → posterior is the likelihood. No shrinkage.
+            post_n1_mu = model_inputs['n1_evidence_mu']
+            post_n2_mu = model_inputs['n2_evidence_mu']
+        else:
+            post_n1_mu, _ = get_posterior(model_inputs['n1_prior_mu'],
+                                          model_inputs['n1_prior_sd'],
+                                          model_inputs['n1_evidence_mu'],
+                                          model_inputs['n1_evidence_sd'])
+            post_n2_mu, _ = get_posterior(model_inputs['n2_prior_mu'],
+                                          model_inputs['n2_prior_sd'],
+                                          model_inputs['n2_evidence_mu'],
+                                          model_inputs['n2_evidence_sd'])
 
         diff_mu, diff_sd = get_diff_dist(post_n2_mu, model_inputs['n2_evidence_sd'], post_n1_mu, model_inputs['n1_evidence_sd'])
 
