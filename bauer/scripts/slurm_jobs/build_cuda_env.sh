@@ -28,7 +28,10 @@ echo "================================================================"
 # (sciencecluster compute nodes don't have lmod by default.)
 nvidia-smi || echo "(nvidia-smi unavailable)"
 
-. $HOME/init_conda.sh
+# Source conda.sh directly — ~/init_conda.sh emits zsh-specific hook code
+# that doesn't eval cleanly under SLURM's bash and silently exits via set -e.
+source "$HOME/data/miniforge3/etc/profile.d/conda.sh"
+conda activate base
 
 YML=$HOME/git/bauer/environment_cuda.yml
 if conda env list | awk '{print $1}' | grep -qx 'bauer_cuda'; then
