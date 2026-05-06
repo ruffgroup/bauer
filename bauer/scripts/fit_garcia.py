@@ -68,6 +68,11 @@ def main():
                      default='pymc',
                      help='Sampler backend. numpyro/blackjax run via JAX, '
                           'often 2-10x faster especially with --gres=gpu:1.')
+    ap.add_argument('--chain-method', choices=['vectorized', 'parallel', 'sequential'],
+                     default='vectorized',
+                     help='JAX-only: chain dispatch. "vectorized" vmaps all '
+                          'chains on a single device (best for 1 GPU); '
+                          '"sequential" runs one at a time (debugging).')
     ap.add_argument('--no-ppc', action='store_true',
                      help='Skip PPC computation after sampling')
     args = ap.parse_args()
@@ -145,7 +150,7 @@ def main():
                 # vectorized = vmap chains on the same device (1 GPU = all
                 # chains run in parallel). 'parallel' would shard chains
                 # across devices and fall back to sequential on 1-device hosts.
-                chain_method='vectorized',
+                chain_method=args.chain_method,
                 progressbar=True,
             )
 
