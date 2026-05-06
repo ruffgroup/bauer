@@ -36,11 +36,14 @@ echo "  env:   $ENV_NAME"
 echo "  cmd:   python -u -m $MODULE $*"
 echo "================================================================"
 
-# GPU modules only loaded when the job actually has a GPU allocation
+# GPU detection: --gres=gpu:1 sets CUDA_VISIBLE_DEVICES. Conda envs ship
+# their own CUDA runtime (jax[cuda12], tensorflow-gpu), so no `module load`
+# is needed. On CPU-only nodes, pin JAX to CPU to avoid a benign but noisy
+# "cuInit failed" warning when the CUDA plugin is bundled in the env.
 if [ -n "${SLURM_JOB_GPUS:-}" ] || [ -n "${CUDA_VISIBLE_DEVICES:-}" ]; then
-  module load gpu 2>/dev/null || true
-  module load cuda/12.2.1 2>/dev/null || true
   nvidia-smi 2>/dev/null | head -12 || true
+else
+  export JAX_PLATFORMS=cpu
 fi
 
 export PYTHONUNBUFFERED=1

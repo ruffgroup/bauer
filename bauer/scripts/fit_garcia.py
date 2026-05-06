@@ -31,7 +31,7 @@ from bauer.utils.data import load_garcia2022
 
 
 def _progress(trace, draw):  # noqa: ARG001 — pymc passes trace as kwarg
-    if draw.draw_idx % 200 == 0:
+    if draw.draw_idx % 100 == 0:
         phase = 'tune' if draw.tuning else 'draw'
         print(f'  chain {draw.chain} {phase} {draw.draw_idx}', flush=True)
 
@@ -57,8 +57,8 @@ def main():
                      help='Output directory (under cwd)')
     ap.add_argument('--draws', type=int, default=1000)
     ap.add_argument('--tune', type=int, default=1000)
-    ap.add_argument('--chains', type=int, default=2)
-    ap.add_argument('--cores', type=int, default=2)
+    ap.add_argument('--chains', type=int, default=4)
+    ap.add_argument('--cores', type=int, default=4)
     ap.add_argument('--target-accept', type=float, default=0.99)
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--no-advantage', action='store_true',
@@ -142,7 +142,7 @@ def main():
             idata = sampler(
                 draws=args.draws, tune=args.tune, chains=args.chains,
                 target_accept=args.target_accept, random_seed=args.seed,
-                progressbar=False,
+                progressbar=True,
             )
 
     # Compose output filename

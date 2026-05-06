@@ -23,8 +23,9 @@ echo "================================================================"
 echo "build started at $(date)  on $(hostname)"
 echo "================================================================"
 
-module load gpu
-module load cuda/12.2.1
+# No `module load` needed: jax[cuda12] ships its own CUDA runtime, and
+# --gres=gpu:1 sets CUDA_VISIBLE_DEVICES so the GPU is detected at import.
+# (sciencecluster compute nodes don't have lmod by default.)
 nvidia-smi || echo "(nvidia-smi unavailable)"
 
 . $HOME/init_conda.sh

@@ -28,7 +28,7 @@ from bauer.utils.data import load_dehollander_tms_risk
 
 
 def _progress(trace, draw):  # noqa: ARG001
-    if draw.draw_idx % 200 == 0:
+    if draw.draw_idx % 100 == 0:
         phase = 'tune' if draw.tuning else 'draw'
         print(f'  chain {draw.chain} {phase} {draw.draw_idx}', flush=True)
 
@@ -64,8 +64,8 @@ def main():
     ap.add_argument('--out-dir', default='results/dehollander_tms')
     ap.add_argument('--draws', type=int, default=1000)
     ap.add_argument('--tune', type=int, default=1000)
-    ap.add_argument('--chains', type=int, default=2)
-    ap.add_argument('--cores', type=int, default=2)
+    ap.add_argument('--chains', type=int, default=4)
+    ap.add_argument('--cores', type=int, default=4)
     ap.add_argument('--target-accept', type=float, default=0.99)
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--backend', choices=['pymc', 'numpyro', 'blackjax'],
@@ -137,7 +137,7 @@ def main():
             idata = sampler(
                 draws=args.draws, tune=args.tune, chains=args.chains,
                 target_accept=args.target_accept, random_seed=args.seed,
-                progressbar=False,
+                progressbar=True,
             )
 
     reg_tag = '_reg' if args.regression else ''
