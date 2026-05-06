@@ -119,6 +119,7 @@ def main():
             idata = sampler(
                 draws=args.draws, tune=args.tune, chains=args.chains,
                 target_accept=args.target_accept, random_seed=args.seed,
+                chain_method='vectorized',
                 progressbar=True,
             )
 

@@ -142,6 +142,10 @@ def main():
             idata = sampler(
                 draws=args.draws, tune=args.tune, chains=args.chains,
                 target_accept=args.target_accept, random_seed=args.seed,
+                # vectorized = vmap chains on the same device (1 GPU = all
+                # chains run in parallel). 'parallel' would shard chains
+                # across devices and fall back to sequential on 1-device hosts.
+                chain_method='vectorized',
                 progressbar=True,
             )
 
