@@ -25,6 +25,7 @@ import pymc as pm
 import pytensor.tensor as pt
 
 from .magnitude import MagnitudeComparisonModel, FlexibleNoiseComparisonModel
+from .risky_choice import RiskModel
 from ..utils.bayes import get_posterior
 from ..utils.math import inverse_softplus_np
 
@@ -116,16 +117,20 @@ class DDMMixin:
     """
 
     fit_v_scale = False
+    fix_z = True
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
         if self.fit_v_scale:
             pars['v_scale'] = {'mu_intercept': 1.0, 'sigma_intercept': 1.0,
                                'transform': 'identity'}
-        pars['a'] = {'mu_intercept': inverse_softplus_np(1.0),
-                     'sigma_intercept': 0.5, 'transform': 'softplus'}
-        pars['z'] = {'mu_intercept': 0.0, 'sigma_intercept': 0.5,
-                     'transform': 'logistic'}
+        # Hard lower bound on `a` to block the a→0 collapse mode. With
+        # min_value=0.3 and mu_intercept=0, softplus(0)=0.69 → a ≈ 0.99.
+        pars['a'] = {'mu_intercept': 0.0, 'sigma_intercept': 0.5,
+                     'transform': 'softplus', 'min_value': 0.3}
+        if not self.fix_z:
+            pars['z'] = {'mu_intercept': 0.0, 'sigma_intercept': 0.5,
+                         'transform': 'logistic'}
         pars['t0'] = {'mu_intercept': inverse_softplus_np(0.2),
                       'sigma_intercept': 0.5, 'transform': 'softplus'}
         return pars
@@ -171,7 +176,7 @@ class DDMMixin:
             pm.Deterministic('drift', v)
 
         a = parameters['a']
-        z = parameters['z']
+        z = pt.constant(0.5) if self.fix_z else parameters['z']
         t0 = parameters['t0']
 
         # CustomDist with the (rt, signed) data array as observed: gives clean
@@ -209,7 +214,8 @@ class DDMMixin:
             pm.Deterministic('drift', v)
             # Also expose (a, z, t0) tiled to per-trial shape for simulate.
             pm.Deterministic('a_t', params['a'])
-            pm.Deterministic('z_t', params['z'])
+            z_per_trial = pt.full_like(v, 0.5) if self.fix_z else params['z']
+            pm.Deterministic('z_t', z_per_trial)
             pm.Deterministic('t0_t', params['t0'])
 
     def build_loglik_model(self, paradigm, parameters):
@@ -227,7 +233,8 @@ class DDMMixin:
             params = self.get_parameter_values()
             model_inputs = self.get_model_inputs(params)
             v = self._get_drift(model_inputs, params)
-            a, z, t0 = params['a'], params['z'], params['t0']
+            a, t0 = params['a'], params['t0']
+            z = pt.constant(0.5) if self.fix_z else params['z']
             mc = pm.Model.get_context()
             signed = pt.switch(mc['choice'], 1.0, -1.0)
             data = pt.stack([mc['rt'], signed], axis=1)
@@ -414,10 +421,14 @@ class DDMMixin:
 
 
 def _drift_from_snr(model_inputs, v_scale=None):
-    """Drift = (post_n2_mu - post_n1_mu) / sqrt(sd1^2 + sd2^2). Scales by v_scale if given.
+    """Drift = ((post_n2_mu - post_n1_mu) + threshold) / sqrt(sd1^2 + sd2^2).
 
     Shared by every DDM model whose cognitive front-end produces the standard
     ``n{1,2}_prior_mu/sd`` and ``n{1,2}_evidence_mu/sd`` keys in model_inputs.
+    For magnitude-comparison front-ends, ``threshold = 0`` (set by the model's
+    ``get_model_inputs``) so the formula reduces to plain SNR. For
+    :class:`RiskModel`-based front-ends, ``threshold = log(p2/p1)`` so drift
+    carries the EU comparison directly.
     """
     post_n1_mu, _ = get_posterior(
         model_inputs['n1_prior_mu'], model_inputs['n1_prior_sd'],
@@ -427,7 +438,8 @@ def _drift_from_snr(model_inputs, v_scale=None):
         model_inputs['n2_prior_mu'], model_inputs['n2_prior_sd'],
         model_inputs['n2_evidence_mu'], model_inputs['n2_evidence_sd'],
     )
-    diff_mu = post_n2_mu - post_n1_mu
+    threshold = model_inputs.get('threshold', 0.0)
+    diff_mu = (post_n2_mu - post_n1_mu) + threshold
     diff_sd = pt.sqrt(model_inputs['n1_evidence_sd'] ** 2 +
                       model_inputs['n2_evidence_sd'] ** 2)
     v = diff_mu / diff_sd
@@ -460,8 +472,10 @@ class DDMMagnitudeComparisonModel(DDMMixin, MagnitudeComparisonModel):
 
     def __init__(self, paradigm=None, fit_prior=False,
                  fit_seperate_evidence_sd=True, memory_model='independent',
-                 save_trialwise_n_estimates=False, fit_v_scale=False):
+                 save_trialwise_n_estimates=False, fit_v_scale=False,
+                 fix_z=True):
         self.fit_v_scale = fit_v_scale
+        self.fix_z = fix_z
         super().__init__(paradigm=paradigm, fit_prior=fit_prior,
                          fit_seperate_evidence_sd=fit_seperate_evidence_sd,
                          memory_model=memory_model,
@@ -493,13 +507,54 @@ class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
 
     def __init__(self, paradigm, fit_seperate_evidence_sd=True,
                  fit_prior=False, polynomial_order=5,
-                 memory_model='independent', fit_v_scale=False):
+                 memory_model='independent', fit_v_scale=False,
+                 fix_z=True):
         self.fit_v_scale = fit_v_scale
+        self.fix_z = fix_z
         FlexibleNoiseComparisonModel.__init__(
             self, paradigm,
             fit_seperate_evidence_sd=fit_seperate_evidence_sd,
             fit_prior=fit_prior,
             polynomial_order=polynomial_order,
+            memory_model=memory_model,
+        )
+
+    def _get_drift(self, model_inputs, parameters):
+        v_scale = parameters['v_scale'] if self.fit_v_scale else None
+        return _drift_from_snr(model_inputs, v_scale=v_scale)
+
+
+class DDMRiskModel(DDMMixin, RiskModel):
+    """DDM variant of :class:`RiskModel` for risky-choice tasks.
+
+    Drift is the SNR of the perceived log-EU difference:
+
+        v = v_scale * ((post_log_n_2 - post_log_n_1) + log(p_2/p_1)) / sqrt(sd_1^2 + sd_2^2)
+
+    Equivalently, with ``threshold = log(p_2/p_1)`` carried through from
+    ``RiskModel.get_model_inputs``, this is just :func:`_drift_from_snr` —
+    probabilities enter as a deterministic shift of the perceived
+    log-magnitude difference. The Bayesian observer infers ``log(n_k)`` only;
+    probabilities are observed precisely. Positive drift drives the upper
+    boundary, which corresponds to ``choice=True`` (option 2 chosen).
+
+    Paradigm columns required: ``n1``, ``n2``, ``p1``, ``p2``, ``choice`` (bool),
+    ``rt`` (seconds).
+
+    Parameters forwarded to :class:`RiskModel`. ``fit_v_scale`` and ``fix_z``
+    follow the same conventions as :class:`DDMMagnitudeComparisonModel`.
+    """
+
+    def __init__(self, paradigm=None, prior_estimate='objective',
+                 fit_seperate_evidence_sd=True,
+                 save_trialwise_n_estimates=False, memory_model='independent',
+                 fit_v_scale=False, fix_z=True):
+        self.fit_v_scale = fit_v_scale
+        self.fix_z = fix_z
+        super().__init__(
+            paradigm=paradigm, prior_estimate=prior_estimate,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
         )
 

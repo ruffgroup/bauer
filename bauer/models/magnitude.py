@@ -33,9 +33,17 @@ class MagnitudeComparisonModel(BaseModel):
         ``'shared_perceptual_noise'`` decomposes into perceptual and memory noise.
     """
 
-    def __init__(self, paradigm=None, fit_prior=False, fit_seperate_evidence_sd=True, memory_model = 'independent',save_trialwise_n_estimates=False):
+    def __init__(self, paradigm=None, fit_prior=False, fit_seperate_evidence_sd=True,
+                 memory_model='independent', save_trialwise_n_estimates=False,
+                 fit_prior_mu_only=False):
 
+        # fit_prior_mu_only=True implies fit_prior=True and pins σ_p at empirical
+        # std(log n). Useful for the unit-σ RDM where σ_p is otherwise unidentified
+        # (see notes/race_diffusion_math.md §8e and the discussion in core.py).
+        if fit_prior_mu_only:
+            fit_prior = True
         self.fit_prior = fit_prior
+        self.fit_prior_mu_only = fit_prior_mu_only
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
         self.memory_model = memory_model
 
@@ -50,8 +58,14 @@ class MagnitudeComparisonModel(BaseModel):
         if self.fit_prior:
             model_inputs['n1_prior_mu'] = parameters['prior_mu']
             model_inputs['n2_prior_mu'] = parameters['prior_mu']
-            model_inputs['n1_prior_sd'] = parameters['prior_sd']
-            model_inputs['n2_prior_sd'] = parameters['prior_sd']
+            if self.fit_prior_mu_only:
+                empirical_sd = (pt.std(pt.log(model['n1'])) +
+                                pt.std(pt.log(model['n2']))) / 2.
+                model_inputs['n1_prior_sd'] = empirical_sd
+                model_inputs['n2_prior_sd'] = empirical_sd
+            else:
+                model_inputs['n1_prior_sd'] = parameters['prior_sd']
+                model_inputs['n2_prior_sd'] = parameters['prior_sd']
 
         else:
             mean_prior = (pt.mean(pt.log(model['n1'])) + pt.mean(pt.log(model['n2']))) / 2.
@@ -107,7 +121,8 @@ class MagnitudeComparisonModel(BaseModel):
             objective_sd = np.std(log_ns)
 
             free_parameters['prior_mu'] = {'mu_intercept': objective_mu, 'transform': 'identity'}
-            free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
+            if not self.fit_prior_mu_only:
+                free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
 
         return free_parameters
 
@@ -168,9 +183,13 @@ class FlexibleNoiseComparisonModel(BaseModel):
     def __init__(self, paradigm, fit_seperate_evidence_sd=True,
                  fit_prior=False,
                  polynomial_order=5,
-                 memory_model='independent'):
+                 memory_model='independent',
+                 fit_prior_mu_only=False):
 
+        if fit_prior_mu_only:
+            fit_prior = True
         self.fit_prior = fit_prior
+        self.fit_prior_mu_only = fit_prior_mu_only
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
 
         if ~fit_seperate_evidence_sd and (memory_model != 'independent'):
@@ -272,8 +291,19 @@ class FlexibleNoiseComparisonModel(BaseModel):
             # Use trialwise variables (expanded per subject) so per-trial shapes
             # broadcast correctly with model['n1']/model['n2'].
             prior_mu = parameters['prior_mu']
-            prior_sd = parameters['prior_sd']
+            if self.fit_prior_mu_only:
+                # σ_p pinned at the global empirical std of the stimuli in this
+                # paradigm (across all trials, both n1 and n2 columns combined).
+                # NB: in natural-magnitude space — the flex model represents
+                # evidence in natural n, not log n. This is inconsistent with
+                # the static MagnitudeComparisonModel (log space); kept here to
+                # match the rest of the flex model. TODO: harmonize.
+                prior_sd = (pt.std(model['n1']) + pt.std(model['n2'])) / 2.
+            else:
+                prior_sd = parameters['prior_sd']
         else:
+            # NB: this branch is per-trial std of the (n1, n2) pair — preserved
+            # for backwards compatibility, but probably also wrong (TODO).
             prior_mu = pt.mean(pt.stack([model['n1'], model['n2']], axis=1), 1)
             prior_sd = pt.std(pt.stack([model['n1'], model['n2']], axis=1), 1)
 
@@ -319,7 +349,8 @@ class FlexibleNoiseComparisonModel(BaseModel):
                 objective_sd = 2
 
             free_parameters['prior_mu'] = {'mu_intercept': objective_mu, 'transform': 'identity'}
-            free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
+            if not self.fit_prior_mu_only:
+                free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
 
         return free_parameters
 

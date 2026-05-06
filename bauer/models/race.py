@@ -1,27 +1,32 @@
-"""Racing diffusion model (RDM) variants of bauer's choice models.
+"""Generalized Bayesian race-diffusion (RDM) variants of bauer's choice models.
 
-Each stimulus drives its own Wiener accumulator racing to a common threshold.
-The first-passage time of accumulator k with drift v_k and noise sigma_k to
-barrier a is inverse Gaussian with mean a/v_k and shape a^2/sigma_k^2 — fully
-analytical, no LANs needed. Likelihood combines the winner's IG density with
-the survival functions of the losing accumulators. Standard reference is the
-"racing diffusion model" of Tillman, Van Zandt & Logan (2020).
+Each stimulus drives its own Wiener accumulator with drift
 
-Cognitive interpretation: each accumulator k integrates noisy evidence about
-its corresponding stimulus n_k. Drift = log(n_k) (stimulus-driven), diffusion
-noise = the *encoding* SD per stimulus (``n_k_evidence_sd``, i.e. nu_k in the
-Khaw, Li & Woodford 2020 framework). Encoding noise can differ per accumulator
-(e.g. n1 carries memory noise added on top of perceptual noise), so the two
-accumulators race with different first-passage distributions. The Khaw-Woodford
-prior is *not* applied to drift here — applying it would make drifts collapse
-toward the prior mean for tight priors and discard discriminative information
-that's actually present in the encoding samples.
+    μ_i = w_0 + w_d·(tilde_i - tilde_j) + w_s·(tilde_i + tilde_j)
+                                          (default, ``advantage=True``;
+                                           van Ravenzwaaij 2020)
+    μ_i = w_0 + (μ_post,i - μ_p)          (ablation, ``advantage=False``)
 
-Predicts the size effect: larger n_k → larger drift on both accumulators →
-faster RTs regardless of which one wins.
+racing to a common threshold ``a`` with diffusion noise σ = 1. The first-
+passage time per accumulator is inverse Gaussian (analytical, no LANs).
+Likelihood combines the winner's IG density with the losers' survival
+functions. Reference: Tillman, Van Zandt & Logan (2020).
 
-HSSM convention for ``data``: column 0 = |rt|, column 1 = signed response
-(+1 = accumulator 2 wins / choice = True, -1 = accumulator 1 wins).
+Conceptual reading (sequential evidence stream):
+    The within-trial Wiener noise σ *is* the per-unit-time sensory noise; the
+    accumulator state at time t is the agent's running estimate of log s_i
+    given evidence so far. Across-trial drift variability is **not** a
+    separate parameter — sensory uncertainty is fully expressed through the
+    within-trial diffusion. Adding s_v on top would double-count.
+    See Bogacz et al. (2006), Drugowitsch et al. (2012).
+
+Magnitude effect on RT (faster RTs at larger stakes) emerges from the Bayesian
+front-end (larger μ_post → larger drift → faster race) without any explicit
+RT-magnitude parameter — its curvature is determined by σ_sens and σ_p, both
+already constrained by the choice data.
+
+HSSM convention for the observed array: column 0 = |rt|, column 1 = signed
+response (+1 = accumulator 2 wins / choice=True, -1 = accumulator 1 wins).
 """
 
 import numpy as np
@@ -30,6 +35,7 @@ import pymc as pm
 import pytensor.tensor as pt
 
 from .magnitude import MagnitudeComparisonModel, FlexibleNoiseComparisonModel
+from .risky_choice import RiskModel
 from ..utils.bayes import get_posterior
 from ..utils.math import inverse_softplus_np
 
@@ -133,28 +139,25 @@ def _sample_wald_race_2(v1, v2, sigma1, sigma2, a, t0, n_samples=1, rng=None):
 
 
 class RaceMixin:
-    """Swaps the static cumulative-normal likelihood for an analytical Wald-race
-    likelihood with per-accumulator drift AND noise.
+    """Generalized Bayesian race-diffusion model.
 
-    Subclasses implement ``_get_drifts(model_inputs, parameters)`` returning
-    ``(v1, v2, sigma1, sigma2)`` — both must be positive per-trial pytensor
-    vectors.
-
-    Free parameters added: ``a`` (threshold), ``t0`` (non-decision time),
-    optionally ``v_scale`` (drift coefficient). No ``z`` — single-boundary
-    accumulators have no analogue of biased starting point in the DDM sense
-    (asymmetric *thresholds* per accumulator would be the analogue and could
-    be added later).
+    Subclasses provide the cognitive front-end (posterior mean, prior); this
+    mixin adds the race likelihood and ``w_0, a, t0`` (and optionally
+    ``w_d, w_s`` when ``advantage=True``).
     """
-    fit_v_scale = False
+    advantage = True
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
-        if self.fit_v_scale:
-            pars['v_scale'] = {'mu_intercept': 1.0, 'sigma_intercept': 1.0,
-                               'transform': 'identity'}
+        pars['w_0'] = {'mu_intercept': inverse_softplus_np(2.5),
+                       'sigma_intercept': 0.5, 'transform': 'softplus'}
+        if self.advantage:
+            pars['w_d'] = {'mu_intercept': inverse_softplus_np(0.5),
+                           'sigma_intercept': 0.5, 'transform': 'softplus'}
+            pars['w_s'] = {'mu_intercept': 0.0,
+                           'sigma_intercept': 0.5, 'transform': 'identity'}
         pars['a'] = {'mu_intercept': inverse_softplus_np(1.0),
-                     'sigma_intercept': 0.5, 'transform': 'softplus'}
+                     'sigma_intercept': 0.3, 'transform': 'softplus'}
         pars['t0'] = {'mu_intercept': inverse_softplus_np(0.2),
                       'sigma_intercept': 0.5, 'transform': 'softplus'}
         return pars
@@ -176,6 +179,13 @@ class RaceMixin:
             if 'choice' in paradigm.columns:
                 signed = np.where(paradigm['choice'].astype(bool).values, 1.0, -1.0)
                 p['_rt_choice_data'] = np.column_stack([np.abs(rt), signed])
+            # Per-trial hard upper bound on t0: 0.95 * min(rt) within subject.
+            # Non-decision time cannot exceed the fastest observed RT — that's
+            # a physical constraint, not a modeling preference. Eliminates the
+            # a→0/t0→long collapse mode without needing a hard floor on `a`.
+            subject_ix = np.asarray(p['subject_ix'], dtype=int)
+            min_rt_per_subj = pd.Series(rt).groupby(subject_ix).min().sort_index().values
+            p['_t0_cap'] = (min_rt_per_subj[subject_ix] * 0.95).astype(float)
         return p
 
     def build_likelihood(self, parameters, save_p_choice=False):
@@ -192,7 +202,9 @@ class RaceMixin:
             pm.Deterministic('sigma_2', sigma2)
 
         a = parameters['a']
-        t0 = parameters['t0']
+        t0 = pt.minimum(parameters['t0'], model['_t0_cap'])
+        if save_p_choice:
+            pm.Deterministic('t0_eff', t0)
         observed = model['_rt_choice_data'].get_value()
         pm.CustomDist('ll', v1, v2, sigma1, sigma2, a, t0,
                       logp=lambda value, v1_, v2_, s1_, s2_, a_, t_:
@@ -223,7 +235,8 @@ class RaceMixin:
             pm.Deterministic('sigma_1', sigma1)
             pm.Deterministic('sigma_2', sigma2)
             pm.Deterministic('a_t', params['a'])
-            pm.Deterministic('t0_t', params['t0'])
+            t0_eff = pt.minimum(params['t0'], pm.Model.get_context()['_t0_cap'])
+            pm.Deterministic('t0_t', t0_eff)
 
     def simulate(self, paradigm, parameters, n_samples=1, random_seed=None):
         self.build_prediction_model(paradigm, parameters)
@@ -320,8 +333,9 @@ class RaceMixin:
             params = self.get_parameter_values()
             model_inputs = self.get_model_inputs(params)
             v1, v2, sigma1, sigma2 = self._get_drifts(model_inputs, params)
-            a, t0 = params['a'], params['t0']
             mc = pm.Model.get_context()
+            a = params['a']
+            t0 = pt.minimum(params['t0'], mc['_t0_cap'])
             signed = pt.switch(mc['choice'], 1.0, -1.0)
             data = pt.stack([mc['rt'], signed], axis=1)
             per_trial = logp_race_diffusion_2(data, v1, v2, sigma1, sigma2, a, t0)
@@ -333,100 +347,75 @@ class RaceMixin:
 
 
 class RaceDiffusionMagnitudeComparisonModel(RaceMixin, MagnitudeComparisonModel):
-    """Racing diffusion model (RDM) for magnitude comparison.
-
-    Each stimulus n_k drives its own Wiener accumulator with:
-
-    - **drift** $v_k = \\mu_{post,k}$ — the Bayesian posterior mean of $\\log n_k$.
-      With asymmetric encoding noise ($\\nu_1 \\ne \\nu_2$), the prior pulls the
-      two accumulator drifts by different amounts ($\\beta_k = \\sigma_p^2 /
-      (\\sigma_p^2 + \\nu_k^2)$), reproducing the order-effect mechanism that
-      the static cumnorm model uses.
-    - **diffusion noise** $\\sigma_k$ = ``n_k_evidence_sd`` — the *encoding* SD
-      per accumulator (what Khaw, Li & Woodford 2020 call $\\nu_k$). Distinct
-      per accumulator so a noisier $r_k$ also gives more variable race times.
-      Note this is *not* the posterior width $\\sigma_{post}^2 = \\beta \\nu^2$.
-
-    Per-accumulator first-passage to threshold $a$ is inverse Gaussian with
-    mean $a/v_k$ and shape $a^2/\\sigma_k^2$.
-
-    Predicts the size effect: larger $n_k$ → larger drift on both accumulators
-    → faster RTs regardless of which one wins. And the order effect:
-    $\\nu_1 > \\nu_2$ slows accumulator 1 in two ways — directly via larger
-    $\\sigma_1$, and indirectly via more prior pulling on $v_1$.
-
-    Tight-prior limit: $\\beta_k \\to 0$, drifts collapse to $\\mu_{prior}$,
-    race becomes 50/50 — consistent with the static cumnorm model in the same
-    limit (the Bayesian observer ignores noisy samples when the prior is sharp).
+    """Generalized Bayesian race-diffusion model for magnitude comparison.
 
     Paradigm columns required: ``n1``, ``n2``, ``choice`` (bool), ``rt`` (seconds).
-
-    Parameters
-    ----------
-    fit_v_scale : bool
-        If True, fit a multiplicative ``v_scale`` on drifts. Default False —
-        the ``a`` parameter absorbs the scale and removes the degeneracy.
     """
 
-    def __init__(self, paradigm=None, fit_prior=False,
+    def __init__(self, paradigm=None, fit_prior=True,
                  fit_seperate_evidence_sd=True, memory_model='independent',
-                 save_trialwise_n_estimates=False, fit_v_scale=False):
-        self.fit_v_scale = fit_v_scale
+                 save_trialwise_n_estimates=False, advantage=True):
+        self.advantage = advantage
         super().__init__(paradigm=paradigm, fit_prior=fit_prior,
                          fit_seperate_evidence_sd=fit_seperate_evidence_sd,
                          memory_model=memory_model,
                          save_trialwise_n_estimates=save_trialwise_n_estimates)
 
     def _get_drifts(self, model_inputs, parameters):
-        return _drifts_from_post_and_prior(model_inputs, self.fit_v_scale, parameters)
+        return _drifts_from_post_and_prior(model_inputs, parameters,
+                                            advantage=self.advantage)
 
 
-def _drifts_from_post_and_prior(model_inputs, fit_v_scale, parameters):
-    """Shared drift/noise computation for race-diffusion magnitude variants.
+def _drifts_from_post_and_prior(model_inputs, parameters, advantage=True):
+    """Per-accumulator drifts under the generalized Bayesian race model.
 
-    Drift = Bayesian posterior mean. Diffusion noise = SD of posterior mean
-    conditional on a fixed objective numerosity = beta_k * nu_k. Used by both
-    the scalar and flexible-noise race-diffusion magnitude models.
+    For risk front-ends (``p1, p2`` in model_inputs) the race operates on
+    ``log(EU_k) = post_log_n_k + log(p_k)``, with the centering reference
+    shifted so the prior baseline sits on log(EU) too.
     """
-    nu1 = model_inputs['n1_evidence_sd']
-    nu2 = model_inputs['n2_evidence_sd']
-    sp1 = model_inputs['n1_prior_sd']
-    sp2 = model_inputs['n2_prior_sd']
-    post_n1_mu, _ = get_posterior(model_inputs['n1_prior_mu'], sp1,
-                                   model_inputs['n1_evidence_mu'], nu1)
-    post_n2_mu, _ = get_posterior(model_inputs['n2_prior_mu'], sp2,
-                                   model_inputs['n2_evidence_mu'], nu2)
-    beta1 = sp1 ** 2 / (sp1 ** 2 + nu1 ** 2)
-    beta2 = sp2 ** 2 / (sp2 ** 2 + nu2 ** 2)
-    v1, v2 = post_n1_mu, post_n2_mu
-    sigma1, sigma2 = beta1 * nu1, beta2 * nu2
-    if fit_v_scale:
-        v1 = parameters['v_scale'] * v1
-        v2 = parameters['v_scale'] * v2
-    return v1, v2, sigma1, sigma2
+    post_n1_mu, _ = get_posterior(
+        model_inputs['n1_prior_mu'], model_inputs['n1_prior_sd'],
+        model_inputs['n1_evidence_mu'], model_inputs['n1_evidence_sd'])
+    post_n2_mu, _ = get_posterior(
+        model_inputs['n2_prior_mu'], model_inputs['n2_prior_sd'],
+        model_inputs['n2_evidence_mu'], model_inputs['n2_evidence_sd'])
+    mu_p1 = model_inputs['n1_prior_mu']
+    mu_p2 = model_inputs['n2_prior_mu']
+    if 'p1' in model_inputs and 'p2' in model_inputs:
+        log_p1, log_p2 = pt.log(model_inputs['p1']), pt.log(model_inputs['p2'])
+        post_n1_mu = post_n1_mu + log_p1
+        post_n2_mu = post_n2_mu + log_p2
+        mu_p1 = mu_p1 + log_p1
+        mu_p2 = mu_p2 + log_p2
+
+    tilde_1 = post_n1_mu - mu_p1
+    tilde_2 = post_n2_mu - mu_p2
+    w0 = parameters['w_0']
+    if advantage:
+        wd, ws = parameters['w_d'], parameters['w_s']
+        diff = tilde_1 - tilde_2
+        summ = tilde_1 + tilde_2
+        v1 = w0 + wd * diff + ws * summ
+        v2 = w0 - wd * diff + ws * summ
+    else:
+        v1 = w0 + tilde_1
+        v2 = w0 + tilde_2
+    # Positivity guard (Wald requires v > 0; informative w_0 prior keeps this slack).
+    v1 = pt.maximum(v1, 1e-3)
+    v2 = pt.maximum(v2, 1e-3)
+    return v1, v2, pt.ones_like(v1), pt.ones_like(v2)
 
 
 class RaceDiffusionFlexibleNoiseComparisonModel(RaceMixin, FlexibleNoiseComparisonModel):
-    """Racing diffusion model with stimulus-dependent (spline) encoding noise.
-
-    Same structure as :class:`RaceDiffusionMagnitudeComparisonModel`, but
-    ``n1_evidence_sd`` and ``n2_evidence_sd`` are smooth functions of stimulus
-    magnitude (B-spline of order ``polynomial_order``) rather than scalar
-    parameters per subject. The race accumulators inherit asymmetric, magnitude-
-    dependent noise from the spline.
-
-    Drift = posterior mean per accumulator (Bayesian-pulled by the stimulus-
-    dependent encoding noise). Diffusion noise per accumulator is again
-    $\\sigma_k = \\beta_k \\nu_k(n_k)$ — the SD of the posterior mean conditional
-    on a fixed $n_k$.
+    """Race-diffusion variant with B-spline stimulus-dependent encoding noise.
 
     Paradigm columns required: ``n1``, ``n2``, ``choice`` (bool), ``rt`` (seconds).
     """
 
     def __init__(self, paradigm, fit_seperate_evidence_sd=True,
-                 fit_prior=False, polynomial_order=5,
-                 memory_model='independent', fit_v_scale=False):
-        self.fit_v_scale = fit_v_scale
+                 fit_prior=True, polynomial_order=5,
+                 memory_model='independent', advantage=True):
+        self.advantage = advantage
         FlexibleNoiseComparisonModel.__init__(
             self, paradigm,
             fit_seperate_evidence_sd=fit_seperate_evidence_sd,
@@ -436,4 +425,29 @@ class RaceDiffusionFlexibleNoiseComparisonModel(RaceMixin, FlexibleNoiseComparis
         )
 
     def _get_drifts(self, model_inputs, parameters):
-        return _drifts_from_post_and_prior(model_inputs, self.fit_v_scale, parameters)
+        return _drifts_from_post_and_prior(model_inputs, parameters,
+                                            advantage=self.advantage)
+
+
+class RaceDiffusionRiskModel(RaceMixin, RiskModel):
+    """Race-diffusion variant for risky choice (race on log(EU_k)).
+
+    Paradigm columns required: ``n1``, ``n2``, ``p1``, ``p2``, ``choice`` (bool),
+    ``rt`` (seconds).
+    """
+
+    def __init__(self, paradigm=None, prior_estimate='objective',
+                 fit_seperate_evidence_sd=True,
+                 save_trialwise_n_estimates=False, memory_model='independent',
+                 advantage=True):
+        self.advantage = advantage
+        super().__init__(
+            paradigm=paradigm, prior_estimate=prior_estimate,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            memory_model=memory_model,
+        )
+
+    def _get_drifts(self, model_inputs, parameters):
+        return _drifts_from_post_and_prior(model_inputs, parameters,
+                                            advantage=self.advantage)

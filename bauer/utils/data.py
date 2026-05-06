@@ -54,8 +54,164 @@ def load_garcia2022(task='magnitude', remove_non_responses=True, min_rt=0.15,
     return df
 
 
+def load_dehollander_tms_risk(stimulation_conditions=None, sessions=None,
+                                tms_only=True, remove_non_responses=True,
+                                min_rt=0.15, max_rt=None):
+    """Return behavioral data from the de Hollander TMS-risk experiment.
+
+    73 subjects total, but **only 35 of them completed the TMS sessions
+    (sessions 2 and 3)**; the remaining 38 only did the baseline session
+    (session 1). For TMS analyses you typically want only the 35 TMS
+    subjects and only sessions 2/3 — the ``tms_only=True`` default does
+    exactly that. Set ``tms_only=False`` to get all 73 subjects across
+    all sessions (useful for behavioral baselines or pilot analyses).
+
+    Each trial has two lotteries (one risky at ``p=0.55``, one safe at
+    ``p=1.0``) and a binary choice. RT is in seconds. ``choice = True``
+    means option 2 was chosen (bauer's risk convention). The TMS condition
+    is in the ``stimulation_condition`` column ∈ {baseline, vertex, ips};
+    pass it as a regression covariate to fit how stimulation modulates
+    noise/aversion.
+
+    Loads from bundled CSV (``bauer/data/dehollander_tms_risk.csv``).
+
+    Parameters
+    ----------
+    stimulation_conditions : list of str or None
+        Subset of ``['baseline', 'vertex', 'ips']`` to keep. Default: all.
+    sessions : list of int or None
+        Subset of ``[1, 2, 3]`` to keep. Default: ``[2, 3]`` if
+        ``tms_only=True``, otherwise all.
+    tms_only : bool
+        If True (default), keep only the 35 subjects who completed TMS
+        sessions, and only sessions 2 and 3. If False, return all 73
+        subjects across all sessions.
+    remove_non_responses : bool
+        Drop trials with missing RT or choice; apply RT cutoffs.
+    min_rt : float
+        Lower RT cutoff in seconds (default 0.15). Set to 0 to disable.
+    max_rt : float or None
+        Upper RT cutoff in seconds (default None).
+    """
+    fn = 'dehollander_tms_risk.csv'
+    with (files(__package__) / f'../data/{fn}').open('rb') as f:
+        df = pd.read_csv(f)
+
+    if tms_only:
+        if sessions is None:
+            sessions = [2, 3]
+        # Keep only subjects who appear in the TMS sessions.
+        tms_subjects = df[df['session'].isin([2, 3])]['subject'].unique()
+        df = df[df['subject'].isin(tms_subjects)]
+
+    if stimulation_conditions is not None:
+        df = df[df['stimulation_condition'].isin(stimulation_conditions)]
+    if sessions is not None:
+        df = df[df['session'].isin(sessions)]
+
+    if remove_non_responses:
+        df = df.dropna(subset=['rt', 'choice'])
+        if min_rt is not None and min_rt > 0:
+            df = df[df['rt'] >= min_rt]
+        if max_rt is not None:
+            df = df[df['rt'] <= max_rt]
+
+    df['choice'] = (df['choice'] == 2.0)
+    df = df.set_index(['subject', 'session', 'stimulation_condition',
+                        'run', 'trial_nr']).sort_index()
+    return df
+
+
+def load_dehollander2024_symbolic(remove_non_responses=True,
+                                   min_rt=0.15, max_rt=None):
+    """Return behavioral data from de Hollander et al. (2024 Nat Comms)
+    *symbolic* (Arabic-numeral) risky-choice task as a multi-indexed DataFrame.
+
+    Loads from the bundled CSV (``bauer/data/dehollander2024_symbolic.csv``).
+    58 subjects, ~256 trials each. RT is in seconds. Unlike the dotcloud task,
+    n1/n2 are continuous (each trial samples a different number on a fine
+    grid, range ~5-100), making this a stronger test of stimulus-dependent
+    encoding-noise models. ``choice = True`` means option 2 was chosen.
+
+    Parameters
+    ----------
+    remove_non_responses : bool
+        Drop rows with missing choices and trials with RT outside
+        ``[min_rt, max_rt]``.
+    min_rt : float
+        Lower RT cutoff in seconds (default 0.15). Set to 0 to disable.
+    max_rt : float or None
+        Upper RT cutoff in seconds (default None).
+    """
+    fn = 'dehollander2024_symbolic.csv'
+    with (files(__package__) / f'../data/{fn}').open('rb') as f:
+        df = pd.read_csv(f, dtype={'subject': str})
+
+    if remove_non_responses:
+        df = df.dropna(subset=['rt', 'choice'])
+        if min_rt is not None and min_rt > 0:
+            df = df[df['rt'] >= min_rt]
+        if max_rt is not None:
+            df = df[df['rt'] <= max_rt]
+
+    df['choice'] = df['choice'].astype(bool)
+    df = df.set_index(['subject', 'run', 'trial_nr']).sort_index()
+    return df
+
+
+def load_dehollander2024_risk(sessions=None, remove_non_responses=True,
+                               min_rt=0.15, max_rt=None):
+    """Return behavioral data from de Hollander et al. (2024 Nat Comms) risky-choice
+    task as a multi-indexed DataFrame.
+
+    Loads from the bundled CSV (``bauer/data/dehollander2024_risk.csv``), which
+    contains one row per trial across 30 subjects (subject IDs as zero-padded
+    strings ``'02'`` … ``'32'``, sub-24 excluded) and two sessions (3T MRI,
+    7T MRI). RT is in seconds. ``choice = True`` means the participant chose
+    option 2 (the second-presented option), matching bauer's risk-model
+    convention. Trials with no response (RT or choice missing) are dropped by
+    default.
+
+    Parameters
+    ----------
+    sessions : list of str or None
+        Sessions to include (default: all). Valid values: ``['3t2', '7t2']``.
+    remove_non_responses : bool
+        Drop rows with missing RT/choice and trials with RT outside
+        ``[min_rt, max_rt]``.
+    min_rt : float
+        Lower RT cutoff in seconds (default 0.15). Set to 0 to disable.
+    max_rt : float or None
+        Upper RT cutoff in seconds (default None).
+
+    Returns
+    -------
+    pd.DataFrame
+        Multi-indexed by (subject, session, run, trial_nr). Columns include
+        ``n1``, ``n2``, ``p1``, ``p2``, ``risky_first``, ``choice`` (bool),
+        ``rt`` (s), ``log_risky_safe``, ``chose_risky``, ``certainty``.
+    """
+    fn = 'dehollander2024_risk.csv'
+    with (files(__package__) / f'../data/{fn}').open('rb') as f:
+        df = pd.read_csv(f, dtype={'subject': str})
+
+    if sessions is not None:
+        df = df[df['session'].isin(sessions)]
+
+    if remove_non_responses:
+        df = df.dropna(subset=['rt', 'choice'])
+        if min_rt is not None and min_rt > 0:
+            df = df[df['rt'] >= min_rt]
+        if max_rt is not None:
+            df = df[df['rt'] <= max_rt]
+
+    df['choice'] = df['choice'].astype(bool)
+    df = df.set_index(['subject', 'session', 'run', 'trial_nr']).sort_index()
+    return df
+
+
 def load_dehollander2024(task='dotcloud', sessions=None,
-                         bids_folder='/data/ds-risk',
+                         bids_folder=None,
                          symbolic_folder='/data/ds-symbolicrisk',
                          remove_non_responses=True):
     """Return behavioral data from de Hollander et al. (2024) as a multi-indexed DataFrame.
@@ -63,27 +219,52 @@ def load_dehollander2024(task='dotcloud', sessions=None,
     Parameters
     ----------
     task : {'dotcloud', 'symbolic'}
-        Which task dataset to load. ``'dotcloud'`` uses the fMRI dot-cloud gamble
-        task (ds-risk); ``'symbolic'`` uses the Arabic-numeral behavioural task
-        (ds-symbolicrisk).
+        Which task dataset to load. ``'dotcloud'`` defaults to the **bundled CSV**
+        (no BIDS folder needed); pass ``bids_folder`` to read raw events.tsvs
+        from the ds-risk dataset instead. ``'symbolic'`` uses the Arabic-numeral
+        behavioural task at ``symbolic_folder``.
     sessions : list of str or None
-        Sessions to include for the dotcloud task (default ``['3t2', '7t2']``).
-        Ignored for the symbolic task.
-    bids_folder : str
-        Root of the ds-risk BIDS dataset.
+        Sessions to include for the dotcloud task (default: all sessions in the
+        bundled CSV, i.e. ``['3t2', '7t2']``). Ignored for the symbolic task.
+    bids_folder : str or None
+        If given (and ``task='dotcloud'``), reads from raw BIDS events.tsvs
+        instead of the bundled CSV. Default ``None`` → use the bundled CSV.
     symbolic_folder : str
         Root of the ds-symbolicrisk dataset.
     remove_non_responses : bool
         If True, drop trials with missing choices and cast the ``choice`` column
         to bool.
+
+    Notes
+    -----
+    Prefer :func:`load_dehollander2024_risk` for new code — it has cleaner
+    defaults and an RT cutoff. This function is kept for back-compat with
+    notebooks and tutorials that import it under the old name.
     """
     if task == 'dotcloud':
+        if bids_folder is None:
+            df = load_dehollander2024_risk(
+                sessions=sessions, remove_non_responses=remove_non_responses,
+                min_rt=0.0,  # back-compat: no RT cutoff in old behaviour
+            )
+            # Match the column subset the legacy loader returned.
+            keep = [c for c in ['n1', 'n2', 'p1', 'p2', 'choice', 'risky_first']
+                    if c in df.columns]
+            return df[keep]
         return _load_dehollander2024_dotcloud(
             sessions=sessions,
             bids_folder=bids_folder,
             remove_non_responses=remove_non_responses,
         )
     elif task == 'symbolic':
+        if symbolic_folder == '/data/ds-symbolicrisk' and not op.isdir(symbolic_folder):
+            # Default BIDS path doesn't exist → use bundled CSV.
+            df = load_dehollander2024_symbolic(
+                remove_non_responses=remove_non_responses, min_rt=0.0,
+            )
+            keep = [c for c in ['n1', 'n2', 'p1', 'p2', 'choice', 'risky_first']
+                    if c in df.columns]
+            return df[keep]
         return _load_dehollander2024_symbolic(
             symbolic_folder=symbolic_folder,
             remove_non_responses=remove_non_responses,

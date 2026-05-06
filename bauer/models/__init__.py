@@ -13,13 +13,9 @@ from .risky_choice import (
     RiskModelProbabilityDistortion, ProspectTheoryModel,
     LossAversionModel, LossAversionRegressionModel,
     RiskModel, RiskRegressionModel, RiskLapseModel, RiskLapseRegressionModel,
-    RNPModel, RNPRegressionModel,
     FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
     ExpectedUtilityRiskModel, ExpectedUtilityRiskRegressionModel,
     PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
-    SafeVsRiskyModel, SafeVsRiskyRegressionModel,
-    SafeVsRiskyMemoryModel, JointSafeVsRiskyModel,
-    SafeVsRiskyFlexibleNoiseModel,
     AffineNoiseRiskModel,
 )
 
@@ -28,6 +24,7 @@ try:
         DDMMixin,
         DDMMagnitudeComparisonModel,
         DDMFlexibleNoiseComparisonModel,
+        DDMRiskModel,
     )
 except ImportError:
     pass
@@ -36,5 +33,6 @@ from .race import (
     RaceMixin,
     RaceDiffusionMagnitudeComparisonModel,
     RaceDiffusionFlexibleNoiseComparisonModel,
+    RaceDiffusionRiskModel,
     logp_race_diffusion_2,
 )

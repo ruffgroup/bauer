@@ -171,6 +171,94 @@ and r̂ ~ 1.01.
 | DDM | yes (mean shift) | no (σ=1 fixed) | P = 0.5, RT = t_0 |
 | RDM (σ_k = β_k ν_k) | yes | **yes** | P = 0.5, deterministic RT = t_0 + a/μ_p |
 | RDM (σ_k = ν_k) | yes | no | P ≠ 0.5 (biased to noisier accumulator) |
+| **RDM (σ_k = 1, current default)** | yes (mean shift via β_k) | no | P = 0.5, RT = t_0 + a/μ_p |
 
 The third row's "yes" in the noise column is the source of the
-identifiability headache.
+identifiability headache. The fifth row is the formulation `bauer` now
+uses by default — see §8.
+
+## 8. Current bauer formulation (σ_acc = 1)
+
+Rationale: identical to the standard RDM convention (Tillman, Van Zandt &
+Logan 2020; LBA family) — fix per-accumulator diffusion noise to a unit
+scale; let drift and threshold absorb the SNR. This decouples σ_p from the
+diffusion-noise term, so σ_p only enters the model through the drift mean.
+The ridge identified in §5 disappears: σ_p has the same role as in the DDM
+("two parameters, two roles"), and the encoding noise ν_k continues to
+influence drift (and only drift) through the Bayesian shrinkage weight β_k.
+
+### 8a. Generative model (per trial)
+
+Latent encoding samples (one per stimulus, drawn at the start of the trial):
+
+$$r_k \mid n_k \sim \mathcal{N}(\log n_k,\ \nu_k^2),\qquad k \in \{1, 2\}$$
+
+Bayesian observer's posterior mean (used as drift below):
+
+$$\mu_{\text{post},k}(r_k) = \beta_k r_k + (1-\beta_k)\mu_p,\qquad
+\beta_k = \frac{\sigma_p^2}{\sigma_p^2 + \nu_k^2}$$
+
+The agent then runs two independent Wiener accumulators with **fixed unit
+diffusion noise**:
+
+$$\mathrm{d}X_k(t) = v_k\, \mathrm{d}t + 1 \cdot \mathrm{d}W_k(t),\qquad
+v_k = \mu_{\text{post},k}(r_k)$$
+
+Each accumulator races to the common absorbing barrier $a$. The first to
+hit determines choice; total RT is the hitting time plus non-decision
+time $t_0$.
+
+### 8b. Likelihood (closed form)
+
+First-passage time of accumulator $k$ to barrier $a$ is inverse Gaussian:
+
+$$T_k \sim \mathrm{IG}\!\left(\mu_k = \frac{a}{v_k},\ \lambda_k = \frac{a^2}{1^2} = a^2\right)$$
+
+Note $\lambda_k = a^2$ for both accumulators (independent of $k$) because
+$\sigma_k = 1$ — this is the change relative to §4b. Joint likelihood for
+"accumulator $w$ wins at time $t$":
+
+$$\mathcal{L}(t, w \mid v_1, v_2, a, t_0) = f_{\mathrm{IG}}(t - t_0;\ \mu_w,\ a^2)\cdot S_{\mathrm{IG}}(t - t_0;\ \mu_{\bar w},\ a^2)$$
+
+### 8c. Free parameters
+
+Per-subject (hierarchical):
+
+- $\nu_1, \nu_2 > 0$: encoding noise SDs (or spline coefficients for the
+  flexible-noise variant).
+- $\mu_p \in \mathbb{R}$, $\sigma_p > 0$: Bayesian observer's prior over
+  $\log n$. Optional — fixed at empirical mean/std of $\log n$ when
+  `fit_prior=False`.
+- $a > 0$: common absorbing threshold.
+- $t_0 > 0$: non-decision time.
+- $v_{\text{scale}}$: optional drift multiplier — only fit for the static
+  RDM (`fit_v_scale=True`); fixed at 1 for the flexible-noise RDM since
+  the spline already absorbs that scale.
+
+No starting-point analogue (single-boundary accumulators don't have one
+in the DDM sense).
+
+### 8d. Order-effect mechanism (with σ_acc = 1)
+
+If $\nu_1 > \nu_2$ (e.g. memory degradation on the first-presented option):
+
+1. $\beta_1 < \beta_2$ (option 1 gets shrunk toward the prior more).
+2. Drift $v_1 = \beta_1 \log n_1 + (1-\beta_1)\mu_p$ is pulled toward $\mu_p$
+   more than $v_2 = \beta_2 \log n_2 + (1-\beta_2)\mu_p$ is.
+3. For pair $(n_1, n_2)$ with both close to $\mu_p$: $|v_2 - v_1|$ shrinks
+   toward zero → P(choose 2) compressed toward 0.5; mean RT lengthens
+   ($\mathbb{E}[T_k] = a/v_k$ grows as $v_k$ shrinks).
+4. Direction of bias depends on signs of $(\log n_k - \mu_p)$, just like
+   the static cumnorm and DDM order effects.
+
+So order effects survive σ_acc = 1 cleanly — they propagate via the same
+β_k drift-pulling mechanism that already works in the DDM.
+
+### 8e. Identifiability
+
+$\sigma_p$ enters only through $\beta_k$ in the drift mean. The drift
+denominator (formerly $\sqrt{\beta_1^2 \nu_1^2 + \beta_2^2 \nu_2^2}$) is
+gone — there is no SNR ratio to compute, just per-accumulator drift and
+unit noise. So $\sigma_p$ and $\nu_k$ no longer have the multiplicative
+ridge of §5. Empirically should sample like the DDM (r̂ ≈ 1.01 on the
+small fits).

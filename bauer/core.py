@@ -302,44 +302,64 @@ class BaseModel(object):
 
         return pd.DataFrame(rows).set_index('subject')
 
-    def ppc(self, paradigm, idata, out_of_sample=False, var_names=['ll_bernoulli'], progressbar=True):
+    def ppc(self, paradigm, idata, n_posterior_samples=200,
+             out_of_sample=False, random_seed=None, progressbar=True):
+        """Posterior-predictive choices for ``paradigm``.
 
+        Returns
+        -------
+        pd.DataFrame
+            Index: ``paradigm.index`` levels + ``ppc_sample``.
+            Single column ``simulated_choice`` (bool).
+            Format matches ``DDMMixin.ppc`` / ``RaceMixin.ppc`` so all bauer
+            models can be fed into the same downstream summarizers.
+        """
         if out_of_sample:
-            assert(hasattr(self, 'paradigm')), 'Model needs to have original paradigm as an attribute (model.paradigm...) for out-of-sample prediction'
-
+            assert hasattr(self, 'paradigm'), (
+                'Model needs paradigm attribute for out-of-sample prediction.')
             if ('subject' in paradigm.index.names) or ('subject' in paradigm.columns):
-                coords = {'subject': self.paradigm.index.unique(level='subject')}            
+                coords = {'subject': self.paradigm.index.unique(level='subject')}
                 hierarchical = True
                 subject_ids = paradigm.index.get_level_values('subject').unique()
-                subject_id_to_ix = {subject: ix for ix, subject in enumerate(subject_ids)}
+                subject_id_to_ix = {s: i for i, s in enumerate(subject_ids)}
             else:
-                hierarchical = False
-                subject_id_to_ix = None
-
+                coords, hierarchical, subject_id_to_ix = None, False, None
             with pm.Model(coords=coords) as self.out_of_sample_model:
-                paradigm_ = self._get_paradigm(paradigm=paradigm, subject_mapping=subject_id_to_ix)
+                paradigm_ = self._get_paradigm(paradigm=paradigm,
+                                                subject_mapping=subject_id_to_ix)
                 self.set_paradigm(paradigm_)
                 self.build_priors(hierarchical=hierarchical)
                 parameters = self.get_parameter_values()
-                save_p_choice = 'p' in var_names
-                self.build_likelihood(parameters, save_p_choice=save_p_choice)            
-    
-                idata = pm.sample_posterior_predictive(idata, var_names=var_names, progressbar=progressbar)
-
+                self.build_likelihood(parameters, save_p_choice=False)
+                pp = pm.sample_posterior_predictive(
+                    idata, var_names=['ll_bernoulli'],
+                    progressbar=progressbar, random_seed=random_seed)
         else:
             with self.estimation_model:
-                idata = pm.sample_posterior_predictive(idata, var_names=var_names, progressbar=progressbar)
+                pp = pm.sample_posterior_predictive(
+                    idata, var_names=['ll_bernoulli'],
+                    progressbar=progressbar, random_seed=random_seed)
 
-        ppc = [idata['posterior_predictive'][key].to_dataframe() for key in var_names]
-        ppc = [e.astype(bool) if var_name == 'll_bernoulli' else e for e, var_name in zip(ppc, var_names)]
-        ppc = pd.concat(ppc, axis=1, keys=var_names, names=['variable'])
-        ppc = ppc.unstack(['chain', 'draw']).droplevel(1, axis=1)
-        ppc.index = paradigm.index
-        ppc = ppc.set_index(pd.MultiIndex.from_frame(paradigm), append=True)
-        ppc = ppc.stack('variable', future_stack=True)
-        ppc = ppc.reorder_levels(np.roll(ppc.index.names, 1)).sort_index()
+        # arr shape: (chain, draw, n_trials)
+        arr = pp['posterior_predictive']['ll_bernoulli'].values.astype(bool)
+        n_chain, n_draw, n_trials = arr.shape
+        assert n_trials == len(paradigm), (
+            f"PPC trial count mismatch: arr has {n_trials}, paradigm has {len(paradigm)}.")
 
-        return ppc
+        rng = np.random.default_rng(random_seed)
+        n_total = n_chain * n_draw
+        n_keep = min(n_posterior_samples, n_total)
+        flat = arr.reshape(n_total, n_trials)
+        sel = rng.choice(n_total, size=n_keep, replace=False)
+        sub = flat[sel].T  # (n_trials, n_keep)
+
+        out = pd.DataFrame(
+            sub,
+            index=paradigm.index,
+            columns=pd.Index(np.arange(n_keep), name='ppc_sample'),
+        ).stack().rename('simulated_choice').to_frame()
+        out['simulated_choice'] = out['simulated_choice'].astype(bool)
+        return out
 
     def get_trialwise_variable(self, key):
 
@@ -359,37 +379,51 @@ class BaseModel(object):
         elif model[f'{key}'].ndim == 0:
             return pt.tile(model[f'{key}'], n_trials)
 
-    def build_hierarchical_nodes(self, name, mu_intercept=None, sigma_intercept=None, cauchy_sigma_intercept=None, transform='identity', **kwargs):
+    def build_hierarchical_nodes(self, name, mu_intercept=None, sigma_intercept=None,
+                                  cauchy_sigma_intercept=None, transform='identity',
+                                  min_value=0.0, **kwargs):
+        """Build a hierarchical (group_mu, group_sd, per-subject offset) node.
+
+        ``transform`` ∈ {'identity', 'softplus', 'logistic'}. When ``transform`` is
+        'softplus' and ``min_value > 0``, the transformed parameter has a hard
+        lower bound: ``param = min_value + softplus(x)``. Used to keep e.g. the
+        DDM/RDM threshold ``a`` away from the a→0 collapse mode.
+        """
 
         if mu_intercept is None:
             mu_intercept = 0.0
 
         if sigma_intercept is None:
             sigma_intercept = .5
-        
+
         if cauchy_sigma_intercept is None:
             cauchy_sigma_intercept = 0.25
 
+        def _softplus_with_floor(x):
+            if min_value:
+                return min_value + pt.softplus(x)
+            return pt.softplus(x)
+
         if transform == 'identity':
-            group_mu = pm.Normal(f"{name}_mu", 
-                                            mu=mu_intercept, 
+            group_mu = pm.Normal(f"{name}_mu",
+                                            mu=mu_intercept,
                                             sigma=sigma_intercept)
         elif transform == 'softplus':
-            group_mu = pm.Normal(f"{name}_mu_untransformed", 
-                                            mu=mu_intercept, 
+            group_mu = pm.Normal(f"{name}_mu_untransformed",
+                                            mu=mu_intercept,
                                             sigma=sigma_intercept)
 
-            pm.Deterministic(name=f'{name}_mu', var=pt.softplus(group_mu))
+            pm.Deterministic(name=f'{name}_mu', var=_softplus_with_floor(group_mu))
         elif transform == 'logistic':
-            group_mu = pm.Normal(f"{name}_mu_untransformed", 
-                                            mu=mu_intercept, 
+            group_mu = pm.Normal(f"{name}_mu_untransformed",
+                                            mu=mu_intercept,
                                             sigma=sigma_intercept)
 
             pm.Deterministic(name=f'{name}_mu', var=logistic(group_mu))
         else:
             raise NotImplementedError
 
-            
+
         group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma_intercept)
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject',))
 
@@ -397,9 +431,9 @@ class BaseModel(object):
              return pm.Deterministic(f'{name}', group_mu + group_sd * subject_offset, dims=('subject',))
         else:
             subjectwise_untrans = pm.Deterministic(f'{name}_untransformed', group_mu + group_sd * subject_offset, dims=('subject',))
-        
+
             if transform == 'softplus':
-                return pm.Deterministic(name=name, var=pt.softplus(subjectwise_untrans), dims=('subject',))
+                return pm.Deterministic(name=name, var=_softplus_with_floor(subjectwise_untrans), dims=('subject',))
             elif transform == 'logistic':
                 return pm.Deterministic(name=name, var=logistic(subjectwise_untrans), dims=('subject',))
             else:
