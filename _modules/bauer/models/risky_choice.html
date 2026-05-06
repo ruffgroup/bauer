@@ -1035,7 +1035,7 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Risky choice model combining flexible (polynomial) noise with Bayesian magnitude inference.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
-                 <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">polynomial_order</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+                 <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">spline_order</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
                  <span class="n">representational_noise</span><span class="o">=</span><span class="s1">&#39;payoff&#39;</span><span class="p">,</span>
                  <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">):</span>
 
@@ -1045,11 +1045,11 @@
         <span class="k">if</span> <span class="n">representational_noise</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;payoff&#39;</span><span class="p">,</span> <span class="s1">&#39;ev&#39;</span><span class="p">]:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unknown representational noise: </span><span class="si">{</span><span class="n">representational_noise</span><span class="si">}</span><span class="s1"> (should be &quot;payoff&quot; or &quot;ev&quot;)&#39;</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">polynomial_order</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
-            <span class="n">polynomial_order</span> <span class="o">=</span> <span class="n">polynomial_order</span><span class="p">,</span> <span class="n">polynomial_order</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">spline_order</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
+            <span class="n">spline_order</span> <span class="o">=</span> <span class="n">spline_order</span><span class="p">,</span> <span class="n">spline_order</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">polynomial_order</span> <span class="o">=</span> <span class="n">polynomial_order</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">max_polynomial_order</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">polynomial_order</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span> <span class="o">=</span> <span class="n">spline_order</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_spline_order</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">representational_noise</span> <span class="o">=</span> <span class="n">representational_noise</span>
 
         <span class="n">RiskModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="n">save_trialwise_n_estimates</span><span class="p">,</span>
@@ -1214,12 +1214,12 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span>
                  <span class="n">regressors</span><span class="p">,</span>
                  <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
-                 <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">polynomial_order</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+                 <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">spline_order</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
                  <span class="n">representational_noise</span><span class="o">=</span><span class="s1">&#39;payoff&#39;</span><span class="p">,</span>
                  <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">):</span>
 
-        <span class="k">if</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">polynomial_order</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
-            <span class="n">polynomial_order</span> <span class="o">=</span> <span class="n">polynomial_order</span><span class="p">,</span> <span class="n">polynomial_order</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">spline_order</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
+            <span class="n">spline_order</span> <span class="o">=</span> <span class="n">spline_order</span><span class="p">,</span> <span class="n">spline_order</span>
 
 
         <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">regressors</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
@@ -1227,11 +1227,11 @@
             <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;memory_noise_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;perceptual_noise_sd&#39;</span><span class="p">]:</span>
 
                 <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;evidence_sd&#39;</span><span class="p">]:</span>
-                    <span class="n">po</span> <span class="o">=</span> <span class="n">polynomial_order</span>
+                    <span class="n">po</span> <span class="o">=</span> <span class="n">spline_order</span>
                 <span class="k">elif</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;memory_noise_sd&#39;</span><span class="p">]:</span>
-                    <span class="n">po</span> <span class="o">=</span> <span class="n">polynomial_order</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">po</span> <span class="o">=</span> <span class="n">spline_order</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
                 <span class="k">elif</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;perceptual_noise_sd&#39;</span><span class="p">]:</span>
-                    <span class="n">po</span> <span class="o">=</span> <span class="n">polynomial_order</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">po</span> <span class="o">=</span> <span class="n">spline_order</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
 
                 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">po</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
                     <span class="n">regressors</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s1">_spline</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">regressors</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
@@ -1241,7 +1241,7 @@
 
         <span class="n">RegressionModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="p">)</span>
         <span class="n">FlexibleNoiseRiskModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="p">,</span>
-                                        <span class="n">polynomial_order</span><span class="p">,</span> <span class="n">representational_noise</span><span class="p">,</span> <span class="n">memory_model</span><span class="p">)</span>
+                                        <span class="n">spline_order</span><span class="p">,</span> <span class="n">representational_noise</span><span class="p">,</span> <span class="n">memory_model</span><span class="p">)</span>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_sd_curve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conditions</span><span class="p">,</span> <span class="n">idata</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pars</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
@@ -1610,7 +1610,7 @@
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="n">prior_estimate</span><span class="p">,</span>
                          <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="n">fit_seperate_evidence_sd</span><span class="p">,</span>
                          <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="n">save_trialwise_n_estimates</span><span class="p">,</span>
-                         <span class="n">polynomial_order</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+                         <span class="n">spline_order</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
                          <span class="n">memory_model</span><span class="o">=</span><span class="n">memory_model</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">make_dm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">):</span>
