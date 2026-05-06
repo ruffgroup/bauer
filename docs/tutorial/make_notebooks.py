@@ -2059,14 +2059,14 @@ from bauer.models import (MagnitudeComparisonModel, FlexibleNoiseComparisonModel
 # two-element basis [1, n̂] instead of 5 B-spline bases.
 #
 # Implementation: subclass FlexibleNoiseComparisonModel, override make_dm()
-# to return an affine design matrix, and fix polynomial_order=2.
+# to return an affine design matrix, and fix spline_order=2.
 
 class AffineNoiseComparisonModel(FlexibleNoiseComparisonModel):
     # Magnitude-comparison model with affine noise: v(n) = softplus(b0 + b1*n_hat)
     def __init__(self, paradigm, fit_seperate_evidence_sd=True,
                  fit_prior=False, memory_model='independent'):
         super().__init__(paradigm, fit_seperate_evidence_sd=fit_seperate_evidence_sd,
-                         fit_prior=fit_prior, polynomial_order=2,
+                         fit_prior=fit_prior, spline_order=2,
                          memory_model=memory_model)
 
     def make_dm(self, x, variable='n1_evidence_sd'):
@@ -2083,7 +2083,7 @@ class AffineNoiseRiskModel(FlexibleNoiseRiskModel):
                  fit_seperate_evidence_sd=True, memory_model='independent'):
         super().__init__(paradigm, prior_estimate=prior_estimate,
                          fit_seperate_evidence_sd=fit_seperate_evidence_sd,
-                         polynomial_order=2, memory_model=memory_model)
+                         spline_order=2, memory_model=memory_model)
 
     def make_dm(self, x, variable='n1_evidence_sd'):
         # Override: [1, n_hat] basis instead of B-splines
@@ -2188,7 +2188,7 @@ code("""\
 # FlexibleNoiseComparisonModel — free noise curve fitted to dot arrays
 model_flex_mag = FlexibleNoiseComparisonModel(paradigm=df_mag,
                                                fit_seperate_evidence_sd=True,
-                                               polynomial_order=5)
+                                               spline_order=5)
 model_flex_mag.build_estimation_model(paradigm=df_mag, hierarchical=True)
 idata_flex_mag = model_flex_mag.sample(draws=200, tune=200, chains=4, progressbar=False,
                                         idata_kwargs={'log_likelihood': True})
@@ -2360,7 +2360,7 @@ idata_pmcm = model_pmcm.sample(draws=200, tune=200, chains=4, progressbar=False,
 code("""\
 # FlexibleNoiseRiskModel — free noise curve on Arabic-numeral data
 model_flex = FlexibleNoiseRiskModel(paradigm=df_sym, prior_estimate='full',
-                                     fit_seperate_evidence_sd=True, polynomial_order=5)
+                                     fit_seperate_evidence_sd=True, spline_order=5)
 model_flex.build_estimation_model(paradigm=df_sym, hierarchical=True, save_p_choice=True)
 idata_flex = model_flex.sample(draws=200, tune=200, chains=4, progressbar=False,
                                 idata_kwargs={'log_likelihood': True})

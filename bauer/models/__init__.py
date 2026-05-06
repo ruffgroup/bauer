@@ -25,6 +25,8 @@ try:
         DDMMagnitudeComparisonModel,
         DDMFlexibleNoiseComparisonModel,
         DDMRiskModel,
+        DDMFlexibleNoiseRiskModel,
+        DDMFlexibleNoiseRiskRegressionModel,
     )
 except ImportError:
     pass
@@ -34,5 +36,7 @@ from .race import (
     RaceDiffusionMagnitudeComparisonModel,
     RaceDiffusionFlexibleNoiseComparisonModel,
     RaceDiffusionRiskModel,
+    RaceDiffusionFlexibleNoiseRiskModel,
+    RaceDiffusionFlexibleNoiseRiskRegressionModel,
     logp_race_diffusion_2,
 )

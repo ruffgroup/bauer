@@ -173,7 +173,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
     ----------
     paradigm : pd.DataFrame
         Must contain columns ``n1``, ``n2``, and ``choice``.
-    polynomial_order : int or tuple of int
+    spline_order : int or tuple of int
         Order(s) of the polynomial for the noise curve (one per prospect when
         ``fit_seperate_evidence_sd=True``).
     memory_model : {'independent', 'shared_perceptual_noise'}
@@ -182,7 +182,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
     def __init__(self, paradigm, fit_seperate_evidence_sd=True,
                  fit_prior=False,
-                 polynomial_order=5,
+                 spline_order=5,
                  memory_model='independent',
                  fit_prior_mu_only=False):
 
@@ -195,11 +195,11 @@ class FlexibleNoiseComparisonModel(BaseModel):
         if ~fit_seperate_evidence_sd and (memory_model != 'independent'):
             raise ValueError('Single evidence_sd can only be used with memory_model=independent')
 
-        if (type(polynomial_order) is int) and fit_seperate_evidence_sd:
-            polynomial_order = polynomial_order, polynomial_order
+        if (type(spline_order) is int) and fit_seperate_evidence_sd:
+            spline_order = spline_order, spline_order
 
-        self.polynomial_order = polynomial_order
-        self.max_polynomial_order = np.max(self.polynomial_order)
+        self.spline_order = spline_order
+        self.max_spline_order = np.max(self.spline_order)
         self.memory_model = memory_model
 
         super().__init__(paradigm)
@@ -210,7 +210,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
         # construction and don't depend on what x is passed to make_dm later.
         # This rules out the silent-misuse mode where the spline coefficients
         # were fit with one set of knots and then evaluated against a different
-        # set. Knot ranges and per-variable polynomial_order are recorded here
+        # set. Knot ranges and per-variable spline_order are recorded here
         # for transparency.
         self._dm_design_infos = {}
         if paradigm is not None:
@@ -228,13 +228,13 @@ class FlexibleNoiseComparisonModel(BaseModel):
                                    self.paradigm['n2'].values])
         raise ValueError(f"Unknown spline variable {variable!r}")
 
-    def _polynomial_order_for(self, variable):
+    def _spline_order_for(self, variable):
         if not self.fit_seperate_evidence_sd:
-            return self.polynomial_order
+            return self.spline_order
         if variable in ('n1_evidence_sd', 'perceptual_noise_sd'):
-            return self.polynomial_order[0]
+            return self.spline_order[0]
         if variable in ('n2_evidence_sd', 'memory_noise_sd'):
-            return self.polynomial_order[1]
+            return self.spline_order[1]
         raise ValueError(f"Unknown spline variable {variable!r}")
 
     def _initialize_design_infos(self):
@@ -254,10 +254,10 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
     def _build_and_cache_design_info(self, variable):
         x = self._spline_x_for(variable)
-        polynomial_order = self._polynomial_order_for(variable)
+        spline_order = self._spline_order_for(variable)
         min_n, max_n = self.paradigm[['n1', 'n2']].min().min(), self.paradigm[['n1', 'n2']].max().max()
-        if polynomial_order > 1:
-            formula = (f"bs(x, degree=3, df={polynomial_order}, "
+        if spline_order > 1:
+            formula = (f"bs(x, degree=3, df={spline_order}, "
                        f"include_intercept=True, lower_bound={min_n}, "
                        f"upper_bound={max_n}) - 1")
         else:
@@ -277,7 +277,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
             assert('subject' in paradigm.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
             coords['subject'] = paradigm.index.unique(level='subject')
 
-        coords['poly_order'] = np.arange(self.max_polynomial_order)
+        coords['poly_order'] = np.arange(self.max_spline_order)
 
         return BaseModel.build_estimation_model(self, data=paradigm, coords=coords, hierarchical=hierarchical, save_p_choice=save_p_choice)
 
@@ -328,14 +328,14 @@ class FlexibleNoiseComparisonModel(BaseModel):
         if self.fit_seperate_evidence_sd:
             key1, key2 = self._get_evidence_sd_labels()
 
-            for n in range(1, self.polynomial_order[0]+1):
+            for n in range(1, self.spline_order[0]+1):
                 free_parameters[f'{key1}_spline{n}'] = {'mu_intercept': 5., 'sigma_intercept': 5., 'transform': 'identity'}
 
-            for n in range(1, self.polynomial_order[1]+1):
+            for n in range(1, self.spline_order[1]+1):
                 free_parameters[f'{key2}_spline{n}'] = {'mu_intercept': 5., 'sigma_intercept': 5., 'transform': 'identity'}
 
         else:
-            for n in range(1, self.polynomial_order+1):
+            for n in range(1, self.spline_order+1):
                 free_parameters[f'evidence_sd_spline{n}'] = {'mu_intercept': 5., 'sigma_intercept': 5., 'transform': 'identity'}
 
         if self.fit_prior:
@@ -357,11 +357,11 @@ class FlexibleNoiseComparisonModel(BaseModel):
     def _get_evidence_sd_spline_par_labels(self):
         if self.fit_seperate_evidence_sd:
             key1, key2 = self._get_evidence_sd_labels()
-            label1 = [f'{key1}_spline{n}' for n in range(1, self.polynomial_order[0]+1)]
-            label2 = [f'{key2}_spline{n}' for n in range(1, self.polynomial_order[1]+1)]
+            label1 = [f'{key1}_spline{n}' for n in range(1, self.spline_order[0]+1)]
+            label2 = [f'{key2}_spline{n}' for n in range(1, self.spline_order[1]+1)]
             return label1, label2
         else:
-            labels = [f'evidence_sd_spline{n}' for n in range(1, self.polynomial_order+1)]
+            labels = [f'evidence_sd_spline{n}' for n in range(1, self.spline_order+1)]
             return labels, labels
 
     def _get_evidence_sd_labels(self):
@@ -610,11 +610,11 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
                  regressors,
                  fit_seperate_evidence_sd=True,
                  fit_prior=False,
-                 polynomial_order=5,
+                 spline_order=5,
                  memory_model='independent'):
 
-        if (type(polynomial_order) is int) and fit_seperate_evidence_sd:
-            polynomial_order = polynomial_order, polynomial_order
+        if (type(spline_order) is int) and fit_seperate_evidence_sd:
+            spline_order = spline_order, spline_order
 
 
         for key in list(regressors.keys()):
@@ -622,11 +622,11 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
             if key in ['evidence_sd', 'n1_evidence_sd', 'memory_noise', 'n2_evidence_sd', 'perceptual_noise']:
 
                 if key in ['evidence_sd']:
-                    po = polynomial_order
+                    po = spline_order
                 elif key in ['n1_evidence_sd', 'memory_noise']:
-                    po = polynomial_order[0]
+                    po = spline_order[0]
                 elif key in ['n2_evidence_sd', 'perceptual_noise']:
-                    po = polynomial_order[1]
+                    po = spline_order[1]
 
                 warn(f'Found {key} in regressors, will add it for all {po} splines!')
 
@@ -638,7 +638,7 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
 
         RegressionModel.__init__(self, regressors)
         FlexibleNoiseComparisonModel.__init__(self, paradigm, fit_seperate_evidence_sd, fit_prior,
-                                              polynomial_order, memory_model)
+                                              spline_order, memory_model)
 
 
 class PowerLawNoiseComparisonModel(BaseModel):

@@ -102,7 +102,7 @@ def fig_sigma_overlay(out_path, df, m_fc, idata_fc, m_fd, idata_fd):
 
     def implied_group(model, idata, variable):
         dm = np.asarray(model.make_dm(x=n_grid, variable=variable))
-        poly = model.polynomial_order
+        poly = model.spline_order
         poly_v = poly[0] if variable == 'n1_evidence_sd' else poly[1]
         keys = [f'{variable}_spline{i}_mu' for i in range(1, poly_v + 1)]
         coefs = np.stack([idata.posterior[k].values for k in keys], axis=-1)
@@ -187,7 +187,7 @@ def main():
     if op.exists(nc_fddm):
         idata_fd = az.from_netcdf(nc_fddm)
         m_fd = DDMFlexibleNoiseComparisonModel(
-            paradigm=df, fit_seperate_evidence_sd=True, polynomial_order=5,
+            paradigm=df, fit_seperate_evidence_sd=True, spline_order=5,
             fit_prior=True, fit_v_scale=False)
         m_fd.build_estimation_model(paradigm=df, hierarchical=True)
         print('  flex-DDM PPC...', flush=True)
@@ -212,7 +212,7 @@ def main():
     if m_fd is not None and op.exists(nc_fchoice):
         idata_fc = az.from_netcdf(nc_fchoice)
         m_fc = FlexibleNoiseComparisonModel(paradigm=df, fit_seperate_evidence_sd=True,
-                                              polynomial_order=5, fit_prior=True)
+                                              spline_order=5, fit_prior=True)
         m_fc.build_estimation_model(paradigm=df, hierarchical=True)
         fig_sigma_overlay(op.join(args.out_dir, 'fig_sigma_overlay.png'),
                            df, m_fc, idata_fc, m_fd, idata_fd)

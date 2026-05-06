@@ -91,7 +91,7 @@ def main():
         if args.flex:
             from bauer.models import FlexibleNoiseComparisonModel as Cls
             kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
-                          polynomial_order=5, fit_prior=True)
+                          spline_order=5, fit_prior=True)
         else:
             from bauer.models import MagnitudeComparisonModel as Cls
             kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
@@ -100,7 +100,7 @@ def main():
         if args.flex:
             from bauer.models import DDMFlexibleNoiseComparisonModel as Cls
             kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
-                          polynomial_order=5, fit_prior=True,
+                          spline_order=5, fit_prior=True,
                           fit_v_scale=fit_v_scale)
         else:
             from bauer.models import DDMMagnitudeComparisonModel as Cls
@@ -111,7 +111,7 @@ def main():
         if args.flex:
             from bauer.models import RaceDiffusionFlexibleNoiseComparisonModel as Cls
             kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
-                          polynomial_order=5, fit_prior=True, advantage=adv)
+                          spline_order=5, fit_prior=True, advantage=adv)
         else:
             from bauer.models import RaceDiffusionMagnitudeComparisonModel as Cls
             kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,

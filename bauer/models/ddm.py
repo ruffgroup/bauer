@@ -25,7 +25,9 @@ import pymc as pm
 import pytensor.tensor as pt
 
 from .magnitude import MagnitudeComparisonModel, FlexibleNoiseComparisonModel
-from .risky_choice import RiskModel
+from .risky_choice import (
+    RiskModel, FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
+)
 from ..utils.bayes import get_posterior
 from ..utils.math import inverse_softplus_np
 
@@ -501,12 +503,12 @@ class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
     ----------
     fit_v_scale : bool
         See :class:`DDMMagnitudeComparisonModel`. Default ``False``.
-    polynomial_order, fit_seperate_evidence_sd, fit_prior, memory_model :
+    spline_order, fit_seperate_evidence_sd, fit_prior, memory_model :
         Forwarded to :class:`FlexibleNoiseComparisonModel`.
     """
 
     def __init__(self, paradigm, fit_seperate_evidence_sd=True,
-                 fit_prior=False, polynomial_order=5,
+                 fit_prior=False, spline_order=5,
                  memory_model='independent', fit_v_scale=False,
                  fix_z=True):
         self.fit_v_scale = fit_v_scale
@@ -515,7 +517,7 @@ class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
             self, paradigm,
             fit_seperate_evidence_sd=fit_seperate_evidence_sd,
             fit_prior=fit_prior,
-            polynomial_order=polynomial_order,
+            spline_order=spline_order,
             memory_model=memory_model,
         )
 
@@ -555,6 +557,81 @@ class DDMRiskModel(DDMMixin, RiskModel):
             paradigm=paradigm, prior_estimate=prior_estimate,
             fit_seperate_evidence_sd=fit_seperate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
+            memory_model=memory_model,
+        )
+
+    def _get_drift(self, model_inputs, parameters):
+        v_scale = parameters['v_scale'] if self.fit_v_scale else None
+        return _drift_from_snr(model_inputs, v_scale=v_scale)
+
+
+class DDMFlexibleNoiseRiskModel(DDMMixin, FlexibleNoiseRiskModel):
+    """DDM variant of :class:`FlexibleNoiseRiskModel` for risky choice with
+    stimulus-dependent (B-spline) encoding noise.
+
+    Drift uses the same SNR-of-perceived-log-EU formula as
+    :class:`DDMRiskModel`, but ``σ_k(n)`` is now a per-trial spline rather
+    than a scalar.
+
+    Paradigm columns required: ``n1``, ``n2``, ``p1``, ``p2``, ``choice`` (bool),
+    ``rt`` (seconds).
+    """
+
+    def __init__(self, paradigm, prior_estimate='full',
+                 fit_seperate_evidence_sd=True,
+                 save_trialwise_n_estimates=False, spline_order=5,
+                 representational_noise='payoff',
+                 memory_model='independent',
+                 fit_v_scale=False, fix_z=True):
+        self.fit_v_scale = fit_v_scale
+        self.fix_z = fix_z
+        FlexibleNoiseRiskModel.__init__(
+            self, paradigm,
+            prior_estimate=prior_estimate,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            spline_order=spline_order,
+            representational_noise=representational_noise,
+            memory_model=memory_model,
+        )
+
+    def _get_drift(self, model_inputs, parameters):
+        v_scale = parameters['v_scale'] if self.fit_v_scale else None
+        return _drift_from_snr(model_inputs, v_scale=v_scale)
+
+
+class DDMFlexibleNoiseRiskRegressionModel(DDMMixin, FlexibleNoiseRiskRegressionModel):
+    """DDM variant of :class:`FlexibleNoiseRiskRegressionModel`.
+
+    Patsy-formula regression on noise spline coefficients (auto-expanded if
+    you target ``n1_evidence_sd`` etc.) plus on accumulator params
+    (``a``, ``t0``, ``v_scale`` if ``fit_v_scale``). Use for TMS analyses
+    where the noise function should differ across stimulation conditions.
+
+    Example:
+
+        regressors = {
+            'n1_evidence_sd': 'stimulation_condition',  # auto-expands per spline
+            'n2_evidence_sd': 'stimulation_condition',
+            'a': 'stimulation_condition',
+        }
+    """
+
+    def __init__(self, paradigm, regressors, prior_estimate='full',
+                 fit_seperate_evidence_sd=True,
+                 save_trialwise_n_estimates=False, spline_order=5,
+                 representational_noise='payoff',
+                 memory_model='independent',
+                 fit_v_scale=False, fix_z=True):
+        self.fit_v_scale = fit_v_scale
+        self.fix_z = fix_z
+        FlexibleNoiseRiskRegressionModel.__init__(
+            self, paradigm, regressors,
+            prior_estimate=prior_estimate,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            spline_order=spline_order,
+            representational_noise=representational_noise,
             memory_model=memory_model,
         )
 

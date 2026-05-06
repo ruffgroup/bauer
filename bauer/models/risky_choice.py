@@ -766,7 +766,7 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
     """Risky choice model combining flexible (polynomial) noise with Bayesian magnitude inference."""
 
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, polynomial_order=5,
+                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, spline_order=5,
                  representational_noise='payoff',
                  memory_model='independent'):
 
@@ -776,11 +776,11 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
         if representational_noise not in ['payoff', 'ev']:
             raise ValueError(f'Unknown representational noise: {representational_noise} (should be "payoff" or "ev")')
 
-        if (type(polynomial_order) is int) and fit_seperate_evidence_sd:
-            polynomial_order = polynomial_order, polynomial_order
+        if (type(spline_order) is int) and fit_seperate_evidence_sd:
+            spline_order = spline_order, spline_order
 
-        self.polynomial_order = polynomial_order
-        self.max_polynomial_order = np.max(self.polynomial_order)
+        self.spline_order = spline_order
+        self.max_spline_order = np.max(self.spline_order)
         self.representational_noise = representational_noise
 
         RiskModel.__init__(self, paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates,
@@ -942,12 +942,12 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
     def __init__(self, paradigm,
                  regressors,
                  prior_estimate='full',
-                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, polynomial_order=5,
+                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, spline_order=5,
                  representational_noise='payoff',
                  memory_model='independent'):
 
-        if (type(polynomial_order) is int) and fit_seperate_evidence_sd:
-            polynomial_order = polynomial_order, polynomial_order
+        if (type(spline_order) is int) and fit_seperate_evidence_sd:
+            spline_order = spline_order, spline_order
 
 
         for key in list(regressors.keys()):
@@ -955,11 +955,11 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
             if key in ['evidence_sd', 'n1_evidence_sd', 'memory_noise_sd', 'n2_evidence_sd', 'perceptual_noise_sd']:
 
                 if key in ['evidence_sd']:
-                    po = polynomial_order
+                    po = spline_order
                 elif key in ['n1_evidence_sd', 'memory_noise_sd']:
-                    po = polynomial_order[0]
+                    po = spline_order[0]
                 elif key in ['n2_evidence_sd', 'perceptual_noise_sd']:
-                    po = polynomial_order[1]
+                    po = spline_order[1]
 
                 for i in range(1, po+1):
                     regressors[f'{key}_spline{i}'] = regressors[key]
@@ -969,7 +969,7 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
 
         RegressionModel.__init__(self, regressors)
         FlexibleNoiseRiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd, save_trialwise_n_estimates,
-                                        polynomial_order, representational_noise, memory_model)
+                                        spline_order, representational_noise, memory_model)
 
 
     def get_sd_curve(self, conditions, idata=None, pars=None, x=None, variable='n1_evidence_sd', group=True, hierarchical=True, data=None):
@@ -1331,7 +1331,7 @@ class AffineNoiseRiskModel(FlexibleNoiseRiskModel):
         super().__init__(paradigm, prior_estimate=prior_estimate,
                          fit_seperate_evidence_sd=fit_seperate_evidence_sd,
                          save_trialwise_n_estimates=save_trialwise_n_estimates,
-                         polynomial_order=2,
+                         spline_order=2,
                          memory_model=memory_model)
 
     def make_dm(self, x, variable='n1_evidence_sd'):

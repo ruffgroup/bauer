@@ -43,7 +43,7 @@ def main():
     parser.add_argument('--n-subjects', type=int, default=4)
     parser.add_argument('--n-trials', type=int, default=200)
     parser.add_argument('--full', action='store_true')
-    parser.add_argument('--polynomial-order', type=int, default=5)
+    parser.add_argument('--spline-order', type=int, default=5)
     parser.add_argument('--draws', type=int, default=1000)
     parser.add_argument('--tune', type=int, default=1000)
     parser.add_argument('--chains', type=int, default=2)
@@ -72,7 +72,7 @@ def main():
     df = df.copy()
     print(f'Fitting {len(df)} trials, '
           f'{df.index.get_level_values("subject").nunique()} subjects, '
-          f'polynomial_order={args.polynomial_order}')
+          f'spline_order={args.spline_order}')
 
     choice_path = op.join(out_dir, 'garcia_flex_choice_idata.nc')
     ddm_path = op.join(out_dir, 'garcia_flex_ddm_idata.nc')
@@ -88,7 +88,7 @@ def main():
         print('\n=== flexible-noise choice-only model (fit_prior=True) ===', flush=True)
         m_choice = FlexibleNoiseComparisonModel(
             paradigm=df, fit_seperate_evidence_sd=True,
-            polynomial_order=args.polynomial_order, fit_prior=True,
+            spline_order=args.spline_order, fit_prior=True,
         )
         m_choice.build_estimation_model(paradigm=df, hierarchical=True)
         idata_choice = m_choice.sample(target_accept=0.9, random_seed=0, **sample_kwargs)
@@ -101,7 +101,7 @@ def main():
         print('\n=== flexible-noise DDM model (fit_prior=True, v_scale fixed to 1) ===', flush=True)
         m_ddm = DDMFlexibleNoiseComparisonModel(
             paradigm=df, fit_seperate_evidence_sd=True,
-            polynomial_order=args.polynomial_order, fit_v_scale=False,
+            spline_order=args.spline_order, fit_v_scale=False,
             fit_prior=True,
         )
         m_ddm.build_estimation_model(paradigm=df, hierarchical=True)
@@ -115,7 +115,7 @@ def main():
         print('\n=== flexible-noise race-diffusion model (fit_prior=True, v_scale fixed to 1) ===', flush=True)
         m_race = RaceDiffusionFlexibleNoiseComparisonModel(
             paradigm=df, fit_seperate_evidence_sd=True,
-            polynomial_order=args.polynomial_order, fit_v_scale=False,
+            spline_order=args.spline_order, fit_v_scale=False,
             fit_prior=True,
         )
         m_race.build_estimation_model(paradigm=df, hierarchical=True)

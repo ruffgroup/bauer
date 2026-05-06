@@ -35,7 +35,9 @@ import pymc as pm
 import pytensor.tensor as pt
 
 from .magnitude import MagnitudeComparisonModel, FlexibleNoiseComparisonModel
-from .risky_choice import RiskModel
+from .risky_choice import (
+    RiskModel, FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
+)
 from ..utils.bayes import get_posterior
 from ..utils.math import inverse_softplus_np
 
@@ -413,14 +415,14 @@ class RaceDiffusionFlexibleNoiseComparisonModel(RaceMixin, FlexibleNoiseComparis
     """
 
     def __init__(self, paradigm, fit_seperate_evidence_sd=True,
-                 fit_prior=True, polynomial_order=5,
+                 fit_prior=True, spline_order=5,
                  memory_model='independent', advantage=True):
         self.advantage = advantage
         FlexibleNoiseComparisonModel.__init__(
             self, paradigm,
             fit_seperate_evidence_sd=fit_seperate_evidence_sd,
             fit_prior=fit_prior,
-            polynomial_order=polynomial_order,
+            spline_order=spline_order,
             memory_model=memory_model,
         )
 
@@ -445,6 +447,81 @@ class RaceDiffusionRiskModel(RaceMixin, RiskModel):
             paradigm=paradigm, prior_estimate=prior_estimate,
             fit_seperate_evidence_sd=fit_seperate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
+            memory_model=memory_model,
+        )
+
+    def _get_drifts(self, model_inputs, parameters):
+        return _drifts_from_post_and_prior(model_inputs, parameters,
+                                            advantage=self.advantage)
+
+
+class RaceDiffusionFlexibleNoiseRiskModel(RaceMixin, FlexibleNoiseRiskModel):
+    """Race-diffusion variant of :class:`FlexibleNoiseRiskModel` for risky
+    choice with stimulus-dependent (B-spline) encoding noise.
+
+    Race operates on log(EU_k) (carried in via FlexibleNoiseRiskModel's
+    cognitive front-end), and σ_k(n) is a per-trial spline rather than a
+    scalar. With ``advantage=True`` (default) drifts decompose into
+    difference + summary terms; with ``False`` they're w_0 + tilde_μ_k*.
+
+    Paradigm columns required: ``n1``, ``n2``, ``p1``, ``p2``, ``choice`` (bool),
+    ``rt`` (seconds).
+    """
+
+    def __init__(self, paradigm, prior_estimate='full',
+                 fit_seperate_evidence_sd=True,
+                 save_trialwise_n_estimates=False, spline_order=5,
+                 representational_noise='payoff',
+                 memory_model='independent',
+                 advantage=True):
+        self.advantage = advantage
+        FlexibleNoiseRiskModel.__init__(
+            self, paradigm,
+            prior_estimate=prior_estimate,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            spline_order=spline_order,
+            representational_noise=representational_noise,
+            memory_model=memory_model,
+        )
+
+    def _get_drifts(self, model_inputs, parameters):
+        return _drifts_from_post_and_prior(model_inputs, parameters,
+                                            advantage=self.advantage)
+
+
+class RaceDiffusionFlexibleNoiseRiskRegressionModel(
+        RaceMixin, FlexibleNoiseRiskRegressionModel):
+    """Race-diffusion variant of :class:`FlexibleNoiseRiskRegressionModel`.
+
+    Patsy-formula regression on noise spline coefficients (auto-expanded if
+    you target ``n1_evidence_sd`` etc.) plus on accumulator parameters
+    (``a``, ``t0``, ``w_0``, ``w_d``, ``w_s``). Use for TMS analyses where
+    the noise function should differ across stimulation conditions.
+
+    Example::
+
+        regressors = {
+            'n1_evidence_sd': 'stimulation_condition',
+            'n2_evidence_sd': 'stimulation_condition',
+            'a': 'stimulation_condition',
+        }
+    """
+
+    def __init__(self, paradigm, regressors, prior_estimate='full',
+                 fit_seperate_evidence_sd=True,
+                 save_trialwise_n_estimates=False, spline_order=5,
+                 representational_noise='payoff',
+                 memory_model='independent',
+                 advantage=True):
+        self.advantage = advantage
+        FlexibleNoiseRiskRegressionModel.__init__(
+            self, paradigm, regressors,
+            prior_estimate=prior_estimate,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            spline_order=spline_order,
+            representational_noise=representational_noise,
             memory_model=memory_model,
         )
 
