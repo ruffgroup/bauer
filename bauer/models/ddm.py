@@ -125,13 +125,10 @@ class DDMMixin:
     fit_v_scale = False
     fix_z = True
 
-    # Recommended numpyro NUTS kwargs for this model class. Used by
-    # bauer/scripts/fit_*.py to set dense_mass=True automatically — the DDM
-    # posterior has strong v_scale × evidence_sd × a correlations that
-    # diagonal mass cannot navigate (step-size collapses, tree-depth maxes,
-    # one chain in four reliably gets stuck). For pymc backend, the
-    # equivalent is `pm.sample(init='adapt_full')`.
-    recommended_nuts_kwargs = {'dense_mass': True}
+    # Strongly-correlated DDM posteriors need full mass adaptation. See
+    # BaseModel for the rationale; both backends get auto-routed defaults.
+    recommended_nuts_kwargs = {'dense_mass': True}     # numpyro / blackjax
+    recommended_pymc_init = 'jitter+adapt_full'        # pymc
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
@@ -587,7 +584,8 @@ class DDMRiskModel(DDMMixin, RiskModel):
 
     def _get_drift(self, model_inputs, parameters):
         v_scale = parameters['v_scale'] if self.fit_v_scale else None
-        return _drift_from_snr(model_inputs, v_scale=v_scale)
+        return _drift_from_snr(model_inputs, v_scale=v_scale,
+                               flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 class DDMFlexibleNoiseRiskModel(DDMMixin, FlexibleNoiseRiskModel):
@@ -622,7 +620,8 @@ class DDMFlexibleNoiseRiskModel(DDMMixin, FlexibleNoiseRiskModel):
 
     def _get_drift(self, model_inputs, parameters):
         v_scale = parameters['v_scale'] if self.fit_v_scale else None
-        return _drift_from_snr(model_inputs, v_scale=v_scale)
+        return _drift_from_snr(model_inputs, v_scale=v_scale,
+                               flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 class DDMFlexibleNoiseRiskRegressionModel(DDMMixin, FlexibleNoiseRiskRegressionModel):
@@ -662,7 +661,8 @@ class DDMFlexibleNoiseRiskRegressionModel(DDMMixin, FlexibleNoiseRiskRegressionM
 
     def _get_drift(self, model_inputs, parameters):
         v_scale = parameters['v_scale'] if self.fit_v_scale else None
-        return _drift_from_snr(model_inputs, v_scale=v_scale)
+        return _drift_from_snr(model_inputs, v_scale=v_scale,
+                               flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 # ============================================================
@@ -693,7 +693,8 @@ class DDMPowerLawNoiseComparisonModel(DDMMixin, PowerLawNoiseComparisonModel):
 
     def _get_drift(self, model_inputs, parameters):
         v_scale = parameters['v_scale'] if self.fit_v_scale else None
-        return _drift_from_snr(model_inputs, v_scale=v_scale)
+        return _drift_from_snr(model_inputs, v_scale=v_scale,
+                               flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 class DDMPowerLawNoiseComparisonRegressionModel(DDMMixin, PowerLawNoiseComparisonRegressionModel):
@@ -718,7 +719,8 @@ class DDMPowerLawNoiseComparisonRegressionModel(DDMMixin, PowerLawNoiseCompariso
 
     def _get_drift(self, model_inputs, parameters):
         v_scale = parameters['v_scale'] if self.fit_v_scale else None
-        return _drift_from_snr(model_inputs, v_scale=v_scale)
+        return _drift_from_snr(model_inputs, v_scale=v_scale,
+                               flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 class DDMPowerLawNoiseRiskModel(DDMMixin, PowerLawNoiseRiskModel):
@@ -742,7 +744,8 @@ class DDMPowerLawNoiseRiskModel(DDMMixin, PowerLawNoiseRiskModel):
 
     def _get_drift(self, model_inputs, parameters):
         v_scale = parameters['v_scale'] if self.fit_v_scale else None
-        return _drift_from_snr(model_inputs, v_scale=v_scale)
+        return _drift_from_snr(model_inputs, v_scale=v_scale,
+                               flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 class DDMPowerLawNoiseRiskRegressionModel(DDMMixin, PowerLawNoiseRiskRegressionModel):
@@ -771,4 +774,5 @@ class DDMPowerLawNoiseRiskRegressionModel(DDMMixin, PowerLawNoiseRiskRegressionM
 
     def _get_drift(self, model_inputs, parameters):
         v_scale = parameters['v_scale'] if self.fit_v_scale else None
-        return _drift_from_snr(model_inputs, v_scale=v_scale)
+        return _drift_from_snr(model_inputs, v_scale=v_scale,
+                               flat_observer_prior=getattr(self, 'flat_observer_prior', False))

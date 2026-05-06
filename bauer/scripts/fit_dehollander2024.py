@@ -106,10 +106,14 @@ def main():
 
     print(f'Sampling (backend={args.backend})...', flush=True)
     if args.backend == 'pymc':
+        rec_init = getattr(m, 'recommended_pymc_init', None)
+        sample_extra = {'init': rec_init} if rec_init is not None else {}
+        if sample_extra:
+            print(f'  pymc init: {rec_init}', flush=True)
         idata = m.sample(
             draws=args.draws, tune=args.tune, chains=args.chains, cores=args.cores,
             target_accept=args.target_accept, random_seed=args.seed,
-            progressbar=False, callback=_progress,
+            progressbar=False, callback=_progress, **sample_extra,
         )
     else:
         from pymc.sampling.jax import sample_numpyro_nuts, sample_blackjax_nuts

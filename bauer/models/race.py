@@ -153,10 +153,11 @@ class RaceMixin:
     """
     advantage = True
 
-    # See DDMMixin.recommended_nuts_kwargs for rationale. The race model has
-    # the same multiplicative w_0 × tilde_μ structure (and w_d × tilde_diff
-    # when advantage=True), so dense mass helps for the same reasons.
+    # See DDMMixin / BaseModel for rationale — race model has the same
+    # multiplicative w_0 × tilde_μ structure (and w_d × tilde_diff when
+    # advantage=True) so dense mass adaptation helps for the same reasons.
     recommended_nuts_kwargs = {'dense_mass': True}
+    recommended_pymc_init = 'jitter+adapt_full'
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()

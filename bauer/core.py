@@ -11,13 +11,23 @@ class BaseModel(object):
 
     paradigm_keys = []
 
-    # Per-model-class hints for the JAX-NUTS sampler. Subclasses with
-    # strongly-correlated posteriors (DDM/RDM) override this with
-    # ``{'dense_mass': True}``. The CLI fit scripts apply this automatically
-    # when ``--backend numpyro|blackjax`` is set, so users don't have to
-    # remember a flag for every problematic model. Empty default = use
-    # numpyro's built-in defaults (diagonal mass, etc.).
+    # Per-model-class hints for the NUTS sampler.
+    #
+    # ``recommended_nuts_kwargs`` is forwarded to numpyro / blackjax via
+    # ``pm.sampling.jax.sample_*_nuts(nuts_kwargs=...)``. DDM/RDM mixins
+    # override this with ``{'dense_mass': True}`` because the posterior has
+    # strongly-correlated parameters (v_scale × evidence_sd × a) that
+    # diagonal mass cannot navigate (step-size collapses, tree-depth maxes,
+    # chains get stuck at numerical singularities).
+    #
+    # ``recommended_pymc_init`` is the equivalent for the default pymc
+    # backend — passed as ``pm.sample(init=...)``. Both 'adapt_full' and
+    # 'jitter+adapt_full' enable full mass-matrix adaptation. Default
+    # ``None`` = use pymc's default ('auto' → 'jitter+adapt_diag').
+    #
+    # Empty / None defaults = use whatever the backend chooses.
     recommended_nuts_kwargs: dict = {}
+    recommended_pymc_init: str | None = None
 
     def __init__(self, paradigm, save_trialwise_n_estimates=False):
         """
