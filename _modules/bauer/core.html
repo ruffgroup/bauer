@@ -500,12 +500,72 @@
 
         <span class="k">return</span> <span class="n">data</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">draws</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">target_accept</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        
-        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimation_model</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">idata</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="n">tune</span><span class="p">,</span> <span class="n">target_accept</span><span class="o">=</span><span class="n">target_accept</span><span class="p">,</span> <span class="n">return_inferencedata</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">idata</span>            
+<div class="viewcode-block" id="BaseModel.sample">
+<a class="viewcode-back" href="../../api_reference.html#bauer.core.BaseModel.sample">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">draws</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">target_accept</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+               <span class="n">backend</span><span class="o">=</span><span class="s1">&#39;pymc&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Sample from the posterior using the requested NUTS backend.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        backend : {&#39;pymc&#39;, &#39;numpyro&#39;, &#39;blackjax&#39;}</span>
+<span class="sd">            &#39;pymc&#39; uses :func:`pm.sample` (default). &#39;numpyro&#39; / &#39;blackjax&#39;</span>
+<span class="sd">            use the corresponding JAX-NUTS sampler from</span>
+<span class="sd">            :mod:`pm.sampling.jax`. JAX backends are much faster on GPU.</span>
+<span class="sd">        chains : int</span>
+<span class="sd">            Number of chains. Default 4.</span>
+<span class="sd">        target_accept : float</span>
+<span class="sd">            NUTS target acceptance probability. 0.8 is fine for well-behaved</span>
+<span class="sd">            models; 0.95 for hierarchical / DDM-like ones; 0.99 only if</span>
+<span class="sd">            divergences persist.</span>
+<span class="sd">        draws, tune : int</span>
+<span class="sd">            Posterior and warmup draws per chain.</span>
+<span class="sd">        **kwargs</span>
+<span class="sd">            Forwarded to the underlying sampler. Notably:</span>
+<span class="sd">            - pymc backend: ``init=`` (e.g. &#39;jitter+adapt_full&#39; for dense</span>
+<span class="sd">              mass adaptation), ``cores=``, ``random_seed=``.</span>
+<span class="sd">            - JAX backends: ``nuts_kwargs={&#39;dense_mass&#39;: True}``,</span>
+<span class="sd">              ``chain_method=&#39;vectorized&#39;``, ``random_seed=``.</span>
+
+<span class="sd">        Auto-applied defaults</span>
+<span class="sd">        ---------------------</span>
+<span class="sd">        Subclasses can declare strongly-correlated posteriors via</span>
+<span class="sd">        ``recommended_pymc_init`` and ``recommended_nuts_kwargs``; this</span>
+<span class="sd">        method applies them unless the user passes the corresponding kwarg</span>
+<span class="sd">        explicitly. DDMMixin / RaceMixin do this for full mass-matrix</span>
+<span class="sd">        adaptation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s1">&#39;pymc&#39;</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;init&#39;</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;recommended_pymc_init&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                                       <span class="ow">or</span> <span class="s1">&#39;auto&#39;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimation_model</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">idata</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span>
+                    <span class="n">draws</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="n">tune</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="n">chains</span><span class="p">,</span>
+                    <span class="n">target_accept</span><span class="o">=</span><span class="n">target_accept</span><span class="p">,</span>
+                    <span class="n">return_inferencedata</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+                <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">backend</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;numpyro&#39;</span><span class="p">,</span> <span class="s1">&#39;blackjax&#39;</span><span class="p">):</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">pymc.sampling.jax</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+                <span class="n">sample_numpyro_nuts</span><span class="p">,</span> <span class="n">sample_blackjax_nuts</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">sampler</span> <span class="o">=</span> <span class="p">(</span><span class="n">sample_numpyro_nuts</span> <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s1">&#39;numpyro&#39;</span>
+                       <span class="k">else</span> <span class="n">sample_blackjax_nuts</span><span class="p">)</span>
+            <span class="c1"># Merge model recommendation with any explicit override</span>
+            <span class="n">rec</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;recommended_nuts_kwargs&#39;</span><span class="p">,</span> <span class="p">{}))</span>
+            <span class="n">user</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;nuts_kwargs&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+            <span class="n">nuts_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">rec</span><span class="p">,</span> <span class="o">**</span><span class="n">user</span><span class="p">}</span>
+            <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;chain_method&#39;</span><span class="p">,</span> <span class="s1">&#39;vectorized&#39;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimation_model</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">idata</span> <span class="o">=</span> <span class="n">sampler</span><span class="p">(</span>
+                    <span class="n">draws</span><span class="o">=</span><span class="n">draws</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="n">tune</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="n">chains</span><span class="p">,</span>
+                    <span class="n">target_accept</span><span class="o">=</span><span class="n">target_accept</span><span class="p">,</span>
+                    <span class="n">nuts_kwargs</span><span class="o">=</span><span class="n">nuts_kwargs</span> <span class="ow">or</span> <span class="kc">None</span><span class="p">,</span>
+                    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+                <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;backend must be &#39;pymc&#39;/&#39;numpyro&#39;/&#39;blackjax&#39;, got </span><span class="si">{</span><span class="n">backend</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">idata</span></div>
+
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fit_map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filter_pars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimation_model</span><span class="p">:</span>

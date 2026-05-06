@@ -309,6 +309,44 @@ models can be fed into the same downstream summarizers.</p>
 </dl>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="bauer.core.BaseModel.sample">
+<span class="sig-name descname"><span class="pre">sample</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">draws</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tune</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_accept</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chains</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'pymc'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/core.html#BaseModel.sample"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.core.BaseModel.sample" title="Link to this definition">¶</a></dt>
+<dd><p>Sample from the posterior using the requested NUTS backend.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>backend</strong> (<em>{'pymc'</em><em>, </em><em>'numpyro'</em><em>, </em><em>'blackjax'}</em>) – ‘pymc’ uses <code class="xref py py-func docutils literal notranslate"><span class="pre">pm.sample()</span></code> (default). ‘numpyro’ / ‘blackjax’
+use the corresponding JAX-NUTS sampler from
+<code class="xref py py-mod docutils literal notranslate"><span class="pre">pm.sampling.jax</span></code>. JAX backends are much faster on GPU.</p></li>
+<li><p><strong>chains</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Number of chains. Default 4.</p></li>
+<li><p><strong>target_accept</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – NUTS target acceptance probability. 0.8 is fine for well-behaved
+models; 0.95 for hierarchical / DDM-like ones; 0.99 only if
+divergences persist.</p></li>
+<li><p><strong>draws</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Posterior and warmup draws per chain.</p></li>
+<li><p><strong>tune</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Posterior and warmup draws per chain.</p></li>
+<li><p><strong>**kwargs</strong> – <p>Forwarded to the underlying sampler. Notably:
+- pymc backend: <code class="docutils literal notranslate"><span class="pre">init=</span></code> (e.g. ‘jitter+adapt_full’ for dense</p>
+<blockquote>
+<div><p>mass adaptation), <code class="docutils literal notranslate"><span class="pre">cores=</span></code>, <code class="docutils literal notranslate"><span class="pre">random_seed=</span></code>.</p>
+</div></blockquote>
+<ul>
+<li><p>JAX backends: <code class="docutils literal notranslate"><span class="pre">nuts_kwargs={'dense_mass':</span> <span class="pre">True}</span></code>,
+<code class="docutils literal notranslate"><span class="pre">chain_method='vectorized'</span></code>, <code class="docutils literal notranslate"><span class="pre">random_seed=</span></code>.</p></li>
+</ul>
+</p></li>
+<li><p><strong>defaults</strong> (<em>Auto-applied</em>)</p></li>
+<li><p><strong>---------------------</strong></p></li>
+<li><p><strong>via</strong> (<em>Subclasses can declare strongly-correlated posteriors</em>)</p></li>
+<li><p><strong>this</strong> (<em>recommended_pymc_init and recommended_nuts_kwargs;</em>)</p></li>
+<li><p><strong>kwarg</strong> (<em>method applies them unless the user passes the corresponding</em>)</p></li>
+<li><p><strong>mass-matrix</strong> (<em>explicitly. DDMMixin / RaceMixin do this for full</em>)</p></li>
+<li><p><strong>adaptation.</strong></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="py class">
@@ -773,6 +811,7 @@ draw a dashed horizontal line at the group-mean posterior mean.</p></li>
 <li><a class="reference internal" href="#bauer.core.BaseModel.build_hierarchical_nodes"><code class="docutils literal notranslate"><span class="pre">BaseModel.build_hierarchical_nodes()</span></code></a></li>
 <li><a class="reference internal" href="#bauer.core.BaseModel.fit_map_individual"><code class="docutils literal notranslate"><span class="pre">BaseModel.fit_map_individual()</span></code></a></li>
 <li><a class="reference internal" href="#bauer.core.BaseModel.ppc"><code class="docutils literal notranslate"><span class="pre">BaseModel.ppc()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.core.BaseModel.sample"><code class="docutils literal notranslate"><span class="pre">BaseModel.sample()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#bauer.core.LapseModel"><code class="docutils literal notranslate"><span class="pre">LapseModel</span></code></a></li>
