@@ -256,13 +256,23 @@
 
     <span class="n">paradigm_keys</span> <span class="o">=</span> <span class="p">[]</span>
 
-    <span class="c1"># Per-model-class hints for the JAX-NUTS sampler. Subclasses with</span>
-    <span class="c1"># strongly-correlated posteriors (DDM/RDM) override this with</span>
-    <span class="c1"># ``{&#39;dense_mass&#39;: True}``. The CLI fit scripts apply this automatically</span>
-    <span class="c1"># when ``--backend numpyro|blackjax`` is set, so users don&#39;t have to</span>
-    <span class="c1"># remember a flag for every problematic model. Empty default = use</span>
-    <span class="c1"># numpyro&#39;s built-in defaults (diagonal mass, etc.).</span>
+    <span class="c1"># Per-model-class hints for the NUTS sampler.</span>
+    <span class="c1">#</span>
+    <span class="c1"># ``recommended_nuts_kwargs`` is forwarded to numpyro / blackjax via</span>
+    <span class="c1"># ``pm.sampling.jax.sample_*_nuts(nuts_kwargs=...)``. DDM/RDM mixins</span>
+    <span class="c1"># override this with ``{&#39;dense_mass&#39;: True}`` because the posterior has</span>
+    <span class="c1"># strongly-correlated parameters (v_scale × evidence_sd × a) that</span>
+    <span class="c1"># diagonal mass cannot navigate (step-size collapses, tree-depth maxes,</span>
+    <span class="c1"># chains get stuck at numerical singularities).</span>
+    <span class="c1">#</span>
+    <span class="c1"># ``recommended_pymc_init`` is the equivalent for the default pymc</span>
+    <span class="c1"># backend — passed as ``pm.sample(init=...)``. Both &#39;adapt_full&#39; and</span>
+    <span class="c1"># &#39;jitter+adapt_full&#39; enable full mass-matrix adaptation. Default</span>
+    <span class="c1"># ``None`` = use pymc&#39;s default (&#39;auto&#39; → &#39;jitter+adapt_diag&#39;).</span>
+    <span class="c1">#</span>
+    <span class="c1"># Empty / None defaults = use whatever the backend chooses.</span>
     <span class="n">recommended_nuts_kwargs</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">recommended_pymc_init</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
