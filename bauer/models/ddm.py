@@ -487,14 +487,13 @@ class DDMMagnitudeComparisonModel(DDMMixin, MagnitudeComparisonModel):
     def __init__(self, paradigm=None, fit_prior=False,
                  fit_seperate_evidence_sd=True, memory_model='independent',
                  save_trialwise_n_estimates=False, fit_v_scale=False,
-                 fix_z=True, flat_observer_prior=False):
+                 fix_z=True):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
         super().__init__(paradigm=paradigm, fit_prior=fit_prior,
                          fit_seperate_evidence_sd=fit_seperate_evidence_sd,
                          memory_model=memory_model,
-                         save_trialwise_n_estimates=save_trialwise_n_estimates,
-                         flat_observer_prior=flat_observer_prior)
+                         save_trialwise_n_estimates=save_trialwise_n_estimates)
 
     def _get_drift(self, model_inputs, parameters):
         v_scale = parameters['v_scale'] if self.fit_v_scale else None
