@@ -278,9 +278,17 @@
 <span class="sd">        ``&#39;shared_perceptual_noise&#39;`` decomposes into perceptual and memory noise.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fit_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">memory_model</span> <span class="o">=</span> <span class="s1">&#39;independent&#39;</span><span class="p">,</span><span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fit_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                 <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                 <span class="n">fit_prior_mu_only</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 
+        <span class="c1"># fit_prior_mu_only=True implies fit_prior=True and pins σ_p at empirical</span>
+        <span class="c1"># std(log n). Useful for the unit-σ RDM where σ_p is otherwise unidentified</span>
+        <span class="c1"># (see notes/race_diffusion_math.md §8e and the discussion in core.py).</span>
+        <span class="k">if</span> <span class="n">fit_prior_mu_only</span><span class="p">:</span>
+            <span class="n">fit_prior</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fit_prior</span> <span class="o">=</span> <span class="n">fit_prior</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit_prior_mu_only</span> <span class="o">=</span> <span class="n">fit_prior_mu_only</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span> <span class="o">=</span> <span class="n">fit_seperate_evidence_sd</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">=</span> <span class="n">memory_model</span>
 
@@ -295,8 +303,14 @@
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_prior</span><span class="p">:</span>
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_mu&#39;</span><span class="p">]</span>
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_mu&#39;</span><span class="p">]</span>
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span>
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_prior_mu_only</span><span class="p">:</span>
+                <span class="n">empirical_sd</span> <span class="o">=</span> <span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]))</span> <span class="o">+</span>
+                                <span class="n">pt</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">])))</span> <span class="o">/</span> <span class="mf">2.</span>
+                <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">empirical_sd</span>
+                <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">empirical_sd</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span>
+                <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span>
 
         <span class="k">else</span><span class="p">:</span>
             <span class="n">mean_prior</span> <span class="o">=</span> <span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]))</span> <span class="o">+</span> <span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">])))</span> <span class="o">/</span> <span class="mf">2.</span>
@@ -352,7 +366,8 @@
             <span class="n">objective_sd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">log_ns</span><span class="p">)</span>
 
             <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">objective_mu</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;identity&#39;</span><span class="p">}</span>
-            <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">objective_sd</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span><span class="p">}</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_prior_mu_only</span><span class="p">:</span>
+                <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">objective_sd</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span><span class="p">}</span>
 
         <span class="k">return</span> <span class="n">free_parameters</span>
 
@@ -425,9 +440,13 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
                  <span class="n">fit_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                  <span class="n">polynomial_order</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
-                 <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">):</span>
+                 <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span>
+                 <span class="n">fit_prior_mu_only</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 
+        <span class="k">if</span> <span class="n">fit_prior_mu_only</span><span class="p">:</span>
+            <span class="n">fit_prior</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fit_prior</span> <span class="o">=</span> <span class="n">fit_prior</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit_prior_mu_only</span> <span class="o">=</span> <span class="n">fit_prior_mu_only</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span> <span class="o">=</span> <span class="n">fit_seperate_evidence_sd</span>
 
         <span class="k">if</span> <span class="o">~</span><span class="n">fit_seperate_evidence_sd</span> <span class="ow">and</span> <span class="p">(</span><span class="n">memory_model</span> <span class="o">!=</span> <span class="s1">&#39;independent&#39;</span><span class="p">):</span>
@@ -529,8 +548,19 @@
             <span class="c1"># Use trialwise variables (expanded per subject) so per-trial shapes</span>
             <span class="c1"># broadcast correctly with model[&#39;n1&#39;]/model[&#39;n2&#39;].</span>
             <span class="n">prior_mu</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_mu&#39;</span><span class="p">]</span>
-            <span class="n">prior_sd</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_prior_mu_only</span><span class="p">:</span>
+                <span class="c1"># σ_p pinned at the global empirical std of the stimuli in this</span>
+                <span class="c1"># paradigm (across all trials, both n1 and n2 columns combined).</span>
+                <span class="c1"># NB: in natural-magnitude space — the flex model represents</span>
+                <span class="c1"># evidence in natural n, not log n. This is inconsistent with</span>
+                <span class="c1"># the static MagnitudeComparisonModel (log space); kept here to</span>
+                <span class="c1"># match the rest of the flex model. TODO: harmonize.</span>
+                <span class="n">prior_sd</span> <span class="o">=</span> <span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])</span> <span class="o">+</span> <span class="n">pt</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]))</span> <span class="o">/</span> <span class="mf">2.</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">prior_sd</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># NB: this branch is per-trial std of the (n1, n2) pair — preserved</span>
+            <span class="c1"># for backwards compatibility, but probably also wrong (TODO).</span>
             <span class="n">prior_mu</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
             <span class="n">prior_sd</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
 
@@ -576,7 +606,8 @@
                 <span class="n">objective_sd</span> <span class="o">=</span> <span class="mi">2</span>
 
             <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">objective_mu</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;identity&#39;</span><span class="p">}</span>
-            <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">objective_sd</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span><span class="p">}</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_prior_mu_only</span><span class="p">:</span>
+                <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">objective_sd</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span><span class="p">}</span>
 
         <span class="k">return</span> <span class="n">free_parameters</span>
 

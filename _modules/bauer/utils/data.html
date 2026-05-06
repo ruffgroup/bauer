@@ -300,10 +300,166 @@
 
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">load_dehollander_tms_risk</span><span class="p">(</span><span class="n">stimulation_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sessions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                                <span class="n">tms_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">remove_non_responses</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                <span class="n">min_rt</span><span class="o">=</span><span class="mf">0.15</span><span class="p">,</span> <span class="n">max_rt</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return behavioral data from the de Hollander TMS-risk experiment.</span>
+
+<span class="sd">    73 subjects total, but **only 35 of them completed the TMS sessions</span>
+<span class="sd">    (sessions 2 and 3)**; the remaining 38 only did the baseline session</span>
+<span class="sd">    (session 1). For TMS analyses you typically want only the 35 TMS</span>
+<span class="sd">    subjects and only sessions 2/3 — the ``tms_only=True`` default does</span>
+<span class="sd">    exactly that. Set ``tms_only=False`` to get all 73 subjects across</span>
+<span class="sd">    all sessions (useful for behavioral baselines or pilot analyses).</span>
+
+<span class="sd">    Each trial has two lotteries (one risky at ``p=0.55``, one safe at</span>
+<span class="sd">    ``p=1.0``) and a binary choice. RT is in seconds. ``choice = True``</span>
+<span class="sd">    means option 2 was chosen (bauer&#39;s risk convention). The TMS condition</span>
+<span class="sd">    is in the ``stimulation_condition`` column ∈ {baseline, vertex, ips};</span>
+<span class="sd">    pass it as a regression covariate to fit how stimulation modulates</span>
+<span class="sd">    noise/aversion.</span>
+
+<span class="sd">    Loads from bundled CSV (``bauer/data/dehollander_tms_risk.csv``).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    stimulation_conditions : list of str or None</span>
+<span class="sd">        Subset of ``[&#39;baseline&#39;, &#39;vertex&#39;, &#39;ips&#39;]`` to keep. Default: all.</span>
+<span class="sd">    sessions : list of int or None</span>
+<span class="sd">        Subset of ``[1, 2, 3]`` to keep. Default: ``[2, 3]`` if</span>
+<span class="sd">        ``tms_only=True``, otherwise all.</span>
+<span class="sd">    tms_only : bool</span>
+<span class="sd">        If True (default), keep only the 35 subjects who completed TMS</span>
+<span class="sd">        sessions, and only sessions 2 and 3. If False, return all 73</span>
+<span class="sd">        subjects across all sessions.</span>
+<span class="sd">    remove_non_responses : bool</span>
+<span class="sd">        Drop trials with missing RT or choice; apply RT cutoffs.</span>
+<span class="sd">    min_rt : float</span>
+<span class="sd">        Lower RT cutoff in seconds (default 0.15). Set to 0 to disable.</span>
+<span class="sd">    max_rt : float or None</span>
+<span class="sd">        Upper RT cutoff in seconds (default None).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">fn</span> <span class="o">=</span> <span class="s1">&#39;dehollander_tms_risk.csv&#39;</span>
+    <span class="k">with</span> <span class="p">(</span><span class="n">files</span><span class="p">(</span><span class="n">__package__</span><span class="p">)</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">&#39;../data/</span><span class="si">{</span><span class="n">fn</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">tms_only</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">sessions</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">sessions</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+        <span class="c1"># Keep only subjects who appear in the TMS sessions.</span>
+        <span class="n">tms_subjects</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;session&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])][</span><span class="s1">&#39;subject&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;subject&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">tms_subjects</span><span class="p">)]</span>
+
+    <span class="k">if</span> <span class="n">stimulation_conditions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;stimulation_condition&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">stimulation_conditions</span><span class="p">)]</span>
+    <span class="k">if</span> <span class="n">sessions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;session&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">sessions</span><span class="p">)]</span>
+
+    <span class="k">if</span> <span class="n">remove_non_responses</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">,</span> <span class="s1">&#39;choice&#39;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">min_rt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">min_rt</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">min_rt</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">max_rt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">max_rt</span><span class="p">]</span>
+
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mf">2.0</span><span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">([</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="s1">&#39;session&#39;</span><span class="p">,</span> <span class="s1">&#39;stimulation_condition&#39;</span><span class="p">,</span>
+                        <span class="s1">&#39;run&#39;</span><span class="p">,</span> <span class="s1">&#39;trial_nr&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">df</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">load_dehollander2024_symbolic</span><span class="p">(</span><span class="n">remove_non_responses</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                   <span class="n">min_rt</span><span class="o">=</span><span class="mf">0.15</span><span class="p">,</span> <span class="n">max_rt</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return behavioral data from de Hollander et al. (2024 Nat Comms)</span>
+<span class="sd">    *symbolic* (Arabic-numeral) risky-choice task as a multi-indexed DataFrame.</span>
+
+<span class="sd">    Loads from the bundled CSV (``bauer/data/dehollander2024_symbolic.csv``).</span>
+<span class="sd">    58 subjects, ~256 trials each. RT is in seconds. Unlike the dotcloud task,</span>
+<span class="sd">    n1/n2 are continuous (each trial samples a different number on a fine</span>
+<span class="sd">    grid, range ~5-100), making this a stronger test of stimulus-dependent</span>
+<span class="sd">    encoding-noise models. ``choice = True`` means option 2 was chosen.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    remove_non_responses : bool</span>
+<span class="sd">        Drop rows with missing choices and trials with RT outside</span>
+<span class="sd">        ``[min_rt, max_rt]``.</span>
+<span class="sd">    min_rt : float</span>
+<span class="sd">        Lower RT cutoff in seconds (default 0.15). Set to 0 to disable.</span>
+<span class="sd">    max_rt : float or None</span>
+<span class="sd">        Upper RT cutoff in seconds (default None).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">fn</span> <span class="o">=</span> <span class="s1">&#39;dehollander2024_symbolic.csv&#39;</span>
+    <span class="k">with</span> <span class="p">(</span><span class="n">files</span><span class="p">(</span><span class="n">__package__</span><span class="p">)</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">&#39;../data/</span><span class="si">{</span><span class="n">fn</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;subject&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">})</span>
+
+    <span class="k">if</span> <span class="n">remove_non_responses</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">,</span> <span class="s1">&#39;choice&#39;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">min_rt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">min_rt</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">min_rt</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">max_rt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">max_rt</span><span class="p">]</span>
+
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">([</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="s1">&#39;run&#39;</span><span class="p">,</span> <span class="s1">&#39;trial_nr&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">df</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">load_dehollander2024_risk</span><span class="p">(</span><span class="n">sessions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">remove_non_responses</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                               <span class="n">min_rt</span><span class="o">=</span><span class="mf">0.15</span><span class="p">,</span> <span class="n">max_rt</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return behavioral data from de Hollander et al. (2024 Nat Comms) risky-choice</span>
+<span class="sd">    task as a multi-indexed DataFrame.</span>
+
+<span class="sd">    Loads from the bundled CSV (``bauer/data/dehollander2024_risk.csv``), which</span>
+<span class="sd">    contains one row per trial across 30 subjects (subject IDs as zero-padded</span>
+<span class="sd">    strings ``&#39;02&#39;`` … ``&#39;32&#39;``, sub-24 excluded) and two sessions (3T MRI,</span>
+<span class="sd">    7T MRI). RT is in seconds. ``choice = True`` means the participant chose</span>
+<span class="sd">    option 2 (the second-presented option), matching bauer&#39;s risk-model</span>
+<span class="sd">    convention. Trials with no response (RT or choice missing) are dropped by</span>
+<span class="sd">    default.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    sessions : list of str or None</span>
+<span class="sd">        Sessions to include (default: all). Valid values: ``[&#39;3t2&#39;, &#39;7t2&#39;]``.</span>
+<span class="sd">    remove_non_responses : bool</span>
+<span class="sd">        Drop rows with missing RT/choice and trials with RT outside</span>
+<span class="sd">        ``[min_rt, max_rt]``.</span>
+<span class="sd">    min_rt : float</span>
+<span class="sd">        Lower RT cutoff in seconds (default 0.15). Set to 0 to disable.</span>
+<span class="sd">    max_rt : float or None</span>
+<span class="sd">        Upper RT cutoff in seconds (default None).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    pd.DataFrame</span>
+<span class="sd">        Multi-indexed by (subject, session, run, trial_nr). Columns include</span>
+<span class="sd">        ``n1``, ``n2``, ``p1``, ``p2``, ``risky_first``, ``choice`` (bool),</span>
+<span class="sd">        ``rt`` (s), ``log_risky_safe``, ``chose_risky``, ``certainty``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">fn</span> <span class="o">=</span> <span class="s1">&#39;dehollander2024_risk.csv&#39;</span>
+    <span class="k">with</span> <span class="p">(</span><span class="n">files</span><span class="p">(</span><span class="n">__package__</span><span class="p">)</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">&#39;../data/</span><span class="si">{</span><span class="n">fn</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;subject&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">})</span>
+
+    <span class="k">if</span> <span class="n">sessions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;session&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">sessions</span><span class="p">)]</span>
+
+    <span class="k">if</span> <span class="n">remove_non_responses</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">,</span> <span class="s1">&#39;choice&#39;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">min_rt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">min_rt</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">min_rt</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">max_rt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">max_rt</span><span class="p">]</span>
+
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">([</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="s1">&#39;session&#39;</span><span class="p">,</span> <span class="s1">&#39;run&#39;</span><span class="p">,</span> <span class="s1">&#39;trial_nr&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">df</span>
+
+
 <div class="viewcode-block" id="load_dehollander2024">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.data.load_dehollander2024">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">load_dehollander2024</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s1">&#39;dotcloud&#39;</span><span class="p">,</span> <span class="n">sessions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-                         <span class="n">bids_folder</span><span class="o">=</span><span class="s1">&#39;/data/ds-risk&#39;</span><span class="p">,</span>
+                         <span class="n">bids_folder</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
                          <span class="n">symbolic_folder</span><span class="o">=</span><span class="s1">&#39;/data/ds-symbolicrisk&#39;</span><span class="p">,</span>
                          <span class="n">remove_non_responses</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return behavioral data from de Hollander et al. (2024) as a multi-indexed DataFrame.</span>
@@ -311,27 +467,52 @@
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
 <span class="sd">    task : {&#39;dotcloud&#39;, &#39;symbolic&#39;}</span>
-<span class="sd">        Which task dataset to load. ``&#39;dotcloud&#39;`` uses the fMRI dot-cloud gamble</span>
-<span class="sd">        task (ds-risk); ``&#39;symbolic&#39;`` uses the Arabic-numeral behavioural task</span>
-<span class="sd">        (ds-symbolicrisk).</span>
+<span class="sd">        Which task dataset to load. ``&#39;dotcloud&#39;`` defaults to the **bundled CSV**</span>
+<span class="sd">        (no BIDS folder needed); pass ``bids_folder`` to read raw events.tsvs</span>
+<span class="sd">        from the ds-risk dataset instead. ``&#39;symbolic&#39;`` uses the Arabic-numeral</span>
+<span class="sd">        behavioural task at ``symbolic_folder``.</span>
 <span class="sd">    sessions : list of str or None</span>
-<span class="sd">        Sessions to include for the dotcloud task (default ``[&#39;3t2&#39;, &#39;7t2&#39;]``).</span>
-<span class="sd">        Ignored for the symbolic task.</span>
-<span class="sd">    bids_folder : str</span>
-<span class="sd">        Root of the ds-risk BIDS dataset.</span>
+<span class="sd">        Sessions to include for the dotcloud task (default: all sessions in the</span>
+<span class="sd">        bundled CSV, i.e. ``[&#39;3t2&#39;, &#39;7t2&#39;]``). Ignored for the symbolic task.</span>
+<span class="sd">    bids_folder : str or None</span>
+<span class="sd">        If given (and ``task=&#39;dotcloud&#39;``), reads from raw BIDS events.tsvs</span>
+<span class="sd">        instead of the bundled CSV. Default ``None`` → use the bundled CSV.</span>
 <span class="sd">    symbolic_folder : str</span>
 <span class="sd">        Root of the ds-symbolicrisk dataset.</span>
 <span class="sd">    remove_non_responses : bool</span>
 <span class="sd">        If True, drop trials with missing choices and cast the ``choice`` column</span>
 <span class="sd">        to bool.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Prefer :func:`load_dehollander2024_risk` for new code — it has cleaner</span>
+<span class="sd">    defaults and an RT cutoff. This function is kept for back-compat with</span>
+<span class="sd">    notebooks and tutorials that import it under the old name.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">task</span> <span class="o">==</span> <span class="s1">&#39;dotcloud&#39;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">bids_folder</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">load_dehollander2024_risk</span><span class="p">(</span>
+                <span class="n">sessions</span><span class="o">=</span><span class="n">sessions</span><span class="p">,</span> <span class="n">remove_non_responses</span><span class="o">=</span><span class="n">remove_non_responses</span><span class="p">,</span>
+                <span class="n">min_rt</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>  <span class="c1"># back-compat: no RT cutoff in old behaviour</span>
+            <span class="p">)</span>
+            <span class="c1"># Match the column subset the legacy loader returned.</span>
+            <span class="n">keep</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">,</span> <span class="s1">&#39;p1&#39;</span><span class="p">,</span> <span class="s1">&#39;p2&#39;</span><span class="p">,</span> <span class="s1">&#39;choice&#39;</span><span class="p">,</span> <span class="s1">&#39;risky_first&#39;</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">df</span><span class="p">[</span><span class="n">keep</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">_load_dehollander2024_dotcloud</span><span class="p">(</span>
             <span class="n">sessions</span><span class="o">=</span><span class="n">sessions</span><span class="p">,</span>
             <span class="n">bids_folder</span><span class="o">=</span><span class="n">bids_folder</span><span class="p">,</span>
             <span class="n">remove_non_responses</span><span class="o">=</span><span class="n">remove_non_responses</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="k">elif</span> <span class="n">task</span> <span class="o">==</span> <span class="s1">&#39;symbolic&#39;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">symbolic_folder</span> <span class="o">==</span> <span class="s1">&#39;/data/ds-symbolicrisk&#39;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">op</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">symbolic_folder</span><span class="p">):</span>
+            <span class="c1"># Default BIDS path doesn&#39;t exist → use bundled CSV.</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">load_dehollander2024_symbolic</span><span class="p">(</span>
+                <span class="n">remove_non_responses</span><span class="o">=</span><span class="n">remove_non_responses</span><span class="p">,</span> <span class="n">min_rt</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">keep</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">,</span> <span class="s1">&#39;p1&#39;</span><span class="p">,</span> <span class="s1">&#39;p2&#39;</span><span class="p">,</span> <span class="s1">&#39;choice&#39;</span><span class="p">,</span> <span class="s1">&#39;risky_first&#39;</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">df</span><span class="p">[</span><span class="n">keep</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">_load_dehollander2024_symbolic</span><span class="p">(</span>
             <span class="n">symbolic_folder</span><span class="o">=</span><span class="n">symbolic_folder</span><span class="p">,</span>
             <span class="n">remove_non_responses</span><span class="o">=</span><span class="n">remove_non_responses</span><span class="p">,</span>

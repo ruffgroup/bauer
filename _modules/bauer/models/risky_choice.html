@@ -786,36 +786,45 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">RiskModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Bayesian observer model for risky choice between two monetary lotteries.</span>
 
-<span class="sd">    Each lottery is characterised by a magnitude (n) and probability (p).  The model</span>
-<span class="sd">    infers posterior beliefs about magnitudes and computes the probability of choosing</span>
-<span class="sd">    the second option via a Bayesian threshold comparison.</span>
+<span class="sd">    Each lottery is characterised by a magnitude (n) and a probability (p).</span>
+<span class="sd">    The Bayesian observer applies a Gaussian prior to ``log(n_k)`` only —</span>
+<span class="sd">    probabilities ``p_k`` are observed precisely. The decision rule compares</span>
+<span class="sd">    ``log(EU)`` of the two options:</span>
+
+<span class="sd">        choose 2  iff  post_log_n_2 + log(p_2)  &gt;  post_log_n_1 + log(p_1)</span>
+
+<span class="sd">    Equivalently, the static cumulative-normal likelihood compares the</span>
+<span class="sd">    perceived log-magnitude difference ``post_log_n_2 - post_log_n_1`` to a</span>
+<span class="sd">    threshold ``log(p_1/p_2)``. ``DDMRiskModel`` and ``RaceDiffusionRiskModel``</span>
+<span class="sd">    use the same front-end with an analytical RT likelihood.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
 <span class="sd">    paradigm : pd.DataFrame, optional</span>
-<span class="sd">        Must contain columns ``n1``, ``n2``, ``p1``, ``p2``, and ``choice``.</span>
-<span class="sd">    prior_estimate : {&#39;objective&#39;, &#39;shared&#39;, &#39;different&#39;, &#39;full&#39;, &#39;full_normed&#39;, &#39;klw&#39;, &#39;fix_prior_sd&#39;}</span>
-<span class="sd">        Strategy for estimating the magnitude prior.</span>
+<span class="sd">        Must contain columns ``n1``, ``n2``, ``p1``, ``p2``, ``choice``.</span>
+<span class="sd">    prior_estimate : {&#39;objective&#39;, &#39;shared&#39;, &#39;full&#39;, &#39;klw&#39;}</span>
+<span class="sd">        Strategy for the magnitude prior. ``objective`` = empirical mean/std</span>
+<span class="sd">        of ``log(n)`` (no fitted parameters); ``shared`` = single fitted</span>
+<span class="sd">        Gaussian shared across options; ``klw`` = Khaw-Li-Woodford style</span>
+<span class="sd">        (empirical ``mu``, fitted ``sd``); ``full`` = separate fitted</span>
+<span class="sd">        ``(mu, sd)`` for the risky and safe options.</span>
 <span class="sd">    fit_seperate_evidence_sd : bool</span>
-<span class="sd">        Whether to fit separate noise for n1 and n2.</span>
-<span class="sd">    incorporate_probability : {&#39;after_inference&#39;, &#39;before_inference&#39;}</span>
-<span class="sd">        Whether probabilities enter the comparison before or after Bayesian inference.</span>
+<span class="sd">        Fit separate encoding noise for n1 and n2 (default ``True``).</span>
 <span class="sd">    memory_model : {&#39;independent&#39;, &#39;shared_perceptual_noise&#39;}</span>
 <span class="sd">        Noise structure; see :class:`MagnitudeComparisonModel`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">paradigm_keys</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">,</span> <span class="s1">&#39;p1&#39;</span><span class="p">,</span> <span class="s1">&#39;p2&#39;</span><span class="p">]</span>
+    <span class="n">_VALID_PRIORS</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;objective&#39;</span><span class="p">,</span> <span class="s1">&#39;shared&#39;</span><span class="p">,</span> <span class="s1">&#39;full&#39;</span><span class="p">,</span> <span class="s1">&#39;klw&#39;</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;objective&#39;</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">incorporate_probability</span><span class="o">=</span><span class="s1">&#39;after_inference&#39;</span><span class="p">,</span>
-                 <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">n_prospects</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
-
-        <span class="k">assert</span> <span class="n">prior_estimate</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;objective&#39;</span><span class="p">,</span> <span class="s1">&#39;shared&#39;</span><span class="p">,</span> <span class="s1">&#39;different&#39;</span><span class="p">,</span> <span class="s1">&#39;full&#39;</span><span class="p">,</span> <span class="s1">&#39;full_normed&#39;</span><span class="p">,</span> <span class="s1">&#39;klw&#39;</span><span class="p">,</span> <span class="s1">&#39;fix_prior_sd&#39;</span><span class="p">]</span>
-
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;objective&#39;</span><span class="p">,</span>
+                 <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                 <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="n">prior_estimate</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_VALID_PRIORS</span><span class="p">,</span> \
+            <span class="sa">f</span><span class="s1">&#39;prior_estimate must be one of </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_VALID_PRIORS</span><span class="si">}</span><span class="s1">&#39;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span> <span class="o">=</span> <span class="n">fit_seperate_evidence_sd</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">=</span> <span class="n">memory_model</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="o">=</span> <span class="n">prior_estimate</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">incorporate_probability</span> <span class="o">=</span> <span class="n">incorporate_probability</span>
-
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="n">save_trialwise_n_estimates</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_model_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
@@ -824,18 +833,11 @@
 
         <span class="n">model_inputs</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])</span> <span class="c1">#self.get_trialwise_variable(&#39;n1_evidence_mu&#39;, transform=&#39;identity&#39;) #at.log(model[&#39;n1&#39;])</span>
+        <span class="c1"># Bayesian observer operates on log(n_k); probabilities enter via the</span>
+        <span class="c1"># threshold (after-inference EU comparison).</span>
+        <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])</span>
         <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">])</span>
-
-        <span class="c1"># Prob of choosing 2 should increase with p2</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">incorporate_probability</span> <span class="o">==</span> <span class="s1">&#39;after_inference&#39;</span><span class="p">:</span>
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;threshold&#39;</span><span class="p">]</span> <span class="o">=</span>  <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">])</span>
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">incorporate_probability</span> <span class="o">==</span> <span class="s1">&#39;before_inference&#39;</span><span class="p">:</span>
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;threshold&#39;</span><span class="p">]</span> <span class="o">=</span>  <span class="mf">0.0</span>
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_mu&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">])</span>
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_mu&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">])</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;incorporate_probability should be either &quot;after_inference&quot; (default) or &quot;before_inference&quot;&#39;</span><span class="p">)</span>
+        <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;threshold&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">])</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="o">==</span> <span class="s1">&#39;objective&#39;</span><span class="p">:</span>
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">stack</span><span class="p">((</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]),</span> <span class="mi">0</span><span class="p">)))</span>
@@ -849,56 +851,14 @@
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_mu&#39;</span><span class="p">]</span>
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">]</span>
 
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="o">==</span> <span class="s1">&#39;fix_prior_sd&#39;</span><span class="p">:</span>
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">stack</span><span class="p">((</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]),</span> <span class="mi">0</span><span class="p">)))</span> <span class="c1"># fixed same prior sd</span>
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">]</span>
-
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;risky_prior_mu&#39;</span><span class="p">]</span>
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;safe_prior_mu&#39;</span><span class="p">]</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="o">==</span> <span class="s1">&#39;two_mus&#39;</span><span class="p">:</span>
-
-            <span class="n">risky_first</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">],</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
-
-            <span class="n">safe_n</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])</span>
-            <span class="n">safe_prior_sd</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">safe_n</span><span class="p">))</span>
-            <span class="n">risky_prior_sd</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;risky_prior_sd&#39;</span><span class="p">]</span>
-
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;n1_prior_mu&#39;</span><span class="p">]</span>
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">risky_prior_sd</span><span class="p">,</span> <span class="n">safe_prior_sd</span><span class="p">)</span>
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;n2_prior_mu&#39;</span><span class="p">]</span>
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">safe_prior_sd</span><span class="p">,</span> <span class="n">risky_prior_sd</span><span class="p">)</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="o">==</span> <span class="s1">&#39;different&#39;</span><span class="p">:</span>
-
-            <span class="n">risky_first</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">]</span>
-
-            <span class="n">safe_n</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])</span>
-            <span class="n">safe_prior_mu</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">safe_n</span><span class="p">))</span>
-            <span class="n">safe_prior_sd</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">safe_n</span><span class="p">))</span>
-
-            <span class="n">risky_prior_mu</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;risky_prior_mu&#39;</span><span class="p">]</span>
-            <span class="n">risky_prior_sd</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;risky_prior_sd&#39;</span><span class="p">]</span>
-
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">risky_prior_mu</span><span class="p">,</span> <span class="n">safe_prior_mu</span><span class="p">)</span>
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">risky_prior_sd</span><span class="p">,</span> <span class="n">safe_prior_sd</span><span class="p">)</span>
-
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">safe_prior_mu</span><span class="p">,</span> <span class="n">risky_prior_mu</span><span class="p">)</span>
-            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">safe_prior_sd</span><span class="p">,</span> <span class="n">risky_prior_sd</span><span class="p">)</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;full&#39;</span><span class="p">,</span> <span class="s1">&#39;full_normed&#39;</span><span class="p">]:</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="o">==</span> <span class="s1">&#39;full&#39;</span><span class="p">:</span>
 
             <span class="n">risky_first</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">]</span>
 
             <span class="n">risky_prior_mu</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;risky_prior_mu&#39;</span><span class="p">]</span>
             <span class="n">risky_prior_sd</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;risky_prior_sd&#39;</span><span class="p">]</span>
-
             <span class="n">safe_prior_mu</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;safe_prior_mu&#39;</span><span class="p">]</span>
-
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="o">==</span> <span class="s1">&#39;full_normed&#39;</span><span class="p">:</span>
-                <span class="n">safe_prior_sd</span> <span class="o">=</span> <span class="mf">1.</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">safe_prior_sd</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;safe_prior_sd&#39;</span><span class="p">]</span>
+            <span class="n">safe_prior_sd</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;safe_prior_sd&#39;</span><span class="p">]</span>
 
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">risky_prior_mu</span><span class="p">,</span> <span class="n">safe_prior_mu</span><span class="p">)</span>
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">risky_prior_sd</span><span class="p">,</span> <span class="n">safe_prior_sd</span><span class="p">)</span>
@@ -961,55 +921,22 @@
             <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span><span class="n">prior_mu</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span><span class="s1">&#39;identity&#39;</span><span class="p">}</span>
             <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span><span class="n">prior_sd</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span><span class="s1">&#39;identity&#39;</span><span class="p">}</span>
 
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="o">==</span> <span class="s1">&#39;different&#39;</span><span class="p">:</span>
-
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="n">risky_n</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">])</span>
-                <span class="n">risky_prior_mu</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">risky_n</span><span class="p">))</span>
-                <span class="n">risky_prior_sd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">risky_n</span><span class="p">))</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">risky_prior_mu</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">25</span><span class="p">)</span>
-                <span class="n">risky_prior_sd</span> <span class="o">=</span> <span class="mi">2</span>
-
-            <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;risky_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span><span class="n">risky_prior_mu</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span><span class="s1">&#39;identity&#39;</span><span class="p">}</span>
-            <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;risky_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span><span class="n">risky_prior_sd</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span><span class="s1">&#39;identity&#39;</span><span class="p">}</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;full&#39;</span><span class="p">,</span> <span class="s1">&#39;full_normed&#39;</span><span class="p">]:</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="o">==</span> <span class="s1">&#39;full&#39;</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">risky_n</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">])</span>
                 <span class="n">safe_n</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])</span>
-
                 <span class="n">risky_prior_mu</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">risky_n</span><span class="p">))</span>
                 <span class="n">risky_prior_sd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">risky_n</span><span class="p">))</span>
-
                 <span class="n">safe_prior_mu</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">safe_n</span><span class="p">))</span>
                 <span class="n">safe_prior_sd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">safe_n</span><span class="p">))</span>
-
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">risky_prior_mu</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">25</span><span class="p">)</span>
-                <span class="n">safe_prior_mu</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">25</span><span class="p">)</span>
+                <span class="n">risky_prior_mu</span> <span class="o">=</span> <span class="n">safe_prior_mu</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">25</span><span class="p">)</span>
+                <span class="n">risky_prior_sd</span> <span class="o">=</span> <span class="n">safe_prior_sd</span> <span class="o">=</span> <span class="mi">2</span>
 
-                <span class="n">risky_prior_sd</span> <span class="o">=</span> <span class="mi">2</span>
-                <span class="n">safe_prior_sd</span> <span class="o">=</span> <span class="mi">2</span>
-
-            <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;risky_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span><span class="n">risky_prior_mu</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span><span class="s1">&#39;identity&#39;</span><span class="p">}</span>
-            <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;risky_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span><span class="n">risky_prior_sd</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span><span class="s1">&#39;softplus&#39;</span><span class="p">}</span>
-
-
-            <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;safe_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span><span class="n">safe_prior_mu</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span><span class="s1">&#39;identity&#39;</span><span class="p">}</span>
-
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="o">==</span> <span class="s1">&#39;full&#39;</span><span class="p">:</span>
-                <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;safe_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span><span class="n">safe_prior_sd</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span><span class="s1">&#39;softplus&#39;</span><span class="p">}</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="o">==</span> <span class="s1">&#39;fix_prior_sd&#39;</span><span class="p">:</span> <span class="c1"># only mus estimated but prior sd fixed</span>
-            <span class="n">risky_n</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">])</span>
-            <span class="n">safe_n</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])</span>
-            <span class="n">risky_prior_mu</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">risky_n</span><span class="p">))</span>
-            <span class="n">safe_prior_mu</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">safe_n</span><span class="p">))</span>
-            <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;risky_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span><span class="n">risky_prior_mu</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span><span class="s1">&#39;identity&#39;</span><span class="p">}</span>
-            <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;safe_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span><span class="n">safe_prior_mu</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span><span class="s1">&#39;identity&#39;</span><span class="p">}</span>
-
-
+            <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;risky_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">risky_prior_mu</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;identity&#39;</span><span class="p">}</span>
+            <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;risky_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">risky_prior_sd</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span><span class="p">}</span>
+            <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;safe_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">safe_prior_mu</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;identity&#39;</span><span class="p">}</span>
+            <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;safe_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">safe_prior_sd</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span><span class="p">}</span>
 
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="o">==</span> <span class="s1">&#39;klw&#39;</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;paradigm&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">):</span>
@@ -1048,11 +975,13 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">RiskRegressionModel</span><span class="p">(</span><span class="n">RegressionModel</span><span class="p">,</span> <span class="n">RiskModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;RiskModel with patsy formula regression on noise, prior, or bias parameters.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>  <span class="n">paradigm</span><span class="p">,</span> <span class="n">regressors</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;objective&#39;</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">incorporate_probability</span><span class="o">=</span><span class="s1">&#39;after_inference&#39;</span><span class="p">,</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">regressors</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;objective&#39;</span><span class="p">,</span>
+                 <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
                  <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">):</span>
         <span class="n">RegressionModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="p">)</span>
-        <span class="n">RiskModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">,</span> <span class="n">incorporate_probability</span><span class="o">=</span><span class="n">incorporate_probability</span><span class="p">,</span>
-                           <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="n">save_trialwise_n_estimates</span><span class="p">,</span> <span class="n">memory_model</span><span class="o">=</span><span class="n">memory_model</span><span class="p">)</span>
+        <span class="n">RiskModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">,</span>
+                           <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="n">save_trialwise_n_estimates</span><span class="p">,</span>
+                           <span class="n">memory_model</span><span class="o">=</span><span class="n">memory_model</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_trialwise_variable</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
 
@@ -1098,75 +1027,6 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">RiskLapseRegressionModel</span><span class="p">(</span><span class="n">LapseModel</span><span class="p">,</span> <span class="n">RiskRegressionModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;RiskModel with both a lapse rate and patsy formula regression.&quot;&quot;&quot;</span>
     <span class="o">...</span></div>
-
-
-<div class="viewcode-block" id="RNPModel">
-<a class="viewcode-back" href="../../../api_reference.html#bauer.models.RNPModel">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">RNPModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Risk Neutral Point model for risky choice based on an indifference probability.</span>
-
-<span class="sd">    Parameterises risk attitude through a ``rnp`` (risk neutral point) that sets the</span>
-<span class="sd">    probability threshold at which the agent is indifferent between a risky and a safe</span>
-<span class="sd">    option, scaled by a slope parameter ``gamma``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">risk_neutral_p</span><span class="o">=</span><span class="mf">0.55</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">risk_neutral_p</span> <span class="o">=</span> <span class="n">risk_neutral_p</span>
-
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">paradigm</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_model_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-
-        <span class="n">model</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span>
-
-        <span class="n">model_inputs</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_trialwise_variable</span><span class="p">(</span><span class="s1">&#39;n1_evidence_mu&#39;</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="s1">&#39;identity&#39;</span><span class="p">)</span> <span class="c1">#model[&#39;n1&#39;])</span>
-        <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_trialwise_variable</span><span class="p">(</span><span class="s1">&#39;n2_evidence_mu&#39;</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="s1">&#39;identity&#39;</span><span class="p">)</span>
-        <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;rnp&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_trialwise_variable</span><span class="p">(</span><span class="s1">&#39;rnp&#39;</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="s1">&#39;logistic&#39;</span><span class="p">)</span>
-        <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;gamma&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_trialwise_variable</span><span class="p">(</span><span class="s1">&#39;gamma&#39;</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="s1">&#39;identity&#39;</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">model_inputs</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_get_paradigm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-
-        <span class="n">paradigm</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_get_paradigm</span><span class="p">(</span><span class="n">paradigm</span><span class="p">)</span>
-
-        <span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
-        <span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
-        <span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;risky_first&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;risky_first&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">paradigm</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_get_choice_predictions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_inputs</span><span class="p">):</span>
-
-        <span class="n">model</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span>
-
-        <span class="n">rnp</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;rnp&#39;</span><span class="p">]</span>
-        <span class="n">slope</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;gamma&#39;</span><span class="p">]</span>
-        <span class="n">risky_first</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;risky_first&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
-
-        <span class="n">intercept</span> <span class="o">=</span> <span class="o">-</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">rnp</span><span class="p">)</span> <span class="o">*</span> <span class="n">slope</span> <span class="c1"># More risk-seeking -&gt; higher rnp, smaller intercept, more likely to choose option 2</span>
-        <span class="n">intercept</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">intercept</span><span class="p">,</span> <span class="o">-</span><span class="n">intercept</span><span class="p">)</span>
-        <span class="n">n1</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_mu&#39;</span><span class="p">]</span>
-        <span class="n">n2</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_mu&#39;</span><span class="p">]</span>
-
-        <span class="n">p1</span><span class="p">,</span> <span class="n">p2</span> <span class="o">=</span>  <span class="n">model</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">]</span>
-
-        <span class="k">return</span> <span class="n">cumulative_normal</span><span class="p">(</span><span class="n">intercept</span> <span class="o">+</span> <span class="n">slope</span><span class="o">*</span><span class="p">(</span><span class="n">n2</span><span class="o">-</span><span class="n">n1</span><span class="p">),</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">build_priors</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">build_hierarchical_nodes</span><span class="p">(</span><span class="s1">&#39;gamma&#39;</span><span class="p">,</span> <span class="n">mu_intercept</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">sigma_intercept</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="s1">&#39;identity&#39;</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">build_hierarchical_nodes</span><span class="p">(</span><span class="s1">&#39;rnp&#39;</span><span class="p">,</span> <span class="n">mu_intercept</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">sigma_intercept</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="s1">&#39;logistic&#39;</span><span class="p">)</span></div>
-
-
-<div class="viewcode-block" id="RNPRegressionModel">
-<a class="viewcode-back" href="../../../api_reference.html#bauer.models.RNPRegressionModel">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">RNPRegressionModel</span><span class="p">(</span><span class="n">RegressionModel</span><span class="p">,</span> <span class="n">RNPModel</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;RNPModel with patsy formula regression on rnp or gamma.&quot;&quot;&quot;</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>  <span class="n">paradigm</span><span class="p">,</span> <span class="n">regressors</span><span class="p">,</span> <span class="n">risk_neutral_p</span><span class="o">=</span><span class="mf">0.55</span><span class="p">):</span>
-        <span class="n">RegressionModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">regressors</span><span class="o">=</span><span class="n">regressors</span><span class="p">)</span>
-        <span class="n">RNPModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">risk_neutral_p</span><span class="p">)</span></div>
-
 
 
 <div class="viewcode-block" id="FlexibleNoiseRiskModel">
@@ -1733,765 +1593,6 @@
         <span class="n">PowerLawNoiseRiskModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">,</span>
                                         <span class="n">save_trialwise_n_estimates</span><span class="p">,</span> <span class="n">memory_model</span><span class="p">)</span>
 
-
-<span class="k">class</span><span class="w"> </span><span class="nc">SafeVsRiskyFlexibleNoiseModel</span><span class="p">(</span><span class="n">FlexibleNoiseRiskModel</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;FlexibleNoiseRiskModel adapted for safe-vs-risky paradigm with gains OR losses.</span>
-
-<span class="sd">    Wraps FlexibleNoiseRiskModel by:</span>
-<span class="sd">      - taking abs(n) of magnitudes (so losses work),</span>
-<span class="sd">      - adding a `domain` parameter (&#39;gain&#39; or &#39;loss&#39;),</span>
-<span class="sd">      - returning P(choose risky) instead of P(choose option 2).</span>
-
-<span class="sd">    Data format:</span>
-<span class="sd">        - n1, n2: signed magnitudes (positive=gains, negative=losses)</span>
-<span class="sd">        - p1, p2: probabilities (risky has p&lt;1, safe has p=1)</span>
-<span class="sd">        - choice: True = chose risky</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">domain</span><span class="o">=</span><span class="s1">&#39;gain&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">assert</span> <span class="n">domain</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;gain&#39;</span><span class="p">,</span> <span class="s1">&#39;loss&#39;</span><span class="p">),</span> <span class="s2">&quot;domain must be &#39;gain&#39; or &#39;loss&#39;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">domain</span> <span class="o">=</span> <span class="n">domain</span>
-        <span class="k">if</span> <span class="n">paradigm</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">paradigm</span> <span class="o">=</span> <span class="n">paradigm</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-            <span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])</span>
-            <span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">paradigm</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">])</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_get_choice_predictions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_inputs</span><span class="p">):</span>
-        <span class="c1"># Underlying RiskModel returns P(choose option 2) assuming higher value is better.</span>
-        <span class="c1"># That&#39;s correct for gains; for losses we want lower magnitude = better, so flip.</span>
-        <span class="n">p_choose2</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_get_choice_predictions</span><span class="p">(</span><span class="n">model_inputs</span><span class="p">)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">domain</span> <span class="o">==</span> <span class="s1">&#39;loss&#39;</span><span class="p">:</span>
-            <span class="n">p_choose2</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">p_choose2</span>
-
-        <span class="c1"># Convert P(option 2) -&gt; P(risky) given which position is risky</span>
-        <span class="n">model</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span>
-        <span class="n">risky_first</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">]</span>
-        <span class="k">return</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">p_choose2</span><span class="p">,</span> <span class="n">p_choose2</span><span class="p">)</span>
-
-
-<span class="k">class</span><span class="w"> </span><span class="nc">SafeVsRiskyModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Bayesian observer model for risky choice between a safe and a risky option.</span>
-
-<span class="sd">    The observer forms posterior beliefs about each option&#39;s log-magnitude</span>
-<span class="sd">    via Bayesian updating of a prior with noisy evidence, then compares</span>
-<span class="sd">    expected values (incorporating probability) to make a choice.</span>
-
-<span class="sd">    Data format:</span>
-<span class="sd">        - n1, n2: magnitudes (positive for gains, negative for losses)</span>
-<span class="sd">        - p1, p2: probabilities (risky option has p &lt; 1, safe has p = 1)</span>
-<span class="sd">        - choice: True = chose the risky option</span>
-
-<span class="sd">    Args:</span>
-<span class="sd">        domain: &#39;gain&#39; or &#39;loss&#39; (required)</span>
-<span class="sd">        separate_priors: separate prior mu/sd for risky vs safe (default True)</span>
-<span class="sd">        fix_prior_mus: fix prior means to data statistics (default False)</span>
-<span class="sd">        fix_prior_sds: fix prior sds to 1.0 (default False)</span>
-<span class="sd">        separate_evidence_sd: separate evidence noise for n1 vs n2 (default True)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="n">paradigm_keys</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">,</span> <span class="s1">&#39;p1&#39;</span><span class="p">,</span> <span class="s1">&#39;p2&#39;</span><span class="p">]</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">domain</span><span class="o">=</span><span class="s1">&#39;gain&#39;</span><span class="p">,</span>
-                 <span class="n">separate_priors</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                 <span class="n">fix_prior_mus</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fix_prior_sds</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                 <span class="n">separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-
-        <span class="k">assert</span> <span class="n">domain</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;gain&#39;</span><span class="p">,</span> <span class="s1">&#39;loss&#39;</span><span class="p">),</span> <span class="s2">&quot;domain must be &#39;gain&#39; or &#39;loss&#39;&quot;</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">domain</span> <span class="o">=</span> <span class="n">domain</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span> <span class="o">=</span> <span class="n">separate_priors</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_mus</span> <span class="o">=</span> <span class="n">fix_prior_mus</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_sds</span> <span class="o">=</span> <span class="n">fix_prior_sds</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">separate_evidence_sd</span> <span class="o">=</span> <span class="n">separate_evidence_sd</span>
-
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-
-    <span class="c1"># ── free parameters ──────────────────────────────────────────────</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_free_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="n">free</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="n">mu_spec</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mf">20.</span><span class="p">),</span> <span class="s1">&#39;sigma_intercept&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mf">20.</span><span class="p">)</span> <span class="o">/</span> <span class="mf">4.</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span><span class="p">}</span>
-        <span class="n">sd_spec</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="mf">1.</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span><span class="p">}</span>
-        <span class="n">noise_spec</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mf">1.</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span><span class="p">}</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_mus</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s1">&#39;prior_mu_risky&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s1">&#39;prior_mu_safe&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s1">&#39;prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_sds</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s1">&#39;prior_sd_risky&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s1">&#39;prior_sd_safe&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_evidence_sd</span><span class="p">:</span>
-            <span class="n">free</span><span class="p">[</span><span class="s1">&#39;evidence_sd_n1&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-            <span class="n">free</span><span class="p">[</span><span class="s1">&#39;evidence_sd_n2&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">free</span><span class="p">[</span><span class="s1">&#39;evidence_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-
-        <span class="k">return</span> <span class="n">free</span>
-
-    <span class="c1"># ── model inputs ─────────────────────────────────────────────────</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_model_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
-        <span class="n">model</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span>
-
-        <span class="n">n1</span><span class="p">,</span> <span class="n">n2</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]</span>
-        <span class="n">p1</span><span class="p">,</span> <span class="n">p2</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">]</span>
-        <span class="n">logn1</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">n1</span><span class="p">))</span>
-        <span class="n">logn2</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">n2</span><span class="p">))</span>
-        <span class="n">risky_first</span> <span class="o">=</span> <span class="p">(</span><span class="n">p1</span> <span class="o">&lt;</span> <span class="n">p2</span><span class="p">)</span>
-
-        <span class="c1"># --- Priors (in role-space: risky / safe) ---</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_mus</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
-                <span class="n">risky_n</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">n1</span><span class="p">,</span> <span class="n">n2</span><span class="p">)</span>
-                <span class="n">safe_n</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">n2</span><span class="p">,</span> <span class="n">n1</span><span class="p">)</span>
-                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">risky_n</span><span class="p">)))</span>
-                <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">safe_n</span><span class="p">)))</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">logn1</span><span class="p">)</span> <span class="o">+</span> <span class="n">pt</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">logn2</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">pt</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">logn1</span><span class="p">)))</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
-                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_mu_risky&#39;</span><span class="p">]</span>
-                <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_mu_safe&#39;</span><span class="p">]</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_mu&#39;</span><span class="p">]</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_sds</span><span class="p">:</span>
-            <span class="n">prior_sd_risky</span> <span class="o">=</span> <span class="n">prior_sd_safe</span> <span class="o">=</span> <span class="mf">1.0</span>
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
-            <span class="n">prior_sd_risky</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd_risky&#39;</span><span class="p">]</span>
-            <span class="n">prior_sd_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd_safe&#39;</span><span class="p">]</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">prior_sd_risky</span> <span class="o">=</span> <span class="n">prior_sd_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span>
-
-        <span class="c1"># --- Evidence noise (built in position-space, then mapped) ---</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_evidence_sd</span><span class="p">:</span>
-            <span class="n">noise1</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;evidence_sd_n1&#39;</span><span class="p">]</span>
-            <span class="n">noise2</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;evidence_sd_n2&#39;</span><span class="p">]</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">noise1</span> <span class="o">=</span> <span class="n">noise2</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;evidence_sd&#39;</span><span class="p">]</span>
-
-        <span class="k">return</span> <span class="p">{</span>
-            <span class="s1">&#39;prior_mu_risky&#39;</span><span class="p">:</span> <span class="n">prior_mu_risky</span><span class="p">,</span> <span class="s1">&#39;prior_sd_risky&#39;</span><span class="p">:</span> <span class="n">prior_sd_risky</span><span class="p">,</span>
-            <span class="s1">&#39;prior_mu_safe&#39;</span><span class="p">:</span> <span class="n">prior_mu_safe</span><span class="p">,</span> <span class="s1">&#39;prior_sd_safe&#39;</span><span class="p">:</span> <span class="n">prior_sd_safe</span><span class="p">,</span>
-            <span class="s1">&#39;logn1&#39;</span><span class="p">:</span> <span class="n">logn1</span><span class="p">,</span> <span class="s1">&#39;logn2&#39;</span><span class="p">:</span> <span class="n">logn2</span><span class="p">,</span>
-            <span class="s1">&#39;ev_sd1&#39;</span><span class="p">:</span> <span class="n">noise1</span><span class="p">,</span> <span class="s1">&#39;ev_sd2&#39;</span><span class="p">:</span> <span class="n">noise2</span><span class="p">,</span>
-            <span class="s1">&#39;p1&#39;</span><span class="p">:</span> <span class="n">p1</span><span class="p">,</span> <span class="s1">&#39;p2&#39;</span><span class="p">:</span> <span class="n">p2</span><span class="p">,</span>
-            <span class="s1">&#39;risky_first&#39;</span><span class="p">:</span> <span class="n">risky_first</span><span class="p">,</span>
-        <span class="p">}</span>
-
-    <span class="c1"># ── choice predictions ───────────────────────────────────────────</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_get_choice_predictions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mi</span><span class="p">):</span>
-        <span class="n">risky_first</span> <span class="o">=</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;risky_first&#39;</span><span class="p">]</span>
-
-        <span class="c1"># Map priors: position → role</span>
-        <span class="n">mu1</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;prior_mu_risky&#39;</span><span class="p">],</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;prior_mu_safe&#39;</span><span class="p">])</span>
-        <span class="n">mu2</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;prior_mu_safe&#39;</span><span class="p">],</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;prior_mu_risky&#39;</span><span class="p">])</span>
-        <span class="n">sd1</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;prior_sd_risky&#39;</span><span class="p">],</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;prior_sd_safe&#39;</span><span class="p">])</span>
-        <span class="n">sd2</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;prior_sd_safe&#39;</span><span class="p">],</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;prior_sd_risky&#39;</span><span class="p">])</span>
-
-        <span class="c1"># Bayesian posterior per option (position-space)</span>
-        <span class="n">post1_mu</span><span class="p">,</span> <span class="n">post1_sd</span> <span class="o">=</span> <span class="n">get_posterior</span><span class="p">(</span><span class="n">mu1</span><span class="p">,</span> <span class="n">sd1</span><span class="p">,</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;logn1&#39;</span><span class="p">],</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;ev_sd1&#39;</span><span class="p">])</span>
-        <span class="n">post2_mu</span><span class="p">,</span> <span class="n">post2_sd</span> <span class="o">=</span> <span class="n">get_posterior</span><span class="p">(</span><span class="n">mu2</span><span class="p">,</span> <span class="n">sd2</span><span class="p">,</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;logn2&#39;</span><span class="p">],</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;ev_sd2&#39;</span><span class="p">])</span>
-
-        <span class="c1"># Map posteriors: position → role</span>
-        <span class="n">risky_post</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">post1_mu</span><span class="p">,</span> <span class="n">post2_mu</span><span class="p">)</span>
-        <span class="n">safe_post</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">post2_mu</span><span class="p">,</span> <span class="n">post1_mu</span><span class="p">)</span>
-
-        <span class="c1"># Decision noise per option: β·ν = post_sd² / evidence_sd</span>
-        <span class="c1"># (see Khaw, Li &amp; Woodford 2020, eq. 2.5)</span>
-        <span class="n">decision_sd1</span> <span class="o">=</span> <span class="n">post1_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;ev_sd1&#39;</span><span class="p">]</span>
-        <span class="n">decision_sd2</span> <span class="o">=</span> <span class="n">post2_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;ev_sd2&#39;</span><span class="p">]</span>
-        <span class="n">risky_decision_sd</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">decision_sd1</span><span class="p">,</span> <span class="n">decision_sd2</span><span class="p">)</span>
-        <span class="n">safe_decision_sd</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">decision_sd2</span><span class="p">,</span> <span class="n">decision_sd1</span><span class="p">)</span>
-
-        <span class="c1"># Decision variable: always risky − safe</span>
-        <span class="n">diff_mu</span> <span class="o">=</span> <span class="n">risky_post</span> <span class="o">-</span> <span class="n">safe_post</span>
-        <span class="n">diff_sd</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">risky_decision_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">safe_decision_sd</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
-
-        <span class="c1"># Probability threshold</span>
-        <span class="n">safe_prob</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">],</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">])</span>
-        <span class="n">risky_prob</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">],</span> <span class="n">mi</span><span class="p">[</span><span class="s1">&#39;p2&#39;</span><span class="p">])</span>
-        <span class="n">threshold</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">safe_prob</span> <span class="o">/</span> <span class="n">risky_prob</span><span class="p">)</span>
-
-        <span class="c1"># Gains: choose risky when perceived risky &gt; safe (accounting for probability)</span>
-        <span class="c1">#   → p_risky = P(diff &gt; threshold)</span>
-        <span class="c1"># Losses: choose risky when perceived risky loss isn&#39;t too big</span>
-        <span class="c1">#   → p_risky = P(diff &lt; threshold)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">domain</span> <span class="o">==</span> <span class="s1">&#39;gain&#39;</span><span class="p">:</span>
-            <span class="n">p_risky</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="n">cumulative_normal</span><span class="p">(</span><span class="n">threshold</span><span class="p">,</span> <span class="n">diff_mu</span><span class="p">,</span> <span class="n">diff_sd</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">p_risky</span> <span class="o">=</span> <span class="n">cumulative_normal</span><span class="p">(</span><span class="n">threshold</span><span class="p">,</span> <span class="n">diff_mu</span><span class="p">,</span> <span class="n">diff_sd</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">p_risky</span>
-
-
-<span class="k">class</span><span class="w"> </span><span class="nc">SafeVsRiskyRegressionModel</span><span class="p">(</span><span class="n">RegressionModel</span><span class="p">,</span> <span class="n">SafeVsRiskyModel</span><span class="p">):</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">regressors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="n">SafeVsRiskyModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="n">RegressionModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="o">=</span><span class="n">regressors</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_trialwise_variable</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
-        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">get_trialwise_variable</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
-    
-
-<span class="k">class</span><span class="w"> </span><span class="nc">SafeVsRiskyMemoryModel</span><span class="p">(</span><span class="n">SafeVsRiskyModel</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Safe-vs-risky model with encoding noise shared across both options</span>
-<span class="sd">    and an extra working-memory noise term on option 1 only.</span>
-
-<span class="sd">    memory_model:</span>
-<span class="sd">        - &#39;independent&#39;: same as original SafeVsRiskyModel</span>
-<span class="sd">        - &#39;shared_perceptual_noise&#39;: option1 = encoding + memory, option2 = encoding</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">domain</span><span class="o">=</span><span class="s2">&quot;gain&quot;</span><span class="p">,</span>
-        <span class="n">separate_priors</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">fix_prior_mus</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fix_prior_sds</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="n">separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">memory_model</span><span class="o">=</span><span class="s2">&quot;shared_perceptual_noise&quot;</span><span class="p">,</span> <span class="n">combine_noise</span><span class="o">=</span><span class="s2">&quot;add_sd&quot;</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">=</span> <span class="n">memory_model</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">combine_noise</span> <span class="o">=</span> <span class="n">combine_noise</span>
-
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">domain</span><span class="o">=</span><span class="n">domain</span><span class="p">,</span> <span class="n">separate_priors</span><span class="o">=</span><span class="n">separate_priors</span><span class="p">,</span>
-                         <span class="n">fix_prior_mus</span><span class="o">=</span><span class="n">fix_prior_mus</span><span class="p">,</span> <span class="n">fix_prior_sds</span><span class="o">=</span><span class="n">fix_prior_sds</span><span class="p">,</span> <span class="n">separate_evidence_sd</span><span class="o">=</span><span class="n">separate_evidence_sd</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_free_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="n">free</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="n">mu_spec</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mu_intercept&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mf">20.</span><span class="p">),</span> <span class="s2">&quot;sigma_intercept&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mf">20.</span><span class="p">)</span> <span class="o">/</span> <span class="mf">4.</span><span class="p">,</span> <span class="s2">&quot;transform&quot;</span><span class="p">:</span> <span class="s2">&quot;softplus&quot;</span><span class="p">}</span>
-        <span class="n">sd_spec</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mu_intercept&quot;</span><span class="p">:</span> <span class="mf">1.</span><span class="p">,</span> <span class="s2">&quot;transform&quot;</span><span class="p">:</span> <span class="s2">&quot;softplus&quot;</span><span class="p">}</span>
-        <span class="n">noise_spec</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mu_intercept&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mf">1.</span><span class="p">,</span> <span class="s2">&quot;transform&quot;</span><span class="p">:</span> <span class="s2">&quot;softplus&quot;</span><span class="p">}</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_mus</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_mu_risky&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_mu_safe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_mu&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_sds</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_sd_risky&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_sd_safe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_sd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-
-        <span class="c1"># evidence / memory parameters</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s2">&quot;independent&quot;</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_evidence_sd</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;evidence_sd_n1&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;evidence_sd_n2&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;evidence_sd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s2">&quot;shared_perceptual_noise&quot;</span><span class="p">:</span>
-            <span class="n">free</span><span class="p">[</span><span class="s2">&quot;encoding_noise_sd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-            <span class="n">free</span><span class="p">[</span><span class="s2">&quot;memory_noise_sd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown memory_model: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">free</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_model_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
-        <span class="n">model</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span>
-
-        <span class="n">n1</span><span class="p">,</span> <span class="n">n2</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s2">&quot;n1&quot;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s2">&quot;n2&quot;</span><span class="p">]</span>
-        <span class="n">p1</span><span class="p">,</span> <span class="n">p2</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s2">&quot;p1&quot;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s2">&quot;p2&quot;</span><span class="p">]</span>
-        <span class="n">logn1</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">n1</span><span class="p">))</span>
-        <span class="n">logn2</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">n2</span><span class="p">))</span>
-        <span class="n">risky_first</span> <span class="o">=</span> <span class="p">(</span><span class="n">p1</span> <span class="o">&lt;</span> <span class="n">p2</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_mus</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
-                <span class="n">risky_n</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">n1</span><span class="p">,</span> <span class="n">n2</span><span class="p">)</span>
-                <span class="n">safe_n</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">n2</span><span class="p">,</span> <span class="n">n1</span><span class="p">)</span>
-                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">risky_n</span><span class="p">)))</span>
-                <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">safe_n</span><span class="p">)))</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">logn1</span><span class="p">)</span> <span class="o">+</span> <span class="n">pt</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">logn2</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">pt</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">logn1</span><span class="p">)))</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
-                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_mu_risky&quot;</span><span class="p">]</span>
-                <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_mu_safe&quot;</span><span class="p">]</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_mu&quot;</span><span class="p">]</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_sds</span><span class="p">:</span>
-            <span class="n">prior_sd_risky</span> <span class="o">=</span> <span class="n">prior_sd_safe</span> <span class="o">=</span> <span class="mf">1.0</span>
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_priors</span><span class="p">:</span>
-            <span class="n">prior_sd_risky</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_sd_risky&quot;</span><span class="p">]</span>
-            <span class="n">prior_sd_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_sd_safe&quot;</span><span class="p">]</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">prior_sd_risky</span> <span class="o">=</span> <span class="n">prior_sd_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_sd&quot;</span><span class="p">]</span>
-
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s2">&quot;independent&quot;</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">separate_evidence_sd</span><span class="p">:</span>
-                <span class="n">noise1</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;evidence_sd_n1&quot;</span><span class="p">]</span>
-                <span class="n">noise2</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;evidence_sd_n2&quot;</span><span class="p">]</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">noise1</span> <span class="o">=</span> <span class="n">noise2</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;evidence_sd&quot;</span><span class="p">]</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s2">&quot;shared_perceptual_noise&quot;</span><span class="p">:</span>
-            <span class="n">enc</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;encoding_noise_sd&quot;</span><span class="p">]</span>
-            <span class="n">mem</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;memory_noise_sd&quot;</span><span class="p">]</span>
-
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">combine_noise</span> <span class="o">==</span> <span class="s2">&quot;add_sd&quot;</span><span class="p">:</span>
-                <span class="n">noise1</span> <span class="o">=</span> <span class="n">enc</span> <span class="o">+</span> <span class="n">mem</span>
-            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">combine_noise</span> <span class="o">==</span> <span class="s2">&quot;variance&quot;</span><span class="p">:</span>
-                <span class="n">noise1</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">enc</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">mem</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;combine_noise must be &#39;add_sd&#39; or &#39;variance&#39;&quot;</span><span class="p">)</span>
-
-            <span class="n">noise2</span> <span class="o">=</span> <span class="n">enc</span>
-
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown memory_model: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;prior_mu_risky&quot;</span><span class="p">:</span> <span class="n">prior_mu_risky</span><span class="p">,</span> <span class="s2">&quot;prior_sd_risky&quot;</span><span class="p">:</span> <span class="n">prior_sd_risky</span><span class="p">,</span> <span class="s2">&quot;prior_mu_safe&quot;</span><span class="p">:</span> <span class="n">prior_mu_safe</span><span class="p">,</span> <span class="s2">&quot;prior_sd_safe&quot;</span><span class="p">:</span> <span class="n">prior_sd_safe</span><span class="p">,</span>
-                <span class="s2">&quot;logn1&quot;</span><span class="p">:</span> <span class="n">logn1</span><span class="p">,</span> <span class="s2">&quot;logn2&quot;</span><span class="p">:</span> <span class="n">logn2</span><span class="p">,</span> <span class="s2">&quot;ev_sd1&quot;</span><span class="p">:</span> <span class="n">noise1</span><span class="p">,</span> <span class="s2">&quot;ev_sd2&quot;</span><span class="p">:</span> <span class="n">noise2</span><span class="p">,</span> <span class="s2">&quot;p1&quot;</span><span class="p">:</span> <span class="n">p1</span><span class="p">,</span> <span class="s2">&quot;p2&quot;</span><span class="p">:</span> <span class="n">p2</span><span class="p">,</span> <span class="s2">&quot;risky_first&quot;</span><span class="p">:</span> <span class="n">risky_first</span><span class="p">}</span>
-    
-
-
-<span class="k">class</span><span class="w"> </span><span class="nc">JointSafeVsRiskyModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Joint Bayesian observer model for risky choice across gain and loss trials.</span>
-
-<span class="sd">    This model fits gain and loss trials together in one likelihood.</span>
-
-<span class="sd">    Required data columns:</span>
-<span class="sd">        - n1, n2: magnitudes, positive for gains and negative for losses</span>
-<span class="sd">        - p1, p2: probabilities</span>
-<span class="sd">        - is_gain: 1 for gain trials, 0 for loss trials</span>
-<span class="sd">        - choice: True = chose risky option</span>
-
-<span class="sd">    Main options:</span>
-<span class="sd">        prior_scope:</span>
-<span class="sd">            &quot;global&quot;:</span>
-<span class="sd">                one prior shared across gain/loss and risky/safe</span>
-
-<span class="sd">            &quot;role&quot;:</span>
-<span class="sd">                risky and safe priors, shared across gain/loss</span>
-
-<span class="sd">            &quot;domain&quot;:</span>
-<span class="sd">                gain and loss priors, shared across risky/safe</span>
-
-<span class="sd">            &quot;domain_role&quot;:</span>
-<span class="sd">                separate priors for gain/loss × risky/safe</span>
-<span class="sd">                This gives the 12-parameter model when evidence_scope=&quot;domain_position&quot;.</span>
-
-<span class="sd">        evidence_scope:</span>
-<span class="sd">            &quot;global&quot;:</span>
-<span class="sd">                one evidence noise parameter</span>
-
-<span class="sd">            &quot;position&quot;:</span>
-<span class="sd">                evidence_sd_n1, evidence_sd_n2</span>
-
-<span class="sd">            &quot;domain&quot;:</span>
-<span class="sd">                gain_evidence_sd, loss_evidence_sd</span>
-
-<span class="sd">            &quot;domain_position&quot;:</span>
-<span class="sd">                gain_evidence_sd_n1, gain_evidence_sd_n2,</span>
-<span class="sd">                loss_evidence_sd_n1, loss_evidence_sd_n2</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="n">paradigm_keys</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">,</span> <span class="s1">&#39;p1&#39;</span><span class="p">,</span> <span class="s1">&#39;p2&#39;</span><span class="p">,</span> <span class="s1">&#39;is_gain&#39;</span><span class="p">]</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-                 <span class="n">prior_scope</span><span class="o">=</span><span class="s2">&quot;global&quot;</span><span class="p">,</span>
-                 <span class="n">evidence_scope</span><span class="o">=</span><span class="s2">&quot;domain_position&quot;</span><span class="p">,</span>
-                 <span class="n">fix_prior_mus</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                 <span class="n">fix_prior_sds</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-
-        <span class="k">assert</span> <span class="n">prior_scope</span> <span class="ow">in</span> <span class="p">(</span>
-            <span class="s2">&quot;global&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;role&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;domain&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;domain_role&quot;</span>
-        <span class="p">)</span>
-
-        <span class="k">assert</span> <span class="n">evidence_scope</span> <span class="ow">in</span> <span class="p">(</span>
-            <span class="s2">&quot;global&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;position&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;domain&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;domain_position&quot;</span>
-        <span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">=</span> <span class="n">prior_scope</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">evidence_scope</span> <span class="o">=</span> <span class="n">evidence_scope</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_mus</span> <span class="o">=</span> <span class="n">fix_prior_mus</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_sds</span> <span class="o">=</span> <span class="n">fix_prior_sds</span>
-
-        <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-
-            <span class="k">if</span> <span class="s2">&quot;is_gain&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
-                <span class="k">if</span> <span class="s2">&quot;domain&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
-                    <span class="n">data</span><span class="p">[</span><span class="s2">&quot;is_gain&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;domain&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;gain&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="s2">&quot;JointSafeVsRiskyModel requires an &#39;is_gain&#39; column, &quot;</span>
-                        <span class="s2">&quot;or a &#39;domain&#39; column with values &#39;gain&#39;/&#39;loss&#39;.&quot;</span>
-                    <span class="p">)</span>
-
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-
-    <span class="c1"># ── free parameters ──────────────────────────────────────────────</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_free_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="n">free</span> <span class="o">=</span> <span class="p">{}</span>
-
-        <span class="n">mu_spec</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mf">20.</span><span class="p">),</span>
-            <span class="s1">&#39;sigma_intercept&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mf">20.</span><span class="p">)</span> <span class="o">/</span> <span class="mf">4.</span><span class="p">,</span>
-            <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span>
-        <span class="p">}</span>
-
-        <span class="n">sd_spec</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="mf">1.</span><span class="p">,</span>
-            <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span>
-        <span class="p">}</span>
-
-        <span class="n">noise_spec</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mf">1.</span><span class="p">,</span>
-            <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span>
-        <span class="p">}</span>
-
-        <span class="c1"># --- Prior means ---</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_mus</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;global&quot;</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_mu&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-
-            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;role&quot;</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_mu_risky&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_mu_safe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-
-            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;domain&quot;</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;gain_prior_mu&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;loss_prior_mu&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-
-            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;domain_role&quot;</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;gain_prior_mu_risky&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;gain_prior_mu_safe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;loss_prior_mu_risky&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;loss_prior_mu_safe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">mu_spec</span><span class="p">}</span>
-
-        <span class="c1"># --- Prior SDs ---</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_sds</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;global&quot;</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_sd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-
-            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;role&quot;</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_sd_risky&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;prior_sd_safe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-
-            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;domain&quot;</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;gain_prior_sd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;loss_prior_sd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-
-            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;domain_role&quot;</span><span class="p">:</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;gain_prior_sd_risky&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;gain_prior_sd_safe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;loss_prior_sd_risky&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-                <span class="n">free</span><span class="p">[</span><span class="s2">&quot;loss_prior_sd_safe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">sd_spec</span><span class="p">}</span>
-
-        <span class="c1"># --- Evidence noise ---</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">evidence_scope</span> <span class="o">==</span> <span class="s2">&quot;global&quot;</span><span class="p">:</span>
-            <span class="n">free</span><span class="p">[</span><span class="s2">&quot;evidence_sd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">evidence_scope</span> <span class="o">==</span> <span class="s2">&quot;position&quot;</span><span class="p">:</span>
-            <span class="n">free</span><span class="p">[</span><span class="s2">&quot;evidence_sd_n1&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-            <span class="n">free</span><span class="p">[</span><span class="s2">&quot;evidence_sd_n2&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">evidence_scope</span> <span class="o">==</span> <span class="s2">&quot;domain&quot;</span><span class="p">:</span>
-            <span class="n">free</span><span class="p">[</span><span class="s2">&quot;gain_evidence_sd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-            <span class="n">free</span><span class="p">[</span><span class="s2">&quot;loss_evidence_sd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">evidence_scope</span> <span class="o">==</span> <span class="s2">&quot;domain_position&quot;</span><span class="p">:</span>
-            <span class="n">free</span><span class="p">[</span><span class="s2">&quot;gain_evidence_sd_n1&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-            <span class="n">free</span><span class="p">[</span><span class="s2">&quot;gain_evidence_sd_n2&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-            <span class="n">free</span><span class="p">[</span><span class="s2">&quot;loss_evidence_sd_n1&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-            <span class="n">free</span><span class="p">[</span><span class="s2">&quot;loss_evidence_sd_n2&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">noise_spec</span><span class="p">}</span>
-
-        <span class="k">return</span> <span class="n">free</span>
-
-
-    <span class="nd">@staticmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_masked_mean</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">mask</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;PyTensor-safe masked mean.&quot;&quot;&quot;</span>
-        <span class="n">mask_f</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="s2">&quot;float64&quot;</span><span class="p">)</span>
-        <span class="n">denom</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">mask_f</span><span class="p">),</span> <span class="mf">1.0</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">pt</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">))</span> <span class="o">/</span> <span class="n">denom</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_fixed_prior_mus</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">logn1</span><span class="p">,</span> <span class="n">logn2</span><span class="p">,</span> <span class="n">risky_first</span><span class="p">,</span> <span class="n">is_gain</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute fixed prior means from the stimulus statistics.&quot;&quot;&quot;</span>
-        <span class="n">risky_logn</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">logn1</span><span class="p">,</span> <span class="n">logn2</span><span class="p">)</span>
-        <span class="n">safe_logn</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">logn2</span><span class="p">,</span> <span class="n">logn1</span><span class="p">)</span>
-
-        <span class="n">all_logn</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">logn1</span><span class="p">,</span> <span class="n">logn2</span><span class="p">])</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;global&quot;</span><span class="p">:</span>
-            <span class="n">prior_mu</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">all_logn</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">prior_mu</span><span class="p">,</span> <span class="n">prior_mu</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;role&quot;</span><span class="p">:</span>
-            <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">risky_logn</span><span class="p">)</span>
-            <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">safe_logn</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">prior_mu_risky</span><span class="p">,</span> <span class="n">prior_mu_safe</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;domain&quot;</span><span class="p">:</span>
-            <span class="n">gain_mu</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_masked_mean</span><span class="p">(</span>
-                <span class="n">pt</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">logn1</span><span class="p">,</span> <span class="n">logn2</span><span class="p">]),</span>
-                <span class="n">pt</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">is_gain</span><span class="p">,</span> <span class="n">is_gain</span><span class="p">])</span>
-            <span class="p">)</span>
-            <span class="n">loss_mu</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_masked_mean</span><span class="p">(</span>
-                <span class="n">pt</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">logn1</span><span class="p">,</span> <span class="n">logn2</span><span class="p">]),</span>
-                <span class="n">pt</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="o">~</span><span class="n">is_gain</span><span class="p">,</span> <span class="o">~</span><span class="n">is_gain</span><span class="p">])</span>
-            <span class="p">)</span>
-            <span class="n">prior_mu</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">is_gain</span><span class="p">,</span> <span class="n">gain_mu</span><span class="p">,</span> <span class="n">loss_mu</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">prior_mu</span><span class="p">,</span> <span class="n">prior_mu</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;domain_role&quot;</span><span class="p">:</span>
-            <span class="n">gain_mu_risky</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_masked_mean</span><span class="p">(</span><span class="n">risky_logn</span><span class="p">,</span> <span class="n">is_gain</span><span class="p">)</span>
-            <span class="n">gain_mu_safe</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_masked_mean</span><span class="p">(</span><span class="n">safe_logn</span><span class="p">,</span> <span class="n">is_gain</span><span class="p">)</span>
-            <span class="n">loss_mu_risky</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_masked_mean</span><span class="p">(</span><span class="n">risky_logn</span><span class="p">,</span> <span class="o">~</span><span class="n">is_gain</span><span class="p">)</span>
-            <span class="n">loss_mu_safe</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_masked_mean</span><span class="p">(</span><span class="n">safe_logn</span><span class="p">,</span> <span class="o">~</span><span class="n">is_gain</span><span class="p">)</span>
-
-            <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-                <span class="n">is_gain</span><span class="p">,</span>
-                <span class="n">gain_mu_risky</span><span class="p">,</span>
-                <span class="n">loss_mu_risky</span>
-            <span class="p">)</span>
-            <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-                <span class="n">is_gain</span><span class="p">,</span>
-                <span class="n">gain_mu_safe</span><span class="p">,</span>
-                <span class="n">loss_mu_safe</span>
-            <span class="p">)</span>
-            <span class="k">return</span> <span class="n">prior_mu_risky</span><span class="p">,</span> <span class="n">prior_mu_safe</span>
-
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_model_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
-        <span class="n">model</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span>
-
-        <span class="n">n1</span><span class="p">,</span> <span class="n">n2</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s2">&quot;n1&quot;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s2">&quot;n2&quot;</span><span class="p">]</span>
-        <span class="n">p1</span><span class="p">,</span> <span class="n">p2</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s2">&quot;p1&quot;</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="s2">&quot;p2&quot;</span><span class="p">]</span>
-
-        <span class="n">is_gain</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">gt</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s2">&quot;is_gain&quot;</span><span class="p">],</span> <span class="mf">0.5</span><span class="p">)</span>
-
-        <span class="n">logn1</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">n1</span><span class="p">))</span>
-        <span class="n">logn2</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">n2</span><span class="p">))</span>
-
-        <span class="n">risky_first</span> <span class="o">=</span> <span class="n">p1</span> <span class="o">&lt;</span> <span class="n">p2</span>
-
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_mus</span><span class="p">:</span>
-            <span class="n">prior_mu_risky</span><span class="p">,</span> <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fixed_prior_mus</span><span class="p">(</span>
-                <span class="n">logn1</span><span class="o">=</span><span class="n">logn1</span><span class="p">,</span>
-                <span class="n">logn2</span><span class="o">=</span><span class="n">logn2</span><span class="p">,</span>
-                <span class="n">risky_first</span><span class="o">=</span><span class="n">risky_first</span><span class="p">,</span>
-                <span class="n">is_gain</span><span class="o">=</span><span class="n">is_gain</span>
-            <span class="p">)</span>
-
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;global&quot;</span><span class="p">:</span>
-                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_mu&quot;</span><span class="p">]</span>
-                <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_mu&quot;</span><span class="p">]</span>
-
-            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;role&quot;</span><span class="p">:</span>
-                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_mu_risky&quot;</span><span class="p">]</span>
-                <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_mu_safe&quot;</span><span class="p">]</span>
-
-            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;domain&quot;</span><span class="p">:</span>
-                <span class="n">prior_mu</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-                    <span class="n">is_gain</span><span class="p">,</span>
-                    <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;gain_prior_mu&quot;</span><span class="p">],</span>
-                    <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;loss_prior_mu&quot;</span><span class="p">]</span>
-                <span class="p">)</span>
-                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">prior_mu</span>
-                <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">prior_mu</span>
-
-            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;domain_role&quot;</span><span class="p">:</span>
-                <span class="n">prior_mu_risky</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-                    <span class="n">is_gain</span><span class="p">,</span>
-                    <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;gain_prior_mu_risky&quot;</span><span class="p">],</span>
-                    <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;loss_prior_mu_risky&quot;</span><span class="p">]</span>
-                <span class="p">)</span>
-                <span class="n">prior_mu_safe</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-                    <span class="n">is_gain</span><span class="p">,</span>
-                    <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;gain_prior_mu_safe&quot;</span><span class="p">],</span>
-                    <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;loss_prior_mu_safe&quot;</span><span class="p">]</span>
-                <span class="p">)</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fix_prior_sds</span><span class="p">:</span>
-            <span class="n">prior_sd_risky</span> <span class="o">=</span> <span class="mf">1.0</span>
-            <span class="n">prior_sd_safe</span> <span class="o">=</span> <span class="mf">1.0</span>
-
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;global&quot;</span><span class="p">:</span>
-                <span class="n">prior_sd_risky</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_sd&quot;</span><span class="p">]</span>
-                <span class="n">prior_sd_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_sd&quot;</span><span class="p">]</span>
-
-            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;role&quot;</span><span class="p">:</span>
-                <span class="n">prior_sd_risky</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_sd_risky&quot;</span><span class="p">]</span>
-                <span class="n">prior_sd_safe</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;prior_sd_safe&quot;</span><span class="p">]</span>
-
-            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;domain&quot;</span><span class="p">:</span>
-                <span class="n">prior_sd</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-                    <span class="n">is_gain</span><span class="p">,</span>
-                    <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;gain_prior_sd&quot;</span><span class="p">],</span>
-                    <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;loss_prior_sd&quot;</span><span class="p">]</span>
-                <span class="p">)</span>
-                <span class="n">prior_sd_risky</span> <span class="o">=</span> <span class="n">prior_sd</span>
-                <span class="n">prior_sd_safe</span> <span class="o">=</span> <span class="n">prior_sd</span>
-
-            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">prior_scope</span> <span class="o">==</span> <span class="s2">&quot;domain_role&quot;</span><span class="p">:</span>
-                <span class="n">prior_sd_risky</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-                    <span class="n">is_gain</span><span class="p">,</span>
-                    <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;gain_prior_sd_risky&quot;</span><span class="p">],</span>
-                    <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;loss_prior_sd_risky&quot;</span><span class="p">]</span>
-                <span class="p">)</span>
-                <span class="n">prior_sd_safe</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-                    <span class="n">is_gain</span><span class="p">,</span>
-                    <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;gain_prior_sd_safe&quot;</span><span class="p">],</span>
-                    <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;loss_prior_sd_safe&quot;</span><span class="p">]</span>
-                <span class="p">)</span>
-
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">evidence_scope</span> <span class="o">==</span> <span class="s2">&quot;global&quot;</span><span class="p">:</span>
-            <span class="n">ev_sd1</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;evidence_sd&quot;</span><span class="p">]</span>
-            <span class="n">ev_sd2</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;evidence_sd&quot;</span><span class="p">]</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">evidence_scope</span> <span class="o">==</span> <span class="s2">&quot;position&quot;</span><span class="p">:</span>
-            <span class="n">ev_sd1</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;evidence_sd_n1&quot;</span><span class="p">]</span>
-            <span class="n">ev_sd2</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;evidence_sd_n2&quot;</span><span class="p">]</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">evidence_scope</span> <span class="o">==</span> <span class="s2">&quot;domain&quot;</span><span class="p">:</span>
-            <span class="n">ev_sd</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-                <span class="n">is_gain</span><span class="p">,</span>
-                <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;gain_evidence_sd&quot;</span><span class="p">],</span>
-                <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;loss_evidence_sd&quot;</span><span class="p">]</span>
-            <span class="p">)</span>
-            <span class="n">ev_sd1</span> <span class="o">=</span> <span class="n">ev_sd</span>
-            <span class="n">ev_sd2</span> <span class="o">=</span> <span class="n">ev_sd</span>
-
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">evidence_scope</span> <span class="o">==</span> <span class="s2">&quot;domain_position&quot;</span><span class="p">:</span>
-            <span class="n">ev_sd1</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-                <span class="n">is_gain</span><span class="p">,</span>
-                <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;gain_evidence_sd_n1&quot;</span><span class="p">],</span>
-                <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;loss_evidence_sd_n1&quot;</span><span class="p">]</span>
-            <span class="p">)</span>
-            <span class="n">ev_sd2</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-                <span class="n">is_gain</span><span class="p">,</span>
-                <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;gain_evidence_sd_n2&quot;</span><span class="p">],</span>
-                <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;loss_evidence_sd_n2&quot;</span><span class="p">]</span>
-            <span class="p">)</span>
-
-        <span class="k">return</span> <span class="p">{</span>
-            <span class="s2">&quot;prior_mu_risky&quot;</span><span class="p">:</span> <span class="n">prior_mu_risky</span><span class="p">,</span>
-            <span class="s2">&quot;prior_sd_risky&quot;</span><span class="p">:</span> <span class="n">prior_sd_risky</span><span class="p">,</span>
-            <span class="s2">&quot;prior_mu_safe&quot;</span><span class="p">:</span> <span class="n">prior_mu_safe</span><span class="p">,</span>
-            <span class="s2">&quot;prior_sd_safe&quot;</span><span class="p">:</span> <span class="n">prior_sd_safe</span><span class="p">,</span>
-            <span class="s2">&quot;logn1&quot;</span><span class="p">:</span> <span class="n">logn1</span><span class="p">,</span>
-            <span class="s2">&quot;logn2&quot;</span><span class="p">:</span> <span class="n">logn2</span><span class="p">,</span>
-            <span class="s2">&quot;ev_sd1&quot;</span><span class="p">:</span> <span class="n">ev_sd1</span><span class="p">,</span>
-            <span class="s2">&quot;ev_sd2&quot;</span><span class="p">:</span> <span class="n">ev_sd2</span><span class="p">,</span>
-            <span class="s2">&quot;p1&quot;</span><span class="p">:</span> <span class="n">p1</span><span class="p">,</span>
-            <span class="s2">&quot;p2&quot;</span><span class="p">:</span> <span class="n">p2</span><span class="p">,</span>
-            <span class="s2">&quot;risky_first&quot;</span><span class="p">:</span> <span class="n">risky_first</span><span class="p">,</span>
-            <span class="s2">&quot;is_gain&quot;</span><span class="p">:</span> <span class="n">is_gain</span><span class="p">,</span>
-        <span class="p">}</span>
-
-    <span class="c1"># ── choice predictions ───────────────────────────────────────────</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_get_choice_predictions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mi</span><span class="p">):</span>
-        <span class="n">risky_first</span> <span class="o">=</span> <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;risky_first&quot;</span><span class="p">]</span>
-
-        <span class="n">mu1</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-            <span class="n">risky_first</span><span class="p">,</span>
-            <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;prior_mu_risky&quot;</span><span class="p">],</span>
-            <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;prior_mu_safe&quot;</span><span class="p">]</span>
-        <span class="p">)</span>
-        <span class="n">mu2</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-            <span class="n">risky_first</span><span class="p">,</span>
-            <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;prior_mu_safe&quot;</span><span class="p">],</span>
-            <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;prior_mu_risky&quot;</span><span class="p">]</span>
-        <span class="p">)</span>
-
-        <span class="n">sd1</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-            <span class="n">risky_first</span><span class="p">,</span>
-            <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;prior_sd_risky&quot;</span><span class="p">],</span>
-            <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;prior_sd_safe&quot;</span><span class="p">]</span>
-        <span class="p">)</span>
-        <span class="n">sd2</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-            <span class="n">risky_first</span><span class="p">,</span>
-            <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;prior_sd_safe&quot;</span><span class="p">],</span>
-            <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;prior_sd_risky&quot;</span><span class="p">]</span>
-        <span class="p">)</span>
-
-        <span class="n">post1_mu</span><span class="p">,</span> <span class="n">post1_sd</span> <span class="o">=</span> <span class="n">get_posterior</span><span class="p">(</span>
-            <span class="n">mu1</span><span class="p">,</span>
-            <span class="n">sd1</span><span class="p">,</span>
-            <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;logn1&quot;</span><span class="p">],</span>
-            <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;ev_sd1&quot;</span><span class="p">]</span>
-        <span class="p">)</span>
-        <span class="n">post2_mu</span><span class="p">,</span> <span class="n">post2_sd</span> <span class="o">=</span> <span class="n">get_posterior</span><span class="p">(</span>
-            <span class="n">mu2</span><span class="p">,</span>
-            <span class="n">sd2</span><span class="p">,</span>
-            <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;logn2&quot;</span><span class="p">],</span>
-            <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;ev_sd2&quot;</span><span class="p">]</span>
-        <span class="p">)</span>
-
-        <span class="n">risky_post</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">post1_mu</span><span class="p">,</span> <span class="n">post2_mu</span><span class="p">)</span>
-        <span class="n">safe_post</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">post2_mu</span><span class="p">,</span> <span class="n">post1_mu</span><span class="p">)</span>
-
-        <span class="n">decision_sd1</span> <span class="o">=</span> <span class="n">post1_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;ev_sd1&quot;</span><span class="p">]</span>
-        <span class="n">decision_sd2</span> <span class="o">=</span> <span class="n">post2_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;ev_sd2&quot;</span><span class="p">]</span>
-
-        <span class="n">risky_decision_sd</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-            <span class="n">risky_first</span><span class="p">,</span>
-            <span class="n">decision_sd1</span><span class="p">,</span>
-            <span class="n">decision_sd2</span>
-        <span class="p">)</span>
-        <span class="n">safe_decision_sd</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-            <span class="n">risky_first</span><span class="p">,</span>
-            <span class="n">decision_sd2</span><span class="p">,</span>
-            <span class="n">decision_sd1</span>
-        <span class="p">)</span>
-
-        <span class="n">diff_mu</span> <span class="o">=</span> <span class="n">risky_post</span> <span class="o">-</span> <span class="n">safe_post</span>
-        <span class="n">diff_sd</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">risky_decision_sd</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">safe_decision_sd</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
-
-        <span class="c1"># Probability threshold.</span>
-        <span class="n">safe_prob</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;p2&quot;</span><span class="p">],</span> <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;p1&quot;</span><span class="p">])</span>
-        <span class="n">risky_prob</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;p1&quot;</span><span class="p">],</span> <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;p2&quot;</span><span class="p">])</span>
-        <span class="n">threshold</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">safe_prob</span> <span class="o">/</span> <span class="n">risky_prob</span><span class="p">)</span>
-
-        <span class="n">p_risky_gain</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="n">cumulative_normal</span><span class="p">(</span>
-            <span class="n">threshold</span><span class="p">,</span>
-            <span class="n">diff_mu</span><span class="p">,</span>
-            <span class="n">diff_sd</span>
-        <span class="p">)</span>
-
-        <span class="n">p_risky_loss</span> <span class="o">=</span> <span class="n">cumulative_normal</span><span class="p">(</span>
-            <span class="n">threshold</span><span class="p">,</span>
-            <span class="n">diff_mu</span><span class="p">,</span>
-            <span class="n">diff_sd</span>
-        <span class="p">)</span>
-
-        <span class="n">p_risky</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-            <span class="n">mi</span><span class="p">[</span><span class="s2">&quot;is_gain&quot;</span><span class="p">],</span>
-            <span class="n">p_risky_gain</span><span class="p">,</span>
-            <span class="n">p_risky_loss</span>
-        <span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">p_risky</span>
-    
 
 <span class="k">class</span><span class="w"> </span><span class="nc">AffineNoiseRiskModel</span><span class="p">(</span><span class="n">FlexibleNoiseRiskModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Risky-choice model with affine (intercept + linear) noise.</span>
