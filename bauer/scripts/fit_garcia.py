@@ -168,8 +168,8 @@ def main():
             ppc = m.ppc(df, idata, n_posterior_samples=200,
                          inner_samples=1, random_seed=args.seed,
                          progressbar=False)
-        ppc_path = out_path.replace('.nc', '_ppc.parquet')
-        ppc.to_parquet(ppc_path)
+        ppc_path = out_path.replace('.nc', '_ppc.pickle')
+        ppc.to_pickle(ppc_path)
         print(f'ppc -> {ppc_path}', flush=True)
 
     print('Done.', flush=True)
