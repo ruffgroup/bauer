@@ -128,15 +128,17 @@ class DDMMixin:
     def get_free_parameters(self):
         pars = super().get_free_parameters()
         if self.fit_v_scale:
-            pars['v_scale'] = {'mu_intercept': 1.0, 'sigma_intercept': 1.0,
-                               'transform': 'identity'}
-        # Hard lower bound on `a` plus tight prior to suppress a multimodal
-        # alt-ridge mode at large `a` values. With min_value=0.3,
-        # mu_intercept=0 and sigma_intercept=0.2 the post-softplus range
-        # is roughly a ∈ [0.5, 1.4] (95% of the prior). Without this tightening
-        # one chain in four typically gets stuck at a ≈ 1.3-1.5 while the
-        # others find the data-implied mode at a ≈ 0.5-1.0.
-        pars['a'] = {'mu_intercept': 0.0, 'sigma_intercept': 0.2,
+            # softplus + lower bound prevents v_scale → 0 collapse mode.
+            # At v_scale ≈ 0 the Wiener likelihood becomes singular at the
+            # boundaries (Neal-funnel pathology); chains get stuck there
+            # with tree_depth maxing out. With min_value=0.3 and
+            # mu_intercept = inverse_softplus(1-0.3), prior centred at 1.
+            pars['v_scale'] = {'mu_intercept': inverse_softplus_np(0.7),
+                               'sigma_intercept': 0.5,
+                               'transform': 'softplus', 'min_value': 0.3}
+        # Hard lower bound on `a` to block the a→0 collapse mode. With
+        # min_value=0.3 and mu_intercept=0, softplus(0)=0.69 → a ≈ 0.99.
+        pars['a'] = {'mu_intercept': 0.0, 'sigma_intercept': 0.5,
                      'transform': 'softplus', 'min_value': 0.3}
         if not self.fix_z:
             pars['z'] = {'mu_intercept': 0.0, 'sigma_intercept': 0.5,

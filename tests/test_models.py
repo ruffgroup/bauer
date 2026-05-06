@@ -149,6 +149,54 @@ def test_rdm_models_build(paradigm_magnitude, paradigm_risk, cls_name):
     assert 't0' in m.free_parameters
 
 
+def test_flat_observer_prior_magnitude(paradigm_magnitude):
+    """Magnitude/Flex/PowerLaw + DDMFlex with flat_observer_prior=True should
+    build without populating n*_prior_* keys, and should reject fit_prior=True."""
+    import pytensor.tensor as pt
+    from bauer.models import (MagnitudeComparisonModel,
+                                FlexibleNoiseComparisonModel,
+                                PowerLawNoiseComparisonModel)
+    # Static comparison
+    m = MagnitudeComparisonModel(paradigm=paradigm_magnitude,
+                                  fit_prior=False, flat_observer_prior=True)
+    m.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
+    assert m.flat_observer_prior is True
+    assert 'prior_mu' not in m.free_parameters
+    assert 'prior_sd' not in m.free_parameters
+
+    # Mutual exclusivity
+    with pytest.raises(ValueError, match='flat_observer_prior'):
+        MagnitudeComparisonModel(paradigm=paradigm_magnitude,
+                                  fit_prior=True, flat_observer_prior=True)
+
+    # Flexible spline (spline_order=4 dodges patsy df>=4 requirement)
+    mf = FlexibleNoiseComparisonModel(paradigm=paradigm_magnitude,
+                                        spline_order=4, fit_prior=False,
+                                        flat_observer_prior=True)
+    mf.build_estimation_model(paradigm=paradigm_magnitude, hierarchical=True)
+    assert mf.flat_observer_prior is True
+
+    # Power-law
+    mp = PowerLawNoiseComparisonModel(paradigm=paradigm_magnitude,
+                                        fit_prior=False, flat_observer_prior=True)
+    mp.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
+    assert mp.flat_observer_prior is True
+    assert 'noise_exponent' in mp.free_parameters
+
+
+def test_flat_observer_prior_ddm_flex(paradigm_magnitude):
+    """DDMFlexibleNoiseComparisonModel composes flat_observer_prior with the DDM mixin."""
+    pytest.importorskip('hssm')
+    from bauer.models import DDMFlexibleNoiseComparisonModel
+    m = DDMFlexibleNoiseComparisonModel(paradigm=paradigm_magnitude,
+                                          spline_order=4, fit_prior=False,
+                                          flat_observer_prior=True)
+    m.build_estimation_model(paradigm=paradigm_magnitude, hierarchical=True)
+    assert m.flat_observer_prior is True
+    assert 'a' in m.free_parameters
+    assert 't0' in m.free_parameters
+
+
 def test_data_loaders():
     """Verify all bundled-data loaders work."""
     from bauer.utils.data import (load_garcia2022,

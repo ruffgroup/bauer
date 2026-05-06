@@ -35,17 +35,21 @@ class MagnitudeComparisonModel(BaseModel):
 
     def __init__(self, paradigm=None, fit_prior=False, fit_seperate_evidence_sd=True,
                  memory_model='independent', save_trialwise_n_estimates=False,
-                 fit_prior_mu_only=False):
+                 fit_prior_mu_only=False, flat_observer_prior=False):
 
         # fit_prior_mu_only=True implies fit_prior=True and pins σ_p at empirical
         # std(log n). Useful for the unit-σ RDM where σ_p is otherwise unidentified
         # (see notes/race_diffusion_math.md §8e and the discussion in core.py).
         if fit_prior_mu_only:
             fit_prior = True
+        if flat_observer_prior and fit_prior:
+            raise ValueError("flat_observer_prior=True is incompatible with fit_prior=True "
+                             "(the prior is being switched off entirely).")
         self.fit_prior = fit_prior
         self.fit_prior_mu_only = fit_prior_mu_only
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
         self.memory_model = memory_model
+        self.flat_observer_prior = flat_observer_prior
 
         super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
@@ -55,7 +59,14 @@ class MagnitudeComparisonModel(BaseModel):
 
         model_inputs = {}
 
-        if self.fit_prior:
+        if self.flat_observer_prior:
+            # Flat improper observer prior: posterior is the likelihood. The
+            # n*_prior_* keys are intentionally NOT populated; consumers
+            # (BaseModel._get_choice_predictions, _drift_from_snr) check
+            # self.flat_observer_prior and skip the shrinkage step entirely.
+            pass
+
+        elif self.fit_prior:
             model_inputs['n1_prior_mu'] = parameters['prior_mu']
             model_inputs['n2_prior_mu'] = parameters['prior_mu']
             if self.fit_prior_mu_only:
@@ -184,12 +195,17 @@ class FlexibleNoiseComparisonModel(BaseModel):
                  fit_prior=False,
                  spline_order=5,
                  memory_model='independent',
-                 fit_prior_mu_only=False):
+                 fit_prior_mu_only=False,
+                 flat_observer_prior=False):
 
         if fit_prior_mu_only:
             fit_prior = True
+        if flat_observer_prior and fit_prior:
+            raise ValueError("flat_observer_prior=True is incompatible with fit_prior=True "
+                             "(the prior is being switched off entirely).")
         self.fit_prior = fit_prior
         self.fit_prior_mu_only = fit_prior_mu_only
+        self.flat_observer_prior = flat_observer_prior
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
 
         if ~fit_seperate_evidence_sd and (memory_model != 'independent'):
@@ -287,30 +303,32 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         model_inputs = {}
 
-        if self.fit_prior:
-            # Use trialwise variables (expanded per subject) so per-trial shapes
-            # broadcast correctly with model['n1']/model['n2'].
-            prior_mu = parameters['prior_mu']
-            if self.fit_prior_mu_only:
-                # σ_p pinned at the global empirical std of the stimuli in this
-                # paradigm (across all trials, both n1 and n2 columns combined).
-                # NB: in natural-magnitude space — the flex model represents
-                # evidence in natural n, not log n. This is inconsistent with
-                # the static MagnitudeComparisonModel (log space); kept here to
-                # match the rest of the flex model. TODO: harmonize.
-                prior_sd = (pt.std(model['n1']) + pt.std(model['n2'])) / 2.
+        if not self.flat_observer_prior:
+            if self.fit_prior:
+                # Use trialwise variables (expanded per subject) so per-trial shapes
+                # broadcast correctly with model['n1']/model['n2'].
+                prior_mu = parameters['prior_mu']
+                if self.fit_prior_mu_only:
+                    # σ_p pinned at the global empirical std of the stimuli in this
+                    # paradigm (across all trials, both n1 and n2 columns combined).
+                    # NB: in natural-magnitude space — the flex model represents
+                    # evidence in natural n, not log n. This is inconsistent with
+                    # the static MagnitudeComparisonModel (log space); kept here to
+                    # match the rest of the flex model. TODO: harmonize.
+                    prior_sd = (pt.std(model['n1']) + pt.std(model['n2'])) / 2.
+                else:
+                    prior_sd = parameters['prior_sd']
             else:
-                prior_sd = parameters['prior_sd']
-        else:
-            # NB: this branch is per-trial std of the (n1, n2) pair — preserved
-            # for backwards compatibility, but probably also wrong (TODO).
-            prior_mu = pt.mean(pt.stack([model['n1'], model['n2']], axis=1), 1)
-            prior_sd = pt.std(pt.stack([model['n1'], model['n2']], axis=1), 1)
+                # NB: this branch is per-trial std of the (n1, n2) pair — preserved
+                # for backwards compatibility, but probably also wrong (TODO).
+                prior_mu = pt.mean(pt.stack([model['n1'], model['n2']], axis=1), 1)
+                prior_sd = pt.std(pt.stack([model['n1'], model['n2']], axis=1), 1)
 
-        model_inputs['n1_prior_mu'] = prior_mu
-        model_inputs['n2_prior_mu'] = prior_mu
-        model_inputs['n1_prior_sd'] = prior_sd
-        model_inputs['n2_prior_sd'] = prior_sd
+            model_inputs['n1_prior_mu'] = prior_mu
+            model_inputs['n2_prior_mu'] = prior_mu
+            model_inputs['n1_prior_sd'] = prior_sd
+            model_inputs['n2_prior_sd'] = prior_sd
+
         model_inputs['threshold'] =  0.0
 
         model_inputs['n1_evidence_mu'] = model['n1']
@@ -683,8 +701,13 @@ class PowerLawNoiseComparisonModel(BaseModel):
 
     def __init__(self, paradigm=None, fit_seperate_evidence_sd=True,
                  fit_prior=False, memory_model='independent',
-                 save_trialwise_n_estimates=False):
+                 save_trialwise_n_estimates=False,
+                 flat_observer_prior=False):
+        if flat_observer_prior and fit_prior:
+            raise ValueError("flat_observer_prior=True is incompatible with fit_prior=True "
+                             "(the prior is being switched off entirely).")
         self.fit_prior = fit_prior
+        self.flat_observer_prior = flat_observer_prior
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
         self.memory_model = memory_model
         super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
@@ -694,17 +717,18 @@ class PowerLawNoiseComparisonModel(BaseModel):
         model = pm.Model.get_context()
         model_inputs = {}
 
-        if self.fit_prior:
-            prior_mu = parameters['prior_mu']
-            prior_sd = parameters['prior_sd']
-        else:
-            prior_mu = pt.mean(pt.stack([model['n1'], model['n2']], axis=1), 1)
-            prior_sd = pt.std(pt.stack([model['n1'], model['n2']], axis=1), 1)
+        if not self.flat_observer_prior:
+            if self.fit_prior:
+                prior_mu = parameters['prior_mu']
+                prior_sd = parameters['prior_sd']
+            else:
+                prior_mu = pt.mean(pt.stack([model['n1'], model['n2']], axis=1), 1)
+                prior_sd = pt.std(pt.stack([model['n1'], model['n2']], axis=1), 1)
+            model_inputs['n1_prior_mu'] = prior_mu
+            model_inputs['n2_prior_mu'] = prior_mu
+            model_inputs['n1_prior_sd'] = prior_sd
+            model_inputs['n2_prior_sd'] = prior_sd
 
-        model_inputs['n1_prior_mu'] = prior_mu
-        model_inputs['n2_prior_mu'] = prior_mu
-        model_inputs['n1_prior_sd'] = prior_sd
-        model_inputs['n2_prior_sd'] = prior_sd
         model_inputs['threshold'] = 0.0
 
         model_inputs['n1_evidence_mu'] = model['n1']
