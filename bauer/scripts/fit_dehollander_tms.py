@@ -147,30 +147,16 @@ def main():
         m.build_estimation_model(paradigm=df, hierarchical=True)
 
     print(f'Sampling (backend={args.backend})...', flush=True)
+    sample_kwargs = dict(
+        draws=args.draws, tune=args.tune, chains=args.chains,
+        target_accept=args.target_accept, random_seed=args.seed,
+        backend=args.backend,
+    )
     if args.backend == 'pymc':
-        rec_init = getattr(m, 'recommended_pymc_init', None)
-        sample_extra = {'init': rec_init} if rec_init is not None else {}
-        if sample_extra:
-            print(f'  pymc init: {rec_init}', flush=True)
-        idata = m.sample(
-            draws=args.draws, tune=args.tune, chains=args.chains, cores=args.cores,
-            target_accept=args.target_accept, random_seed=args.seed,
-            progressbar=False, callback=_progress, **sample_extra,
-        )
+        sample_kwargs.update(cores=args.cores, progressbar=False, callback=_progress)
     else:
-        from pymc.sampling.jax import sample_numpyro_nuts, sample_blackjax_nuts
-        sampler = sample_numpyro_nuts if args.backend == 'numpyro' \
-                                       else sample_blackjax_nuts
-        with m.estimation_model:
-            nuts_kwargs = dict(getattr(m, 'recommended_nuts_kwargs', {}))
-            print(f'  nuts_kwargs: {nuts_kwargs or "(numpyro defaults)"}', flush=True)
-            idata = sampler(
-                draws=args.draws, tune=args.tune, chains=args.chains,
-                target_accept=args.target_accept, random_seed=args.seed,
-                chain_method='vectorized',
-                nuts_kwargs=nuts_kwargs or None,
-                progressbar=True,
-            )
+        sample_kwargs.update(chain_method='vectorized', progressbar=True)
+    idata = m.sample(**sample_kwargs)
 
     flex_tag = '_flex' if args.flex else ''
     reg_tag = '_reg' if args.regression else ''

@@ -255,12 +255,69 @@ class BaseModel(object):
 
         return data
 
-    def sample(self, draws=1000, tune=1000, target_accept=0.8, **kwargs):
-        
-        with self.estimation_model:
-            self.idata = pm.sample(draws, tune=tune, target_accept=target_accept, return_inferencedata=True, **kwargs)
-        
-        return self.idata            
+    def sample(self, draws=1000, tune=1000, target_accept=0.8, chains=4,
+               backend='pymc', **kwargs):
+        """Sample from the posterior using the requested NUTS backend.
+
+        Parameters
+        ----------
+        backend : {'pymc', 'numpyro', 'blackjax'}
+            'pymc' uses :func:`pm.sample` (default). 'numpyro' / 'blackjax'
+            use the corresponding JAX-NUTS sampler from
+            :mod:`pm.sampling.jax`. JAX backends are much faster on GPU.
+        chains : int
+            Number of chains. Default 4.
+        target_accept : float
+            NUTS target acceptance probability. 0.8 is fine for well-behaved
+            models; 0.95 for hierarchical / DDM-like ones; 0.99 only if
+            divergences persist.
+        draws, tune : int
+            Posterior and warmup draws per chain.
+        **kwargs
+            Forwarded to the underlying sampler. Notably:
+            - pymc backend: ``init=`` (e.g. 'jitter+adapt_full' for dense
+              mass adaptation), ``cores=``, ``random_seed=``.
+            - JAX backends: ``nuts_kwargs={'dense_mass': True}``,
+              ``chain_method='vectorized'``, ``random_seed=``.
+
+        Auto-applied defaults
+        ---------------------
+        Subclasses can declare strongly-correlated posteriors via
+        ``recommended_pymc_init`` and ``recommended_nuts_kwargs``; this
+        method applies them unless the user passes the corresponding kwarg
+        explicitly. DDMMixin / RaceMixin do this for full mass-matrix
+        adaptation.
+        """
+        if backend == 'pymc':
+            kwargs.setdefault('init', getattr(self, 'recommended_pymc_init', None)
+                                       or 'auto')
+            with self.estimation_model:
+                self.idata = pm.sample(
+                    draws, tune=tune, chains=chains,
+                    target_accept=target_accept,
+                    return_inferencedata=True, **kwargs,
+                )
+        elif backend in ('numpyro', 'blackjax'):
+            from pymc.sampling.jax import (
+                sample_numpyro_nuts, sample_blackjax_nuts,
+            )
+            sampler = (sample_numpyro_nuts if backend == 'numpyro'
+                       else sample_blackjax_nuts)
+            # Merge model recommendation with any explicit override
+            rec = dict(getattr(self, 'recommended_nuts_kwargs', {}))
+            user = kwargs.pop('nuts_kwargs', None) or {}
+            nuts_kwargs = {**rec, **user}
+            kwargs.setdefault('chain_method', 'vectorized')
+            with self.estimation_model:
+                self.idata = sampler(
+                    draws=draws, tune=tune, chains=chains,
+                    target_accept=target_accept,
+                    nuts_kwargs=nuts_kwargs or None,
+                    **kwargs,
+                )
+        else:
+            raise ValueError(f"backend must be 'pymc'/'numpyro'/'blackjax', got {backend!r}")
+        return self.idata
 
     def fit_map(self, filter_pars=True, progressbar=True, **kwargs):
         with self.estimation_model:
