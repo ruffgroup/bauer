@@ -109,3 +109,17 @@ ENV/
 # Allow notebooks/lib (shared notebook helpers, not a Python distribution lib)
 !notebooks/lib/
 !notebooks/lib/*
+
+# Fit outputs (rsync'd from cluster). Live in
+# /shares/zne.uzh/gdehol/bauer_results/ canonically.
+notebooks/results_*/
+notebooks/results/
+*.nc
+*.parquet
+*.netcdf
+
+# Rendered figures
+notebooks/figures/
+
+# Per-job runtime logs (cluster-side; not in repo, but defensive)
+*runtimes.tsv
