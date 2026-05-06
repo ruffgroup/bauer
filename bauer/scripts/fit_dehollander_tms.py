@@ -45,7 +45,11 @@ def main():
     ap.add_argument('model', choices=['choice', 'ddm', 'rdm'])
     ap.add_argument('--regression', action='store_true',
                      help='Use the RegressionModel variant with stimulation_condition '
-                          'as a covariate (choice model only for now)')
+                          'as a covariate. Choice + non-flex available; '
+                          'flex variants of DDM/RDM regression now supported.')
+    ap.add_argument('--flex', action='store_true',
+                     help='Use flexible-noise (B-spline) variant')
+    ap.add_argument('--spline-order', type=int, default=5)
     ap.add_argument(
         '--reg-on', default='n1_evidence_sd,n2_evidence_sd',
         help='Comma-separated list of parameters to regress on stimulation_condition. '
@@ -84,38 +88,58 @@ def main():
           f'regression={args.regression}, prior={args.prior_estimate}, '
           f'v_scale={args.v_scale}', flush=True)
 
+    # Patsy regression needs `stimulation_condition` as a column, not an
+    # index level. Promote it for regression fits.
+    df_use = df.reset_index().set_index('subject') if args.regression else df
+
+    common = dict(paradigm=df_use, prior_estimate=args.prior_estimate,
+                  fit_seperate_evidence_sd=True)
+    if args.flex:
+        common['spline_order'] = args.spline_order
+
     if args.regression:
-        if args.model != 'choice':
-            raise NotImplementedError(
-                'Regression variant currently only available for choice model. '
-                'DDM/RDM regression risk models are TODO.'
-            )
-        from bauer.models import RiskRegressionModel as Cls
         reg_params = [p.strip() for p in args.reg_on.split(',') if p.strip()]
         regressors = {p: 'stimulation_condition' for p in reg_params}
-        # Patsy needs ``stimulation_condition`` as a column on the dataframe
-        # (it lives in the index; promote to column).
-        df_for_fit = df.reset_index().set_index('subject')
-        kwargs = dict(paradigm=df_for_fit, regressors=regressors,
-                      prior_estimate=args.prior_estimate,
-                      fit_seperate_evidence_sd=True)
-        m = Cls(**kwargs)
-    elif args.model == 'choice':
-        from bauer.models import RiskModel as Cls
-        kwargs = dict(paradigm=df, prior_estimate=args.prior_estimate,
-                      fit_seperate_evidence_sd=True)
-        m = Cls(**kwargs)
-    elif args.model == 'ddm':
-        from bauer.models import DDMRiskModel as Cls
-        kwargs = dict(paradigm=df, prior_estimate=args.prior_estimate,
-                      fit_seperate_evidence_sd=True, fit_v_scale=fit_v_scale)
-        m = Cls(**kwargs)
-    elif args.model == 'rdm':
-        from bauer.models import RaceDiffusionRiskModel as Cls
-        kwargs = dict(paradigm=df, prior_estimate=args.prior_estimate,
-                      fit_seperate_evidence_sd=True, fit_v_scale=fit_v_scale,
-                      unit_sigma=True)
-        m = Cls(**kwargs)
+        common['regressors'] = regressors
+
+        if args.model == 'choice':
+            if args.flex:
+                from bauer.models import FlexibleNoiseRiskRegressionModel as Cls
+            else:
+                from bauer.models import RiskRegressionModel as Cls
+        elif args.model == 'ddm':
+            if not args.flex:
+                raise NotImplementedError(
+                    'Non-flex DDM regression on risk not implemented yet. '
+                    'Use --flex.'
+                )
+            from bauer.models import DDMFlexibleNoiseRiskRegressionModel as Cls
+            common['fit_v_scale'] = fit_v_scale
+        elif args.model == 'rdm':
+            if not args.flex:
+                raise NotImplementedError(
+                    'Non-flex RDM regression on risk not implemented yet. '
+                    'Use --flex.'
+                )
+            from bauer.models import RaceDiffusionFlexibleNoiseRiskRegressionModel as Cls
+    else:
+        if args.model == 'choice':
+            if args.flex:
+                from bauer.models import FlexibleNoiseRiskModel as Cls
+            else:
+                from bauer.models import RiskModel as Cls
+        elif args.model == 'ddm':
+            if args.flex:
+                from bauer.models import DDMFlexibleNoiseRiskModel as Cls
+            else:
+                from bauer.models import DDMRiskModel as Cls
+            common['fit_v_scale'] = fit_v_scale
+        elif args.model == 'rdm':
+            if args.flex:
+                from bauer.models import RaceDiffusionFlexibleNoiseRiskModel as Cls
+            else:
+                from bauer.models import RaceDiffusionRiskModel as Cls
+    m = Cls(**common)
 
     try:
         m.build_estimation_model(data=df, hierarchical=True)
@@ -140,10 +164,11 @@ def main():
                 progressbar=True,
             )
 
+    flex_tag = '_flex' if args.flex else ''
     reg_tag = '_reg' if args.regression else ''
     scale_tag = f'_{args.v_scale}scale' if args.model in ('ddm', 'rdm') else ''
     out_path = op.join(args.out_dir, f'{n_subj}subj',
-                        f'{args.model}{reg_tag}{scale_tag}_{args.prior_estimate}.nc')
+                        f'{args.model}{flex_tag}{reg_tag}{scale_tag}_{args.prior_estimate}.nc')
     _safe_to_netcdf(idata, out_path)
     print(f'idata -> {out_path}', flush=True)
 

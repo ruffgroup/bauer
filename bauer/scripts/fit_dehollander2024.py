@@ -57,6 +57,9 @@ def main():
     ap.add_argument('--backend', choices=['pymc', 'numpyro', 'blackjax'],
                      default='pymc')
     ap.add_argument('--no-ppc', action='store_true')
+    ap.add_argument('--flex', action='store_true',
+                     help='Use flexible-noise (B-spline) variant')
+    ap.add_argument('--spline-order', type=int, default=5)
     args = ap.parse_args()
 
     fit_v_scale = (args.v_scale == 'free')
@@ -74,20 +77,27 @@ def main():
           f'model={args.model}, prior={args.prior_estimate}, '
           f'v_scale={args.v_scale}', flush=True)
 
+    common = dict(paradigm=df, prior_estimate=args.prior_estimate,
+                  fit_seperate_evidence_sd=True)
+    if args.flex:
+        common['spline_order'] = args.spline_order
     if args.model == 'choice':
-        from bauer.models import RiskModel as Cls
-        kwargs = dict(paradigm=df, prior_estimate=args.prior_estimate,
-                      fit_seperate_evidence_sd=True)
+        if args.flex:
+            from bauer.models import FlexibleNoiseRiskModel as Cls
+        else:
+            from bauer.models import RiskModel as Cls
     elif args.model == 'ddm':
-        from bauer.models import DDMRiskModel as Cls
-        kwargs = dict(paradigm=df, prior_estimate=args.prior_estimate,
-                      fit_seperate_evidence_sd=True, fit_v_scale=fit_v_scale)
+        if args.flex:
+            from bauer.models import DDMFlexibleNoiseRiskModel as Cls
+        else:
+            from bauer.models import DDMRiskModel as Cls
+        common['fit_v_scale'] = fit_v_scale
     elif args.model == 'rdm':
-        from bauer.models import RaceDiffusionRiskModel as Cls
-        kwargs = dict(paradigm=df, prior_estimate=args.prior_estimate,
-                      fit_seperate_evidence_sd=True, fit_v_scale=fit_v_scale,
-                      unit_sigma=True)
-    m = Cls(**kwargs)
+        if args.flex:
+            from bauer.models import RaceDiffusionFlexibleNoiseRiskModel as Cls
+        else:
+            from bauer.models import RaceDiffusionRiskModel as Cls
+    m = Cls(**common)
 
     try:
         m.build_estimation_model(data=df, hierarchical=True)
@@ -112,9 +122,10 @@ def main():
                 progressbar=True,
             )
 
+    flex_tag = '_flex' if args.flex else ''
     scale_tag = f'_{args.v_scale}scale' if args.model in ('ddm', 'rdm') else ''
     out_path = op.join(args.out_dir, args.task, f'{n_subj}subj',
-                        f'{args.model}{scale_tag}_{args.prior_estimate}.nc')
+                        f'{args.model}{flex_tag}{scale_tag}_{args.prior_estimate}.nc')
     _safe_to_netcdf(idata, out_path)
     print(f'idata -> {out_path}', flush=True)
 
