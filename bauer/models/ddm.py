@@ -24,9 +24,13 @@ import pandas as pd
 import pymc as pm
 import pytensor.tensor as pt
 
-from .magnitude import MagnitudeComparisonModel, FlexibleNoiseComparisonModel
+from .magnitude import (
+    MagnitudeComparisonModel, FlexibleNoiseComparisonModel,
+    PowerLawNoiseComparisonModel, PowerLawNoiseComparisonRegressionModel,
+)
 from .risky_choice import (
     RiskModel, FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
+    PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
 )
 from ..utils.bayes import get_posterior
 from ..utils.math import inverse_softplus_np
@@ -422,7 +426,7 @@ class DDMMixin:
         )
 
 
-def _drift_from_snr(model_inputs, v_scale=None):
+def _drift_from_snr(model_inputs, v_scale=None, flat_observer_prior=False):
     """Drift = ((post_n2_mu - post_n1_mu) + threshold) / sqrt(sd1^2 + sd2^2).
 
     Shared by every DDM model whose cognitive front-end produces the standard
@@ -431,15 +435,23 @@ def _drift_from_snr(model_inputs, v_scale=None):
     ``get_model_inputs``) so the formula reduces to plain SNR. For
     :class:`RiskModel`-based front-ends, ``threshold = log(p2/p1)`` so drift
     carries the EU comparison directly.
+
+    ``flat_observer_prior=True`` skips the Bayesian shrinkage step entirely
+    (posterior is the likelihood); ``n*_prior_*`` keys are then not required
+    in ``model_inputs``.
     """
-    post_n1_mu, _ = get_posterior(
-        model_inputs['n1_prior_mu'], model_inputs['n1_prior_sd'],
-        model_inputs['n1_evidence_mu'], model_inputs['n1_evidence_sd'],
-    )
-    post_n2_mu, _ = get_posterior(
-        model_inputs['n2_prior_mu'], model_inputs['n2_prior_sd'],
-        model_inputs['n2_evidence_mu'], model_inputs['n2_evidence_sd'],
-    )
+    if flat_observer_prior:
+        post_n1_mu = model_inputs['n1_evidence_mu']
+        post_n2_mu = model_inputs['n2_evidence_mu']
+    else:
+        post_n1_mu, _ = get_posterior(
+            model_inputs['n1_prior_mu'], model_inputs['n1_prior_sd'],
+            model_inputs['n1_evidence_mu'], model_inputs['n1_evidence_sd'],
+        )
+        post_n2_mu, _ = get_posterior(
+            model_inputs['n2_prior_mu'], model_inputs['n2_prior_sd'],
+            model_inputs['n2_evidence_mu'], model_inputs['n2_evidence_sd'],
+        )
     threshold = model_inputs.get('threshold', 0.0)
     diff_mu = (post_n2_mu - post_n1_mu) + threshold
     diff_sd = pt.sqrt(model_inputs['n1_evidence_sd'] ** 2 +
@@ -475,17 +487,19 @@ class DDMMagnitudeComparisonModel(DDMMixin, MagnitudeComparisonModel):
     def __init__(self, paradigm=None, fit_prior=False,
                  fit_seperate_evidence_sd=True, memory_model='independent',
                  save_trialwise_n_estimates=False, fit_v_scale=False,
-                 fix_z=True):
+                 fix_z=True, flat_observer_prior=False):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
         super().__init__(paradigm=paradigm, fit_prior=fit_prior,
                          fit_seperate_evidence_sd=fit_seperate_evidence_sd,
                          memory_model=memory_model,
-                         save_trialwise_n_estimates=save_trialwise_n_estimates)
+                         save_trialwise_n_estimates=save_trialwise_n_estimates,
+                         flat_observer_prior=flat_observer_prior)
 
     def _get_drift(self, model_inputs, parameters):
         v_scale = parameters['v_scale'] if self.fit_v_scale else None
-        return _drift_from_snr(model_inputs, v_scale=v_scale)
+        return _drift_from_snr(model_inputs, v_scale=v_scale,
+                               flat_observer_prior=self.flat_observer_prior)
 
 
 class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
@@ -510,7 +524,7 @@ class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
     def __init__(self, paradigm, fit_seperate_evidence_sd=True,
                  fit_prior=False, spline_order=5,
                  memory_model='independent', fit_v_scale=False,
-                 fix_z=True):
+                 fix_z=True, flat_observer_prior=False):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
         FlexibleNoiseComparisonModel.__init__(
@@ -519,11 +533,13 @@ class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
             fit_prior=fit_prior,
             spline_order=spline_order,
             memory_model=memory_model,
+            flat_observer_prior=flat_observer_prior,
         )
 
     def _get_drift(self, model_inputs, parameters):
         v_scale = parameters['v_scale'] if self.fit_v_scale else None
-        return _drift_from_snr(model_inputs, v_scale=v_scale)
+        return _drift_from_snr(model_inputs, v_scale=v_scale,
+                               flat_observer_prior=self.flat_observer_prior)
 
 
 class DDMRiskModel(DDMMixin, RiskModel):
@@ -632,6 +648,115 @@ class DDMFlexibleNoiseRiskRegressionModel(DDMMixin, FlexibleNoiseRiskRegressionM
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             spline_order=spline_order,
             representational_noise=representational_noise,
+            memory_model=memory_model,
+        )
+
+    def _get_drift(self, model_inputs, parameters):
+        v_scale = parameters['v_scale'] if self.fit_v_scale else None
+        return _drift_from_snr(model_inputs, v_scale=v_scale)
+
+
+# ============================================================
+# DDM × PowerLawNoise variants
+# ============================================================
+
+class DDMPowerLawNoiseComparisonModel(DDMMixin, PowerLawNoiseComparisonModel):
+    """DDM variant of :class:`PowerLawNoiseComparisonModel`.
+
+    Drift uses the same SNR-of-perceived-difference formula as
+    :class:`DDMMagnitudeComparisonModel`, but ``σ_k(n) = exp(log_sd_k) ·
+    n^noise_exponent`` is a power-law in magnitude. ``noise_exponent`` is
+    shared across n1/n2; ``noise_exponent=0`` → linear scale, ``=1`` →
+    Weber's law (log scale).
+    """
+
+    def __init__(self, paradigm, fit_seperate_evidence_sd=True,
+                 fit_prior=False, memory_model='independent',
+                 fit_v_scale=False, fix_z=True, flat_observer_prior=False):
+        self.fit_v_scale = fit_v_scale
+        self.fix_z = fix_z
+        PowerLawNoiseComparisonModel.__init__(
+            self, paradigm,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_prior=fit_prior, memory_model=memory_model,
+            flat_observer_prior=flat_observer_prior,
+        )
+
+    def _get_drift(self, model_inputs, parameters):
+        v_scale = parameters['v_scale'] if self.fit_v_scale else None
+        return _drift_from_snr(model_inputs, v_scale=v_scale)
+
+
+class DDMPowerLawNoiseComparisonRegressionModel(DDMMixin, PowerLawNoiseComparisonRegressionModel):
+    """DDM + power-law noise + patsy-formula regression on parameters.
+
+    Use to let ``noise_exponent`` vary across conditions (e.g. across
+    formats, subjects, sessions, stim conditions). All accumulator params
+    (``a``, ``t0``, ``v_scale``) are also targetable in the formula dict.
+    """
+
+    def __init__(self, paradigm, regressors,
+                 fit_seperate_evidence_sd=True,
+                 fit_prior=False, memory_model='independent',
+                 fit_v_scale=False, fix_z=True):
+        self.fit_v_scale = fit_v_scale
+        self.fix_z = fix_z
+        PowerLawNoiseComparisonRegressionModel.__init__(
+            self, paradigm, regressors,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_prior=fit_prior, memory_model=memory_model,
+        )
+
+    def _get_drift(self, model_inputs, parameters):
+        v_scale = parameters['v_scale'] if self.fit_v_scale else None
+        return _drift_from_snr(model_inputs, v_scale=v_scale)
+
+
+class DDMPowerLawNoiseRiskModel(DDMMixin, PowerLawNoiseRiskModel):
+    """DDM + power-law noise for risky choice. Drift = SNR of perceived
+    log-EU difference (same as :class:`DDMRiskModel`)."""
+
+    def __init__(self, paradigm, prior_estimate='full',
+                 fit_seperate_evidence_sd=True,
+                 save_trialwise_n_estimates=False,
+                 memory_model='independent',
+                 fit_v_scale=False, fix_z=True):
+        self.fit_v_scale = fit_v_scale
+        self.fix_z = fix_z
+        PowerLawNoiseRiskModel.__init__(
+            self, paradigm,
+            prior_estimate=prior_estimate,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            memory_model=memory_model,
+        )
+
+    def _get_drift(self, model_inputs, parameters):
+        v_scale = parameters['v_scale'] if self.fit_v_scale else None
+        return _drift_from_snr(model_inputs, v_scale=v_scale)
+
+
+class DDMPowerLawNoiseRiskRegressionModel(DDMMixin, PowerLawNoiseRiskRegressionModel):
+    """DDM + power-law-noise risky choice + patsy-formula regression.
+
+    Same multi-inheritance pattern as the flex versions. Targetable
+    parameters include ``noise_exponent`` (the headline exponent),
+    ``log_sd_intercept_n1/n2``, accumulator params, and the prior params
+    if ``fit_prior=True``.
+    """
+
+    def __init__(self, paradigm, regressors, prior_estimate='full',
+                 fit_seperate_evidence_sd=True,
+                 save_trialwise_n_estimates=False,
+                 memory_model='independent',
+                 fit_v_scale=False, fix_z=True):
+        self.fit_v_scale = fit_v_scale
+        self.fix_z = fix_z
+        PowerLawNoiseRiskRegressionModel.__init__(
+            self, paradigm, regressors,
+            prior_estimate=prior_estimate,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
         )
 

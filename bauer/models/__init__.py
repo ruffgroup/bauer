@@ -24,9 +24,13 @@ try:
         DDMMixin,
         DDMMagnitudeComparisonModel,
         DDMFlexibleNoiseComparisonModel,
+        DDMPowerLawNoiseComparisonModel,
+        DDMPowerLawNoiseComparisonRegressionModel,
         DDMRiskModel,
         DDMFlexibleNoiseRiskModel,
         DDMFlexibleNoiseRiskRegressionModel,
+        DDMPowerLawNoiseRiskModel,
+        DDMPowerLawNoiseRiskRegressionModel,
     )
 except ImportError:
     pass
@@ -35,8 +39,12 @@ from .race import (
     RaceMixin,
     RaceDiffusionMagnitudeComparisonModel,
     RaceDiffusionFlexibleNoiseComparisonModel,
+    RaceDiffusionPowerLawNoiseComparisonModel,
+    RaceDiffusionPowerLawNoiseComparisonRegressionModel,
     RaceDiffusionRiskModel,
     RaceDiffusionFlexibleNoiseRiskModel,
     RaceDiffusionFlexibleNoiseRiskRegressionModel,
+    RaceDiffusionPowerLawNoiseRiskModel,
+    RaceDiffusionPowerLawNoiseRiskRegressionModel,
     logp_race_diffusion_2,
 )

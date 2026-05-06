@@ -34,9 +34,13 @@ import pandas as pd
 import pymc as pm
 import pytensor.tensor as pt
 
-from .magnitude import MagnitudeComparisonModel, FlexibleNoiseComparisonModel
+from .magnitude import (
+    MagnitudeComparisonModel, FlexibleNoiseComparisonModel,
+    PowerLawNoiseComparisonModel, PowerLawNoiseComparisonRegressionModel,
+)
 from .risky_choice import (
     RiskModel, FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
+    PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
 )
 from ..utils.bayes import get_posterior
 from ..utils.math import inverse_softplus_np
@@ -522,6 +526,105 @@ class RaceDiffusionFlexibleNoiseRiskRegressionModel(
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             spline_order=spline_order,
             representational_noise=representational_noise,
+            memory_model=memory_model,
+        )
+
+    def _get_drifts(self, model_inputs, parameters):
+        return _drifts_from_post_and_prior(model_inputs, parameters,
+                                            advantage=self.advantage)
+
+
+# ============================================================
+# Race-Diffusion × PowerLawNoise variants
+# ============================================================
+
+class RaceDiffusionPowerLawNoiseComparisonModel(RaceMixin, PowerLawNoiseComparisonModel):
+    """Race-diffusion variant of :class:`PowerLawNoiseComparisonModel`.
+
+    Race accumulators with σ_k(n) = exp(log_sd_k) · n^noise_exponent. The
+    noise_exponent is shared across n1/n2; together with separate log-SD
+    intercepts this lets you recover the Stevens compression exponent
+    (alpha = 1 - noise_exponent) jointly with choice + RT.
+    """
+
+    def __init__(self, paradigm, fit_seperate_evidence_sd=True,
+                 fit_prior=False, memory_model='independent',
+                 advantage=True, flat_observer_prior=False):
+        self.advantage = advantage
+        PowerLawNoiseComparisonModel.__init__(
+            self, paradigm,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_prior=fit_prior, memory_model=memory_model,
+            flat_observer_prior=flat_observer_prior,
+        )
+
+    def _get_drifts(self, model_inputs, parameters):
+        return _drifts_from_post_and_prior(model_inputs, parameters,
+                                            advantage=self.advantage)
+
+
+class RaceDiffusionPowerLawNoiseComparisonRegressionModel(
+        RaceMixin, PowerLawNoiseComparisonRegressionModel):
+    """Race-diffusion + power-law noise + patsy-formula regression.
+
+    Same multi-inheritance pattern as the flex versions. Use to let
+    ``noise_exponent`` (Stevens compression) vary with experimental
+    condition.
+    """
+
+    def __init__(self, paradigm, regressors,
+                 fit_seperate_evidence_sd=True,
+                 fit_prior=False, memory_model='independent',
+                 advantage=True):
+        self.advantage = advantage
+        PowerLawNoiseComparisonRegressionModel.__init__(
+            self, paradigm, regressors,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_prior=fit_prior, memory_model=memory_model,
+        )
+
+    def _get_drifts(self, model_inputs, parameters):
+        return _drifts_from_post_and_prior(model_inputs, parameters,
+                                            advantage=self.advantage)
+
+
+class RaceDiffusionPowerLawNoiseRiskModel(RaceMixin, PowerLawNoiseRiskModel):
+    """Race-diffusion + power-law-noise risky choice."""
+
+    def __init__(self, paradigm, prior_estimate='full',
+                 fit_seperate_evidence_sd=True,
+                 save_trialwise_n_estimates=False,
+                 memory_model='independent',
+                 advantage=True):
+        self.advantage = advantage
+        PowerLawNoiseRiskModel.__init__(
+            self, paradigm,
+            prior_estimate=prior_estimate,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            memory_model=memory_model,
+        )
+
+    def _get_drifts(self, model_inputs, parameters):
+        return _drifts_from_post_and_prior(model_inputs, parameters,
+                                            advantage=self.advantage)
+
+
+class RaceDiffusionPowerLawNoiseRiskRegressionModel(
+        RaceMixin, PowerLawNoiseRiskRegressionModel):
+    """Race-diffusion + power-law-noise risky choice + regression."""
+
+    def __init__(self, paradigm, regressors, prior_estimate='full',
+                 fit_seperate_evidence_sd=True,
+                 save_trialwise_n_estimates=False,
+                 memory_model='independent',
+                 advantage=True):
+        self.advantage = advantage
+        PowerLawNoiseRiskRegressionModel.__init__(
+            self, paradigm, regressors,
+            prior_estimate=prior_estimate,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
         )
 
