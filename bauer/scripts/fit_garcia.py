@@ -73,6 +73,10 @@ def main():
                      help='JAX-only: chain dispatch. "vectorized" vmaps all '
                           'chains on a single device (best for 1 GPU); '
                           '"sequential" runs one at a time (debugging).')
+    ap.add_argument('--dense-mass', action='store_true',
+                     help='JAX-only: use dense mass matrix in NUTS warmup. '
+                          'Helps when parameters are strongly correlated '
+                          '(typical for DDM: v_scale × evidence_sd × a).')
     ap.add_argument('--no-ppc', action='store_true',
                      help='Skip PPC computation after sampling')
     args = ap.parse_args()
@@ -144,6 +148,7 @@ def main():
         sampler = sample_numpyro_nuts if args.backend == 'numpyro' \
                                        else sample_blackjax_nuts
         with m.estimation_model:
+            nuts_kwargs = {'dense_mass': True} if args.dense_mass else None
             idata = sampler(
                 draws=args.draws, tune=args.tune, chains=args.chains,
                 target_accept=args.target_accept, random_seed=args.seed,
@@ -151,6 +156,7 @@ def main():
                 # chains run in parallel). 'parallel' would shard chains
                 # across devices and fall back to sequential on 1-device hosts.
                 chain_method=args.chain_method,
+                nuts_kwargs=nuts_kwargs,
                 progressbar=True,
             )
 
