@@ -106,3 +106,6 @@ ENV/
 .idea/
 
 .DS_Store
+# Allow notebooks/lib (shared notebook helpers, not a Python distribution lib)
+!notebooks/lib/
+!notebooks/lib/*
