@@ -21,7 +21,11 @@ ROOT=/shares/zne.uzh/gdehol/bauer_results
 submit_l4() {
   local NAME="$1"; shift
   local TIME="$1"; shift
-  sbatch --job-name="$NAME" --gres=gpu:L4:1 --time="$TIME" \
+  # Default to lowprio partition (more L4 nodes, much shorter wait); jobs can
+  # be pre-empted by standard-partition users but our 5-30 min fits rarely
+  # get caught. Override with PARTITION env var.
+  sbatch --partition="${PARTITION:-lowprio}" \
+         --job-name="$NAME" --gres=gpu:L4:1 --time="$TIME" \
          "$SLURM/run_fit.sh" bauer_cuda "$@"
 }
 
