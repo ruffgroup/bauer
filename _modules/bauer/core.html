@@ -298,16 +298,19 @@
         <span class="k">return</span> <span class="n">paradigm_</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_choice_predictions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_inputs</span><span class="p">):</span>
-        <span class="n">post_n1_mu</span><span class="p">,</span> <span class="n">post_n1_sd</span> <span class="o">=</span> <span class="n">get_posterior</span><span class="p">(</span><span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_mu&#39;</span><span class="p">],</span> 
-                                               <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">],</span> 
-                                               <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_mu&#39;</span><span class="p">],</span> 
-                                               <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">]</span>
-                                               <span class="p">)</span>
-
-        <span class="n">post_n2_mu</span><span class="p">,</span> <span class="n">post_n2_sd</span> <span class="o">=</span> <span class="n">get_posterior</span><span class="p">(</span><span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_mu&#39;</span><span class="p">],</span>
-                                               <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_sd&#39;</span><span class="p">],</span>
-                                               <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_mu&#39;</span><span class="p">],</span> 
-                                               <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;flat_observer_prior&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="c1"># Flat improper prior → posterior is the likelihood. No shrinkage.</span>
+            <span class="n">post_n1_mu</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_mu&#39;</span><span class="p">]</span>
+            <span class="n">post_n2_mu</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_mu&#39;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">post_n1_mu</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">get_posterior</span><span class="p">(</span><span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_mu&#39;</span><span class="p">],</span>
+                                          <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">],</span>
+                                          <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_mu&#39;</span><span class="p">],</span>
+                                          <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">])</span>
+            <span class="n">post_n2_mu</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">get_posterior</span><span class="p">(</span><span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_mu&#39;</span><span class="p">],</span>
+                                          <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_sd&#39;</span><span class="p">],</span>
+                                          <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_mu&#39;</span><span class="p">],</span>
+                                          <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">])</span>
 
         <span class="n">diff_mu</span><span class="p">,</span> <span class="n">diff_sd</span> <span class="o">=</span> <span class="n">get_diff_dist</span><span class="p">(</span><span class="n">post_n2_mu</span><span class="p">,</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">],</span> <span class="n">post_n1_mu</span><span class="p">,</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">])</span>
 
