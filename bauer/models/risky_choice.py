@@ -787,6 +787,12 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
                            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
                            prior_estimate=prior_estimate,
                            memory_model=memory_model)
+        # FlexibleNoiseComparisonModel.__init__ is skipped by the explicit
+        # RiskModel.__init__ call above (sibling in the MRO), so the spline
+        # design-info setup never runs. Restore it here.
+        self._dm_design_infos = {}
+        if paradigm is not None:
+            self._initialize_design_infos()
 
     def get_model_inputs(self, parameters):
 
