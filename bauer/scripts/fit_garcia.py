@@ -64,6 +64,10 @@ def main():
     ap.add_argument('--no-advantage', action='store_true',
                      help='RDM only: turn OFF advantage decomposition '
                           '(default is advantage=True).')
+    ap.add_argument('--backend', choices=['pymc', 'numpyro', 'blackjax'],
+                     default='pymc',
+                     help='Sampler backend. numpyro/blackjax run via JAX, '
+                          'often 2-10x faster especially with --gres=gpu:1.')
     ap.add_argument('--no-ppc', action='store_true',
                      help='Skip PPC computation after sampling')
     args = ap.parse_args()
@@ -120,12 +124,26 @@ def main():
     except TypeError:
         m.build_estimation_model(paradigm=df, hierarchical=True)
 
-    print('Sampling...', flush=True)
-    idata = m.sample(
-        draws=args.draws, tune=args.tune, chains=args.chains, cores=args.cores,
-        target_accept=args.target_accept, random_seed=args.seed,
-        progressbar=False, callback=_progress,
-    )
+    print(f'Sampling (backend={args.backend})...', flush=True)
+    if args.backend == 'pymc':
+        idata = m.sample(
+            draws=args.draws, tune=args.tune, chains=args.chains, cores=args.cores,
+            target_accept=args.target_accept, random_seed=args.seed,
+            progressbar=False, callback=_progress,
+        )
+    else:
+        # JAX-backed NUTS via numpyro or blackjax. Both run all chains in
+        # parallel within a single process; honors --chains but ignores
+        # --cores / --callback (no per-step Python callback hooks).
+        from pymc.sampling.jax import sample_numpyro_nuts, sample_blackjax_nuts
+        sampler = sample_numpyro_nuts if args.backend == 'numpyro' \
+                                       else sample_blackjax_nuts
+        with m.estimation_model:
+            idata = sampler(
+                draws=args.draws, tune=args.tune, chains=args.chains,
+                target_accept=args.target_accept, random_seed=args.seed,
+                progressbar=False,
+            )
 
     # Compose output filename
     flex_tag = '_flex' if args.flex else ''

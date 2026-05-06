@@ -1,0 +1,28 @@
+name: bauer_cuda
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - seaborn
+  - patsy
+  - pymc>=5
+  - pytensor
+  - arviz
+  - jupyter
+  - nbformat
+  - nbconvert
+  - pip:
+    - hssm
+    # CUDA-enabled JAX. The cluster has cuda 12.x available via
+    # `module load gpu cuda/12.2.1`; jax[cuda12] ships with the matching
+    # CUDA runtime so no module load is strictly required at import time.
+    - "jax[cuda12]"
+    - numpyro
+    - blackjax
+    - -e .

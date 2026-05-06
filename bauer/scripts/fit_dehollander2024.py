@@ -54,6 +54,8 @@ def main():
     ap.add_argument('--cores', type=int, default=2)
     ap.add_argument('--target-accept', type=float, default=0.99)
     ap.add_argument('--seed', type=int, default=0)
+    ap.add_argument('--backend', choices=['pymc', 'numpyro', 'blackjax'],
+                     default='pymc')
     ap.add_argument('--no-ppc', action='store_true')
     args = ap.parse_args()
 
@@ -92,12 +94,23 @@ def main():
     except TypeError:
         m.build_estimation_model(paradigm=df, hierarchical=True)
 
-    print('Sampling...', flush=True)
-    idata = m.sample(
-        draws=args.draws, tune=args.tune, chains=args.chains, cores=args.cores,
-        target_accept=args.target_accept, random_seed=args.seed,
-        progressbar=False, callback=_progress,
-    )
+    print(f'Sampling (backend={args.backend})...', flush=True)
+    if args.backend == 'pymc':
+        idata = m.sample(
+            draws=args.draws, tune=args.tune, chains=args.chains, cores=args.cores,
+            target_accept=args.target_accept, random_seed=args.seed,
+            progressbar=False, callback=_progress,
+        )
+    else:
+        from pymc.sampling.jax import sample_numpyro_nuts, sample_blackjax_nuts
+        sampler = sample_numpyro_nuts if args.backend == 'numpyro' \
+                                       else sample_blackjax_nuts
+        with m.estimation_model:
+            idata = sampler(
+                draws=args.draws, tune=args.tune, chains=args.chains,
+                target_accept=args.target_accept, random_seed=args.seed,
+                progressbar=False,
+            )
 
     scale_tag = f'_{args.v_scale}scale' if args.model in ('ddm', 'rdm') else ''
     out_path = op.join(args.out_dir, args.task, f'{n_subj}subj',
