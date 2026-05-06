@@ -66,7 +66,7 @@ def main():
     ap.add_argument('--tune', type=int, default=1000)
     ap.add_argument('--chains', type=int, default=4)
     ap.add_argument('--cores', type=int, default=4)
-    ap.add_argument('--target-accept', type=float, default=0.99)
+    ap.add_argument('--target-accept', type=float, default=0.95)
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--backend', choices=['pymc', 'numpyro', 'blackjax'],
                      default='pymc')

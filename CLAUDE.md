@@ -76,3 +76,19 @@ df = load_garcia2022(task='magnitude')  # or task='risk'
 ### Regression models
 
 `RegressionModel` accepts a `formula` dict mapping parameter names to patsy formulas. Design matrices are built once via `build_design_matrix()` and can be updated for new data via `rebuild_design_matrix()`. Use `get_conditionwise_parameters()` to extract posterior means at specific covariate values.
+
+## Wall-time tracking for benchmarking
+
+Bauer fits run across multiple backends (pymc-NUTS, numpyro, blackjax) and devices (CPU, GPU). To compare them rigorously — for the GPU-vs-CPU experiment now and for a possible methods paper later — the cluster `run_fit.sh` wrapper appends a one-line summary per job to `~/logs/bauer_runtimes.tsv`:
+
+```
+job_id  job_name  host  env  elapsed_sec  exit  start  end  cmd
+```
+
+Inspect / sort with:
+
+```bash
+column -t -s$'\t' ~/logs/bauer_runtimes.tsv | sort -k5n
+```
+
+When reporting timings (paper, talk, README), pull from this TSV rather than re-eyeballing logs — keeps the comparison auditable. Note that the elapsed time includes JAX JIT compilation for numpyro/blackjax (~30-120 s for the first chain), which inflates wall time on small fits but amortizes for big ones.
