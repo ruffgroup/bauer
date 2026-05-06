@@ -1,10 +1,14 @@
 #!/bin/bash
-# Submits 3 small fits to compare backends on Garcia 8-subj DDM:
-#   - pymc-NUTS (CPU)
-#   - numpyro NUTS (CPU JAX, bauer env)
-#   - numpyro NUTS (GPU JAX, bauer_cuda env, --gres=gpu:1)
+# Benchmarks 3 backends on Garcia DDM at TWO scales (N=8 and N=64). 6 jobs
+# total. GPU jobs pinned to L4 for reproducible timings — the cluster's L4
+# nodes have 24 GB which is plenty for these models.
 #
-# Inspect timings via:  grep -E "Sampling|saved|exit" ~/logs/jax_exp_*
+#   N=8:                          N=64:
+#     pymc CPU                      pymc CPU (~3-4 hr expected)
+#     numpyro CPU                   numpyro CPU
+#     numpyro GPU (L4)              numpyro GPU (L4)
+#
+# Timings auto-appended to ~/logs/bauer_runtimes.tsv.
 
 set -e
 SLURM=$HOME/git/bauer/bauer/scripts/slurm_jobs
@@ -12,22 +16,36 @@ OUT=/shares/zne.uzh/gdehol/bauer_results/jax_experiment
 
 mkdir -p "$OUT"
 
-# 1) pymc on CPU (baseline)
-sbatch --job-name=jax_exp_pymc_cpu --time=00:45:00 \
+# ---------- N=8 (cheap, runs in minutes) ----------
+sbatch --job-name=jax_exp_pymc_cpu_n8 --time=00:45:00 \
        "$SLURM/run_fit.sh" bauer bauer.scripts.fit_garcia ddm \
        --n-subjects 8 --backend pymc --v-scale free \
-       --no-ppc --out-dir "$OUT/pymc_cpu"
+       --no-ppc --out-dir "$OUT/pymc_cpu_n8"
 
-# 2) numpyro on CPU (JAX, no GPU)
-sbatch --job-name=jax_exp_numpyro_cpu --time=00:30:00 \
+sbatch --job-name=jax_exp_numpyro_cpu_n8 --time=00:30:00 \
        "$SLURM/run_fit.sh" bauer bauer.scripts.fit_garcia ddm \
        --n-subjects 8 --backend numpyro --v-scale free \
-       --no-ppc --out-dir "$OUT/numpyro_cpu"
+       --no-ppc --out-dir "$OUT/numpyro_cpu_n8"
 
-# 3) numpyro on GPU (JAX with CUDA, bauer_cuda env)
-sbatch --job-name=jax_exp_numpyro_gpu --gres=gpu:1 --time=00:20:00 \
+sbatch --job-name=jax_exp_numpyro_gpu_n8 --gres=gpu:L4:1 --time=00:20:00 \
        "$SLURM/run_fit.sh" bauer_cuda bauer.scripts.fit_garcia ddm \
        --n-subjects 8 --backend numpyro --v-scale free \
-       --no-ppc --out-dir "$OUT/numpyro_gpu"
+       --no-ppc --out-dir "$OUT/numpyro_gpu_n8"
 
-echo "submitted; squeue -u \$USER  to watch."
+# ---------- N=64 (production scale) ----------
+sbatch --job-name=jax_exp_pymc_cpu_n64 --time=06:00:00 \
+       "$SLURM/run_fit.sh" bauer bauer.scripts.fit_garcia ddm \
+       --n-subjects all --backend pymc --v-scale free \
+       --no-ppc --out-dir "$OUT/pymc_cpu_n64"
+
+sbatch --job-name=jax_exp_numpyro_cpu_n64 --time=04:00:00 \
+       "$SLURM/run_fit.sh" bauer bauer.scripts.fit_garcia ddm \
+       --n-subjects all --backend numpyro --v-scale free \
+       --no-ppc --out-dir "$OUT/numpyro_cpu_n64"
+
+sbatch --job-name=jax_exp_numpyro_gpu_n64 --gres=gpu:L4:1 --time=01:30:00 \
+       "$SLURM/run_fit.sh" bauer_cuda bauer.scripts.fit_garcia ddm \
+       --n-subjects all --backend numpyro --v-scale free \
+       --no-ppc --out-dir "$OUT/numpyro_gpu_n64"
+
+echo "submitted 6 jobs; squeue -u \$USER  to watch."
