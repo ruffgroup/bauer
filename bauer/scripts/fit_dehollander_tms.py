@@ -142,9 +142,9 @@ def main():
     m = Cls(**common)
 
     try:
-        m.build_estimation_model(data=df, hierarchical=True)
+        m.build_estimation_model(data=df_use, hierarchical=True)
     except TypeError:
-        m.build_estimation_model(paradigm=df, hierarchical=True)
+        m.build_estimation_model(paradigm=df_use, hierarchical=True)
 
     print(f'Sampling (backend={args.backend})...', flush=True)
     sample_kwargs = dict(

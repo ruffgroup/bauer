@@ -64,6 +64,8 @@ def main():
     ap.add_argument('--no-advantage', action='store_true',
                      help='RDM only: turn OFF advantage decomposition '
                           '(default is advantage=True).')
+    ap.add_argument('--spline-order', type=int, default=5,
+                     help='Flex-noise spline df (n knots). Default 5.')
     ap.add_argument('--backend', choices=['pymc', 'numpyro', 'blackjax'],
                      default='pymc',
                      help='Sampler backend. numpyro/blackjax run via JAX, '
@@ -100,7 +102,7 @@ def main():
         if args.flex:
             from bauer.models import FlexibleNoiseComparisonModel as Cls
             kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
-                          spline_order=5, fit_prior=True)
+                          spline_order=args.spline_order, fit_prior=True)
         else:
             from bauer.models import MagnitudeComparisonModel as Cls
             kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
@@ -109,7 +111,7 @@ def main():
         if args.flex:
             from bauer.models import DDMFlexibleNoiseComparisonModel as Cls
             kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
-                          spline_order=5, fit_prior=True,
+                          spline_order=args.spline_order, fit_prior=True,
                           fit_v_scale=fit_v_scale)
         else:
             from bauer.models import DDMMagnitudeComparisonModel as Cls
@@ -120,7 +122,7 @@ def main():
         if args.flex:
             from bauer.models import RaceDiffusionFlexibleNoiseComparisonModel as Cls
             kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
-                          spline_order=5, fit_prior=True, advantage=adv)
+                          spline_order=args.spline_order, fit_prior=True, advantage=adv)
         else:
             from bauer.models import RaceDiffusionMagnitudeComparisonModel as Cls
             kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
