@@ -973,6 +973,13 @@
 
             <span class="k">if</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;softplus&#39;</span><span class="p">:</span>
                 <span class="n">trialwise_pars</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">softplus</span><span class="p">(</span><span class="n">trialwise_pars</span><span class="p">)</span>
+                <span class="c1"># Apply the same min_value floor BaseModel.build_hierarchical_nodes</span>
+                <span class="c1"># applies to non-regressed softplus parameters (e.g. DDM `a`, `t0`).</span>
+                <span class="c1"># Without this, regressed versions of those parameters can collapse</span>
+                <span class="c1"># toward 0 even though the prior intercept assumes a hard lower bound.</span>
+                <span class="n">min_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">free_parameters</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;min_value&#39;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">min_value</span><span class="p">:</span>
+                    <span class="n">trialwise_pars</span> <span class="o">=</span> <span class="n">min_value</span> <span class="o">+</span> <span class="n">trialwise_pars</span>
             <span class="k">elif</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;logistic&#39;</span><span class="p">:</span>
                 <span class="n">trialwise_pars</span> <span class="o">=</span> <span class="n">logistic</span><span class="p">(</span><span class="n">trialwise_pars</span><span class="p">)</span>
 
@@ -1005,7 +1012,14 @@
 
 <div class="viewcode-block" id="RegressionModel.build_hierarchical_nodes">
 <a class="viewcode-back" href="../../api_reference.html#bauer.core.RegressionModel.build_hierarchical_nodes">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">build_hierarchical_nodes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">mu_intercept</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">sigma_intercept</span><span class="o">=</span><span class="mf">1.</span><span class="p">,</span> <span class="n">cauchy_sigma_intercept</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">sigma_regressors</span><span class="o">=</span><span class="mf">1.</span><span class="p">,</span> <span class="n">cauchy_sigma_regressors</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="s1">&#39;identity&#39;</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_hierarchical_nodes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">mu_intercept</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">sigma_intercept</span><span class="o">=</span><span class="mf">1.</span><span class="p">,</span>
+                                  <span class="n">cauchy_sigma_intercept</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">sigma_regressors</span><span class="o">=</span><span class="mf">1.</span><span class="p">,</span>
+                                  <span class="n">cauchy_sigma_regressors</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="s1">&#39;identity&#39;</span><span class="p">,</span>
+                                  <span class="n">min_value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="c1"># `min_value` and the transform are applied in get_trialwise_variable</span>
+        <span class="c1"># (which sees the design-matrix product); accepted here so that</span>
+        <span class="c1"># parameters carrying these kwargs (e.g. DDM `a`, `t0`) don&#39;t crash the</span>
+        <span class="c1"># regression-model dispatch.</span>
 
         <span class="n">model</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span>
         <span class="n">model</span><span class="o">.</span><span class="n">add_coord</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_regressors&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">design_matrices</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">design_info</span><span class="o">.</span><span class="n">column_names</span><span class="p">)</span>
