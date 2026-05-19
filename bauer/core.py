@@ -710,6 +710,13 @@ class RegressionModel(BaseModel):
 
             if transform == 'softplus':
                 trialwise_pars = pt.softplus(trialwise_pars)
+                # Apply the same min_value floor BaseModel.build_hierarchical_nodes
+                # applies to non-regressed softplus parameters (e.g. DDM `a`, `t0`).
+                # Without this, regressed versions of those parameters can collapse
+                # toward 0 even though the prior intercept assumes a hard lower bound.
+                min_value = self.free_parameters[key].get('min_value', 0.0)
+                if min_value:
+                    trialwise_pars = min_value + trialwise_pars
             elif transform == 'logistic':
                 trialwise_pars = logistic(trialwise_pars)
 
@@ -740,7 +747,14 @@ class RegressionModel(BaseModel):
         pm.Normal(name, mu=mu, sigma=sigma, dims=(f'{name}_regressors',))
 
 
-    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=1., cauchy_sigma_intercept=0.25, sigma_regressors=1., cauchy_sigma_regressors=0.25, transform='identity'):
+    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=1.,
+                                  cauchy_sigma_intercept=0.25, sigma_regressors=1.,
+                                  cauchy_sigma_regressors=0.25, transform='identity',
+                                  min_value=0.0, **kwargs):
+        # `min_value` and the transform are applied in get_trialwise_variable
+        # (which sees the design-matrix product); accepted here so that
+        # parameters carrying these kwargs (e.g. DDM `a`, `t0`) don't crash the
+        # regression-model dispatch.
 
         model = pm.Model.get_context()
         model.add_coord(f'{name}_regressors', self.design_matrices[name].design_info.column_names)
