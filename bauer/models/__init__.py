@@ -36,6 +36,13 @@ try:
 except ImportError:
     pass
 
+from .legacy import (
+    SafeVsRiskyModel,
+    SafeVsRiskyRegressionModel,
+    SafeVsRiskyMemoryModel,
+    JointSafeVsRiskyModel,
+)
+
 from .race import (
     RaceMixin,
     RaceDiffusionMagnitudeComparisonModel,
