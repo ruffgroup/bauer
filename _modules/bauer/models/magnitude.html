@@ -202,6 +202,8 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../tutorial/lesson3.html">Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../tutorial/lesson4.html">Lesson 4: Flexible Noise Curves — <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseComparisonModel</span></code> and <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseRiskModel</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../tutorial/lesson5.html">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorial/lesson8.html">Lesson 8: DDM vs probit on the Garcia magnitude task</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorial/lesson9.html">Lesson 9: Choice + Reaction Time Models — DDM and Race-Diffusion</a></li>
 </ul>
 </li>
 </ul>
@@ -278,9 +280,24 @@
 <span class="sd">        ``&#39;shared_perceptual_noise&#39;`` decomposes into perceptual and memory noise.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fit_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fit_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
                  <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                 <span class="n">fit_prior_mu_only</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">flat_observer_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+                 <span class="n">fit_prior_mu_only</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">flat_observer_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                 <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="c1"># Accept both spellings — `fit_separate_evidence_sd` (correct) is the</span>
+        <span class="c1"># canonical kwarg; `fit_seperate_evidence_sd` (the historical typo)</span>
+        <span class="c1"># is still accepted but emits a DeprecationWarning.</span>
+        <span class="k">if</span> <span class="n">fit_seperate_evidence_sd</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">fit_separate_evidence_sd</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;`fit_seperate_evidence_sd` is misspelled; use &quot;</span>
+                <span class="s2">&quot;`fit_separate_evidence_sd` instead. The old spelling will &quot;</span>
+                <span class="s2">&quot;be removed in a future bauer release.&quot;</span><span class="p">,</span>
+                <span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">fit_separate_evidence_sd</span> <span class="o">=</span> <span class="n">fit_seperate_evidence_sd</span>
+        <span class="k">if</span> <span class="n">fit_separate_evidence_sd</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">fit_separate_evidence_sd</span> <span class="o">=</span> <span class="kc">True</span>
 
         <span class="c1"># fit_prior_mu_only=True implies fit_prior=True and pins σ_p at empirical</span>
         <span class="c1"># std(log n). Useful for the unit-σ RDM where σ_p is otherwise unidentified</span>
@@ -292,7 +309,10 @@
                              <span class="s2">&quot;(the prior is being switched off entirely).&quot;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fit_prior</span> <span class="o">=</span> <span class="n">fit_prior</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fit_prior_mu_only</span> <span class="o">=</span> <span class="n">fit_prior_mu_only</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span> <span class="o">=</span> <span class="n">fit_seperate_evidence_sd</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit_separate_evidence_sd</span> <span class="o">=</span> <span class="n">fit_separate_evidence_sd</span>
+        <span class="c1"># Backward-compat attribute alias — existing subclasses/scripts</span>
+        <span class="c1"># read `self.fit_seperate_evidence_sd`; keep both attributes in sync.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span> <span class="o">=</span> <span class="n">fit_separate_evidence_sd</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">=</span> <span class="n">memory_model</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">flat_observer_prior</span> <span class="o">=</span> <span class="n">flat_observer_prior</span>
 
