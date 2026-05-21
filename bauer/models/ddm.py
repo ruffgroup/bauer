@@ -25,7 +25,8 @@ import pymc as pm
 import pytensor.tensor as pt
 
 from .magnitude import (
-    MagnitudeComparisonModel, FlexibleNoiseComparisonModel,
+    MagnitudeComparisonModel, MagnitudeComparisonRegressionModel,
+    FlexibleNoiseComparisonModel,
     PowerLawNoiseComparisonModel, PowerLawNoiseComparisonRegressionModel,
 )
 from .risky_choice import (
@@ -141,15 +142,35 @@ class DDMMixin:
             pars['v_scale'] = {'mu_intercept': inverse_softplus_np(0.7),
                                'sigma_intercept': 0.5,
                                'transform': 'softplus', 'min_value': 0.3}
-        # Hard lower bound on `a` to block the a→0 collapse mode. With
-        # min_value=0.3 and mu_intercept=0, softplus(0)=0.69 → a ≈ 0.99.
-        pars['a'] = {'mu_intercept': 0.0, 'sigma_intercept': 0.5,
+        # Priors mirroring HSSM/HDDM hierarchical defaults
+        # (hssm.prior.HDDM_MU / HDDM_SIGMA). HSSM allows a fairly wide
+        # group-mean prior but a tight group-SD prior — the opposite of
+        # bauer's old default (tight mu, loose SD). This combination
+        # mixes far better on the a↔t0↔drift identifiability ridge.
+        #
+        # HSSM a: Gamma(mu=1.5, sigma=0.75) for group mean,
+        #         HalfNormal(sigma=0.1) for group SD.
+        #   → group median a ≈ 1.5 (= softplus(0.93)+0.3); transformed-scale
+        #     SD ≈ 0.75 needs sigma_intercept ≈ 1.0 since d/dx softplus(0.93)
+        #     ≈ 0.72. cauchy_sigma_intercept=0.1 to match HSSM's tight SD.
+        # min_value=0.3 still blocks the a→0 collapse mode.
+        pars['a'] = {'mu_intercept': inverse_softplus_np(1.2),  # → median ≈ 1.5
+                     'sigma_intercept': 1.0,
+                     'cauchy_sigma_intercept': 0.1,
                      'transform': 'softplus', 'min_value': 0.3}
         if not self.fix_z:
+            # HSSM z: Beta(α=10, β=10) → mean=0.5, sd≈0.11. Our logistic
+            # transform of Normal(0, 0.5) gives mean=0.5, sd≈0.12 — close.
             pars['z'] = {'mu_intercept': 0.0, 'sigma_intercept': 0.5,
                          'transform': 'logistic'}
-        pars['t0'] = {'mu_intercept': inverse_softplus_np(0.2),
-                      'sigma_intercept': 0.5, 'transform': 'softplus'}
+        # HSSM t: Gamma(mu=0.2, sigma=0.2) for group mean,
+        #        HalfNormal(sigma=0.2) for group SD.
+        #   → group median t0 ≈ 0.2; transformed-scale SD ≈ 0.2 needs
+        #     sigma_intercept ≈ 1.1 since d/dx softplus(-1.51) ≈ 0.18.
+        pars['t0'] = {'mu_intercept': inverse_softplus_np(0.2),  # ≈ -1.51
+                      'sigma_intercept': 1.0,
+                      'cauchy_sigma_intercept': 0.2,
+                      'transform': 'softplus'}
         return pars
 
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
@@ -168,6 +189,32 @@ class DDMMixin:
                     f"Found {n_bad} trial(s) with rt <= 0 or NaN. "
                     "Filter non-responses and convert RT to seconds before fitting."
                 )
+            # Warn loudly when RTs are fast enough to trap NUTS via the t0
+            # likelihood-floor pathology. HSSM's logp_ddm replaces
+            # logp(t0 > rt) with a flat LOGP_LB = -66.1: the gradient w.r.t.
+            # t0 is then exactly 0 in the invalid region, so chains that
+            # wander above any subject's min(RT) cannot get back. Default t0
+            # prior is centred at 0.20 s; if min(rt) is at or below that, the
+            # prior puts mass in the invalid region from the start.
+            T0_PRIOR_CENTER = 0.20
+            min_rt = float(rt.min())
+            if min_rt < T0_PRIOR_CENTER and not getattr(self, '_warned_fast_rt', False):
+                import sys
+                pct = 100 * (rt < T0_PRIOR_CENTER).mean()
+                sys.stderr.write(
+                    f"\n*** bauer DDM/RDM warning ***\n"
+                    f"  Fastest RT in paradigm: {min_rt:.3f} s "
+                    f"({pct:.1f}% of trials below {T0_PRIOR_CENTER:.2f} s).\n"
+                    f"  The default t0 prior is centred at {T0_PRIOR_CENTER:.2f} s; "
+                    f"when t0 wanders above min(rt), the HSSM\n"
+                    f"  WFPT likelihood floors at LOGP_LB=-66.1 with ZERO gradient "
+                    f"w.r.t. t0, which can trap NUTS chains.\n"
+                    f"  Recommended: drop trials with rt < {T0_PRIOR_CENTER:.2f} s "
+                    f"(typical HDDM convention, below motor non-decision time).\n"
+                    f"  See docs/tutorial/lesson8.ipynb for the explanation.\n\n"
+                )
+                sys.stderr.flush()
+                self._warned_fast_rt = True
             p['rt'] = rt
             # Pre-compute the (n, 2) HSSM-format data array for the WFPT/race
             # likelihood: column 0 = |rt|, column 1 = signed response (+1 = upper).
@@ -512,6 +559,47 @@ class DDMMagnitudeComparisonModel(DDMMixin, MagnitudeComparisonModel):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
         super().__init__(paradigm=paradigm, **kwargs)
+
+    def _get_drift(self, model_inputs, parameters):
+        v_scale = parameters['v_scale'] if self.fit_v_scale else None
+        return _drift_from_snr(model_inputs, v_scale=v_scale,
+                               flat_observer_prior=getattr(self, 'flat_observer_prior', False))
+
+
+class DDMMagnitudeComparisonRegressionModel(DDMMixin, MagnitudeComparisonRegressionModel):
+    """DDM variant of :class:`MagnitudeComparisonRegressionModel`.
+
+    Patsy-formula regression on the cognitive front-end (``n1_evidence_sd``,
+    ``n2_evidence_sd``, ``prior_mu``, ``prior_sd``) and on the accumulator
+    parameters (``a``, ``t0``, ``v_scale`` if ``fit_v_scale``). Use for
+    two-group or condition-comparison designs.
+
+    Example — testing whether a clinical group (e.g. dyscalculia vs control)
+    shifts response caution (``a``) or sensory acuity (``n*_evidence_sd``)::
+
+        regressors = {
+            'a':              'group',  # does caution differ?
+            'n1_evidence_sd': 'group',  # does acuity differ?
+            'n2_evidence_sd': 'group',
+        }
+
+    The ``group`` column must exist in ``paradigm`` (e.g. as a categorical
+    'control'/'dyscalculia' column joined onto the trial dataframe).
+    """
+
+    def __init__(self, paradigm, regressors, fit_prior=False,
+                 fit_seperate_evidence_sd=True, memory_model='independent',
+                 save_trialwise_estimates=False,
+                 fit_v_scale=False, fix_z=True):
+        self.fit_v_scale = fit_v_scale
+        self.fix_z = fix_z
+        MagnitudeComparisonRegressionModel.__init__(
+            self, paradigm, regressors,
+            fit_prior=fit_prior,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            memory_model=memory_model,
+            save_trialwise_estimates=save_trialwise_estimates,
+        )
 
     def _get_drift(self, model_inputs, parameters):
         v_scale = parameters['v_scale'] if self.fit_v_scale else None

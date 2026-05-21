@@ -33,9 +33,24 @@ class MagnitudeComparisonModel(BaseModel):
         ``'shared_perceptual_noise'`` decomposes into perceptual and memory noise.
     """
 
-    def __init__(self, paradigm=None, fit_prior=False, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm=None, fit_prior=False, fit_seperate_evidence_sd=None,
                  memory_model='independent', save_trialwise_n_estimates=False,
-                 fit_prior_mu_only=False, flat_observer_prior=False):
+                 fit_prior_mu_only=False, flat_observer_prior=False,
+                 fit_separate_evidence_sd=None):
+        # Accept both spellings — `fit_separate_evidence_sd` (correct) is the
+        # canonical kwarg; `fit_seperate_evidence_sd` (the historical typo)
+        # is still accepted but emits a DeprecationWarning.
+        if fit_seperate_evidence_sd is not None and fit_separate_evidence_sd is None:
+            import warnings
+            warnings.warn(
+                "`fit_seperate_evidence_sd` is misspelled; use "
+                "`fit_separate_evidence_sd` instead. The old spelling will "
+                "be removed in a future bauer release.",
+                DeprecationWarning, stacklevel=2,
+            )
+            fit_separate_evidence_sd = fit_seperate_evidence_sd
+        if fit_separate_evidence_sd is None:
+            fit_separate_evidence_sd = True
 
         # fit_prior_mu_only=True implies fit_prior=True and pins σ_p at empirical
         # std(log n). Useful for the unit-σ RDM where σ_p is otherwise unidentified
@@ -47,7 +62,10 @@ class MagnitudeComparisonModel(BaseModel):
                              "(the prior is being switched off entirely).")
         self.fit_prior = fit_prior
         self.fit_prior_mu_only = fit_prior_mu_only
-        self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
+        self.fit_separate_evidence_sd = fit_separate_evidence_sd
+        # Backward-compat attribute alias — existing subclasses/scripts
+        # read `self.fit_seperate_evidence_sd`; keep both attributes in sync.
+        self.fit_seperate_evidence_sd = fit_separate_evidence_sd
         self.memory_model = memory_model
         self.flat_observer_prior = flat_observer_prior
 

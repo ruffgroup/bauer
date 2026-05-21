@@ -653,7 +653,14 @@ class RegressionModel(BaseModel):
         self.design_matrices = {}
         
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
-        paradigm_ = super()._get_paradigm(paradigm, subject_mapping=None)
+        # Forward subject_mapping only when the next class in the MRO accepts
+        # it (DDMMixin does; plain MagnitudeComparisonModel doesn't). Without
+        # this fallback, multiple-inheritance combinations like
+        # DDMMagnitudeComparisonRegressionModel raise TypeError on build.
+        try:
+            paradigm_ = super()._get_paradigm(paradigm, subject_mapping=None)
+        except TypeError:
+            paradigm_ = super()._get_paradigm(paradigm)
 
         free_parameters = self.get_free_parameters()
 

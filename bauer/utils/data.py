@@ -50,6 +50,13 @@ def load_garcia2022(task='magnitude', remove_non_responses=True, min_rt=0.15,
     converts to seconds. Implausibly fast trials (rt < 150 ms) are dropped by
     default — typical motor anticipations distort DDM non-decision times.
 
+    The magnitude-task dataframe carries an **``isi``** column (seconds)
+    extracted from the original BIDS events.tsv files — the inter-stimulus
+    interval between offset of n1 and onset of n2. The design jitters ISI
+    over seven half-second levels {6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0}; useful
+    for testing whether memory-load duration changes encoding noise or
+    response caution (see docs/tutorial/lesson8.ipynb).
+
     Parameters
     ----------
     task : {'magnitude', 'risk'}

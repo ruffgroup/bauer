@@ -9,3 +9,5 @@ Tutorials
    lesson3.ipynb
    lesson4.ipynb
    lesson5.ipynb
+   lesson8.ipynb
+   lesson9.ipynb

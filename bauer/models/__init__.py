@@ -23,6 +23,7 @@ try:
     from .ddm import (
         DDMMixin,
         DDMMagnitudeComparisonModel,
+        DDMMagnitudeComparisonRegressionModel,
         DDMFlexibleNoiseComparisonModel,
         DDMPowerLawNoiseComparisonModel,
         DDMPowerLawNoiseComparisonRegressionModel,
