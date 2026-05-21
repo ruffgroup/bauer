@@ -13,7 +13,7 @@ from ..core import BaseModel, LapseModel, RegressionModel
 from ..utils.bayes import cumulative_normal, get_posterior, get_diff_dist, get_posterior_np
 from ..utils.math import inverse_softplus_np, softplus_np, inverse_softplus, logit_derivative, gaussian_pdf
 from ..utils.plotting import plot_prediction
-from .magnitude import FlexibleNoiseComparisonModel, PowerLawNoiseComparisonModel
+from .magnitude import FlexibleNoiseComparisonModel, PowerLawNoiseComparisonModel, PowerLawEncodingComparisonModel
 
 class RiskModelProbabilityDistortion(BaseModel):
     """Risky choice model with Bayesian distortion of magnitudes and/or probabilities.
@@ -1798,3 +1798,162 @@ class AffineNoiseRiskModel(FlexibleNoiseRiskModel):
         max_n = self.paradigm[['n1', 'n2']].max().max()
         x_norm = (np.asarray(x, dtype=float) - min_n) / (max_n - min_n)
         return np.column_stack([np.ones_like(x_norm), x_norm])
+
+
+class AffineNoiseRiskRegressionModel(RegressionModel, AffineNoiseRiskModel):
+
+    def __init__(self, paradigm, regressors, prior_estimate='full',
+                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False,
+                 memory_model='independent'):
+        RegressionModel.__init__(self, regressors)
+        AffineNoiseRiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd,
+                                      save_trialwise_n_estimates, memory_model)
+
+
+class PowerLawEncodingRiskModel(PowerLawEncodingComparisonModel, RiskModel):
+    """Risky-choice model with direct power-law encoding (r = n^alpha).
+
+    Extends :class:`PowerLawEncodingComparisonModel` to the risky-choice paradigm.
+    Payoffs are encoded as ``n^alpha`` with constant additive Gaussian noise in
+    representation space before being weighted by probability.  ``alpha`` directly
+    characterises the geometry of the representational scale:
+
+    * ``alpha = 1``: linear scale
+    * ``alpha → 0``: logarithmic scale / Weber's law
+    * ``alpha < 0``: sub-logarithmic (discrimination degrades with magnitude)
+
+    The prior SDs are always computed empirically from ``n^alpha`` (tracking the
+    representation space as alpha moves).  Prior means can optionally be estimated
+    as free parameters (``fit_prior_mu=True``) — this is safe because a location
+    shift interacts much more mildly with alpha than a scale parameter would.
+
+    Parameters
+    ----------
+    paradigm : pd.DataFrame
+    fit_seperate_evidence_sd : bool or str
+    fixed_alpha : float or None
+        If a float, alpha is held constant at that value and not estimated.
+        Useful for model comparison: ``fixed_alpha=1.0`` is the linear/natural-space
+        model, ``None`` (default) estimates alpha freely.
+    flat_prior : bool
+        If True, prior SDs are set to a large constant so the prior has negligible
+        influence — equivalent to a pure signal-detection model with no regression
+        to the mean.  Default False.
+    fit_prior_mu : bool
+        If True, estimate separate prior means for the risky and safe options as
+        free parameters.  Prior SDs remain empirical.  Default False.
+    """
+
+    def __init__(self, paradigm, fit_seperate_evidence_sd=True, fixed_alpha=None,
+                 flat_prior=False, fit_prior_mu=False, save_trialwise_n_estimates=False):
+
+        self.fixed_alpha = fixed_alpha
+        self.fit_prior_mu = fit_prior_mu
+        self.flat_prior = flat_prior
+
+        RiskModel.__init__(self, paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates,
+                           fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+                           prior_estimate='shared')
+
+    def get_model_inputs(self, parameters):
+
+        model = pm.Model.get_context()
+        model_inputs = {}
+
+        alpha = self.fixed_alpha if self.fixed_alpha is not None else parameters['alpha']
+        n1_rep = model['n1'] ** alpha
+        n2_rep = model['n2'] ** alpha
+
+        risky_first = model['p1'] < model['p2']
+        risky_rep = pt.where(risky_first, n1_rep, n2_rep)
+        safe_rep = pt.where(risky_first, n2_rep, n1_rep)
+
+        if self.flat_prior:
+            risky_prior_sd = 1e6
+            safe_prior_sd = 1e6
+        else:
+            # Prior SDs always empirical — scale tracks n^alpha, no free parameters
+            risky_prior_sd = pt.std(risky_rep)
+            safe_prior_sd = pt.std(safe_rep)
+
+        if self.fit_prior_mu:
+            risky_prior_mu = parameters['risky_prior_mu']
+            safe_prior_mu = parameters['safe_prior_mu']
+        else:
+            risky_prior_mu = pt.mean(risky_rep)
+            safe_prior_mu = pt.mean(safe_rep)
+
+        model_inputs['n1_prior_mu'] = pt.where(risky_first, risky_prior_mu, safe_prior_mu)
+        model_inputs['n1_prior_sd'] = pt.where(risky_first, risky_prior_sd, safe_prior_sd)
+        model_inputs['n2_prior_mu'] = pt.where(risky_first, safe_prior_mu, risky_prior_mu)
+        model_inputs['n2_prior_sd'] = pt.where(risky_first, safe_prior_sd, risky_prior_sd)
+
+        model_inputs['n1_evidence_mu'] = n1_rep
+        model_inputs['n2_evidence_mu'] = n2_rep
+
+        if self.fit_seperate_evidence_sd:
+            model_inputs['n1_evidence_sd'] = parameters['n1_evidence_sd']
+            model_inputs['n2_evidence_sd'] = parameters['n2_evidence_sd']
+        else:
+            model_inputs['n1_evidence_sd'] = parameters['evidence_sd']
+            model_inputs['n2_evidence_sd'] = parameters['evidence_sd']
+
+        model_inputs['p1'] = model['p1']
+        model_inputs['p2'] = model['p2']
+
+        return model_inputs
+
+    def _get_choice_predictions(self, model_inputs):
+
+        post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'],
+                                               model_inputs['n1_prior_sd'],
+                                               model_inputs['n1_evidence_mu'],
+                                               model_inputs['n1_evidence_sd'])
+        post_n2_mu, post_n2_sd = get_posterior(model_inputs['n2_prior_mu'],
+                                               model_inputs['n2_prior_sd'],
+                                               model_inputs['n2_evidence_mu'],
+                                               model_inputs['n2_evidence_sd'])
+
+        diff_mu, diff_sd = get_diff_dist(post_n2_mu * model_inputs['p2'], model_inputs['n2_evidence_sd'],
+                                         post_n1_mu * model_inputs['p1'], model_inputs['n1_evidence_sd'])
+
+        if self.save_trialwise_n_estimates:
+            pm.Deterministic('n1_hat', post_n1_mu)
+            pm.Deterministic('n2_hat', post_n2_mu)
+
+        return cumulative_normal(0.0, diff_mu, diff_sd)
+
+    def get_free_parameters(self):
+        self.fit_prior = False
+        free_parameters = PowerLawEncodingComparisonModel.get_free_parameters(self)
+        self.fit_prior = False
+
+        if self.fixed_alpha is not None:
+            del free_parameters['alpha']
+
+        if self.fit_prior_mu:
+            if self.paradigm is not None:
+                risky_n = np.where(self.paradigm['p1'] != 1.0, self.paradigm['n1'], self.paradigm['n2'])
+                safe_n = np.where(self.paradigm['p2'] != 1.0, self.paradigm['n2'], self.paradigm['n1'])
+                risky_mu0 = float(np.mean(risky_n ** 0.5))
+                safe_mu0 = float(np.mean(safe_n ** 0.5))
+            else:
+                risky_mu0 = safe_mu0 = 5.
+            free_parameters['risky_prior_mu'] = {'mu_intercept': risky_mu0, 'transform': 'identity'}
+            free_parameters['safe_prior_mu'] = {'mu_intercept': safe_mu0, 'transform': 'identity'}
+
+        return free_parameters
+
+    def _get_paradigm(self, paradigm=None, subject_mapping=None):
+        return RiskModel._get_paradigm(self, paradigm, subject_mapping=subject_mapping)
+
+
+class PowerLawEncodingRiskRegressionModel(RegressionModel, PowerLawEncodingRiskModel):
+
+    def __init__(self, paradigm, regressors, fit_seperate_evidence_sd=True,
+                 fixed_alpha=None, flat_prior=False,
+                 fit_prior_mu=False, save_trialwise_n_estimates=False):
+        RegressionModel.__init__(self, regressors)
+        PowerLawEncodingRiskModel.__init__(self, paradigm, fit_seperate_evidence_sd,
+                                           fixed_alpha, flat_prior,
+                                           fit_prior_mu, save_trialwise_n_estimates)

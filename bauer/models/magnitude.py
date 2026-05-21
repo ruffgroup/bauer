@@ -767,9 +767,13 @@ class PowerLawEncodingComparisonModel(BaseModel):
     ----------
     paradigm : pd.DataFrame
         Must contain columns ``n1``, ``n2``, ``choice``.
-    fit_seperate_evidence_sd : bool
-        If True (default), fit separate noise SDs for n1 and n2 in representation space.
-        Useful when n1 is held in memory (adding memory noise).
+    fit_seperate_evidence_sd : bool or str
+        If True (default), fit fully independent noise SDs for n1 and n2.
+        If ``'offset'``, fit a shared baseline ``evidence_sd`` plus a ``log_sd_ratio``
+        that captures attention asymmetry: n1_sd = evidence_sd · exp(log_sd_ratio/2),
+        n2_sd = evidence_sd · exp(-log_sd_ratio/2).  ``log_sd_ratio = 0`` means equal
+        attention; positive values mean n1 receives less attention.
+        If False, a single shared SD is fit.
     fit_prior : bool
         If True, estimate the prior mean and SD in representation space as free parameters.
         If False, the prior is set to the empirical distribution of n^alpha.
@@ -808,7 +812,11 @@ class PowerLawEncodingComparisonModel(BaseModel):
         model_inputs['n1_evidence_mu'] = n1_rep
         model_inputs['n2_evidence_mu'] = n2_rep
 
-        if self.fit_seperate_evidence_sd:
+        if self.fit_seperate_evidence_sd == 'offset':
+            half = parameters['log_sd_ratio'] / 2.
+            model_inputs['n1_evidence_sd'] = parameters['evidence_sd'] * pt.exp(half)
+            model_inputs['n2_evidence_sd'] = parameters['evidence_sd'] * pt.exp(-half)
+        elif self.fit_seperate_evidence_sd:
             model_inputs['n1_evidence_sd'] = parameters['n1_evidence_sd']
             model_inputs['n2_evidence_sd'] = parameters['n2_evidence_sd']
         else:
@@ -821,13 +829,16 @@ class PowerLawEncodingComparisonModel(BaseModel):
 
         free_parameters = {}
 
-        free_parameters['alpha'] = {'mu_intercept': 0.5, 'sigma_intercept': 1., 'transform': 'identity'}
+        free_parameters['alpha'] = {'mu_intercept': 0.5, 'sigma_intercept': 0.5, 'transform': 'softplus'}
 
-        if self.fit_seperate_evidence_sd:
-            free_parameters['n1_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
-            free_parameters['n2_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
-        else:
+        if self.fit_seperate_evidence_sd == 'offset':
             free_parameters['evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+            free_parameters['log_sd_ratio'] = {'mu_intercept': 0., 'transform': 'identity'}
+        elif self.fit_seperate_evidence_sd:
+            free_parameters['n1_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus','sigma_intercept': 0.5} # changed otherwise regression model defaults to sigma_intercept = 1 here... which leads to distortions in alpha.... maybe change this in 
+            free_parameters['n2_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus', 'sigma_intercept': 0.5}
+        else:
+            free_parameters['evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus', 'sigma_intercept': 0.5}
 
         if self.fit_prior:
             if self.paradigm is not None:
@@ -837,8 +848,8 @@ class PowerLawEncodingComparisonModel(BaseModel):
             else:
                 objective_mu = 5.
                 objective_sd = 2.
-            free_parameters['prior_mu'] = {'mu_intercept': objective_mu, 'transform': 'identity'}
-            free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
+            free_parameters['prior_mu'] = {'mu_intercept': objective_mu, 'sigma_intercept': 0.5, 'transform': 'identity'}
+            free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'sigma_intercept': 0.5, 'transform': 'softplus'}
 
         return free_parameters
 
