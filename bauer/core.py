@@ -11,6 +11,24 @@ class BaseModel(object):
 
     paradigm_keys = []
 
+    # Per-model-class hints for the NUTS sampler.
+    #
+    # ``recommended_nuts_kwargs`` is forwarded to numpyro / blackjax via
+    # ``pm.sampling.jax.sample_*_nuts(nuts_kwargs=...)``. DDM/RDM mixins
+    # override this with ``{'dense_mass': True}`` because the posterior has
+    # strongly-correlated parameters (v_scale × evidence_sd × a) that
+    # diagonal mass cannot navigate (step-size collapses, tree-depth maxes,
+    # chains get stuck at numerical singularities).
+    #
+    # ``recommended_pymc_init`` is the equivalent for the default pymc
+    # backend — passed as ``pm.sample(init=...)``. Both 'adapt_full' and
+    # 'jitter+adapt_full' enable full mass-matrix adaptation. Default
+    # ``None`` = use pymc's default ('auto' → 'jitter+adapt_diag').
+    #
+    # Empty / None defaults = use whatever the backend chooses.
+    recommended_nuts_kwargs: dict = {}
+    recommended_pymc_init: str | None = None
+
     def __init__(self, paradigm, save_trialwise_n_estimates=False):
         """
         data should contain ['n1', 'n2'] and 'choice'.
@@ -53,16 +71,19 @@ class BaseModel(object):
         return paradigm_
 
     def _get_choice_predictions(self, model_inputs):
-        post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'], 
-                                               model_inputs['n1_prior_sd'], 
-                                               model_inputs['n1_evidence_mu'], 
-                                               model_inputs['n1_evidence_sd']
-                                               )
-
-        post_n2_mu, post_n2_sd = get_posterior(model_inputs['n2_prior_mu'],
-                                               model_inputs['n2_prior_sd'],
-                                               model_inputs['n2_evidence_mu'], 
-                                               model_inputs['n2_evidence_sd'])
+        if getattr(self, 'flat_observer_prior', False):
+            # Flat improper prior → posterior is the likelihood. No shrinkage.
+            post_n1_mu = model_inputs['n1_evidence_mu']
+            post_n2_mu = model_inputs['n2_evidence_mu']
+        else:
+            post_n1_mu, _ = get_posterior(model_inputs['n1_prior_mu'],
+                                          model_inputs['n1_prior_sd'],
+                                          model_inputs['n1_evidence_mu'],
+                                          model_inputs['n1_evidence_sd'])
+            post_n2_mu, _ = get_posterior(model_inputs['n2_prior_mu'],
+                                          model_inputs['n2_prior_sd'],
+                                          model_inputs['n2_evidence_mu'],
+                                          model_inputs['n2_evidence_sd'])
 
         diff_mu, diff_sd = get_diff_dist(post_n2_mu, model_inputs['n2_evidence_sd'], post_n1_mu, model_inputs['n1_evidence_sd'])
 
@@ -234,12 +255,69 @@ class BaseModel(object):
 
         return data
 
-    def sample(self, draws=1000, tune=1000, target_accept=0.8, **kwargs):
-        
-        with self.estimation_model:
-            self.idata = pm.sample(draws, tune=tune, target_accept=target_accept, return_inferencedata=True, **kwargs)
-        
-        return self.idata            
+    def sample(self, draws=1000, tune=1000, target_accept=0.8, chains=4,
+               backend='pymc', **kwargs):
+        """Sample from the posterior using the requested NUTS backend.
+
+        Parameters
+        ----------
+        backend : {'pymc', 'numpyro', 'blackjax'}
+            'pymc' uses :func:`pm.sample` (default). 'numpyro' / 'blackjax'
+            use the corresponding JAX-NUTS sampler from
+            :mod:`pm.sampling.jax`. JAX backends are much faster on GPU.
+        chains : int
+            Number of chains. Default 4.
+        target_accept : float
+            NUTS target acceptance probability. 0.8 is fine for well-behaved
+            models; 0.95 for hierarchical / DDM-like ones; 0.99 only if
+            divergences persist.
+        draws, tune : int
+            Posterior and warmup draws per chain.
+        **kwargs
+            Forwarded to the underlying sampler. Notably:
+            - pymc backend: ``init=`` (e.g. 'jitter+adapt_full' for dense
+              mass adaptation), ``cores=``, ``random_seed=``.
+            - JAX backends: ``nuts_kwargs={'dense_mass': True}``,
+              ``chain_method='vectorized'``, ``random_seed=``.
+
+        Auto-applied defaults
+        ---------------------
+        Subclasses can declare strongly-correlated posteriors via
+        ``recommended_pymc_init`` and ``recommended_nuts_kwargs``; this
+        method applies them unless the user passes the corresponding kwarg
+        explicitly. DDMMixin / RaceMixin do this for full mass-matrix
+        adaptation.
+        """
+        if backend == 'pymc':
+            kwargs.setdefault('init', getattr(self, 'recommended_pymc_init', None)
+                                       or 'auto')
+            with self.estimation_model:
+                self.idata = pm.sample(
+                    draws, tune=tune, chains=chains,
+                    target_accept=target_accept,
+                    return_inferencedata=True, **kwargs,
+                )
+        elif backend in ('numpyro', 'blackjax'):
+            from pymc.sampling.jax import (
+                sample_numpyro_nuts, sample_blackjax_nuts,
+            )
+            sampler = (sample_numpyro_nuts if backend == 'numpyro'
+                       else sample_blackjax_nuts)
+            # Merge model recommendation with any explicit override
+            rec = dict(getattr(self, 'recommended_nuts_kwargs', {}))
+            user = kwargs.pop('nuts_kwargs', None) or {}
+            nuts_kwargs = {**rec, **user}
+            kwargs.setdefault('chain_method', 'vectorized')
+            with self.estimation_model:
+                self.idata = sampler(
+                    draws=draws, tune=tune, chains=chains,
+                    target_accept=target_accept,
+                    nuts_kwargs=nuts_kwargs or None,
+                    **kwargs,
+                )
+        else:
+            raise ValueError(f"backend must be 'pymc'/'numpyro'/'blackjax', got {backend!r}")
+        return self.idata
 
     def fit_map(self, filter_pars=True, progressbar=True, **kwargs):
         with self.estimation_model:
@@ -302,44 +380,64 @@ class BaseModel(object):
 
         return pd.DataFrame(rows).set_index('subject')
 
-    def ppc(self, paradigm, idata, out_of_sample=False, var_names=['ll_bernoulli'], progressbar=True):
+    def ppc(self, paradigm, idata, n_posterior_samples=200,
+             out_of_sample=False, random_seed=None, progressbar=True):
+        """Posterior-predictive choices for ``paradigm``.
 
+        Returns
+        -------
+        pd.DataFrame
+            Index: ``paradigm.index`` levels + ``ppc_sample``.
+            Single column ``simulated_choice`` (bool).
+            Format matches ``DDMMixin.ppc`` / ``RaceMixin.ppc`` so all bauer
+            models can be fed into the same downstream summarizers.
+        """
         if out_of_sample:
-            assert(hasattr(self, 'paradigm')), 'Model needs to have original paradigm as an attribute (model.paradigm...) for out-of-sample prediction'
-
+            assert hasattr(self, 'paradigm'), (
+                'Model needs paradigm attribute for out-of-sample prediction.')
             if ('subject' in paradigm.index.names) or ('subject' in paradigm.columns):
-                coords = {'subject': self.paradigm.index.unique(level='subject')}            
+                coords = {'subject': self.paradigm.index.unique(level='subject')}
                 hierarchical = True
                 subject_ids = paradigm.index.get_level_values('subject').unique()
-                subject_id_to_ix = {subject: ix for ix, subject in enumerate(subject_ids)}
+                subject_id_to_ix = {s: i for i, s in enumerate(subject_ids)}
             else:
-                hierarchical = False
-                subject_id_to_ix = None
-
+                coords, hierarchical, subject_id_to_ix = None, False, None
             with pm.Model(coords=coords) as self.out_of_sample_model:
-                paradigm_ = self._get_paradigm(paradigm=paradigm, subject_mapping=subject_id_to_ix)
+                paradigm_ = self._get_paradigm(paradigm=paradigm,
+                                                subject_mapping=subject_id_to_ix)
                 self.set_paradigm(paradigm_)
                 self.build_priors(hierarchical=hierarchical)
                 parameters = self.get_parameter_values()
-                save_p_choice = 'p' in var_names
-                self.build_likelihood(parameters, save_p_choice=save_p_choice)            
-    
-                idata = pm.sample_posterior_predictive(idata, var_names=var_names, progressbar=progressbar)
-
+                self.build_likelihood(parameters, save_p_choice=False)
+                pp = pm.sample_posterior_predictive(
+                    idata, var_names=['ll_bernoulli'],
+                    progressbar=progressbar, random_seed=random_seed)
         else:
             with self.estimation_model:
-                idata = pm.sample_posterior_predictive(idata, var_names=var_names, progressbar=progressbar)
+                pp = pm.sample_posterior_predictive(
+                    idata, var_names=['ll_bernoulli'],
+                    progressbar=progressbar, random_seed=random_seed)
 
-        ppc = [idata['posterior_predictive'][key].to_dataframe() for key in var_names]
-        ppc = [e.astype(bool) if var_name == 'll_bernoulli' else e for e, var_name in zip(ppc, var_names)]
-        ppc = pd.concat(ppc, axis=1, keys=var_names, names=['variable'])
-        ppc = ppc.unstack(['chain', 'draw']).droplevel(1, axis=1)
-        ppc.index = paradigm.index
-        ppc = ppc.set_index(pd.MultiIndex.from_frame(paradigm), append=True)
-        ppc = ppc.stack('variable', future_stack=True)
-        ppc = ppc.reorder_levels(np.roll(ppc.index.names, 1)).sort_index()
+        # arr shape: (chain, draw, n_trials)
+        arr = pp['posterior_predictive']['ll_bernoulli'].values.astype(bool)
+        n_chain, n_draw, n_trials = arr.shape
+        assert n_trials == len(paradigm), (
+            f"PPC trial count mismatch: arr has {n_trials}, paradigm has {len(paradigm)}.")
 
-        return ppc
+        rng = np.random.default_rng(random_seed)
+        n_total = n_chain * n_draw
+        n_keep = min(n_posterior_samples, n_total)
+        flat = arr.reshape(n_total, n_trials)
+        sel = rng.choice(n_total, size=n_keep, replace=False)
+        sub = flat[sel].T  # (n_trials, n_keep)
+
+        out = pd.DataFrame(
+            sub,
+            index=paradigm.index,
+            columns=pd.Index(np.arange(n_keep), name='ppc_sample'),
+        ).stack().rename('simulated_choice').to_frame()
+        out['simulated_choice'] = out['simulated_choice'].astype(bool)
+        return out
 
     def get_trialwise_variable(self, key):
 
@@ -359,37 +457,51 @@ class BaseModel(object):
         elif model[f'{key}'].ndim == 0:
             return pt.tile(model[f'{key}'], n_trials)
 
-    def build_hierarchical_nodes(self, name, mu_intercept=None, sigma_intercept=None, cauchy_sigma_intercept=None, transform='identity', **kwargs):
+    def build_hierarchical_nodes(self, name, mu_intercept=None, sigma_intercept=None,
+                                  cauchy_sigma_intercept=None, transform='identity',
+                                  min_value=0.0, **kwargs):
+        """Build a hierarchical (group_mu, group_sd, per-subject offset) node.
+
+        ``transform`` ∈ {'identity', 'softplus', 'logistic'}. When ``transform`` is
+        'softplus' and ``min_value > 0``, the transformed parameter has a hard
+        lower bound: ``param = min_value + softplus(x)``. Used to keep e.g. the
+        DDM/RDM threshold ``a`` away from the a→0 collapse mode.
+        """
 
         if mu_intercept is None:
             mu_intercept = 0.0
 
         if sigma_intercept is None:
             sigma_intercept = .5
-        
+
         if cauchy_sigma_intercept is None:
             cauchy_sigma_intercept = 0.25
 
+        def _softplus_with_floor(x):
+            if min_value:
+                return min_value + pt.softplus(x)
+            return pt.softplus(x)
+
         if transform == 'identity':
-            group_mu = pm.Normal(f"{name}_mu", 
-                                            mu=mu_intercept, 
+            group_mu = pm.Normal(f"{name}_mu",
+                                            mu=mu_intercept,
                                             sigma=sigma_intercept)
         elif transform == 'softplus':
-            group_mu = pm.Normal(f"{name}_mu_untransformed", 
-                                            mu=mu_intercept, 
+            group_mu = pm.Normal(f"{name}_mu_untransformed",
+                                            mu=mu_intercept,
                                             sigma=sigma_intercept)
 
-            pm.Deterministic(name=f'{name}_mu', var=pt.softplus(group_mu))
+            pm.Deterministic(name=f'{name}_mu', var=_softplus_with_floor(group_mu))
         elif transform == 'logistic':
-            group_mu = pm.Normal(f"{name}_mu_untransformed", 
-                                            mu=mu_intercept, 
+            group_mu = pm.Normal(f"{name}_mu_untransformed",
+                                            mu=mu_intercept,
                                             sigma=sigma_intercept)
 
             pm.Deterministic(name=f'{name}_mu', var=logistic(group_mu))
         else:
             raise NotImplementedError
 
-            
+
         group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma_intercept)
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject',))
 
@@ -397,9 +509,9 @@ class BaseModel(object):
              return pm.Deterministic(f'{name}', group_mu + group_sd * subject_offset, dims=('subject',))
         else:
             subjectwise_untrans = pm.Deterministic(f'{name}_untransformed', group_mu + group_sd * subject_offset, dims=('subject',))
-        
+
             if transform == 'softplus':
-                return pm.Deterministic(name=name, var=pt.softplus(subjectwise_untrans), dims=('subject',))
+                return pm.Deterministic(name=name, var=_softplus_with_floor(subjectwise_untrans), dims=('subject',))
             elif transform == 'logistic':
                 return pm.Deterministic(name=name, var=logistic(subjectwise_untrans), dims=('subject',))
             else:
@@ -541,7 +653,14 @@ class RegressionModel(BaseModel):
         self.design_matrices = {}
         
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
-        paradigm_ = super()._get_paradigm(paradigm, subject_mapping=None)
+        # Forward subject_mapping only when the next class in the MRO accepts
+        # it (DDMMixin does; plain MagnitudeComparisonModel doesn't). Without
+        # this fallback, multiple-inheritance combinations like
+        # DDMMagnitudeComparisonRegressionModel raise TypeError on build.
+        try:
+            paradigm_ = super()._get_paradigm(paradigm, subject_mapping=None)
+        except TypeError:
+            paradigm_ = super()._get_paradigm(paradigm)
 
         free_parameters = self.get_free_parameters()
 
@@ -598,6 +717,13 @@ class RegressionModel(BaseModel):
 
             if transform == 'softplus':
                 trialwise_pars = pt.softplus(trialwise_pars)
+                # Apply the same min_value floor BaseModel.build_hierarchical_nodes
+                # applies to non-regressed softplus parameters (e.g. DDM `a`, `t0`).
+                # Without this, regressed versions of those parameters can collapse
+                # toward 0 even though the prior intercept assumes a hard lower bound.
+                min_value = self.free_parameters[key].get('min_value', 0.0)
+                if min_value:
+                    trialwise_pars = min_value + trialwise_pars
             elif transform == 'logistic':
                 trialwise_pars = logistic(trialwise_pars)
 
@@ -628,7 +754,14 @@ class RegressionModel(BaseModel):
         pm.Normal(name, mu=mu, sigma=sigma, dims=(f'{name}_regressors',))
 
 
-    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=1., cauchy_sigma_intercept=0.25, sigma_regressors=1., cauchy_sigma_regressors=0.25, transform='identity'):
+    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=1.,
+                                  cauchy_sigma_intercept=0.25, sigma_regressors=1.,
+                                  cauchy_sigma_regressors=0.25, transform='identity',
+                                  min_value=0.0, **kwargs):
+        # `min_value` and the transform are applied in get_trialwise_variable
+        # (which sees the design-matrix product); accepted here so that
+        # parameters carrying these kwargs (e.g. DDM `a`, `t0`) don't crash the
+        # regression-model dispatch.
 
         model = pm.Model.get_context()
         model.add_coord(f'{name}_regressors', self.design_matrices[name].design_info.column_names)

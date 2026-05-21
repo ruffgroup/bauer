@@ -5,7 +5,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from arviz import hdi
-from patsy import dmatrix
+from patsy import dmatrix, build_design_matrices
 from warnings import warn
 from ..core import BaseModel, LapseModel, RegressionModel
 from ..utils.bayes import cumulative_normal, get_posterior, get_diff_dist
@@ -33,11 +33,41 @@ class MagnitudeComparisonModel(BaseModel):
         ``'shared_perceptual_noise'`` decomposes into perceptual and memory noise.
     """
 
-    def __init__(self, paradigm=None, fit_prior=False, fit_seperate_evidence_sd=True, memory_model = 'independent',save_trialwise_n_estimates=False):
+    def __init__(self, paradigm=None, fit_prior=False, fit_seperate_evidence_sd=None,
+                 memory_model='independent', save_trialwise_n_estimates=False,
+                 fit_prior_mu_only=False, flat_observer_prior=False,
+                 fit_separate_evidence_sd=None):
+        # Accept both spellings — `fit_separate_evidence_sd` (correct) is the
+        # canonical kwarg; `fit_seperate_evidence_sd` (the historical typo)
+        # is still accepted but emits a DeprecationWarning.
+        if fit_seperate_evidence_sd is not None and fit_separate_evidence_sd is None:
+            import warnings
+            warnings.warn(
+                "`fit_seperate_evidence_sd` is misspelled; use "
+                "`fit_separate_evidence_sd` instead. The old spelling will "
+                "be removed in a future bauer release.",
+                DeprecationWarning, stacklevel=2,
+            )
+            fit_separate_evidence_sd = fit_seperate_evidence_sd
+        if fit_separate_evidence_sd is None:
+            fit_separate_evidence_sd = True
 
+        # fit_prior_mu_only=True implies fit_prior=True and pins σ_p at empirical
+        # std(log n). Useful for the unit-σ RDM where σ_p is otherwise unidentified
+        # (see notes/race_diffusion_math.md §8e and the discussion in core.py).
+        if fit_prior_mu_only:
+            fit_prior = True
+        if flat_observer_prior and fit_prior:
+            raise ValueError("flat_observer_prior=True is incompatible with fit_prior=True "
+                             "(the prior is being switched off entirely).")
         self.fit_prior = fit_prior
-        self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
+        self.fit_prior_mu_only = fit_prior_mu_only
+        self.fit_separate_evidence_sd = fit_separate_evidence_sd
+        # Backward-compat attribute alias — existing subclasses/scripts
+        # read `self.fit_seperate_evidence_sd`; keep both attributes in sync.
+        self.fit_seperate_evidence_sd = fit_separate_evidence_sd
         self.memory_model = memory_model
+        self.flat_observer_prior = flat_observer_prior
 
         super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
@@ -47,11 +77,24 @@ class MagnitudeComparisonModel(BaseModel):
 
         model_inputs = {}
 
-        if self.fit_prior:
+        if self.flat_observer_prior:
+            # Flat improper observer prior: posterior is the likelihood. The
+            # n*_prior_* keys are intentionally NOT populated; consumers
+            # (BaseModel._get_choice_predictions, _drift_from_snr) check
+            # self.flat_observer_prior and skip the shrinkage step entirely.
+            pass
+
+        elif self.fit_prior:
             model_inputs['n1_prior_mu'] = parameters['prior_mu']
             model_inputs['n2_prior_mu'] = parameters['prior_mu']
-            model_inputs['n1_prior_sd'] = parameters['prior_sd']
-            model_inputs['n2_prior_sd'] = parameters['prior_sd']
+            if self.fit_prior_mu_only:
+                empirical_sd = (pt.std(pt.log(model['n1'])) +
+                                pt.std(pt.log(model['n2']))) / 2.
+                model_inputs['n1_prior_sd'] = empirical_sd
+                model_inputs['n2_prior_sd'] = empirical_sd
+            else:
+                model_inputs['n1_prior_sd'] = parameters['prior_sd']
+                model_inputs['n2_prior_sd'] = parameters['prior_sd']
 
         else:
             mean_prior = (pt.mean(pt.log(model['n1'])) + pt.mean(pt.log(model['n2']))) / 2.
@@ -107,7 +150,8 @@ class MagnitudeComparisonModel(BaseModel):
             objective_sd = np.std(log_ns)
 
             free_parameters['prior_mu'] = {'mu_intercept': objective_mu, 'transform': 'identity'}
-            free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
+            if not self.fit_prior_mu_only:
+                free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
 
         return free_parameters
 
@@ -158,7 +202,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
     ----------
     paradigm : pd.DataFrame
         Must contain columns ``n1``, ``n2``, and ``choice``.
-    polynomial_order : int or tuple of int
+    spline_order : int or tuple of int
         Order(s) of the polynomial for the noise curve (one per prospect when
         ``fit_seperate_evidence_sd=True``).
     memory_model : {'independent', 'shared_perceptual_noise'}
@@ -167,23 +211,94 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
     def __init__(self, paradigm, fit_seperate_evidence_sd=True,
                  fit_prior=False,
-                 polynomial_order=5,
-                 memory_model='independent'):
+                 spline_order=5,
+                 memory_model='independent',
+                 fit_prior_mu_only=False,
+                 flat_observer_prior=False):
 
+        if fit_prior_mu_only:
+            fit_prior = True
+        if flat_observer_prior and fit_prior:
+            raise ValueError("flat_observer_prior=True is incompatible with fit_prior=True "
+                             "(the prior is being switched off entirely).")
         self.fit_prior = fit_prior
+        self.fit_prior_mu_only = fit_prior_mu_only
+        self.flat_observer_prior = flat_observer_prior
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
 
         if ~fit_seperate_evidence_sd and (memory_model != 'independent'):
             raise ValueError('Single evidence_sd can only be used with memory_model=independent')
 
-        if (type(polynomial_order) is int) and fit_seperate_evidence_sd:
-            polynomial_order = polynomial_order, polynomial_order
+        if (type(spline_order) is int) and fit_seperate_evidence_sd:
+            spline_order = spline_order, spline_order
 
-        self.polynomial_order = polynomial_order
-        self.max_polynomial_order = np.max(self.polynomial_order)
+        self.spline_order = spline_order
+        self.max_spline_order = np.max(self.spline_order)
         self.memory_model = memory_model
 
         super().__init__(paradigm)
+
+        # Build spline design_info ONCE, at construction time, anchored to the
+        # paradigm columns. Every later call to make_dm reuses this design_info,
+        # so the knot positions are fully determined by the paradigm given at
+        # construction and don't depend on what x is passed to make_dm later.
+        # This rules out the silent-misuse mode where the spline coefficients
+        # were fit with one set of knots and then evaluated against a different
+        # set. Knot ranges and per-variable spline_order are recorded here
+        # for transparency.
+        self._dm_design_infos = {}
+        if paradigm is not None:
+            self._initialize_design_infos()
+
+    def _spline_x_for(self, variable):
+        """Which paradigm column anchors the basis for a given spline variable."""
+        if variable in ('n1_evidence_sd', 'memory_noise_sd'):
+            return self.paradigm['n1'].values
+        if variable in ('n2_evidence_sd', 'perceptual_noise_sd'):
+            return self.paradigm['n2'].values
+        if variable == 'evidence_sd':
+            # Single shared spline: anchor to both columns combined.
+            return np.concatenate([self.paradigm['n1'].values,
+                                   self.paradigm['n2'].values])
+        raise ValueError(f"Unknown spline variable {variable!r}")
+
+    def _spline_order_for(self, variable):
+        if not self.fit_seperate_evidence_sd:
+            return self.spline_order
+        if variable in ('n1_evidence_sd', 'perceptual_noise_sd'):
+            return self.spline_order[0]
+        if variable in ('n2_evidence_sd', 'memory_noise_sd'):
+            return self.spline_order[1]
+        raise ValueError(f"Unknown spline variable {variable!r}")
+
+    def _initialize_design_infos(self):
+        """Eagerly build and cache spline design_info for each variable this
+        model will use, anchored to the paradigm columns."""
+        if self.fit_seperate_evidence_sd:
+            if self.memory_model == 'independent':
+                variables = ['n1_evidence_sd', 'n2_evidence_sd']
+            elif self.memory_model == 'shared_perceptual_noise':
+                variables = ['memory_noise_sd', 'perceptual_noise_sd']
+            else:
+                raise ValueError(f'Unknown memory_model {self.memory_model!r}')
+        else:
+            variables = ['evidence_sd']
+        for variable in variables:
+            self._build_and_cache_design_info(variable)
+
+    def _build_and_cache_design_info(self, variable):
+        x = self._spline_x_for(variable)
+        spline_order = self._spline_order_for(variable)
+        min_n, max_n = self.paradigm[['n1', 'n2']].min().min(), self.paradigm[['n1', 'n2']].max().max()
+        if spline_order > 1:
+            formula = (f"bs(x, degree=3, df={spline_order}, "
+                       f"include_intercept=True, lower_bound={min_n}, "
+                       f"upper_bound={max_n}) - 1")
+        else:
+            formula = (f"bs(x, degree=0, df=0, include_intercept=False, "
+                       f"lower_bound={min_n}, upper_bound={max_n})")
+        dm = dmatrix(formula, {"x": x})
+        self._dm_design_infos[variable] = dm.design_info
 
     def build_estimation_model(self, paradigm=None, coords=None, hierarchical=True, save_p_choice=False):
 
@@ -196,7 +311,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
             assert('subject' in paradigm.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
             coords['subject'] = paradigm.index.unique(level='subject')
 
-        coords['poly_order'] = np.arange(self.max_polynomial_order)
+        coords['poly_order'] = np.arange(self.max_spline_order)
 
         return BaseModel.build_estimation_model(self, data=paradigm, coords=coords, hierarchical=hierarchical, save_p_choice=save_p_choice)
 
@@ -206,17 +321,32 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         model_inputs = {}
 
-        if self.fit_prior:
-            prior_mu = model['prior_mu']
-            prior_sd = model['prior_sd']
-        else:
-            prior_mu = pt.mean(pt.stack([model['n1'], model['n2']], axis=1), 1)
-            prior_sd = pt.std(pt.stack([model['n1'], model['n2']], axis=1), 1)
+        if not self.flat_observer_prior:
+            if self.fit_prior:
+                # Use trialwise variables (expanded per subject) so per-trial shapes
+                # broadcast correctly with model['n1']/model['n2'].
+                prior_mu = parameters['prior_mu']
+                if self.fit_prior_mu_only:
+                    # σ_p pinned at the global empirical std of the stimuli in this
+                    # paradigm (across all trials, both n1 and n2 columns combined).
+                    # NB: in natural-magnitude space — the flex model represents
+                    # evidence in natural n, not log n. This is inconsistent with
+                    # the static MagnitudeComparisonModel (log space); kept here to
+                    # match the rest of the flex model. TODO: harmonize.
+                    prior_sd = (pt.std(model['n1']) + pt.std(model['n2'])) / 2.
+                else:
+                    prior_sd = parameters['prior_sd']
+            else:
+                # NB: this branch is per-trial std of the (n1, n2) pair — preserved
+                # for backwards compatibility, but probably also wrong (TODO).
+                prior_mu = pt.mean(pt.stack([model['n1'], model['n2']], axis=1), 1)
+                prior_sd = pt.std(pt.stack([model['n1'], model['n2']], axis=1), 1)
 
-        model_inputs['n1_prior_mu'] = prior_mu
-        model_inputs['n2_prior_mu'] = prior_mu
-        model_inputs['n1_prior_sd'] = prior_sd
-        model_inputs['n2_prior_sd'] = prior_sd
+            model_inputs['n1_prior_mu'] = prior_mu
+            model_inputs['n2_prior_mu'] = prior_mu
+            model_inputs['n1_prior_sd'] = prior_sd
+            model_inputs['n2_prior_sd'] = prior_sd
+
         model_inputs['threshold'] =  0.0
 
         model_inputs['n1_evidence_mu'] = model['n1']
@@ -234,14 +364,14 @@ class FlexibleNoiseComparisonModel(BaseModel):
         if self.fit_seperate_evidence_sd:
             key1, key2 = self._get_evidence_sd_labels()
 
-            for n in range(1, self.polynomial_order[0]+1):
+            for n in range(1, self.spline_order[0]+1):
                 free_parameters[f'{key1}_spline{n}'] = {'mu_intercept': 5., 'sigma_intercept': 5., 'transform': 'identity'}
 
-            for n in range(1, self.polynomial_order[1]+1):
+            for n in range(1, self.spline_order[1]+1):
                 free_parameters[f'{key2}_spline{n}'] = {'mu_intercept': 5., 'sigma_intercept': 5., 'transform': 'identity'}
 
         else:
-            for n in range(1, self.polynomial_order+1):
+            for n in range(1, self.spline_order+1):
                 free_parameters[f'evidence_sd_spline{n}'] = {'mu_intercept': 5., 'sigma_intercept': 5., 'transform': 'identity'}
 
         if self.fit_prior:
@@ -255,18 +385,19 @@ class FlexibleNoiseComparisonModel(BaseModel):
                 objective_sd = 2
 
             free_parameters['prior_mu'] = {'mu_intercept': objective_mu, 'transform': 'identity'}
-            free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
+            if not self.fit_prior_mu_only:
+                free_parameters['prior_sd'] = {'mu_intercept': objective_sd, 'transform': 'softplus'}
 
         return free_parameters
 
     def _get_evidence_sd_spline_par_labels(self):
         if self.fit_seperate_evidence_sd:
             key1, key2 = self._get_evidence_sd_labels()
-            label1 = [f'{key1}_spline{n}' for n in range(1, self.polynomial_order[0]+1)]
-            label2 = [f'{key2}_spline{n}' for n in range(1, self.polynomial_order[1]+1)]
+            label1 = [f'{key1}_spline{n}' for n in range(1, self.spline_order[0]+1)]
+            label2 = [f'{key2}_spline{n}' for n in range(1, self.spline_order[1]+1)]
             return label1, label2
         else:
-            labels = [f'evidence_sd_spline{n}' for n in range(1, self.polynomial_order+1)]
+            labels = [f'evidence_sd_spline{n}' for n in range(1, self.spline_order+1)]
             return labels, labels
 
     def _get_evidence_sd_labels(self):
@@ -280,51 +411,63 @@ class FlexibleNoiseComparisonModel(BaseModel):
         return key1, key2
 
     def _get_trialwise_evidence_sd(self, key, parameters):
+        """Evaluate per-trial spline noise at the n1/n2 of the *current* model
+        (i.e. of whatever paradigm was passed to build_estimation_model or
+        build_prediction_model), NOT of ``self.paradigm`` (the training paradigm).
 
+        The spline knots themselves are still anchored to ``self.paradigm`` via
+        the cached design_info, so the basis is fixed; only the evaluation
+        points change with the active paradigm. This is what allows the same
+        model object to be evaluated on out-of-sample paradigms, and is also
+        what was buggy before — the dm was pinned to the training paradigm's
+        n column, which mismatched ``parameters`` (per-trial via the active
+        paradigm's subject_ix) any time the active paradigm differed from the
+        training one (or even silently produced row-misaligned values when
+        shapes happened to match).
+        """
         model = pm.Model.get_context()
+        # Read the current paradigm's stimulus columns directly from the model's
+        # SharedVariables (set via pm.Data in set_paradigm).
+        current_n1 = np.asarray(model['n1'].get_value())
+        current_n2 = np.asarray(model['n2'].get_value())
 
         key1, key2 = self._get_evidence_sd_labels()
         labels1, labels2 = self._get_evidence_sd_spline_par_labels()
 
         if key == 'n1_evidence_sd':
             if self.memory_model == 'independent':
-                dm = self.make_dm(x=self.paradigm['n1'], variable=key1)
+                dm = self.make_dm(x=current_n1, variable=key1)
                 spline_pars = pt.stack([parameters[l1] for l1 in labels1], axis=1)
 
             elif self.memory_model == 'shared_perceptual_noise':
-                dm1 = self.make_dm(x=self.paradigm['n1'], variable=key1)
+                dm1 = self.make_dm(x=current_n1, variable=key1)
                 spline_pars1 = pt.stack([parameters[l1] for l1 in labels1], axis=1)
-                dm2 = self.make_dm(x=self.paradigm['n1'], variable=key2)
+                dm2 = self.make_dm(x=current_n1, variable=key2)
                 spline_pars2 = pt.stack([parameters[l2] for l2 in labels2], axis=1)
 
                 return pt.softplus(pt.sum(spline_pars1 * dm1, 1) + pt.sum(spline_pars2 * dm2, 1))
 
         elif key == 'n2_evidence_sd':
-            dm = self.make_dm(x=self.paradigm['n2'], variable=key2)
+            dm = self.make_dm(x=current_n2, variable=key2)
             spline_pars = pt.stack([parameters[l2] for l2 in labels2], axis=1)
 
         return pt.softplus(pt.sum(spline_pars * dm, 1))
 
     def make_dm(self, x, variable='n1_evidence_sd'):
-
-        min_n, max_n = self.paradigm[['n1', 'n2']].min().min(), self.paradigm[['n1', 'n2']].max().max()
-
-        if self.fit_seperate_evidence_sd:
-            if variable in ['n1_evidence_sd', 'perceptual_noise_sd']:
-                polynomial_order = self.polynomial_order[0]
-            elif variable in ['n2_evidence_sd', 'memory_noise_sd']:
-                polynomial_order = self.polynomial_order[1]
-        else:
-            polynomial_order = self.polynomial_order
-
-        if polynomial_order > 1:
-            dm = np.asarray(dmatrix(f"bs(x, degree=3, df={polynomial_order}, include_intercept=True, lower_bound={min_n}, upper_bound={max_n}) - 1",
-                            {"x": x}))
-        else:
-            dm = np.asarray(dmatrix(f"bs(x, degree=0, df=0, include_intercept=False, lower_bound={min_n}, upper_bound={max_n})",
-                            {"x": x}))
-
-        return dm
+        """Evaluate the spline basis at ``x`` using the design_info that was
+        fixed at construction time (anchored to the paradigm column for this
+        variable). Knot positions DO NOT depend on ``x`` — they were determined
+        once when the model was instantiated. Pass any x array (training data,
+        a linspace for plotting, a few selected points for tabulation) and
+        you'll get the basis evaluated against the same fixed knots.
+        """
+        if variable not in self._dm_design_infos:
+            # Defensive fallback: paradigm-anchored init may not have run if the
+            # subclass set up state in an unusual order. Build now from the
+            # paradigm column.
+            self._build_and_cache_design_info(variable)
+        dm = build_design_matrices([self._dm_design_infos[variable]], {"x": x})[0]
+        return np.asarray(dm)
 
     def get_sd_curve(self, idata=None, pars=None, x=None, variable='n1_evidence_sd', group=True, hierarchical=True, data=None):
 
@@ -503,11 +646,11 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
                  regressors,
                  fit_seperate_evidence_sd=True,
                  fit_prior=False,
-                 polynomial_order=5,
+                 spline_order=5,
                  memory_model='independent'):
 
-        if (type(polynomial_order) is int) and fit_seperate_evidence_sd:
-            polynomial_order = polynomial_order, polynomial_order
+        if (type(spline_order) is int) and fit_seperate_evidence_sd:
+            spline_order = spline_order, spline_order
 
 
         for key in list(regressors.keys()):
@@ -515,11 +658,11 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
             if key in ['evidence_sd', 'n1_evidence_sd', 'memory_noise', 'n2_evidence_sd', 'perceptual_noise']:
 
                 if key in ['evidence_sd']:
-                    po = polynomial_order
+                    po = spline_order
                 elif key in ['n1_evidence_sd', 'memory_noise']:
-                    po = polynomial_order[0]
+                    po = spline_order[0]
                 elif key in ['n2_evidence_sd', 'perceptual_noise']:
-                    po = polynomial_order[1]
+                    po = spline_order[1]
 
                 warn(f'Found {key} in regressors, will add it for all {po} splines!')
 
@@ -531,7 +674,7 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
 
         RegressionModel.__init__(self, regressors)
         FlexibleNoiseComparisonModel.__init__(self, paradigm, fit_seperate_evidence_sd, fit_prior,
-                                              polynomial_order, memory_model)
+                                              spline_order, memory_model)
 
 
 class PowerLawNoiseComparisonModel(BaseModel):
@@ -576,8 +719,13 @@ class PowerLawNoiseComparisonModel(BaseModel):
 
     def __init__(self, paradigm=None, fit_seperate_evidence_sd=True,
                  fit_prior=False, memory_model='independent',
-                 save_trialwise_n_estimates=False):
+                 save_trialwise_n_estimates=False,
+                 flat_observer_prior=False):
+        if flat_observer_prior and fit_prior:
+            raise ValueError("flat_observer_prior=True is incompatible with fit_prior=True "
+                             "(the prior is being switched off entirely).")
         self.fit_prior = fit_prior
+        self.flat_observer_prior = flat_observer_prior
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
         self.memory_model = memory_model
         super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
@@ -587,17 +735,18 @@ class PowerLawNoiseComparisonModel(BaseModel):
         model = pm.Model.get_context()
         model_inputs = {}
 
-        if self.fit_prior:
-            prior_mu = parameters['prior_mu']
-            prior_sd = parameters['prior_sd']
-        else:
-            prior_mu = pt.mean(pt.stack([model['n1'], model['n2']], axis=1), 1)
-            prior_sd = pt.std(pt.stack([model['n1'], model['n2']], axis=1), 1)
+        if not self.flat_observer_prior:
+            if self.fit_prior:
+                prior_mu = parameters['prior_mu']
+                prior_sd = parameters['prior_sd']
+            else:
+                prior_mu = pt.mean(pt.stack([model['n1'], model['n2']], axis=1), 1)
+                prior_sd = pt.std(pt.stack([model['n1'], model['n2']], axis=1), 1)
+            model_inputs['n1_prior_mu'] = prior_mu
+            model_inputs['n2_prior_mu'] = prior_mu
+            model_inputs['n1_prior_sd'] = prior_sd
+            model_inputs['n2_prior_sd'] = prior_sd
 
-        model_inputs['n1_prior_mu'] = prior_mu
-        model_inputs['n2_prior_mu'] = prior_mu
-        model_inputs['n1_prior_sd'] = prior_sd
-        model_inputs['n2_prior_sd'] = prior_sd
         model_inputs['threshold'] = 0.0
 
         model_inputs['n1_evidence_mu'] = model['n1']

@@ -529,36 +529,45 @@ class LossAversionRegressionModel(RegressionModel, LossAversionModel):
 class RiskModel(BaseModel):
     """Bayesian observer model for risky choice between two monetary lotteries.
 
-    Each lottery is characterised by a magnitude (n) and probability (p).  The model
-    infers posterior beliefs about magnitudes and computes the probability of choosing
-    the second option via a Bayesian threshold comparison.
+    Each lottery is characterised by a magnitude (n) and a probability (p).
+    The Bayesian observer applies a Gaussian prior to ``log(n_k)`` only —
+    probabilities ``p_k`` are observed precisely. The decision rule compares
+    ``log(EU)`` of the two options:
+
+        choose 2  iff  post_log_n_2 + log(p_2)  >  post_log_n_1 + log(p_1)
+
+    Equivalently, the static cumulative-normal likelihood compares the
+    perceived log-magnitude difference ``post_log_n_2 - post_log_n_1`` to a
+    threshold ``log(p_1/p_2)``. ``DDMRiskModel`` and ``RaceDiffusionRiskModel``
+    use the same front-end with an analytical RT likelihood.
 
     Parameters
     ----------
     paradigm : pd.DataFrame, optional
-        Must contain columns ``n1``, ``n2``, ``p1``, ``p2``, and ``choice``.
-    prior_estimate : {'objective', 'shared', 'different', 'full', 'full_normed', 'klw', 'fix_prior_sd'}
-        Strategy for estimating the magnitude prior.
+        Must contain columns ``n1``, ``n2``, ``p1``, ``p2``, ``choice``.
+    prior_estimate : {'objective', 'shared', 'full', 'klw'}
+        Strategy for the magnitude prior. ``objective`` = empirical mean/std
+        of ``log(n)`` (no fitted parameters); ``shared`` = single fitted
+        Gaussian shared across options; ``klw`` = Khaw-Li-Woodford style
+        (empirical ``mu``, fitted ``sd``); ``full`` = separate fitted
+        ``(mu, sd)`` for the risky and safe options.
     fit_seperate_evidence_sd : bool
-        Whether to fit separate noise for n1 and n2.
-    incorporate_probability : {'after_inference', 'before_inference'}
-        Whether probabilities enter the comparison before or after Bayesian inference.
+        Fit separate encoding noise for n1 and n2 (default ``True``).
     memory_model : {'independent', 'shared_perceptual_noise'}
         Noise structure; see :class:`MagnitudeComparisonModel`.
     """
 
     paradigm_keys = ['n1', 'n2', 'p1', 'p2']
+    _VALID_PRIORS = ('objective', 'shared', 'full', 'klw')
 
-    def __init__(self, paradigm=None, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
-                 save_trialwise_n_estimates=False, memory_model='independent', n_prospects=2):
-
-        assert prior_estimate in ['objective', 'shared', 'different', 'full', 'full_normed', 'klw', 'fix_prior_sd']
-
+    def __init__(self, paradigm=None, prior_estimate='objective',
+                 fit_seperate_evidence_sd=True,
+                 save_trialwise_n_estimates=False, memory_model='independent'):
+        assert prior_estimate in self._VALID_PRIORS, \
+            f'prior_estimate must be one of {self._VALID_PRIORS}'
         self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
         self.memory_model = memory_model
         self.prior_estimate = prior_estimate
-        self.incorporate_probability = incorporate_probability
-
         super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
     def get_model_inputs(self, parameters):
@@ -567,18 +576,11 @@ class RiskModel(BaseModel):
 
         model_inputs = {}
 
-        model_inputs['n1_evidence_mu'] = pt.log(model['n1']) #self.get_trialwise_variable('n1_evidence_mu', transform='identity') #at.log(model['n1'])
+        # Bayesian observer operates on log(n_k); probabilities enter via the
+        # threshold (after-inference EU comparison).
+        model_inputs['n1_evidence_mu'] = pt.log(model['n1'])
         model_inputs['n2_evidence_mu'] = pt.log(model['n2'])
-
-        # Prob of choosing 2 should increase with p2
-        if self.incorporate_probability == 'after_inference':
-            model_inputs['threshold'] =  pt.log(model['p2'] / model['p1'])
-        elif self.incorporate_probability == 'before_inference':
-            model_inputs['threshold'] =  0.0
-            model_inputs['n1_evidence_mu'] += pt.log(model['p1'])
-            model_inputs['n2_evidence_mu'] += pt.log(model['p2'])
-        else:
-            raise ValueError('incorporate_probability should be either "after_inference" (default) or "before_inference"')
+        model_inputs['threshold'] = pt.log(model['p2'] / model['p1'])
 
         if self.prior_estimate == 'objective':
             model_inputs['n1_prior_mu'] = pt.mean(pt.log(pt.stack((model['n1'], model['n2']), 0)))
@@ -592,56 +594,14 @@ class RiskModel(BaseModel):
             model_inputs['n2_prior_mu'] = model_inputs['n1_prior_mu']
             model_inputs['n2_prior_sd'] = model_inputs['n1_prior_sd']
 
-        elif self.prior_estimate == 'fix_prior_sd':
-            model_inputs['n1_prior_sd'] = pt.std(pt.log(pt.stack((model['n1'], model['n2']), 0))) # fixed same prior sd
-            model_inputs['n2_prior_sd'] = model_inputs['n1_prior_sd']
-
-            model_inputs['n1_prior_mu'] = parameters['risky_prior_mu']
-            model_inputs['n2_prior_mu'] = parameters['safe_prior_mu']
-
-        elif self.prior_estimate == 'two_mus':
-
-            risky_first = pt.where(model['p1'] < model['p2'], True, False)
-
-            safe_n = pt.where(risky_first, model['n2'], model['n1'])
-            safe_prior_sd = pt.std(pt.log(safe_n))
-            risky_prior_sd = parameters['risky_prior_sd']
-
-            model_inputs['n1_prior_mu'] = parameters['n1_prior_mu']
-            model_inputs['n1_prior_sd'] = pt.where(risky_first, risky_prior_sd, safe_prior_sd)
-            model_inputs['n2_prior_mu'] = parameters['n2_prior_mu']
-            model_inputs['n2_prior_sd'] = pt.where(risky_first, safe_prior_sd, risky_prior_sd)
-
-        elif self.prior_estimate == 'different':
-
-            risky_first = model['p1'] < model['p2']
-
-            safe_n = pt.where(risky_first, model['n2'], model['n1'])
-            safe_prior_mu = pt.mean(pt.log(safe_n))
-            safe_prior_sd = pt.std(pt.log(safe_n))
-
-            risky_prior_mu = parameters['risky_prior_mu']
-            risky_prior_sd = parameters['risky_prior_sd']
-
-            model_inputs['n1_prior_mu'] = pt.where(risky_first, risky_prior_mu, safe_prior_mu)
-            model_inputs['n1_prior_sd'] = pt.where(risky_first, risky_prior_sd, safe_prior_sd)
-
-            model_inputs['n2_prior_mu'] = pt.where(risky_first, safe_prior_mu, risky_prior_mu)
-            model_inputs['n2_prior_sd'] = pt.where(risky_first, safe_prior_sd, risky_prior_sd)
-
-        elif self.prior_estimate in ['full', 'full_normed']:
+        elif self.prior_estimate == 'full':
 
             risky_first = model['p1'] < model['p2']
 
             risky_prior_mu = parameters['risky_prior_mu']
             risky_prior_sd = parameters['risky_prior_sd']
-
             safe_prior_mu = parameters['safe_prior_mu']
-
-            if self.prior_estimate == 'full_normed':
-                safe_prior_sd = 1.
-            else:
-                safe_prior_sd = parameters['safe_prior_sd']
+            safe_prior_sd = parameters['safe_prior_sd']
 
             model_inputs['n1_prior_mu'] = pt.where(risky_first, risky_prior_mu, safe_prior_mu)
             model_inputs['n1_prior_sd'] = pt.where(risky_first, risky_prior_sd, safe_prior_sd)
@@ -704,55 +664,22 @@ class RiskModel(BaseModel):
             free_parameters['prior_mu'] = {'mu_intercept':prior_mu, 'transform':'identity'}
             free_parameters['prior_sd'] = {'mu_intercept':prior_sd, 'transform':'identity'}
 
-        elif self.prior_estimate == 'different':
-
-            if self.paradigm is not None:
-                risky_n = np.where(self.paradigm['p1'] != 1.0, self.paradigm['n1'], self.paradigm['n2'])
-                risky_prior_mu = np.mean(np.log(risky_n))
-                risky_prior_sd = np.std(np.log(risky_n))
-            else:
-                risky_prior_mu = np.log(25)
-                risky_prior_sd = 2
-
-            free_parameters['risky_prior_mu'] = {'mu_intercept':risky_prior_mu, 'transform':'identity'}
-            free_parameters['risky_prior_sd'] = {'mu_intercept':risky_prior_sd, 'transform':'identity'}
-
-        elif self.prior_estimate in ['full', 'full_normed']:
+        elif self.prior_estimate == 'full':
             if self.paradigm is not None:
                 risky_n = np.where(self.paradigm['p1'] != 1.0, self.paradigm['n1'], self.paradigm['n2'])
                 safe_n = np.where(self.paradigm['p2'] != 1.0, self.paradigm['n2'], self.paradigm['n1'])
-
                 risky_prior_mu = np.mean(np.log(risky_n))
                 risky_prior_sd = np.std(np.log(risky_n))
-
                 safe_prior_mu = np.mean(np.log(safe_n))
                 safe_prior_sd = np.std(np.log(safe_n))
-
             else:
-                risky_prior_mu = np.log(25)
-                safe_prior_mu = np.log(25)
+                risky_prior_mu = safe_prior_mu = np.log(25)
+                risky_prior_sd = safe_prior_sd = 2
 
-                risky_prior_sd = 2
-                safe_prior_sd = 2
-
-            free_parameters['risky_prior_mu'] = {'mu_intercept':risky_prior_mu, 'transform':'identity'}
-            free_parameters['risky_prior_sd'] = {'mu_intercept':risky_prior_sd, 'transform':'softplus'}
-
-
-            free_parameters['safe_prior_mu'] = {'mu_intercept':safe_prior_mu, 'transform':'identity'}
-
-            if self.prior_estimate == 'full':
-                free_parameters['safe_prior_sd'] = {'mu_intercept':safe_prior_sd, 'transform':'softplus'}
-
-        elif self.prior_estimate == 'fix_prior_sd': # only mus estimated but prior sd fixed
-            risky_n = np.where(self.paradigm['p1'] != 1.0, self.paradigm['n1'], self.paradigm['n2'])
-            safe_n = np.where(self.paradigm['p2'] != 1.0, self.paradigm['n2'], self.paradigm['n1'])
-            risky_prior_mu = np.mean(np.log(risky_n))
-            safe_prior_mu = np.mean(np.log(safe_n))
-            free_parameters['risky_prior_mu'] = {'mu_intercept':risky_prior_mu, 'transform':'identity'}
-            free_parameters['safe_prior_mu'] = {'mu_intercept':safe_prior_mu, 'transform':'identity'}
-
-
+            free_parameters['risky_prior_mu'] = {'mu_intercept': risky_prior_mu, 'transform': 'identity'}
+            free_parameters['risky_prior_sd'] = {'mu_intercept': risky_prior_sd, 'transform': 'softplus'}
+            free_parameters['safe_prior_mu'] = {'mu_intercept': safe_prior_mu, 'transform': 'identity'}
+            free_parameters['safe_prior_sd'] = {'mu_intercept': safe_prior_sd, 'transform': 'softplus'}
 
         elif self.prior_estimate == 'klw':
             if hasattr(self, 'paradigm') and (self.paradigm is not None):
@@ -788,11 +715,13 @@ class RiskModel(BaseModel):
 class RiskRegressionModel(RegressionModel, RiskModel):
     """RiskModel with patsy formula regression on noise, prior, or bias parameters."""
 
-    def __init__(self,  paradigm, regressors, prior_estimate='objective', fit_seperate_evidence_sd=True, incorporate_probability='after_inference',
+    def __init__(self, paradigm, regressors, prior_estimate='objective',
+                 fit_seperate_evidence_sd=True,
                  save_trialwise_n_estimates=False, memory_model='independent'):
         RegressionModel.__init__(self, regressors)
-        RiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd, incorporate_probability=incorporate_probability,
-                           save_trialwise_n_estimates=save_trialwise_n_estimates, memory_model=memory_model)
+        RiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd,
+                           save_trialwise_n_estimates=save_trialwise_n_estimates,
+                           memory_model=memory_model)
 
     def get_trialwise_variable(self, key):
 
@@ -833,74 +762,11 @@ class RiskLapseRegressionModel(LapseModel, RiskRegressionModel):
     """RiskModel with both a lapse rate and patsy formula regression."""
     ...
 
-class RNPModel(BaseModel):
-    """Risk Neutral Point model for risky choice based on an indifference probability.
-
-    Parameterises risk attitude through a ``rnp`` (risk neutral point) that sets the
-    probability threshold at which the agent is indifferent between a risky and a safe
-    option, scaled by a slope parameter ``gamma``.
-    """
-
-    def __init__(self, paradigm, risk_neutral_p=0.55):
-        self.risk_neutral_p = risk_neutral_p
-
-        super().__init__(paradigm)
-
-    def get_model_inputs(self):
-
-        model = pm.Model.get_context()
-
-        model_inputs = {}
-        model_inputs['n1_evidence_mu'] = self.get_trialwise_variable('n1_evidence_mu', transform='identity') #model['n1'])
-        model_inputs['n2_evidence_mu'] = self.get_trialwise_variable('n2_evidence_mu', transform='identity')
-        model_inputs['rnp'] = self.get_trialwise_variable('rnp', transform='logistic')
-        model_inputs['gamma'] = self.get_trialwise_variable('gamma', transform='identity')
-
-        return model_inputs
-
-    def _get_paradigm(self, paradigm=None):
-
-        paradigm = super()._get_paradigm(paradigm)
-
-        paradigm['p1'] = paradigm['p1'].values
-        paradigm['p2'] = paradigm['p2'].values
-        paradigm['risky_first'] = paradigm['risky_first'].values.astype(bool)
-
-        return paradigm
-
-    def _get_choice_predictions(self, model_inputs):
-
-        model = pm.Model.get_context()
-
-        rnp = model_inputs['rnp']
-        slope = model_inputs['gamma']
-        risky_first = model['risky_first'].astype(bool)
-
-        intercept = -pt.log(rnp) * slope # More risk-seeking -> higher rnp, smaller intercept, more likely to choose option 2
-        intercept = pt.where(risky_first, intercept, -intercept)
-        n1 = model_inputs['n1_evidence_mu']
-        n2 = model_inputs['n2_evidence_mu']
-
-        p1, p2 =  model['p1'], model['p2']
-
-        return cumulative_normal(intercept + slope*(n2-n1), 0.0, 1.0)
-
-    def build_priors(self):
-        self.build_hierarchical_nodes('gamma', mu_intercept=1.0, sigma_intercept=0.5, transform='identity')
-        self.build_hierarchical_nodes('rnp', mu_intercept=0.0, sigma_intercept=1.0, transform='logistic')
-
-class RNPRegressionModel(RegressionModel, RNPModel):
-    """RNPModel with patsy formula regression on rnp or gamma."""
-    def __init__(self,  paradigm, regressors, risk_neutral_p=0.55):
-        RegressionModel.__init__(self, paradigm, regressors=regressors)
-        RNPModel.__init__(self, paradigm, risk_neutral_p)
-
-
 class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
     """Risky choice model combining flexible (polynomial) noise with Bayesian magnitude inference."""
 
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, polynomial_order=5,
+                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, spline_order=5,
                  representational_noise='payoff',
                  memory_model='independent'):
 
@@ -910,17 +776,23 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
         if representational_noise not in ['payoff', 'ev']:
             raise ValueError(f'Unknown representational noise: {representational_noise} (should be "payoff" or "ev")')
 
-        if (type(polynomial_order) is int) and fit_seperate_evidence_sd:
-            polynomial_order = polynomial_order, polynomial_order
+        if (type(spline_order) is int) and fit_seperate_evidence_sd:
+            spline_order = spline_order, spline_order
 
-        self.polynomial_order = polynomial_order
-        self.max_polynomial_order = np.max(self.polynomial_order)
+        self.spline_order = spline_order
+        self.max_spline_order = np.max(self.spline_order)
         self.representational_noise = representational_noise
 
         RiskModel.__init__(self, paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates,
                            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
                            prior_estimate=prior_estimate,
                            memory_model=memory_model)
+        # FlexibleNoiseComparisonModel.__init__ is skipped by the explicit
+        # RiskModel.__init__ call above (sibling in the MRO), so the spline
+        # design-info setup never runs. Restore it here.
+        self._dm_design_infos = {}
+        if paradigm is not None:
+            self._initialize_design_infos()
 
     def get_model_inputs(self, parameters):
 
@@ -1076,12 +948,12 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
     def __init__(self, paradigm,
                  regressors,
                  prior_estimate='full',
-                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, polynomial_order=5,
+                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, spline_order=5,
                  representational_noise='payoff',
                  memory_model='independent'):
 
-        if (type(polynomial_order) is int) and fit_seperate_evidence_sd:
-            polynomial_order = polynomial_order, polynomial_order
+        if (type(spline_order) is int) and fit_seperate_evidence_sd:
+            spline_order = spline_order, spline_order
 
 
         for key in list(regressors.keys()):
@@ -1089,11 +961,11 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
             if key in ['evidence_sd', 'n1_evidence_sd', 'memory_noise_sd', 'n2_evidence_sd', 'perceptual_noise_sd']:
 
                 if key in ['evidence_sd']:
-                    po = polynomial_order
+                    po = spline_order
                 elif key in ['n1_evidence_sd', 'memory_noise_sd']:
-                    po = polynomial_order[0]
+                    po = spline_order[0]
                 elif key in ['n2_evidence_sd', 'perceptual_noise_sd']:
-                    po = polynomial_order[1]
+                    po = spline_order[1]
 
                 for i in range(1, po+1):
                     regressors[f'{key}_spline{i}'] = regressors[key]
@@ -1103,7 +975,7 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
 
         RegressionModel.__init__(self, regressors)
         FlexibleNoiseRiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd, save_trialwise_n_estimates,
-                                        polynomial_order, representational_noise, memory_model)
+                                        spline_order, representational_noise, memory_model)
 
 
     def get_sd_curve(self, conditions, idata=None, pars=None, x=None, variable='n1_evidence_sd', group=True, hierarchical=True, data=None):
@@ -1449,331 +1321,6 @@ class PowerLawNoiseRiskRegressionModel(RegressionModel, PowerLawNoiseRiskModel):
                                         save_trialwise_n_estimates, memory_model)
 
 
-class SafeVsRiskyFlexibleNoiseModel(FlexibleNoiseRiskModel):
-    """FlexibleNoiseRiskModel adapted for safe-vs-risky paradigm with gains OR losses.
-
-    Wraps FlexibleNoiseRiskModel by:
-      - taking abs(n) of magnitudes (so losses work),
-      - adding a `domain` parameter ('gain' or 'loss'),
-      - returning P(choose risky) instead of P(choose option 2).
-
-    Data format:
-        - n1, n2: signed magnitudes (positive=gains, negative=losses)
-        - p1, p2: probabilities (risky has p<1, safe has p=1)
-        - choice: True = chose risky
-    """
-
-    def __init__(self, paradigm, domain='gain', **kwargs):
-        assert domain in ('gain', 'loss'), "domain must be 'gain' or 'loss'"
-        self.domain = domain
-        if paradigm is not None:
-            paradigm = paradigm.copy()
-            paradigm['n1'] = np.abs(paradigm['n1'])
-            paradigm['n2'] = np.abs(paradigm['n2'])
-        super().__init__(paradigm, **kwargs)
-
-    def _get_choice_predictions(self, model_inputs):
-        # Underlying RiskModel returns P(choose option 2) assuming higher value is better.
-        # That's correct for gains; for losses we want lower magnitude = better, so flip.
-        p_choose2 = super()._get_choice_predictions(model_inputs)
-        if self.domain == 'loss':
-            p_choose2 = 1 - p_choose2
-
-        # Convert P(option 2) -> P(risky) given which position is risky
-        model = pm.Model.get_context()
-        risky_first = model['p1'] < model['p2']
-        return pt.where(risky_first, 1 - p_choose2, p_choose2)
-
-
-class SafeVsRiskyModel(BaseModel):
-    """Bayesian observer model for risky choice between a safe and a risky option.
-
-    The observer forms posterior beliefs about each option's log-magnitude
-    via Bayesian updating of a prior with noisy evidence, then compares
-    expected values (incorporating probability) to make a choice.
-
-    Data format:
-        - n1, n2: magnitudes (positive for gains, negative for losses)
-        - p1, p2: probabilities (risky option has p < 1, safe has p = 1)
-        - choice: True = chose the risky option
-
-    Args:
-        domain: 'gain' or 'loss' (required)
-        separate_priors: separate prior mu/sd for risky vs safe (default True)
-        fix_prior_mus: fix prior means to data statistics (default False)
-        fix_prior_sds: fix prior sds to 1.0 (default False)
-        separate_evidence_sd: separate evidence noise for n1 vs n2 (default True)
-    """
-
-    paradigm_keys = ['n1', 'n2', 'p1', 'p2']
-
-    def __init__(self, data=None, domain='gain',
-                 separate_priors=True,
-                 fix_prior_mus=False, fix_prior_sds=False,
-                 separate_evidence_sd=True):
-
-        assert domain in ('gain', 'loss'), "domain must be 'gain' or 'loss'"
-
-        self.domain = domain
-        self.separate_priors = separate_priors
-        self.fix_prior_mus = fix_prior_mus
-        self.fix_prior_sds = fix_prior_sds
-        self.separate_evidence_sd = separate_evidence_sd
-
-        super().__init__(data)
-
-    # ── free parameters ──────────────────────────────────────────────
-
-    def get_free_parameters(self):
-        free = {}
-        mu_spec = {'mu_intercept': np.log(20.), 'sigma_intercept': np.log(20.) / 4., 'transform': 'softplus'}
-        sd_spec = {'mu_intercept': 1., 'transform': 'softplus'}
-        noise_spec = {'mu_intercept': -1., 'transform': 'softplus'}
-
-        if not self.fix_prior_mus:
-            if self.separate_priors:
-                free['prior_mu_risky'] = {**mu_spec}
-                free['prior_mu_safe'] = {**mu_spec}
-            else:
-                free['prior_mu'] = {**mu_spec}
-
-        if not self.fix_prior_sds:
-            if self.separate_priors:
-                free['prior_sd_risky'] = {**sd_spec}
-                free['prior_sd_safe'] = {**sd_spec}
-            else:
-                free['prior_sd'] = {**sd_spec}
-
-        if self.separate_evidence_sd:
-            free['evidence_sd_n1'] = {**noise_spec}
-            free['evidence_sd_n2'] = {**noise_spec}
-        else:
-            free['evidence_sd'] = {**noise_spec}
-
-        return free
-
-    # ── model inputs ─────────────────────────────────────────────────
-
-    def get_model_inputs(self, parameters):
-        model = pm.Model.get_context()
-
-        n1, n2 = model['n1'], model['n2']
-        p1, p2 = model['p1'], model['p2']
-        logn1 = pt.log(pt.abs(n1))
-        logn2 = pt.log(pt.abs(n2))
-        risky_first = (p1 < p2)
-
-        # --- Priors (in role-space: risky / safe) ---
-        if self.fix_prior_mus:
-            if self.separate_priors:
-                risky_n = pt.where(risky_first, n1, n2)
-                safe_n = pt.where(risky_first, n2, n1)
-                prior_mu_risky = pt.mean(pt.log(pt.abs(risky_n)))
-                prior_mu_safe = pt.mean(pt.log(pt.abs(safe_n)))
-            else:
-                prior_mu_risky = prior_mu_safe = (pt.sum(logn1) + pt.sum(logn2)) / (2 * pt.sum(pt.ones_like(logn1)))
-        else:
-            if self.separate_priors:
-                prior_mu_risky = parameters['prior_mu_risky']
-                prior_mu_safe = parameters['prior_mu_safe']
-            else:
-                prior_mu_risky = prior_mu_safe = parameters['prior_mu']
-
-        if self.fix_prior_sds:
-            prior_sd_risky = prior_sd_safe = 1.0
-        elif self.separate_priors:
-            prior_sd_risky = parameters['prior_sd_risky']
-            prior_sd_safe = parameters['prior_sd_safe']
-        else:
-            prior_sd_risky = prior_sd_safe = parameters['prior_sd']
-
-        # --- Evidence noise (built in position-space, then mapped) ---
-        if self.separate_evidence_sd:
-            noise1 = parameters['evidence_sd_n1']
-            noise2 = parameters['evidence_sd_n2']
-        else:
-            noise1 = noise2 = parameters['evidence_sd']
-
-        return {
-            'prior_mu_risky': prior_mu_risky, 'prior_sd_risky': prior_sd_risky,
-            'prior_mu_safe': prior_mu_safe, 'prior_sd_safe': prior_sd_safe,
-            'logn1': logn1, 'logn2': logn2,
-            'ev_sd1': noise1, 'ev_sd2': noise2,
-            'p1': p1, 'p2': p2,
-            'risky_first': risky_first,
-        }
-
-    # ── choice predictions ───────────────────────────────────────────
-
-    def _get_choice_predictions(self, mi):
-        risky_first = mi['risky_first']
-
-        # Map priors: position → role
-        mu1 = pt.where(risky_first, mi['prior_mu_risky'], mi['prior_mu_safe'])
-        mu2 = pt.where(risky_first, mi['prior_mu_safe'], mi['prior_mu_risky'])
-        sd1 = pt.where(risky_first, mi['prior_sd_risky'], mi['prior_sd_safe'])
-        sd2 = pt.where(risky_first, mi['prior_sd_safe'], mi['prior_sd_risky'])
-
-        # Bayesian posterior per option (position-space)
-        post1_mu, post1_sd = get_posterior(mu1, sd1, mi['logn1'], mi['ev_sd1'])
-        post2_mu, post2_sd = get_posterior(mu2, sd2, mi['logn2'], mi['ev_sd2'])
-
-        # Map posteriors: position → role
-        risky_post = pt.where(risky_first, post1_mu, post2_mu)
-        safe_post = pt.where(risky_first, post2_mu, post1_mu)
-
-        # Decision noise per option: β·ν = post_sd² / evidence_sd
-        # (see Khaw, Li & Woodford 2020, eq. 2.5)
-        decision_sd1 = post1_sd**2 / mi['ev_sd1']
-        decision_sd2 = post2_sd**2 / mi['ev_sd2']
-        risky_decision_sd = pt.where(risky_first, decision_sd1, decision_sd2)
-        safe_decision_sd = pt.where(risky_first, decision_sd2, decision_sd1)
-
-        # Decision variable: always risky − safe
-        diff_mu = risky_post - safe_post
-        diff_sd = pt.sqrt(risky_decision_sd**2 + safe_decision_sd**2)
-
-        # Probability threshold
-        safe_prob = pt.where(risky_first, mi['p2'], mi['p1'])
-        risky_prob = pt.where(risky_first, mi['p1'], mi['p2'])
-        threshold = pt.log(safe_prob / risky_prob)
-
-        # Gains: choose risky when perceived risky > safe (accounting for probability)
-        #   → p_risky = P(diff > threshold)
-        # Losses: choose risky when perceived risky loss isn't too big
-        #   → p_risky = P(diff < threshold)
-        if self.domain == 'gain':
-            p_risky = 1.0 - cumulative_normal(threshold, diff_mu, diff_sd)
-        else:
-            p_risky = cumulative_normal(threshold, diff_mu, diff_sd)
-
-        return p_risky
-
-
-class SafeVsRiskyRegressionModel(RegressionModel, SafeVsRiskyModel):
-    def __init__(self, data=None, regressors=None, **kwargs):
-        SafeVsRiskyModel.__init__(self, data=data, **kwargs)
-        RegressionModel.__init__(self, regressors=regressors)
-
-    def get_trialwise_variable(self, key):
-        return super().get_trialwise_variable(key)
-    
-
-class SafeVsRiskyMemoryModel(SafeVsRiskyModel):
-    """Safe-vs-risky model with encoding noise shared across both options
-    and an extra working-memory noise term on option 1 only.
-
-    memory_model:
-        - 'independent': same as original SafeVsRiskyModel
-        - 'shared_perceptual_noise': option1 = encoding + memory, option2 = encoding
-    """
-
-    def __init__(self, data=None, domain="gain",
-        separate_priors=True, fix_prior_mus=False, fix_prior_sds=False,
-        separate_evidence_sd=True, memory_model="shared_perceptual_noise", combine_noise="add_sd"):
-        self.memory_model = memory_model
-        self.combine_noise = combine_noise
-
-        super().__init__(data=data, domain=domain, separate_priors=separate_priors,
-                         fix_prior_mus=fix_prior_mus, fix_prior_sds=fix_prior_sds, separate_evidence_sd=separate_evidence_sd)
-
-    def get_free_parameters(self):
-        free = {}
-        mu_spec = {"mu_intercept": np.log(20.), "sigma_intercept": np.log(20.) / 4., "transform": "softplus"}
-        sd_spec = {"mu_intercept": 1., "transform": "softplus"}
-        noise_spec = {"mu_intercept": -1., "transform": "softplus"}
-
-        if not self.fix_prior_mus:
-            if self.separate_priors:
-                free["prior_mu_risky"] = {**mu_spec}
-                free["prior_mu_safe"] = {**mu_spec}
-            else:
-                free["prior_mu"] = {**mu_spec}
-
-        if not self.fix_prior_sds:
-            if self.separate_priors:
-                free["prior_sd_risky"] = {**sd_spec}
-                free["prior_sd_safe"] = {**sd_spec}
-            else:
-                free["prior_sd"] = {**sd_spec}
-
-        # evidence / memory parameters
-        if self.memory_model == "independent":
-            if self.separate_evidence_sd:
-                free["evidence_sd_n1"] = {**noise_spec}
-                free["evidence_sd_n2"] = {**noise_spec}
-            else:
-                free["evidence_sd"] = {**noise_spec}
-
-        elif self.memory_model == "shared_perceptual_noise":
-            free["encoding_noise_sd"] = {**noise_spec}
-            free["memory_noise_sd"] = {**noise_spec}
-
-        else:
-            raise ValueError(f"Unknown memory_model: {self.memory_model}")
-
-        return free
-
-    def get_model_inputs(self, parameters):
-        model = pm.Model.get_context()
-
-        n1, n2 = model["n1"], model["n2"]
-        p1, p2 = model["p1"], model["p2"]
-        logn1 = pt.log(pt.abs(n1))
-        logn2 = pt.log(pt.abs(n2))
-        risky_first = (p1 < p2)
-
-        if self.fix_prior_mus:
-            if self.separate_priors:
-                risky_n = pt.where(risky_first, n1, n2)
-                safe_n = pt.where(risky_first, n2, n1)
-                prior_mu_risky = pt.mean(pt.log(pt.abs(risky_n)))
-                prior_mu_safe = pt.mean(pt.log(pt.abs(safe_n)))
-            else:
-                prior_mu_risky = prior_mu_safe = (pt.sum(logn1) + pt.sum(logn2)) / (2 * pt.sum(pt.ones_like(logn1)))
-        else:
-            if self.separate_priors:
-                prior_mu_risky = parameters["prior_mu_risky"]
-                prior_mu_safe = parameters["prior_mu_safe"]
-            else:
-                prior_mu_risky = prior_mu_safe = parameters["prior_mu"]
-
-        if self.fix_prior_sds:
-            prior_sd_risky = prior_sd_safe = 1.0
-        elif self.separate_priors:
-            prior_sd_risky = parameters["prior_sd_risky"]
-            prior_sd_safe = parameters["prior_sd_safe"]
-        else:
-            prior_sd_risky = prior_sd_safe = parameters["prior_sd"]
-
-
-        if self.memory_model == "independent":
-            if self.separate_evidence_sd:
-                noise1 = parameters["evidence_sd_n1"]
-                noise2 = parameters["evidence_sd_n2"]
-            else:
-                noise1 = noise2 = parameters["evidence_sd"]
-
-        elif self.memory_model == "shared_perceptual_noise":
-            enc = parameters["encoding_noise_sd"]
-            mem = parameters["memory_noise_sd"]
-
-            if self.combine_noise == "add_sd":
-                noise1 = enc + mem
-            elif self.combine_noise == "variance":
-                noise1 = pt.sqrt(enc**2 + mem**2)
-            else:
-                raise ValueError("combine_noise must be 'add_sd' or 'variance'")
-
-            noise2 = enc
-
-        else:
-            raise ValueError(f"Unknown memory_model: {self.memory_model}")
-
-        return {"prior_mu_risky": prior_mu_risky, "prior_sd_risky": prior_sd_risky, "prior_mu_safe": prior_mu_safe, "prior_sd_safe": prior_sd_safe,
-                "logn1": logn1, "logn2": logn2, "ev_sd1": noise1, "ev_sd2": noise2, "p1": p1, "p2": p2, "risky_first": risky_first}
-    
-
 class AffineNoiseRiskModel(FlexibleNoiseRiskModel):
     """Risky-choice model with affine (intercept + linear) noise.
 
@@ -1790,7 +1337,7 @@ class AffineNoiseRiskModel(FlexibleNoiseRiskModel):
         super().__init__(paradigm, prior_estimate=prior_estimate,
                          fit_seperate_evidence_sd=fit_seperate_evidence_sd,
                          save_trialwise_n_estimates=save_trialwise_n_estimates,
-                         polynomial_order=2,
+                         spline_order=2,
                          memory_model=memory_model)
 
     def make_dm(self, x, variable='n1_evidence_sd'):

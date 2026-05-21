@@ -18,6 +18,38 @@ def get_diff_dist(mu1, sd1, mu2, sd2):
 def get_diff_dist_np(mu1, sd1, mu2, sd2):
     return mu2 - mu1, np.sqrt(sd1**2+sd2**2)
 
+
+def posterior_mean_sd(prior_sd, evidence_sd):
+    """SD of the posterior mean conditional on the true latent value.
+
+    For a Gaussian observer with prior V ~ N(μ_p, σ_p²) and a single noisy
+    observation x | V ~ N(V, σ_e²), the posterior mean μ_post(x) =
+    σ_p²/(σ_p²+σ_e²) · x + σ_e²/(σ_p²+σ_e²) · μ_p is a linear function of x.
+    Treating x as random under fixed true V, the marginal SD of μ_post is::
+
+        SD[μ_post | true V] = w · σ_e,    where  w = σ_p² / (σ_p² + σ_e²)
+
+    Limits:
+      * Flat prior (σ_p → ∞):    w → 1 ⇒ returns ``evidence_sd`` (no shrinkage).
+      * Strong shrinkage (σ_p → 0): w → 0 ⇒ returns 0 (μ_post pinned to μ_p).
+
+    This is the principled within-trial diffusion noise for both DDM and RDM
+    accumulators when they integrate posterior-mean evidence over time
+    (Bogacz/Drugowitsch sequential-evidence-stream interpretation).
+    """
+    var_p = prior_sd ** 2
+    var_e = evidence_sd ** 2
+    w = var_p / (var_p + var_e)
+    return w * evidence_sd
+
+
+def posterior_mean_sd_np(prior_sd, evidence_sd):
+    """NumPy version of :func:`posterior_mean_sd`."""
+    var_p = np.asarray(prior_sd) ** 2
+    var_e = np.asarray(evidence_sd) ** 2
+    w = var_p / (var_p + var_e)
+    return w * np.asarray(evidence_sd)
+
 def cumulative_normal(x, mu, sd, s=pt.sqrt(2.)):
 #     Cumulative distribution function for the standard normal distribution
     return pt.clip(0.5 + 0.5 *

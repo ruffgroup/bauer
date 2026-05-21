@@ -13,12 +13,47 @@ from .risky_choice import (
     RiskModelProbabilityDistortion, ProspectTheoryModel,
     LossAversionModel, LossAversionRegressionModel,
     RiskModel, RiskRegressionModel, RiskLapseModel, RiskLapseRegressionModel,
-    RNPModel, RNPRegressionModel,
     FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
     ExpectedUtilityRiskModel, ExpectedUtilityRiskRegressionModel,
     PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
-    PowerLawEncodingRiskModel, PowerLawEncodingRiskRegressionModel,
-    SafeVsRiskyModel, SafeVsRiskyRegressionModel,
-    SafeVsRiskyFlexibleNoiseModel,
     AffineNoiseRiskModel, AffineNoiseRiskRegressionModel,
+    PowerLawEncodingRiskModel, PowerLawEncodingRiskRegressionModel,
+)
+
+try:
+    from .ddm import (
+        DDMMixin,
+        DDMMagnitudeComparisonModel,
+        DDMMagnitudeComparisonRegressionModel,
+        DDMFlexibleNoiseComparisonModel,
+        DDMPowerLawNoiseComparisonModel,
+        DDMPowerLawNoiseComparisonRegressionModel,
+        DDMRiskModel,
+        DDMFlexibleNoiseRiskModel,
+        DDMFlexibleNoiseRiskRegressionModel,
+        DDMPowerLawNoiseRiskModel,
+        DDMPowerLawNoiseRiskRegressionModel,
+    )
+except ImportError:
+    pass
+
+from .legacy import (
+    SafeVsRiskyModel,
+    SafeVsRiskyRegressionModel,
+    SafeVsRiskyMemoryModel,
+    JointSafeVsRiskyModel,
+)
+
+from .race import (
+    RaceMixin,
+    RaceDiffusionMagnitudeComparisonModel,
+    RaceDiffusionFlexibleNoiseComparisonModel,
+    RaceDiffusionPowerLawNoiseComparisonModel,
+    RaceDiffusionPowerLawNoiseComparisonRegressionModel,
+    RaceDiffusionRiskModel,
+    RaceDiffusionFlexibleNoiseRiskModel,
+    RaceDiffusionFlexibleNoiseRiskRegressionModel,
+    RaceDiffusionPowerLawNoiseRiskModel,
+    RaceDiffusionPowerLawNoiseRiskRegressionModel,
+    logp_race_diffusion_2,
 )
