@@ -16,13 +16,12 @@ fitted means+SDs for risky vs safe options) per the paper.
 
 Output: ``<out_dir>/<task>/<n>subj/{model}{_freescale|_fixedscale}.nc``.
 """
+from bauer.utils.data import load_dehollander2024_risk, load_dehollander2024_symbolic
 import argparse
 import os
 import os.path as op
 import warnings
 warnings.filterwarnings('ignore')
-
-from bauer.utils.data import load_dehollander2024_risk, load_dehollander2024_symbolic
 
 
 def _progress(trace, draw):  # noqa: ARG001

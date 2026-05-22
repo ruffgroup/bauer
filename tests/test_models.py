@@ -5,12 +5,11 @@ These tests do NOT run MCMC. They only verify that:
 - each prior_estimate option produces sensible free-parameter sets
 - DDM/RDM models correctly require rt + choice columns
 """
+import pytest
+import pandas as pd
+import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
-
-import numpy as np
-import pandas as pd
-import pytest
 
 
 @pytest.fixture
@@ -209,10 +208,15 @@ def test_data_loaders():
                                     load_dehollander2024_risk,
                                     load_dehollander2024_symbolic,
                                     load_dehollander_tms_risk)
-    df1 = load_garcia2022(task='magnitude'); assert len(df1) > 0
-    df2 = load_garcia2022(task='risk');      assert len(df2) > 0
-    df3 = load_dehollander2024_risk();        assert df3.index.get_level_values('subject').nunique() == 30
-    df4 = load_dehollander2024_symbolic();    assert df4.index.get_level_values('subject').nunique() == 58
-    df5 = load_dehollander_tms_risk();        assert df5.index.get_level_values('subject').nunique() == 35
+    df1 = load_garcia2022(task='magnitude')
+    assert len(df1) > 0
+    df2 = load_garcia2022(task='risk')
+    assert len(df2) > 0
+    df3 = load_dehollander2024_risk()
+    assert df3.index.get_level_values('subject').nunique() == 30
+    df4 = load_dehollander2024_symbolic()
+    assert df4.index.get_level_values('subject').nunique() == 58
+    df5 = load_dehollander_tms_risk()
+    assert df5.index.get_level_values('subject').nunique() == 35
     df6 = load_dehollander_tms_risk(tms_only=False)
     assert df6.index.get_level_values('subject').nunique() == 73

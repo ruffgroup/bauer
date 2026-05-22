@@ -21,13 +21,12 @@ Canonical kwargs applied to every fit:
 Output: ``<out_dir>/<n>subj/{model}{_flex}{_freescale|_fixedscale}.nc``
 with per-trial PPC stored as a deterministic group on the same idata.
 """
+from bauer.utils.data import load_garcia2022
 import argparse
 import os
 import os.path as op
 import warnings
 warnings.filterwarnings('ignore')
-
-from bauer.utils.data import load_garcia2022
 
 
 def _progress(trace, draw):  # noqa: ARG001 — pymc passes trace as kwarg

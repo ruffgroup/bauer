@@ -12,12 +12,11 @@ the Bernoulli used in the comparison/risk models). No MCMC is run here —
 tests verify that build_estimation_model() succeeds on a tiny multi-subject
 paradigm and that the expected free parameters appear.
 """
+import pytest
+import pandas as pd
+import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
-
-import numpy as np
-import pandas as pd
-import pytest
 
 
 # ---------------------------------------------------------------------------

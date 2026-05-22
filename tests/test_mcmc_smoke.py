@@ -14,12 +14,11 @@ build-only smoke tests miss.
 Marked ``slow`` for opt-out via ``pytest -m 'not slow'`` if the user wants
 the fast feedback loop. CI runs the whole suite.
 """
+import pytest
+import pandas as pd
+import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
-
-import numpy as np
-import pandas as pd
-import pytest
 
 
 pytestmark = pytest.mark.slow

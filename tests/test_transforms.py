@@ -6,12 +6,11 @@ helpers (sample_parameters_from_prior, fit_map_individual) need to round-trip
 through the untransformed scale. These tests confirm the two transforms are
 mutually inverse.
 """
+import pytest
+import pandas as pd
+import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
-
-import numpy as np
-import pandas as pd
-import pytest
 
 
 @pytest.fixture

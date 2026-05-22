@@ -7,12 +7,11 @@ Tests do NOT run MCMC — they verify that:
 - ``build_estimation_model()`` succeeds on a tiny multi-subject paradigm,
 - ``get_free_parameters()`` returns the expected keys for the main options.
 """
+import pytest
+import pandas as pd
+import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
-
-import numpy as np
-import pandas as pd
-import pytest
 
 
 @pytest.fixture

@@ -18,13 +18,12 @@ Pass ``--all-subjects-no-tms`` to use all 73 subjects across all sessions.
 the TMS condition as a covariate on the noise/aversion parameters. Currently
 only implemented for ``choice`` (DDM/RDM regression versions to come).
 """
+from bauer.utils.data import load_dehollander_tms_risk
 import argparse
 import os
 import os.path as op
 import warnings
 warnings.filterwarnings('ignore')
-
-from bauer.utils.data import load_dehollander_tms_risk
 
 
 def _progress(trace, draw):  # noqa: ARG001
