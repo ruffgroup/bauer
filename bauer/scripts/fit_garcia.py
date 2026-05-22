@@ -46,14 +46,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('model', choices=['choice', 'ddm', 'rdm'])
     ap.add_argument('--flex', action='store_true',
-                     help='Use flexible-noise (B-spline) variant')
+                    help='Use flexible-noise (B-spline) variant')
     ap.add_argument('--v-scale', choices=['free', 'fixed'], default=None,
-                     help='free or fixed v_scale. Default: free for static '
-                          'DDM/RDM, fixed for flex (spline absorbs scale).')
+                    help='free or fixed v_scale. Default: free for static '
+                    'DDM/RDM, fixed for flex (spline absorbs scale).')
     ap.add_argument('--n-subjects', default='8',
-                     help='Number of subjects: integer or "all"')
+                    help='Number of subjects: integer or "all"')
     ap.add_argument('--out-dir', default='results/garcia',
-                     help='Output directory (under cwd)')
+                    help='Output directory (under cwd)')
     ap.add_argument('--draws', type=int, default=1000)
     ap.add_argument('--tune', type=int, default=1000)
     ap.add_argument('--chains', type=int, default=4)
@@ -61,25 +61,25 @@ def main():
     ap.add_argument('--target-accept', type=float, default=0.95)
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--no-advantage', action='store_true',
-                     help='RDM only: turn OFF advantage decomposition '
-                          '(default is advantage=True).')
+                    help='RDM only: turn OFF advantage decomposition '
+                    '(default is advantage=True).')
     ap.add_argument('--spline-order', type=int, default=5,
-                     help='Flex-noise spline df (n knots). Default 5.')
+                    help='Flex-noise spline df (n knots). Default 5.')
     ap.add_argument('--backend', choices=['pymc', 'numpyro', 'blackjax'],
-                     default='pymc',
-                     help='Sampler backend. numpyro/blackjax run via JAX, '
-                          'often 2-10x faster especially with --gres=gpu:1.')
+                    default='pymc',
+                    help='Sampler backend. numpyro/blackjax run via JAX, '
+                    'often 2-10x faster especially with --gres=gpu:1.')
     ap.add_argument('--chain-method', choices=['vectorized', 'parallel', 'sequential'],
-                     default='vectorized',
-                     help='JAX-only: chain dispatch. "vectorized" vmaps all '
-                          'chains on a single device (best for 1 GPU); '
-                          '"sequential" runs one at a time (debugging).')
+                    default='vectorized',
+                    help='JAX-only: chain dispatch. "vectorized" vmaps all '
+                    'chains on a single device (best for 1 GPU); '
+                    '"sequential" runs one at a time (debugging).')
     ap.add_argument('--dense-mass', action='store_true',
-                     help='JAX-only: use dense mass matrix in NUTS warmup. '
-                          'Helps when parameters are strongly correlated '
-                          '(typical for DDM: v_scale × evidence_sd × a).')
+                    help='JAX-only: use dense mass matrix in NUTS warmup. '
+                    'Helps when parameters are strongly correlated '
+                    '(typical for DDM: v_scale × evidence_sd × a).')
     ap.add_argument('--no-ppc', action='store_true',
-                     help='Skip PPC computation after sampling')
+                    help='Skip PPC computation after sampling')
     args = ap.parse_args()
 
     # Defaults for v_scale: free in static, fixed in flex
@@ -157,7 +157,7 @@ def main():
     else:
         suffix = ''
     out_path = op.join(args.out_dir, f'{n_subj}subj',
-                        f'{args.model}{flex_tag}{suffix}.nc')
+                       f'{args.model}{flex_tag}{suffix}.nc')
     _safe_to_netcdf(idata, out_path)
     print(f'idata -> {out_path}', flush=True)
 
@@ -167,8 +167,8 @@ def main():
             ppc = m.ppc(df, idata, progressbar=False)
         else:
             ppc = m.ppc(df, idata, n_posterior_samples=200,
-                         inner_samples=1, random_seed=args.seed,
-                         progressbar=False)
+                        inner_samples=1, random_seed=args.seed,
+                        progressbar=False)
         ppc_path = out_path.replace('.nc', '_ppc.pickle')
         ppc.to_pickle(ppc_path)
         print(f'ppc -> {ppc_path}', flush=True)

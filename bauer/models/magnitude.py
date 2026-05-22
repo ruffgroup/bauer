@@ -8,8 +8,7 @@ from arviz import hdi
 from patsy import dmatrix, build_design_matrices
 from warnings import warn
 from ..core import BaseModel, LapseModel, RegressionModel
-from ..utils.bayes import cumulative_normal, get_posterior, get_diff_dist
-from ..utils.math import inverse_softplus_np, softplus_np, inverse_softplus
+from ..utils.math import softplus_np
 from ..utils.plotting import plot_prediction
 
 
@@ -590,7 +589,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
         col = 'subject' if 'subject' in n_sd_stats.index.names else None
 
         g = sns.FacetGrid(n_sd_stats.reset_index(), hue=hue, col=col, col_wrap=3 if col is not None else None, sharex=False, sharey=False,
-                        **kwargs)
+                          **kwargs)
 
         g.map_dataframe(plot_prediction, x='x', y=y)
         g.map_dataframe(plt.plot, 'x', y)
