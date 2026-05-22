@@ -561,44 +561,6 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         return output
 
-    @classmethod
-    def get_sd_curve_stats(n_sd, groupby=[]):
-        keys = ['x']
-
-        if 'subject' in n_sd.index.names:
-            keys.append('subject')
-
-        if 'variable' in n_sd.index.names:
-            keys.append('variable')
-
-        keys += groupby
-
-        sd_ci = n_sd.groupby(keys).apply(lambda d: pd.Series(hdi(d.values.ravel())))  # , index=pd.Index(['hdi025', 'hdi975']))))
-        sd_ci.columns = ['hdi025', 'hdi975']
-        sd_mean = n_sd.groupby(keys).mean()
-
-        return sd_mean.join(sd_ci)
-
-    @classmethod
-    def plot_sd_curve_stats(n_sd_stats, ylim=(0, 20), y=None, **kwargs):
-
-        if y is None:
-            y = n_sd_stats.columns[0]
-
-        hue = 'variable' if 'variable' in n_sd_stats.index.names else None
-        col = 'subject' if 'subject' in n_sd_stats.index.names else None
-
-        g = sns.FacetGrid(n_sd_stats.reset_index(), hue=hue, col=col, col_wrap=3 if col is not None else None, sharex=False, sharey=False,
-                          **kwargs)
-
-        g.map_dataframe(plot_prediction, x='x', y=y)
-        g.map_dataframe(plt.plot, 'x', y)
-
-        g.set(ylim=ylim)
-        g.fig.set_size_inches(6, 6)
-
-        return g
-
     @staticmethod
     def get_sd_curve_stats(n_sd, groupby=[]):
         keys = ['x']
