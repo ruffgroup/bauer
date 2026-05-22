@@ -128,8 +128,8 @@ class RiskModelProbabilityDistortion(BaseModel):
             p_choice = pt.sum(pt.sum(p_posterior_joint * p_choice, 1), 1)
 
         elif self.distort_magnitudes & (~self.distort_probabilities):
-            p1 = invlogit(model_inputs[f'p1_evidence_mu'])
-            p2 = invlogit(model_inputs[f'p2_evidence_mu'])
+            p1 = invlogit(model_inputs['p1_evidence_mu'])
+            p2 = invlogit(model_inputs['p2_evidence_mu'])
 
             ev1_hat_mean = n1_hat_mean + pt.log(p1)
             ev2_hat_mean = n2_hat_mean + pt.log(p2)
@@ -142,8 +142,8 @@ class RiskModelProbabilityDistortion(BaseModel):
 
         elif (~self.distort_magnitudes) & self.distort_probabilities:
 
-            n1 = model_inputs[f'n1_evidence_mu']
-            n2 = model_inputs[f'n2_evidence_mu']
+            n1 = model_inputs['n1_evidence_mu']
+            n2 = model_inputs['n2_evidence_mu']
 
             ev1 = n1[:, np.newaxis, np.newaxis] + pt.log(self.p_grid)[np.newaxis, :, np.newaxis]
             ev2 = n2[:, np.newaxis, np.newaxis] + pt.log(self.p_grid)[np.newaxis, np.newaxis, :]
