@@ -510,6 +510,42 @@ class RaceDiffusionRiskModel(RaceMixin, RiskModel):
                                            fit_w_s=getattr(self, 'fit_w_s', True))
 
 
+class RaceDiffusionRiskRegressionModel(RaceMixin, RiskRegressionModel):
+    """Race-diffusion variant of :class:`RiskRegressionModel`.
+
+    Patsy-formula regression on the cognitive front-end
+    (``n1_evidence_sd``, ``n2_evidence_sd``, prior params) and on the
+    accumulator params (``a``, ``t0``, ``w_0``, ``w_d``, ``w_s``). Use
+    this for two-group / condition-comparison designs where the noise
+    function shape itself is *not* the focus.
+
+    For richer noise-curve-shape comparisons see
+    :class:`RaceDiffusionFlexibleNoiseRiskRegressionModel` (B-spline noise).
+
+    Paradigm columns required: ``n1``, ``n2``, ``p1``, ``p2``,
+    ``choice`` (bool), ``rt`` (seconds).
+    """
+
+    def __init__(self, paradigm, regressors, prior_estimate='objective',
+                 fit_seperate_evidence_sd=True,
+                 save_trialwise_n_estimates=False, memory_model='independent',
+                 advantage=True):
+        self.advantage = advantage
+        RiskRegressionModel.__init__(
+            self, paradigm, regressors,
+            prior_estimate=prior_estimate,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            memory_model=memory_model,
+        )
+
+    def _get_drifts(self, model_inputs, parameters):
+        return _drifts_from_post_and_prior(model_inputs, parameters,
+                                           advantage=self.advantage,
+                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False),
+                                           fit_w_s=getattr(self, 'fit_w_s', True))
+
+
 class RaceDiffusionFlexibleNoiseRiskModel(RaceMixin, FlexibleNoiseRiskModel):
     """Race-diffusion variant of :class:`FlexibleNoiseRiskModel` for risky
     choice with stimulus-dependent (B-spline) encoding noise.
