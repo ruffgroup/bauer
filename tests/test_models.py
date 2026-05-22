@@ -37,13 +37,15 @@ def paradigm_risk():
     rng = np.random.default_rng(0)
     n_trials = 16
     n_subj = 3
-    safe_n = np.array([5, 7, 10, 14, 20, 28])
+    # n_trials must equal 2 * len(safe_n) so that safe_n.repeat(2) has the
+    # right length (was previously 6 vs 16 — broadcast error).
+    safe_n = np.array([5, 7, 10, 14, 18, 22, 26, 30])
     return pd.DataFrame({
         'subject': np.repeat([1, 2, 3], n_trials),
         'run': 1,
         'trial_nr': np.tile(np.arange(n_trials), n_subj),
-        'n1': np.tile(safe_n.repeat(2)[:n_trials] * (1 + 0.5 * rng.random(n_trials)), n_subj).round(),
-        'n2': np.tile(safe_n.repeat(2)[:n_trials], n_subj),
+        'n1': np.tile(safe_n.repeat(2) * (1 + 0.5 * rng.random(n_trials)), n_subj).round(),
+        'n2': np.tile(safe_n.repeat(2), n_subj),
         'p1': np.tile([0.55, 1.0] * (n_trials // 2), n_subj),
         'p2': np.tile([1.0, 0.55] * (n_trials // 2), n_subj),
         'choice': rng.random(n_trials * n_subj) > 0.5,
@@ -64,9 +66,11 @@ def test_magnitude_model_builds(paradigm_magnitude):
 
 def test_flexible_noise_builds(paradigm_magnitude):
     from bauer.models import FlexibleNoiseComparisonModel
+    # spline_order=4 (df>=4) — patsy requires df >= degree+1 when an Intercept
+    # is included.
     m = FlexibleNoiseComparisonModel(
         paradigm=paradigm_magnitude, fit_seperate_evidence_sd=True,
-        spline_order=3, fit_prior=True,
+        spline_order=4, fit_prior=True,
     )
     m.build_estimation_model(paradigm=paradigm_magnitude, hierarchical=True)
     assert any(k.startswith('n1_evidence_sd_spline') for k in m.free_parameters)
@@ -91,7 +95,7 @@ def test_risk_model_prior_estimates(paradigm_risk, prior_estimate):
 
 @pytest.mark.parametrize('cls_name,extras', [
     ('DDMMagnitudeComparisonModel', {'fit_v_scale': True, 'fit_prior': True}),
-    ('DDMFlexibleNoiseComparisonModel', {'spline_order': 3, 'fit_prior': True}),
+    ('DDMFlexibleNoiseComparisonModel', {'spline_order': 4, 'fit_prior': True}),
 ])
 def test_ddm_magnitude_models_build(paradigm_magnitude, cls_name, extras):
     pytest.importorskip('hssm')
@@ -127,17 +131,19 @@ def test_ddm_risk_model_builds(paradigm_risk, cls_name, extras):
 def test_rdm_models_build(paradigm_magnitude, paradigm_risk, cls_name):
     import bauer.models as M
     Cls = getattr(M, cls_name)
+    # Race models do not accept `fit_v_scale` (the v_scale parameter belongs
+    # to DDM only).
     if 'Risk' in cls_name:
         m = Cls(paradigm=paradigm_risk, prior_estimate='shared',
-                 fit_seperate_evidence_sd=True, fit_v_scale=True)
+                 fit_seperate_evidence_sd=True)
         try:
             m.build_estimation_model(data=paradigm_risk, hierarchical=True)
         except TypeError:
             m.build_estimation_model(paradigm=paradigm_risk, hierarchical=True)
     else:
-        kwargs = {'fit_seperate_evidence_sd': True, 'fit_v_scale': True}
+        kwargs = {'fit_seperate_evidence_sd': True}
         if 'Flexible' in cls_name:
-            kwargs['spline_order'] = 3
+            kwargs['spline_order'] = 4
         else:
             kwargs['fit_prior'] = True
         m = Cls(paradigm=paradigm_magnitude, **kwargs)

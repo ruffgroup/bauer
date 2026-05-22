@@ -49,3 +49,15 @@ include = ["bauer", "bauer.*"]
 
 [tool.setuptools.package-data]
 bauer = ["data/*.csv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests that run real MCMC (deselect with -m 'not slow')",
+]
+filterwarnings = [
+    # PyMC / xarray / arviz noise that fires on every test
+    "ignore::DeprecationWarning",
+    "ignore::FutureWarning",
+    "ignore::UserWarning",
+]
