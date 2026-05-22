@@ -18,7 +18,7 @@ dependencies = [
     "seaborn",
     "pymc>=5",
     "pytensor",
-    "arviz",
+    "arviz<1.0",
     "patsy",
 ]
 
