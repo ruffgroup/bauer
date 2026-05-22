@@ -38,7 +38,7 @@ def plot_ppc(df, ppc, exp_type='magnitude', plot_type=1, var_name='p', level='su
     if not (df.groupby(['subject', x]).size().groupby('subject').size() < (n_clusters + 1)).all():
         if level == 'subject':
             df[x] = df.groupby(['subject'],
-                                            group_keys=False).apply(lambda d: cluster_offers(d, n_clusters, x))
+                               group_keys=False).apply(lambda d: cluster_offers(d, n_clusters, x))
         else:
             df[x] = cluster_offers(df, n_clusters, x)
 

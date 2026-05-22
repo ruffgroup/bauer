@@ -1,7 +1,3 @@
-import numpy as np
-import pymc as pm
-import pytensor.tensor as pt
-import pandas as pd
 from ..core import BaseModel, LapseModel, RegressionModel
 from ..utils.bayes import cumulative_normal, get_diff_dist
 from ..utils.math import inverse_softplus_np

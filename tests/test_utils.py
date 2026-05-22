@@ -12,7 +12,6 @@ from bauer.utils.math import (
     softplus_np, inverse_softplus_np,
     logistic_np, logit_np,
 )
-import pytest
 import pandas as pd
 import numpy as np
 import warnings

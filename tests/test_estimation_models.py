@@ -83,7 +83,7 @@ def paradigm_orientation():
 def test_log_encoding_estimation_builds(paradigm_numerosity):
     from bauer.numerosity import LogEncodingEstimationModel
     m = LogEncodingEstimationModel(paradigm=paradigm_numerosity,
-                                    grid_resolution=33)
+                                   grid_resolution=33)
     m.build_estimation_model(data=paradigm_numerosity, hierarchical=True)
     free = set(m.free_parameters)
     assert free == {'nu', 'sigma_motor'}
@@ -110,7 +110,7 @@ def test_flexible_encoding_estimation_builds(paradigm_numerosity, condition_spec
 def test_efficient_encoding_estimation_builds(paradigm_numerosity):
     from bauer.numerosity import EfficientEncodingEstimationModel
     m = EfficientEncodingEstimationModel(paradigm=paradigm_numerosity,
-                                           grid_resolution=25)
+                                         grid_resolution=25)
     m.build_estimation_model(data=paradigm_numerosity, hierarchical=True)
     assert set(m.free_parameters) == {'nu', 'sigma_motor'}
 
@@ -122,7 +122,7 @@ def test_efficient_encoding_estimation_builds(paradigm_numerosity):
 def test_efficient_perception_model_builds(paradigm_orientation):
     from bauer.efficient_coding import EfficientPerceptionModel
     m = EfficientPerceptionModel(paradigm=paradigm_orientation,
-                                  grid_resolution=33)
+                                 grid_resolution=33)
     m.build_estimation_model(data=paradigm_orientation, hierarchical=True)
     assert set(m.free_parameters) == {'kappa_r'}
 
@@ -130,7 +130,7 @@ def test_efficient_perception_model_builds(paradigm_orientation):
 def test_efficient_valuation_model_builds(paradigm_orientation):
     from bauer.efficient_coding import EfficientValuationModel
     m = EfficientValuationModel(paradigm=paradigm_orientation,
-                                 grid_resolution=33)
+                                grid_resolution=33)
     m.build_estimation_model(data=paradigm_orientation, hierarchical=True)
     assert set(m.free_parameters) == {'sigma_rep'}
 
@@ -138,7 +138,7 @@ def test_efficient_valuation_model_builds(paradigm_orientation):
 def test_sequential_efficient_coding_builds(paradigm_orientation):
     from bauer.efficient_coding import SequentialEfficientCodingModel
     m = SequentialEfficientCodingModel(paradigm=paradigm_orientation,
-                                        grid_resolution=33)
+                                       grid_resolution=33)
     m.build_estimation_model(data=paradigm_orientation, hierarchical=True)
     # Both perceptual and value noise are free
     assert {'kappa_r', 'sigma_rep'}.issubset(m.free_parameters)

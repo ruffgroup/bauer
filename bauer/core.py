@@ -289,7 +289,7 @@ class BaseModel(object):
         """
         if backend == 'pymc':
             kwargs.setdefault('init', getattr(self, 'recommended_pymc_init', None)
-                                       or 'auto')
+                              or 'auto')
             with self.estimation_model:
                 self.idata = pm.sample(
                     draws, tune=tune, chains=chains,
@@ -380,7 +380,7 @@ class BaseModel(object):
         return pd.DataFrame(rows).set_index('subject')
 
     def ppc(self, paradigm, idata, n_posterior_samples=200,
-             out_of_sample=False, random_seed=None, progressbar=True):
+            out_of_sample=False, random_seed=None, progressbar=True):
         """Posterior-predictive choices for ``paradigm``.
 
         Returns
@@ -403,7 +403,7 @@ class BaseModel(object):
                 coords, hierarchical, subject_id_to_ix = None, False, None
             with pm.Model(coords=coords) as self.out_of_sample_model:
                 paradigm_ = self._get_paradigm(paradigm=paradigm,
-                                                subject_mapping=subject_id_to_ix)
+                                               subject_mapping=subject_id_to_ix)
                 self.set_paradigm(paradigm_)
                 self.build_priors(hierarchical=hierarchical)
                 parameters = self.get_parameter_values()
@@ -456,8 +456,8 @@ class BaseModel(object):
             return pt.tile(model[f'{key}'], n_trials)
 
     def build_hierarchical_nodes(self, name, mu_intercept=None, sigma_intercept=None,
-                                  cauchy_sigma_intercept=None, transform='identity',
-                                  min_value=0.0, **kwargs):
+                                 cauchy_sigma_intercept=None, transform='identity',
+                                 min_value=0.0, **kwargs):
         """Build a hierarchical (group_mu, group_sd, per-subject offset) node.
 
         ``transform`` ∈ {'identity', 'softplus', 'logistic'}. When ``transform`` is
@@ -482,18 +482,18 @@ class BaseModel(object):
 
         if transform == 'identity':
             group_mu = pm.Normal(f"{name}_mu",
-                                            mu=mu_intercept,
-                                            sigma=sigma_intercept)
+                                 mu=mu_intercept,
+                                 sigma=sigma_intercept)
         elif transform == 'softplus':
             group_mu = pm.Normal(f"{name}_mu_untransformed",
-                                            mu=mu_intercept,
-                                            sigma=sigma_intercept)
+                                 mu=mu_intercept,
+                                 sigma=sigma_intercept)
 
             pm.Deterministic(name=f'{name}_mu', var=_softplus_with_floor(group_mu))
         elif transform == 'logistic':
             group_mu = pm.Normal(f"{name}_mu_untransformed",
-                                            mu=mu_intercept,
-                                            sigma=sigma_intercept)
+                                 mu=mu_intercept,
+                                 sigma=sigma_intercept)
 
             pm.Deterministic(name=f'{name}_mu', var=logistic(group_mu))
         else:
@@ -749,9 +749,9 @@ class RegressionModel(BaseModel):
         pm.Normal(name, mu=mu, sigma=sigma, dims=(f'{name}_regressors',))
 
     def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=1.,
-                                  cauchy_sigma_intercept=0.25, sigma_regressors=1.,
-                                  cauchy_sigma_regressors=0.25, transform='identity',
-                                  min_value=0.0, **kwargs):
+                                 cauchy_sigma_intercept=0.25, sigma_regressors=1.,
+                                 cauchy_sigma_regressors=0.25, transform='identity',
+                                 min_value=0.0, **kwargs):
         # `min_value` and the transform are applied in get_trialwise_variable
         # (which sees the design-matrix product); accepted here so that
         # parameters carrying these kwargs (e.g. DDM `a`, `t0`) don't crash the
@@ -779,9 +779,9 @@ class RegressionModel(BaseModel):
             # Possibly use inverse of softplus
 
         group_mu = pm.Normal(f"{name}_mu",
-                                        mu=mu,
-                                        sigma=sigma,
-                                        dims=(f'{name}_regressors',))
+                             mu=mu,
+                             sigma=sigma,
+                             dims=(f'{name}_regressors',))
 
         group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma, dims=(f'{name}_regressors',))
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject', f'{name}_regressors'))
@@ -802,10 +802,10 @@ class RegressionModel(BaseModel):
             for parameter, dm in self.design_matrices.items():
                 if hierarchical:
                     df.append(pd.DataFrame(map_parameters[parameter],
-                                            index=pd.Index(subjects, name='subject'), columns=pd.Index(dm.design_info.column_names, name='dm_key')))
+                                           index=pd.Index(subjects, name='subject'), columns=pd.Index(dm.design_info.column_names, name='dm_key')))
                 else:
                     df.append(pd.Series(map_parameters[parameter],
-                                            index=pd.Index(dm.design_info.column_names, name='dm_key')))
+                                        index=pd.Index(dm.design_info.column_names, name='dm_key')))
 
             df = pd.concat(df, keys=parameters, axis=1)
 

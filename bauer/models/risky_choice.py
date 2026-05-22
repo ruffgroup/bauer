@@ -2,17 +2,11 @@ import numpy as np
 import pymc as pm
 import pytensor.tensor as pt
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from arviz import hdi
 from pytensor import scan
 from pymc.math import logit, invlogit
-from patsy import dmatrix
-from warnings import warn
 from ..core import BaseModel, LapseModel, RegressionModel
-from ..utils.bayes import cumulative_normal, get_posterior, get_diff_dist, get_posterior_np
+from ..utils.bayes import cumulative_normal, get_posterior, get_diff_dist
 from ..utils.math import inverse_softplus_np, softplus_np, inverse_softplus, logit_derivative, gaussian_pdf
-from ..utils.plotting import plot_prediction
 from .magnitude import FlexibleNoiseComparisonModel, PowerLawNoiseComparisonModel
 
 
@@ -404,8 +398,8 @@ class LossAversionModel(BaseModel):
 
             # n_ev_diff_grid x n_trials x n_grid (gains) x n_grid (losses)
             ev1_diff_mapping, _ = scan(lambda bin_index, evs1, ev_diff_grid: (evs1 >= ev_diff_grid[bin_index]) & (evs1 < ev_diff_grid[bin_index + 1]),
-                                        sequences=[pt.arange(ev_diff_grid.shape[0] - 1, dtype=int)],
-                                        non_sequences=[evs1, ev_diff_grid])
+                                       sequences=[pt.arange(ev_diff_grid.shape[0] - 1, dtype=int)],
+                                       non_sequences=[evs1, ev_diff_grid])
 
             # Distribution o er expecrtations of the expected value of first option (n_trials x n_diff_grid)
             # ev1_pdf, _ = scan(lambda bin_index, evs1, ev_diff_grid, joint_pdf1: pt.sum(joint_pdf1 * ((evs1 >= ev_diff_grid[bin_index]) & (evs1 < ev_diff_grid[bin_index+1]) ), axis=[-2, -1]),
@@ -413,22 +407,22 @@ class LossAversionModel(BaseModel):
             #                 non_sequences=[evs1, ev_diff_grid, joint_pdf1])
 
             ev1_pdf, _ = scan(lambda ev_diff_mapping_, joint_pdf1: pt.sum(joint_pdf1 * ev_diff_mapping_, axis=[-2, -1]),
-                            sequences=[ev1_diff_mapping],
-                            non_sequences=[joint_pdf1])
+                              sequences=[ev1_diff_mapping],
+                              non_sequences=[joint_pdf1])
             ev1_pdf = pt.transpose(ev1_pdf)
 
             # Distribution o er expecrtations of the expected value of first option (n_trials x n_diff_grid)
             ev2_diff_mapping, _ = scan(lambda bin_index, evs2, ev_diff_grid: (evs2 >= ev_diff_grid[bin_index]) & (evs2 < ev_diff_grid[bin_index + 1]),
-                                    sequences=[pt.arange(ev_diff_grid.shape[0] - 1, dtype=int)],
-                                    non_sequences=[evs2, ev_diff_grid])
+                                       sequences=[pt.arange(ev_diff_grid.shape[0] - 1, dtype=int)],
+                                       non_sequences=[evs2, ev_diff_grid])
 
             # ev2_pdf, _ = scan(lambda bin_index, evs2, ev_diff_grid, joint_pdf2: pt.sum(joint_pdf2 * ((evs2 >= ev_diff_grid[bin_index]) & (evs2 < ev_diff_grid[bin_index+1]) ), axis=[-2, -1]),
             #                 sequences=[pt.arange(len(ev_diff_grid)-1, dtype=int)],
             #                 non_sequences=[evs2, ev_diff_grid, joint_pdf2])
 
             ev2_pdf, _ = scan(lambda ev_diff_mapping_, joint_pdf2: pt.sum(joint_pdf2 * ev_diff_mapping_, axis=[-2, -1]),
-                            sequences=[ev2_diff_mapping],
-                            non_sequences=[joint_pdf2])
+                              sequences=[ev2_diff_mapping],
+                              non_sequences=[joint_pdf2])
 
             ev2_pdf = pt.transpose(ev2_pdf)
 
@@ -846,15 +840,15 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
 
         if self.representational_noise == 'payoff':
             post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'],
-                                                model_inputs['n1_prior_sd'],
-                                                model_inputs['n1_evidence_mu'],
-                                                model_inputs['n1_evidence_sd']
+                                                   model_inputs['n1_prior_sd'],
+                                                   model_inputs['n1_evidence_mu'],
+                                                   model_inputs['n1_evidence_sd']
                                                    )
 
             post_n2_mu, post_n2_sd = get_posterior(model_inputs['n2_prior_mu'],
-                                                model_inputs['n2_prior_sd'],
-                                                model_inputs['n2_evidence_mu'],
-                                                model_inputs['n2_evidence_sd'])
+                                                   model_inputs['n2_prior_sd'],
+                                                   model_inputs['n2_evidence_mu'],
+                                                   model_inputs['n2_evidence_sd'])
 
             n1_noise = post_n1_sd**2 / model_inputs['n1_evidence_sd'] * model_inputs['p1']
             n2_noise = post_n2_sd**2 / model_inputs['n2_evidence_sd'] * model_inputs['p2']
@@ -864,15 +858,15 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
         elif self.representational_noise == 'ev':
 
             post_n1_mu, post_n1_sd = get_posterior(model_inputs['n1_prior_mu'],
-                                                model_inputs['n1_prior_sd'],
-                                                model_inputs['n1_evidence_mu'],
-                                                model_inputs['n1_evidence_sd']
+                                                   model_inputs['n1_prior_sd'],
+                                                   model_inputs['n1_evidence_mu'],
+                                                   model_inputs['n1_evidence_sd']
                                                    )
 
             post_n2_mu, post_n2_sd = get_posterior(model_inputs['n2_prior_mu'],
-                                                model_inputs['n2_prior_sd'],
-                                                model_inputs['n2_evidence_mu'],
-                                                model_inputs['n2_evidence_sd'])
+                                                   model_inputs['n2_prior_sd'],
+                                                   model_inputs['n2_evidence_mu'],
+                                                   model_inputs['n2_evidence_sd'])
 
             n1_noise = post_n1_sd**2 / model_inputs['n1_evidence_sd'] * model_inputs['p1']
             n2_noise = post_n2_sd**2 / model_inputs['n2_evidence_sd'] * model_inputs['p2']

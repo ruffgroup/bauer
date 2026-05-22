@@ -55,7 +55,7 @@ def paradigm_risk():
 def test_magnitude_model_builds(paradigm_magnitude):
     from bauer.models import MagnitudeComparisonModel
     m = MagnitudeComparisonModel(paradigm=paradigm_magnitude,
-                                  fit_seperate_evidence_sd=True, fit_prior=True)
+                                 fit_seperate_evidence_sd=True, fit_prior=True)
     m.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
     assert 'a' not in m.free_parameters
     assert 'n1_evidence_sd' in m.free_parameters
@@ -79,14 +79,14 @@ def test_flexible_noise_builds(paradigm_magnitude):
 def test_risk_model_prior_estimates(paradigm_risk, prior_estimate):
     from bauer.models import RiskModel
     m = RiskModel(paradigm=paradigm_risk, prior_estimate=prior_estimate,
-                   fit_seperate_evidence_sd=True)
+                  fit_seperate_evidence_sd=True)
     m.build_estimation_model(data=paradigm_risk, hierarchical=True)
     pars = set(m.free_parameters)
     expected_priors = {
         'objective': set(),
         'shared': {'prior_mu', 'prior_sd'},
         'full': {'risky_prior_mu', 'risky_prior_sd',
-                  'safe_prior_mu', 'safe_prior_sd'},
+                 'safe_prior_mu', 'safe_prior_sd'},
         'klw': {'prior_sd'},
     }
     assert expected_priors[prior_estimate].issubset(pars)
@@ -117,7 +117,7 @@ def test_ddm_risk_model_builds(paradigm_risk, cls_name, extras):
     import bauer.models as M
     Cls = getattr(M, cls_name)
     m = Cls(paradigm=paradigm_risk, prior_estimate='full',
-             fit_seperate_evidence_sd=True, **extras)
+            fit_seperate_evidence_sd=True, **extras)
     m.build_estimation_model(data=paradigm_risk, hierarchical=True)
     assert {'a', 't0', 'risky_prior_mu', 'safe_prior_mu'}.issubset(m.free_parameters)
 
@@ -134,7 +134,7 @@ def test_rdm_models_build(paradigm_magnitude, paradigm_risk, cls_name):
     # to DDM only).
     if 'Risk' in cls_name:
         m = Cls(paradigm=paradigm_risk, prior_estimate='shared',
-                 fit_seperate_evidence_sd=True)
+                fit_seperate_evidence_sd=True)
         try:
             m.build_estimation_model(data=paradigm_risk, hierarchical=True)
         except TypeError:
@@ -157,13 +157,12 @@ def test_rdm_models_build(paradigm_magnitude, paradigm_risk, cls_name):
 def test_flat_observer_prior_magnitude(paradigm_magnitude):
     """Magnitude/Flex/PowerLaw + DDMFlex with flat_observer_prior=True should
     build without populating n*_prior_* keys, and should reject fit_prior=True."""
-    import pytensor.tensor as pt
     from bauer.models import (MagnitudeComparisonModel,
-                                FlexibleNoiseComparisonModel,
-                                PowerLawNoiseComparisonModel)
+                              FlexibleNoiseComparisonModel,
+                              PowerLawNoiseComparisonModel)
     # Static comparison
     m = MagnitudeComparisonModel(paradigm=paradigm_magnitude,
-                                  fit_prior=False, flat_observer_prior=True)
+                                 fit_prior=False, flat_observer_prior=True)
     m.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
     assert m.flat_observer_prior is True
     assert 'prior_mu' not in m.free_parameters
@@ -172,18 +171,18 @@ def test_flat_observer_prior_magnitude(paradigm_magnitude):
     # Mutual exclusivity
     with pytest.raises(ValueError, match='flat_observer_prior'):
         MagnitudeComparisonModel(paradigm=paradigm_magnitude,
-                                  fit_prior=True, flat_observer_prior=True)
+                                 fit_prior=True, flat_observer_prior=True)
 
     # Flexible spline (spline_order=4 dodges patsy df>=4 requirement)
     mf = FlexibleNoiseComparisonModel(paradigm=paradigm_magnitude,
-                                        spline_order=4, fit_prior=False,
-                                        flat_observer_prior=True)
+                                      spline_order=4, fit_prior=False,
+                                      flat_observer_prior=True)
     mf.build_estimation_model(paradigm=paradigm_magnitude, hierarchical=True)
     assert mf.flat_observer_prior is True
 
     # Power-law
     mp = PowerLawNoiseComparisonModel(paradigm=paradigm_magnitude,
-                                        fit_prior=False, flat_observer_prior=True)
+                                      fit_prior=False, flat_observer_prior=True)
     mp.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
     assert mp.flat_observer_prior is True
     assert 'noise_exponent' in mp.free_parameters
@@ -194,8 +193,8 @@ def test_flat_observer_prior_ddm_flex(paradigm_magnitude):
     pytest.importorskip('hssm')
     from bauer.models import DDMFlexibleNoiseComparisonModel
     m = DDMFlexibleNoiseComparisonModel(paradigm=paradigm_magnitude,
-                                          spline_order=4, fit_prior=False,
-                                          flat_observer_prior=True)
+                                        spline_order=4, fit_prior=False,
+                                        flat_observer_prior=True)
     m.build_estimation_model(paradigm=paradigm_magnitude, hierarchical=True)
     assert m.flat_observer_prior is True
     assert 'a' in m.free_parameters
@@ -205,9 +204,9 @@ def test_flat_observer_prior_ddm_flex(paradigm_magnitude):
 def test_data_loaders():
     """Verify all bundled-data loaders work."""
     from bauer.utils.data import (load_garcia2022,
-                                    load_dehollander2024_risk,
-                                    load_dehollander2024_symbolic,
-                                    load_dehollander_tms_risk)
+                                  load_dehollander2024_risk,
+                                  load_dehollander2024_symbolic,
+                                  load_dehollander_tms_risk)
     df1 = load_garcia2022(task='magnitude')
     assert len(df1) > 0
     df2 = load_garcia2022(task='risk')

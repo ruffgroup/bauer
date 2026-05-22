@@ -99,7 +99,7 @@ def paradigm_risk():
 def test_magnitude_model_sample_predict_ppc(paradigm_magnitude):
     from bauer.models import MagnitudeComparisonModel
     m = MagnitudeComparisonModel(paradigm=paradigm_magnitude,
-                                  fit_separate_evidence_sd=True, fit_prior=True)
+                                 fit_separate_evidence_sd=True, fit_prior=True)
     m.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
     idata = m.sample(**SAMPLE_KWARGS)
 
@@ -135,7 +135,7 @@ def test_risk_model_sample(paradigm_risk):
     from bauer.models import RiskModel
     # RiskModel still accepts only the historical-spelling kwarg
     m = RiskModel(paradigm=paradigm_risk, prior_estimate='shared',
-                   fit_seperate_evidence_sd=True)
+                  fit_seperate_evidence_sd=True)
     m.build_estimation_model(data=paradigm_risk, hierarchical=True)
     idata = m.sample(**SAMPLE_KWARGS)
     assert {'prior_mu', 'prior_sd'}.issubset(idata.posterior.data_vars)
@@ -150,8 +150,8 @@ def test_ddm_magnitude_model_sample_and_ppc(paradigm_magnitude):
     from bauer.models import DDMMagnitudeComparisonModel
 
     m = DDMMagnitudeComparisonModel(paradigm=paradigm_magnitude,
-                                      fit_separate_evidence_sd=True,
-                                      fit_prior=True, fit_v_scale=True)
+                                    fit_separate_evidence_sd=True,
+                                    fit_prior=True, fit_v_scale=True)
     try:
         m.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
     except TypeError:

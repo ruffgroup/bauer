@@ -42,10 +42,10 @@ def main():
     ap.add_argument('model', choices=['choice', 'ddm', 'rdm'])
     ap.add_argument('--task', choices=['dotcloud', 'symbolic'], default='dotcloud')
     ap.add_argument('--prior-estimate', default='full',
-                     choices=['objective', 'shared', 'full', 'klw'])
+                    choices=['objective', 'shared', 'full', 'klw'])
     ap.add_argument('--v-scale', choices=['free', 'fixed'], default='free')
     ap.add_argument('--n-subjects', default='all',
-                     help='Number of subjects: integer or "all"')
+                    help='Number of subjects: integer or "all"')
     ap.add_argument('--out-dir', default='results/dehollander2024')
     ap.add_argument('--draws', type=int, default=1000)
     ap.add_argument('--tune', type=int, default=1000)
@@ -54,10 +54,10 @@ def main():
     ap.add_argument('--target-accept', type=float, default=0.95)
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--backend', choices=['pymc', 'numpyro', 'blackjax'],
-                     default='pymc')
+                    default='pymc')
     ap.add_argument('--no-ppc', action='store_true')
     ap.add_argument('--flex', action='store_true',
-                     help='Use flexible-noise (B-spline) variant')
+                    help='Use flexible-noise (B-spline) variant')
     ap.add_argument('--spline-order', type=int, default=5)
     args = ap.parse_args()
 
@@ -118,7 +118,7 @@ def main():
     flex_tag = '_flex' if args.flex else ''
     scale_tag = f'_{args.v_scale}scale' if args.model in ('ddm', 'rdm') else ''
     out_path = op.join(args.out_dir, args.task, f'{n_subj}subj',
-                        f'{args.model}{flex_tag}{scale_tag}_{args.prior_estimate}.nc')
+                       f'{args.model}{flex_tag}{scale_tag}_{args.prior_estimate}.nc')
     _safe_to_netcdf(idata, out_path)
     print(f'idata -> {out_path}', flush=True)
 
@@ -128,8 +128,8 @@ def main():
             ppc = m.ppc(df, idata, progressbar=False)
         else:
             ppc = m.ppc(df, idata, n_posterior_samples=200,
-                         inner_samples=1, random_seed=args.seed,
-                         progressbar=False)
+                        inner_samples=1, random_seed=args.seed,
+                        progressbar=False)
         ppc_path = out_path.replace('.nc', '_ppc.pickle')
         ppc.to_pickle(ppc_path)
         print(f'ppc -> {ppc_path}', flush=True)

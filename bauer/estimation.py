@@ -8,7 +8,6 @@ distributions via pm.Potential.
 """
 
 import numpy as np
-from numpy import trapezoid as np_trapz
 import pandas as pd
 import pymc as pm
 import pytensor.tensor as pt
@@ -303,7 +302,7 @@ class EstimationBaseModel(BaseModel):
             indices = np.argmax(cdf >= u[:, np.newaxis], axis=-1)
             # Add uniform jitter within the bin
             samples = response_grid[indices] + np.random.uniform(-dv / 2, dv / 2,
-                                                                   size=len(indices))
+                                                                 size=len(indices))
             all_samples.append(samples)
 
         all_samples = np.column_stack(all_samples)

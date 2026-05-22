@@ -198,8 +198,8 @@ class SafeVsRiskyMemoryModel(SafeVsRiskyModel):
     """
 
     def __init__(self, data=None, domain="gain",
-            separate_priors=True, fix_prior_mus=False, fix_prior_sds=False,
-            separate_evidence_sd=True, memory_model="shared_perceptual_noise", combine_noise="add_sd"):
+                 separate_priors=True, fix_prior_mus=False, fix_prior_sds=False,
+                 separate_evidence_sd=True, memory_model="shared_perceptual_noise", combine_noise="add_sd"):
         self.memory_model = memory_model
         self.combine_noise = combine_noise
 

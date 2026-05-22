@@ -519,9 +519,9 @@ def _drift_from_snr(model_inputs, v_scale=None, flat_observer_prior=False):
         # posterior-mean signal feeding the accumulator actually is, given a
         # fixed true V.
         sigma1 = posterior_mean_sd(model_inputs['n1_prior_sd'],
-                                     model_inputs['n1_evidence_sd'])
+                                   model_inputs['n1_evidence_sd'])
         sigma2 = posterior_mean_sd(model_inputs['n2_prior_sd'],
-                                     model_inputs['n2_evidence_sd'])
+                                   model_inputs['n2_evidence_sd'])
     threshold = model_inputs.get('threshold', 0.0)
     diff_mu = (post_n2_mu - post_n1_mu) + threshold
     diff_sd = pt.sqrt(sigma1 ** 2 + sigma2 ** 2)
