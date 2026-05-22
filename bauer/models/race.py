@@ -39,7 +39,8 @@ from .magnitude import (
     PowerLawNoiseComparisonModel, PowerLawNoiseComparisonRegressionModel,
 )
 from .risky_choice import (
-    RiskModel, FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
+    RiskModel, RiskRegressionModel,
+    FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
     PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
 )
 from ..utils.bayes import get_posterior, posterior_mean_sd
