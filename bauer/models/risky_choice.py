@@ -15,6 +15,7 @@ from ..utils.math import inverse_softplus_np, softplus_np, inverse_softplus, log
 from ..utils.plotting import plot_prediction
 from .magnitude import FlexibleNoiseComparisonModel, PowerLawNoiseComparisonModel
 
+
 class RiskModelProbabilityDistortion(BaseModel):
     """Risky choice model with Bayesian distortion of magnitudes and/or probabilities.
 
@@ -33,7 +34,7 @@ class RiskModelProbabilityDistortion(BaseModel):
         self.magnitude_prior_estimate = magnitude_prior_estimate
         self.n_prospects = n_prospects
 
-        self.p_grid = np.linspace(1e-6, 1-1e-6, p_grid_size)
+        self.p_grid = np.linspace(1e-6, 1 - 1e-6, p_grid_size)
         self.lapse_rate = lapse_rate
 
         self.distort_magnitudes = distort_magnitudes
@@ -45,11 +46,10 @@ class RiskModelProbabilityDistortion(BaseModel):
 
         if paradigm is not None:
             for ix in range(self.n_prospects):
-                assert(f'n{ix+1}' in paradigm.columns), f'paradigm should contain columns n1, n2, ... n{self.n_prospects}'
-                assert(f'p{ix+1}' in paradigm.columns), f'paradigm should contain columns p1, p2, ... p{self.n_prospects}'
+                assert (f'n{ix+1}' in paradigm.columns), f'paradigm should contain columns n1, n2, ... n{self.n_prospects}'
+                assert (f'p{ix+1}' in paradigm.columns), f'paradigm should contain columns p1, p2, ... p{self.n_prospects}'
 
         super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
-
 
     def _get_paradigm(self, paradigm=None):
 
@@ -57,7 +57,6 @@ class RiskModelProbabilityDistortion(BaseModel):
             paradigm = self.paradigm
 
         paradigm_ = {}
-
 
         if np.in1d(paradigm['p1'], [0.0, 1.0]).any():
             raise ValueError('p1 contains 0 or 1, this is not supported by the current model (logodds(0) = -inf)\nHINT: You probably want to replace 0 by 1e-5 and 1 by 1-1e-5')
@@ -95,7 +94,6 @@ class RiskModelProbabilityDistortion(BaseModel):
 
             return p_logodds * logit_derivative(p_grid)
 
-
         if self.distort_probabilities:
             posteriors = {}
             for ix in range(self.n_prospects):
@@ -110,7 +108,7 @@ class RiskModelProbabilityDistortion(BaseModel):
             p_posterior2 = logodds_dist_in_p(posteriors[f'p{ix+1}_posterior_mu'], posteriors[f'p{ix+1}_posterior_sd'])
 
             # n x p1 x p2
-            p_posterior_joint = p_posterior1[:, :,np.newaxis] * p_posterior2[:, np.newaxis, :]
+            p_posterior_joint = p_posterior1[:, :, np.newaxis] * p_posterior2[:, np.newaxis, :]
             p_posterior_joint = p_posterior_joint / pt.sum(p_posterior_joint, (1, 2), keepdims=True)
 
         if self.distort_magnitudes:
@@ -156,11 +154,10 @@ class RiskModelProbabilityDistortion(BaseModel):
             ev1 = n1[:, np.newaxis, np.newaxis] + pt.log(self.p_grid)[np.newaxis, :, np.newaxis]
             ev2 = n2[:, np.newaxis, np.newaxis] + pt.log(self.p_grid)[np.newaxis, np.newaxis, :]
 
-            p_choice = pt.clip(pt.sum((ev2 > ev1) * p_posterior_joint, (1,2)), 1e-6, 1-1e-6)
+            p_choice = pt.clip(pt.sum((ev2 > ev1) * p_posterior_joint, (1, 2)), 1e-6, 1 - 1e-6)
 
         else:
             raise NotImplementedError('At least probabilities or magnitudes should be distorted.')
-
 
         clip_range = self.lapse_rate / 2., 1 - self.lapse_rate / 2.
         p_choice = pt.clip(p_choice, clip_range[0], clip_range[1])
@@ -231,6 +228,7 @@ class RiskModelProbabilityDistortion(BaseModel):
 
         return free_parameters
 
+
 class ProspectTheoryModel(BaseModel):
     """Classic Prospect Theory model for mixed (gain/loss) gambles.
 
@@ -249,9 +247,9 @@ class ProspectTheoryModel(BaseModel):
     def get_free_parameters(self):
 
         free_parameters = {}
-        free_parameters['lambda'] = {'mu_intercept': 1, 'sigma_intercept':.5, 'transform': 'identity'}
-        free_parameters['alpha'] = {'mu_intercept': 0.5, 'sigma_intercept':.5, 'transform': 'identity'}
-        free_parameters['beta'] = {'mu_intercept': 0.5, 'sigma_intercept':.5, 'transform': 'identity'}
+        free_parameters['lambda'] = {'mu_intercept': 1, 'sigma_intercept': .5, 'transform': 'identity'}
+        free_parameters['alpha'] = {'mu_intercept': 0.5, 'sigma_intercept': .5, 'transform': 'identity'}
+        free_parameters['beta'] = {'mu_intercept': 0.5, 'sigma_intercept': .5, 'transform': 'identity'}
 
         return free_parameters
 
@@ -261,7 +259,7 @@ class ProspectTheoryModel(BaseModel):
         gain = model_inputs['gain']
         loss = model_inputs['loss']
 
-        utility = p * gain ** model_inputs['alpha'] - (1-p) * model_inputs['lambda'] * loss ** model_inputs['beta']
+        utility = p * gain ** model_inputs['alpha'] - (1 - p) * model_inputs['lambda'] * loss ** model_inputs['beta']
 
         p_choose = cumulative_normal(utility, 0.0, 1.0)
 
@@ -280,6 +278,7 @@ class ProspectTheoryModel(BaseModel):
 
         return model_inputs
 
+
 class LossAversionModel(BaseModel):
     """Bayesian observer model for risky choices with separate gain and loss representations.
 
@@ -296,7 +295,7 @@ class LossAversionModel(BaseModel):
                  ev_diff_grid=None,
                  lapse_rate=0.01,
                  normalize_likelihoods=True,
-                 paradigm_type='mixed_vs_mixed',# mixed_vs_mixed or mixed_vs_0
+                 paradigm_type='mixed_vs_mixed',  # mixed_vs_mixed or mixed_vs_0
                  fix_prior_sds=True):
 
         if magnitude_grid is None:
@@ -325,20 +324,19 @@ class LossAversionModel(BaseModel):
 
         super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
-
     def get_free_parameters(self):
 
         free_parameters = {}
 
-        free_parameters['prior_mu_gains'] = {'mu_intercept': np.log(10.), 'sigma_intercept':np.log(10)/2., 'transform': 'identity'}
-        free_parameters['prior_mu_losses'] = {'mu_intercept': np.log(10.), 'sigma_intercept':np.log(10)/2., 'transform': 'identity'}
+        free_parameters['prior_mu_gains'] = {'mu_intercept': np.log(10.), 'sigma_intercept': np.log(10) / 2., 'transform': 'identity'}
+        free_parameters['prior_mu_losses'] = {'mu_intercept': np.log(10.), 'sigma_intercept': np.log(10) / 2., 'transform': 'identity'}
 
         free_parameters['evidence_sd_gains'] = {'mu_intercept': -1., 'transform': 'softplus'}
         free_parameters['evidence_sd_losses'] = {'mu_intercept': -1., 'transform': 'softplus'}
 
         if not self.fix_prior_sds:
-            free_parameters['prior_sd_gains'] = {'mu_intercept': 1., 'sigma_intercept':1., 'transform': 'softplus'}
-            free_parameters['prior_sd_losses'] = {'mu_intercept': 1., 'sigma_intercept':1., 'transform': 'softplus'}
+            free_parameters['prior_sd_gains'] = {'mu_intercept': 1., 'sigma_intercept': 1., 'transform': 'softplus'}
+            free_parameters['prior_sd_losses'] = {'mu_intercept': 1., 'sigma_intercept': 1., 'transform': 'softplus'}
 
         return free_parameters
 
@@ -391,10 +389,10 @@ class LossAversionModel(BaseModel):
             joint_pdf2 = gains2_pdf[:, :, np.newaxis] * losses2_pdf[:, np.newaxis, :]
 
             # ev_grids: n_trials x n_grid
-            gains1_ev_grid = p1[:, np.newaxis]*n_grid[np.newaxis, :]
-            losses1_ev_grid = (1-p1)[:, np.newaxis]*n_grid[np.newaxis, :]
-            gains2_ev_grid = p2[:, np.newaxis]*n_grid[np.newaxis, :]
-            losses2_ev_grid = (1-p2)[:, np.newaxis]*n_grid[np.newaxis, :]
+            gains1_ev_grid = p1[:, np.newaxis] * n_grid[np.newaxis, :]
+            losses1_ev_grid = (1 - p1)[:, np.newaxis] * n_grid[np.newaxis, :]
+            gains2_ev_grid = p2[:, np.newaxis] * n_grid[np.newaxis, :]
+            losses2_ev_grid = (1 - p2)[:, np.newaxis] * n_grid[np.newaxis, :]
 
             # ev_grids: n_trials x n_grid (gains) x n_grid (losses)
             evs1 = gains1_ev_grid[:, :, np.newaxis] - losses1_ev_grid[:, np.newaxis, :]
@@ -405,8 +403,8 @@ class LossAversionModel(BaseModel):
             # joint_pdf2 /= n_grid_dx**2
 
             # n_ev_diff_grid x n_trials x n_grid (gains) x n_grid (losses)
-            ev1_diff_mapping, _ = scan(lambda bin_index, evs1, ev_diff_grid: (evs1 >= ev_diff_grid[bin_index]) & (evs1 < ev_diff_grid[bin_index+1]),
-                                        sequences=[pt.arange(ev_diff_grid.shape[0]-1, dtype=int)],
+            ev1_diff_mapping, _ = scan(lambda bin_index, evs1, ev_diff_grid: (evs1 >= ev_diff_grid[bin_index]) & (evs1 < ev_diff_grid[bin_index + 1]),
+                                        sequences=[pt.arange(ev_diff_grid.shape[0] - 1, dtype=int)],
                                         non_sequences=[evs1, ev_diff_grid])
 
             # Distribution o er expecrtations of the expected value of first option (n_trials x n_diff_grid)
@@ -420,8 +418,8 @@ class LossAversionModel(BaseModel):
             ev1_pdf = pt.transpose(ev1_pdf)
 
             # Distribution o er expecrtations of the expected value of first option (n_trials x n_diff_grid)
-            ev2_diff_mapping, _ = scan(lambda bin_index, evs2, ev_diff_grid: (evs2 >= ev_diff_grid[bin_index]) & (evs2 < ev_diff_grid[bin_index+1]),
-                                    sequences=[pt.arange(ev_diff_grid.shape[0]-1, dtype=int)],
+            ev2_diff_mapping, _ = scan(lambda bin_index, evs2, ev_diff_grid: (evs2 >= ev_diff_grid[bin_index]) & (evs2 < ev_diff_grid[bin_index + 1]),
+                                    sequences=[pt.arange(ev_diff_grid.shape[0] - 1, dtype=int)],
                                     non_sequences=[evs2, ev_diff_grid])
 
             # ev2_pdf, _ = scan(lambda bin_index, evs2, ev_diff_grid, joint_pdf2: pt.sum(joint_pdf2 * ((evs2 >= ev_diff_grid[bin_index]) & (evs2 < ev_diff_grid[bin_index+1]) ), axis=[-2, -1]),
@@ -438,11 +436,11 @@ class LossAversionModel(BaseModel):
             joint_ev_pdf = ev1_pdf[:, :, np.newaxis] * ev2_pdf[:, np.newaxis, :]
 
             # Calculate the probability of choosing the second option
-            centers_of_ev_diff_bins = ev_diff_grid[:-1] + ev_diff_grid_dx/2
+            centers_of_ev_diff_bins = ev_diff_grid[:-1] + ev_diff_grid_dx / 2
             choose2 = centers_of_ev_diff_bins[np.newaxis, :, np.newaxis] < centers_of_ev_diff_bins[np.newaxis, np.newaxis, :]
 
             # Integrate over unique_evs1
-            p_choose2 = pt.clip(pt.sum(joint_ev_pdf * choose2, axis=[-2, -1]), 1e-6, 1-1e-6)
+            p_choose2 = pt.clip(pt.sum(joint_ev_pdf * choose2, axis=[-2, -1]), 1e-6, 1 - 1e-6)
 
         elif self.paradigm_type == 'mixed_vs_0':
 
@@ -455,7 +453,7 @@ class LossAversionModel(BaseModel):
             expectations_losses_mu_log, expectations_losses_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses), model_inputs['evidence_sd_losses'])
 
             diff_mu, diff_sd = get_diff_dist(p * expectations_gains_mu_log, p * model_inputs['evidence_sd_gains'],
-                                             (1-p) * expectations_losses_mu_log, (1-p) * model_inputs['evidence_sd_losses'])
+                                             (1 - p) * expectations_losses_mu_log, (1 - p) * model_inputs['evidence_sd_losses'])
 
             p_choose2 = cumulative_normal(0.0, diff_mu, diff_sd)
 
@@ -468,7 +466,6 @@ class LossAversionModel(BaseModel):
 
             expectations_gains_mu_log, expectations_gains_sd_log = get_posterior(model_inputs['prior_mu_gains'], model_inputs['prior_sd_gains'], pt.log(gains), model_inputs['evidence_sd_gains'])
             expectations_losses_mu_log, expectations_losses_sd_log = get_posterior(model_inputs['prior_mu_losses'], model_inputs['prior_sd_losses'], pt.log(losses), model_inputs['evidence_sd_losses'])
-
 
             expectations_gains_sd_log = pt.atleast_1d(expectations_gains_sd_log)
             expectations_losses_sd_log = pt.atleast_1d(expectations_losses_sd_log)
@@ -486,8 +483,8 @@ class LossAversionModel(BaseModel):
             joint_pdf = gains_pdf[:, :, np.newaxis] * losses_pdf[:, np.newaxis, :]
 
             # ev_grids: n_grid
-            gains_ev_grid = p*n_grid
-            losses_ev_grid = (1-p)*n_grid
+            gains_ev_grid = p * n_grid
+            losses_ev_grid = (1 - p) * n_grid
 
             # evs: n_grid (gains) x n_grid (losses)
             evs = gains_ev_grid[:, np.newaxis] - losses_ev_grid[np.newaxis, :]
@@ -519,12 +516,14 @@ class LossAversionModel(BaseModel):
 
         return model_inputs
 
+
 class LossAversionRegressionModel(RegressionModel, LossAversionModel):
     """LossAversionModel with patsy formula regression on noise/prior parameters."""
 
     def __init__(self, paradigm=None, save_trialwise_n_estimates=False, magnitude_grid=None, ev_diff_grid=None, lapse_rate=0.01, normalize_likelihoods=True, paradigm_type='mixed_vs_mixed', fix_prior_sds=True, regressors=None):
         LossAversionModel.__init__(self, paradigm=paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates, magnitude_grid=magnitude_grid, ev_diff_grid=ev_diff_grid, lapse_rate=lapse_rate, normalize_likelihoods=normalize_likelihoods, paradigm_type=paradigm_type, fix_prior_sds=fix_prior_sds)
         RegressionModel.__init__(self, regressors=regressors)
+
 
 class RiskModel(BaseModel):
     """Bayesian observer model for risky choice between two monetary lotteries.
@@ -616,7 +615,6 @@ class RiskModel(BaseModel):
             model_inputs['n1_prior_sd'] = parameters['prior_sd']
             model_inputs['n2_prior_sd'] = model_inputs['n1_prior_sd']
 
-
         if self.fit_seperate_evidence_sd:
 
             if self.memory_model == 'independent':
@@ -643,15 +641,15 @@ class RiskModel(BaseModel):
 
         if self.fit_seperate_evidence_sd:
             if self.memory_model == 'independent':
-                free_parameters['n1_evidence_sd'] = {'mu_intercept':-1., 'transform':'softplus'}
-                free_parameters['n2_evidence_sd'] = {'mu_intercept':-1., 'transform':'softplus'}
+                free_parameters['n1_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+                free_parameters['n2_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
             elif self.memory_model == 'shared_perceptual_noise':
-                free_parameters['perceptual_noise_sd'] = {'mu_intercept':-1., 'transform':'softplus'}
-                free_parameters['memory_noise_sd'] = {'mu_intercept':-1., 'transform':'softplus'}
+                free_parameters['perceptual_noise_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
+                free_parameters['memory_noise_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
             else:
                 raise ValueError('Unknown memory model: {}'.format(self.memory_model))
         else:
-            free_parameters['evidence_sd'] = {'mu_intercept':-1., 'transform':'softplus'}
+            free_parameters['evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
 
         if self.prior_estimate == 'shared':
             if self.paradigm is not None:
@@ -661,8 +659,8 @@ class RiskModel(BaseModel):
                 prior_mu = np.log(25)
                 prior_sd = 2
 
-            free_parameters['prior_mu'] = {'mu_intercept':prior_mu, 'transform':'identity'}
-            free_parameters['prior_sd'] = {'mu_intercept':prior_sd, 'transform':'identity'}
+            free_parameters['prior_mu'] = {'mu_intercept': prior_mu, 'transform': 'identity'}
+            free_parameters['prior_sd'] = {'mu_intercept': prior_sd, 'transform': 'identity'}
 
         elif self.prior_estimate == 'full':
             if self.paradigm is not None:
@@ -687,7 +685,7 @@ class RiskModel(BaseModel):
             else:
                 prior_sd = 1.5
 
-            free_parameters['prior_sd'] = {'mu_intercept':inverse_softplus_np(prior_sd), 'transform':'softplus'}
+            free_parameters['prior_sd'] = {'mu_intercept': inverse_softplus_np(prior_sd), 'transform': 'softplus'}
 
         return free_parameters
 
@@ -708,9 +706,10 @@ class RiskModel(BaseModel):
 
         paradigm['log(risky/safe)'] = np.log(paradigm['fraction'])
 
-        paradigm.set_index(pd.Index(np.arange(1, len(paradigm)+1), name='trial'), inplace=True)
+        paradigm.set_index(pd.Index(np.arange(1, len(paradigm) + 1), name='trial'), inplace=True)
 
         return paradigm
+
 
 class RiskRegressionModel(RegressionModel, RiskModel):
     """RiskModel with patsy formula regression on noise, prior, or bias parameters."""
@@ -758,9 +757,11 @@ class RiskLapseModel(LapseModel, RiskModel):
     """RiskModel extended with a lapse rate parameter."""
     ...
 
+
 class RiskLapseRegressionModel(LapseModel, RiskRegressionModel):
     """RiskModel with both a lapse rate and patsy formula regression."""
     ...
+
 
 class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
     """Risky choice model combining flexible (polynomial) noise with Bayesian magnitude inference."""
@@ -818,7 +819,7 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
             model_inputs['n2_prior_mu'] = pt.where(risky_first, safe_prior_mu, risky_prior_mu)
             model_inputs['n2_prior_sd'] = pt.where(risky_first, safe_prior_sd, risky_prior_sd)
         elif self.prior_estimate == 'fix_prior_sd':
-            model_inputs['n1_prior_sd'] = pt.std(pt.log(pt.stack((model['n1'], model['n2']), 0))) # fixed same prior sd
+            model_inputs['n1_prior_sd'] = pt.std(pt.log(pt.stack((model['n1'], model['n2']), 0)))  # fixed same prior sd
             model_inputs['n2_prior_sd'] = model_inputs['n1_prior_sd']
 
             model_inputs['n1_prior_mu'] = parameters['risky_prior_mu']
@@ -848,7 +849,7 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
                                                 model_inputs['n1_prior_sd'],
                                                 model_inputs['n1_evidence_mu'],
                                                 model_inputs['n1_evidence_sd']
-                                                )
+                                                   )
 
             post_n2_mu, post_n2_sd = get_posterior(model_inputs['n2_prior_mu'],
                                                 model_inputs['n2_prior_sd'],
@@ -866,7 +867,7 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
                                                 model_inputs['n1_prior_sd'],
                                                 model_inputs['n1_evidence_mu'],
                                                 model_inputs['n1_evidence_sd']
-                                                )
+                                                   )
 
             post_n2_mu, post_n2_sd = get_posterior(model_inputs['n2_prior_mu'],
                                                 model_inputs['n2_prior_sd'],
@@ -877,7 +878,6 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
             n2_noise = post_n2_sd**2 / model_inputs['n2_evidence_sd'] * model_inputs['p2']
             diff_mu, diff_sd = get_diff_dist(post_n2_mu * model_inputs['p2'], n2_noise,
                                              post_n1_mu * model_inputs['p1'], n1_noise)
-
 
         if self.save_trialwise_n_estimates:
             pm.Deterministic('n1_hat', post_n1_mu)
@@ -909,20 +909,20 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
                 risky_prior_sd = 50
                 safe_prior_sd = 50
 
-            free_parameters['risky_prior_mu'] = {'mu_intercept':risky_prior_mu, 'sigma_intercept':25., 'transform':'identity'}
-            free_parameters['risky_prior_sd'] = {'mu_intercept':risky_prior_sd, 'sigma_intercept':25., 'transform':'softplus'}
-            free_parameters['safe_prior_mu'] = {'mu_intercept':safe_prior_mu, 'sigma_intercept':25., 'transform':'identity'}
+            free_parameters['risky_prior_mu'] = {'mu_intercept': risky_prior_mu, 'sigma_intercept': 25., 'transform': 'identity'}
+            free_parameters['risky_prior_sd'] = {'mu_intercept': risky_prior_sd, 'sigma_intercept': 25., 'transform': 'softplus'}
+            free_parameters['safe_prior_mu'] = {'mu_intercept': safe_prior_mu, 'sigma_intercept': 25., 'transform': 'identity'}
 
             if self.prior_estimate == 'full':
-                free_parameters['safe_prior_sd'] = {'mu_intercept':safe_prior_sd, 'transform':'softplus'}
+                free_parameters['safe_prior_sd'] = {'mu_intercept': safe_prior_sd, 'transform': 'softplus'}
 
-        elif self.prior_estimate == 'fix_prior_sd': # only mus estimated but prior sd fixed
+        elif self.prior_estimate == 'fix_prior_sd':  # only mus estimated but prior sd fixed
             risky_n = np.where(self.paradigm['p1'] != 1.0, self.paradigm['n1'], self.paradigm['n2'])
             safe_n = np.where(self.paradigm['p2'] != 1.0, self.paradigm['n2'], self.paradigm['n1'])
             risky_prior_mu = np.mean(risky_n)
             safe_prior_mu = np.mean(safe_n)
-            free_parameters['risky_prior_mu'] = {'mu_intercept':risky_prior_mu, 'transform':'identity'}
-            free_parameters['safe_prior_mu'] = {'mu_intercept':safe_prior_mu, 'transform':'identity'}
+            free_parameters['risky_prior_mu'] = {'mu_intercept': risky_prior_mu, 'transform': 'identity'}
+            free_parameters['safe_prior_mu'] = {'mu_intercept': safe_prior_mu, 'transform': 'identity'}
 
         elif self.prior_estimate == 'shared':
 
@@ -934,13 +934,14 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
                 prior_mu = 25
                 prior_sd = 25
 
-            free_parameters['prior_mu'] = {'mu_intercept':prior_mu, 'sigma_intercept':25., 'transform':'identity'}
-            free_parameters['prior_sd'] = {'mu_intercept':prior_sd, 'sigma_intercept':25., 'transform':'softplus'}
+            free_parameters['prior_mu'] = {'mu_intercept': prior_mu, 'sigma_intercept': 25., 'transform': 'identity'}
+            free_parameters['prior_sd'] = {'mu_intercept': prior_sd, 'sigma_intercept': 25., 'transform': 'softplus'}
 
         return free_parameters
 
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
         return RiskModel._get_paradigm(self, paradigm, subject_mapping=subject_mapping)
+
 
 class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
     """FlexibleNoiseRiskModel with patsy formula regression on noise spline coefficients."""
@@ -955,7 +956,6 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
         if (type(spline_order) is int) and fit_seperate_evidence_sd:
             spline_order = spline_order, spline_order
 
-
         for key in list(regressors.keys()):
 
             if key in ['evidence_sd', 'n1_evidence_sd', 'memory_noise_sd', 'n2_evidence_sd', 'perceptual_noise_sd']:
@@ -967,28 +967,25 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
                 elif key in ['n2_evidence_sd', 'perceptual_noise_sd']:
                     po = spline_order[1]
 
-                for i in range(1, po+1):
+                for i in range(1, po + 1):
                     regressors[f'{key}_spline{i}'] = regressors[key]
 
                 regressors.pop(key)
 
-
         RegressionModel.__init__(self, regressors)
         FlexibleNoiseRiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd, save_trialwise_n_estimates,
                                         spline_order, representational_noise, memory_model)
-
 
     def get_sd_curve(self, conditions, idata=None, pars=None, x=None, variable='n1_evidence_sd', group=True, hierarchical=True, data=None):
 
         conditionwise_parameters = self.get_conditionwise_parameters(idata, conditions, group=group)
         conditionwise_parameters = conditionwise_parameters.stack(list(range(conditions.columns.nlevels))).unstack('parameter')
 
-
         if self.memory_model == 'independent':
             possible_variables = ['n1_evidence_sd', 'n2_evidence_sd', 'both']
         elif self.memory_model == 'shared_perceptual_noise':
             possible_variables = ['memory_noise_sd', 'perceptual_noise_sd', 'both']
-        assert(variable in possible_variables), f'variable must be one of {possible_variables}'
+        assert (variable in possible_variables), f'variable must be one of {possible_variables}'
 
         if variable == 'both':
             key1, key2 = self._get_evidence_sd_labels()
@@ -998,7 +995,6 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
 
             return n1_evidence_sd.join(n2_evidence_sd)
 
-
         if pars is not None:
             raise NotImplementedError('pars argument is not implemented yet')
 
@@ -1006,7 +1002,7 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
             raise ValueError('idata argument is mandatory')
 
         if x is None:
-            assert((data is not None) or (hasattr(self, 'data'))), "If x is not provided, data must be provided."
+            assert ((data is not None) or (hasattr(self, 'data'))), "If x is not provided, data must be provided."
 
             if data is None:
                 data = self.data
@@ -1036,6 +1032,7 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
         output.columns.name = 'variable'
 
         return output
+
 
 class ExpectedUtilityRiskModel(BaseModel):
     """Expected utility model for risky choice with optional probability distortion.
@@ -1075,7 +1072,7 @@ class ExpectedUtilityRiskModel(BaseModel):
                 print('*** Warning: did not find choice column, assuming all choices are False ***')
                 paradigm_['choice'] = np.zeros_like(paradigm['n1']).astype(bool)
 
-            for ix in range(1, self.n_outcomes+1):
+            for ix in range(1, self.n_outcomes + 1):
                 paradigm_[f'n1.{ix}'] = paradigm[f'n1.{ix}'].values
                 paradigm_[f'n2.{ix}'] = paradigm[f'n2.{ix}'].values
                 paradigm_[f'p1.{ix}'] = paradigm[f'p1.{ix}'].values
@@ -1099,7 +1096,7 @@ class ExpectedUtilityRiskModel(BaseModel):
     def _get_choice_predictions(self, model_inputs):
 
         def prob_distortion(p, phi):
-            return (p**phi) / ((p**phi + (1-p)**phi)**(1/phi))
+            return (p**phi) / ((p**phi + (1 - p)**phi)**(1 / phi))
 
         if self.n_outcomes == 1:
             if self.probability_distortion:
@@ -1107,8 +1104,8 @@ class ExpectedUtilityRiskModel(BaseModel):
                 p2 = prob_distortion(model_inputs['p2'], model_inputs['phi'])
 
             else:
-                p1 =  model_inputs['p1']
-                p2 =  model_inputs['p2']
+                p1 = model_inputs['p1']
+                p2 = model_inputs['p2']
 
             eu1 = p1 * model_inputs['n1']**model_inputs['alpha']
             eu2 = p2 * model_inputs['n2']**model_inputs['alpha']
@@ -1116,7 +1113,7 @@ class ExpectedUtilityRiskModel(BaseModel):
         else:
             eu1, eu2 = 0.0, 0.0
 
-            for ix in range(1, self.n_outcomes+1):
+            for ix in range(1, self.n_outcomes + 1):
                 if self.probability_distortion:
                     eu1 += model_inputs[f'n1.{ix}']**model_inputs['alpha'] * prob_distortion(model_inputs[f'p1.{ix}'], model_inputs['phi'])
                     eu2 += model_inputs[f'n2.{ix}']**model_inputs['alpha'] * prob_distortion(model_inputs[f'p2.{ix}'], model_inputs['phi'])
@@ -1143,7 +1140,7 @@ class ExpectedUtilityRiskModel(BaseModel):
             model_inputs['p1'] = model['p1']
             model_inputs['p2'] = model['p2']
         else:
-            for ix in range(1, self.n_outcomes+1):
+            for ix in range(1, self.n_outcomes + 1):
                 model_inputs[f'n1.{ix}'] = model[f'n1.{ix}']
                 model_inputs[f'n2.{ix}'] = model[f'n2.{ix}']
                 model_inputs[f'p1.{ix}'] = model[f'p1.{ix}']
@@ -1157,9 +1154,11 @@ class ExpectedUtilityRiskModel(BaseModel):
 
         return model_inputs
 
+
 class ExpectedUtilityRiskRegressionModel(RegressionModel, ExpectedUtilityRiskModel):
     """ExpectedUtilityRiskModel with patsy formula regression on utility or noise parameters."""
-    def __init__(self,  paradigm, save_trialwise_eu, probability_distortion, regressors):
+
+    def __init__(self, paradigm, save_trialwise_eu, probability_distortion, regressors):
         RegressionModel.__init__(self, regressors=regressors)
         ExpectedUtilityRiskModel.__init__(self, paradigm, save_trialwise_eu, probability_distortion=probability_distortion)
 

@@ -12,6 +12,7 @@ from ..utils.bayes import cumulative_normal, get_posterior, get_diff_dist
 from ..utils.math import inverse_softplus_np, softplus_np, inverse_softplus
 from ..utils.plotting import plot_prediction
 
+
 class MagnitudeComparisonModel(BaseModel):
     """Bayesian observer model for two-alternative magnitude comparison (e.g. numerosity).
 
@@ -88,8 +89,8 @@ class MagnitudeComparisonModel(BaseModel):
             model_inputs['n1_prior_mu'] = parameters['prior_mu']
             model_inputs['n2_prior_mu'] = parameters['prior_mu']
             if self.fit_prior_mu_only:
-                empirical_sd = (pt.std(pt.log(model['n1'])) +
-                                pt.std(pt.log(model['n2']))) / 2.
+                empirical_sd = (pt.std(pt.log(model['n1']))
+                                + pt.std(pt.log(model['n2']))) / 2.
                 model_inputs['n1_prior_sd'] = empirical_sd
                 model_inputs['n2_prior_sd'] = empirical_sd
             else:
@@ -109,12 +110,12 @@ class MagnitudeComparisonModel(BaseModel):
         model_inputs['n1_evidence_mu'] = model['log(n1)']
         model_inputs['n2_evidence_mu'] = model['log(n2)']
 
-        model_inputs['threshold'] =  0.0
+        model_inputs['threshold'] = 0.0
 
         if self.fit_seperate_evidence_sd:
             if self.memory_model == 'independent':
                 model_inputs['n1_evidence_sd'] = parameters['n1_evidence_sd']
-                model_inputs['n2_evidence_sd']= parameters['n2_evidence_sd']
+                model_inputs['n2_evidence_sd'] = parameters['n2_evidence_sd']
             elif self.memory_model == 'shared_perceptual_noise':
                 perceptual_sd = parameters['perceptual_noise_sd']
                 memory_sd = parameters['memory_noise_sd']
@@ -173,24 +174,28 @@ class MagnitudeComparisonModel(BaseModel):
         n1 = np.repeat(base_ns, len(fractions))
         n2 = (base_ns[:, None] * fractions[None, :]).ravel()
 
-        paradigm = pd.DataFrame({'n1':n1, 'n2':n2})
+        paradigm = pd.DataFrame({'n1': n1, 'n2': n2})
 
         return paradigm
+
 
 class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonModel):
     """MagnitudeComparisonModel with patsy formula regression on noise/prior parameters."""
 
-    def __init__(self, paradigm, regressors, fit_prior=False, fit_seperate_evidence_sd=True, memory_model = 'independent',save_trialwise_estimates=False):
+    def __init__(self, paradigm, regressors, fit_prior=False, fit_seperate_evidence_sd=True, memory_model='independent', save_trialwise_estimates=False):
         RegressionModel.__init__(self, regressors)
         MagnitudeComparisonModel.__init__(self, paradigm, fit_prior, fit_seperate_evidence_sd, memory_model, save_trialwise_estimates)
+
 
 class MagnitudeComparisonLapseModel(LapseModel, MagnitudeComparisonModel):
     """MagnitudeComparisonModel extended with a lapse rate parameter."""
     ...
 
+
 class MagnitudeComparisonLapseRegressionModel(LapseModel, MagnitudeComparisonRegressionModel):
     """MagnitudeComparisonModel with both a lapse rate and patsy formula regression."""
     ...
+
 
 class FlexibleNoiseComparisonModel(BaseModel):
     """Magnitude comparison model with stimulus-dependent noise parameterised by a polynomial spline.
@@ -308,7 +313,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
             paradigm = self.paradigm
 
         if hierarchical and ('subject' not in coords.keys()):
-            assert('subject' in paradigm.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
+            assert ('subject' in paradigm.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
             coords['subject'] = paradigm.index.unique(level='subject')
 
         coords['poly_order'] = np.arange(self.max_spline_order)
@@ -347,7 +352,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
             model_inputs['n1_prior_sd'] = prior_sd
             model_inputs['n2_prior_sd'] = prior_sd
 
-        model_inputs['threshold'] =  0.0
+        model_inputs['threshold'] = 0.0
 
         model_inputs['n1_evidence_mu'] = model['n1']
         model_inputs['n2_evidence_mu'] = model['n2']
@@ -364,14 +369,14 @@ class FlexibleNoiseComparisonModel(BaseModel):
         if self.fit_seperate_evidence_sd:
             key1, key2 = self._get_evidence_sd_labels()
 
-            for n in range(1, self.spline_order[0]+1):
+            for n in range(1, self.spline_order[0] + 1):
                 free_parameters[f'{key1}_spline{n}'] = {'mu_intercept': 5., 'sigma_intercept': 5., 'transform': 'identity'}
 
-            for n in range(1, self.spline_order[1]+1):
+            for n in range(1, self.spline_order[1] + 1):
                 free_parameters[f'{key2}_spline{n}'] = {'mu_intercept': 5., 'sigma_intercept': 5., 'transform': 'identity'}
 
         else:
-            for n in range(1, self.spline_order+1):
+            for n in range(1, self.spline_order + 1):
                 free_parameters[f'evidence_sd_spline{n}'] = {'mu_intercept': 5., 'sigma_intercept': 5., 'transform': 'identity'}
 
         if self.fit_prior:
@@ -393,11 +398,11 @@ class FlexibleNoiseComparisonModel(BaseModel):
     def _get_evidence_sd_spline_par_labels(self):
         if self.fit_seperate_evidence_sd:
             key1, key2 = self._get_evidence_sd_labels()
-            label1 = [f'{key1}_spline{n}' for n in range(1, self.spline_order[0]+1)]
-            label2 = [f'{key2}_spline{n}' for n in range(1, self.spline_order[1]+1)]
+            label1 = [f'{key1}_spline{n}' for n in range(1, self.spline_order[0] + 1)]
+            label2 = [f'{key2}_spline{n}' for n in range(1, self.spline_order[1] + 1)]
             return label1, label2
         else:
-            labels = [f'evidence_sd_spline{n}' for n in range(1, self.spline_order+1)]
+            labels = [f'evidence_sd_spline{n}' for n in range(1, self.spline_order + 1)]
             return labels, labels
 
     def _get_evidence_sd_labels(self):
@@ -477,7 +482,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
         if (idata is not None) and (pars is not None):
             raise ValueError('Only one of idata or pars must be provided.')
 
-        assert(variable in ['n1_evidence_sd', 'n2_evidence_sd', 'evidence_sd', 'both', 'perceptual_noise_sd', 'memory_noise_sd']), "Variable must be 'n1_evidence_sd', 'n2_evidence_sd', 'both', 'perceptual_noise_sd', or 'memory_noise_sd'."
+        assert (variable in ['n1_evidence_sd', 'n2_evidence_sd', 'evidence_sd', 'both', 'perceptual_noise_sd', 'memory_noise_sd']), "Variable must be 'n1_evidence_sd', 'n2_evidence_sd', 'both', 'perceptual_noise_sd', or 'memory_noise_sd'."
 
         if variable == 'both':
             n1_evidence_sd = self.get_sd_curve(idata, pars, x=x, variable='n1_evidence_sd', group=group, hierarchical=hierarchical, data=data)
@@ -486,7 +491,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
             return n1_evidence_sd.join(n2_evidence_sd)
 
         if variable == 'evidence_sd':
-            assert(not self.fit_seperate_evidence_sd), "Single evidence_sd only when not fit_seperate_evidence_sd."
+            assert (not self.fit_seperate_evidence_sd), "Single evidence_sd only when not fit_seperate_evidence_sd."
 
             evidence_sd = self.get_sd_curve(idata, x=x, variable='n1_evidence_sd', group=group, hierarchical=hierarchical, data=data)
 
@@ -494,9 +499,8 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
             return evidence_sd
 
-
         if x is None:
-            assert((data is not None) or (hasattr(self, 'data'))), "If x is not provided, data must be provided."
+            assert ((data is not None) or (hasattr(self, 'data'))), "If x is not provided, data must be provided."
 
             if data is None:
                 data = self.data
@@ -570,7 +574,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         keys += groupby
 
-        sd_ci = n_sd.groupby(keys).apply(lambda d: pd.Series(hdi(d.values.ravel())))#, index=pd.Index(['hdi025', 'hdi975']))))
+        sd_ci = n_sd.groupby(keys).apply(lambda d: pd.Series(hdi(d.values.ravel())))  # , index=pd.Index(['hdi025', 'hdi975']))))
         sd_ci.columns = ['hdi025', 'hdi975']
         sd_mean = n_sd.groupby(keys).mean()
 
@@ -608,7 +612,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         keys += groupby
 
-        sd_ci = n_sd.groupby(keys).apply(lambda d: pd.Series(hdi(d.values.ravel())))#, index=pd.Index(['hdi025', 'hdi975']))))
+        sd_ci = n_sd.groupby(keys).apply(lambda d: pd.Series(hdi(d.values.ravel())))  # , index=pd.Index(['hdi025', 'hdi975']))))
         sd_ci.columns = ['hdi025', 'hdi975']
         sd_mean = n_sd.groupby(keys).mean()
 
@@ -639,6 +643,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         return paradigm_
 
+
 class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseComparisonModel):
     """FlexibleNoiseComparisonModel with patsy formula regression on noise spline coefficients."""
 
@@ -651,7 +656,6 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
 
         if (type(spline_order) is int) and fit_seperate_evidence_sd:
             spline_order = spline_order, spline_order
-
 
         for key in list(regressors.keys()):
 
@@ -666,11 +670,10 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
 
                 warn(f'Found {key} in regressors, will add it for all {po} splines!')
 
-                for i in range(1, po+1):
+                for i in range(1, po + 1):
                     regressors[f'{key}_spline{i}'] = regressors[key]
 
                 regressors.pop(key)
-
 
         RegressionModel.__init__(self, regressors)
         FlexibleNoiseComparisonModel.__init__(self, paradigm, fit_seperate_evidence_sd, fit_prior,
@@ -765,8 +768,8 @@ class PowerLawNoiseComparisonModel(BaseModel):
                 memory_log_sd = parameters['memory_log_sd_intercept']
                 # Combine perceptual and memory noise in variance (linear) space
                 model_inputs['n1_evidence_sd'] = pt.sqrt(
-                    pt.exp(2 * (perceptual_log_sd + noise_exponent * pt.log(model['n1']))) +
-                    pt.exp(2 * (memory_log_sd + noise_exponent * pt.log(model['n1']))))
+                    pt.exp(2 * (perceptual_log_sd + noise_exponent * pt.log(model['n1'])))
+                    + pt.exp(2 * (memory_log_sd + noise_exponent * pt.log(model['n1']))))
                 model_inputs['n2_evidence_sd'] = pt.exp(
                     perceptual_log_sd + noise_exponent * pt.log(model['n2']))
             else:
@@ -880,7 +883,6 @@ class PowerLawNoiseComparisonRegressionModel(RegressionModel, PowerLawNoiseCompa
         RegressionModel.__init__(self, regressors)
         PowerLawNoiseComparisonModel.__init__(self, paradigm, fit_seperate_evidence_sd,
                                               fit_prior, memory_model, save_trialwise_n_estimates)
-
 
 
 class PowerLawEncodingComparisonModel(BaseModel):
@@ -1013,5 +1015,3 @@ class PowerLawEncodingComparisonRegressionModel(RegressionModel, PowerLawEncodin
         RegressionModel.__init__(self, regressors)
         PowerLawEncodingComparisonModel.__init__(self, paradigm, fit_seperate_evidence_sd,
                                                  fit_prior, save_trialwise_n_estimates)
-
-

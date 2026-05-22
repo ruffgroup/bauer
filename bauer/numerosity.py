@@ -421,7 +421,7 @@ class FlexibleEncodingEstimationModel(LogEncodingEstimationModel):
         rep_grid = pt.as_tensor_variable(self.rep_grid)
         priors = pt.as_tensor_variable(self.priors)
         basis_grid = pt.as_tensor_variable(self.bernstein_basis_matrix)   # (N, n_poly)
-        basis_unique = pt.as_tensor_variable(self.bernstein_basis_unique) # (K, n_poly)
+        basis_unique = pt.as_tensor_variable(self.bernstein_basis_unique)  # (K, n_poly)
 
         d_stim = self.d_stim
         d_rep = self.d_rep

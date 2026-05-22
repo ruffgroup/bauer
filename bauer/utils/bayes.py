@@ -4,19 +4,23 @@ import pytensor.tensor as pt
 import arviz as az
 from scipy.special import expit
 
+
 def get_posterior(mu1, sd1, mu2, sd2):
     var1, var2 = sd1**2, sd2**2
-    return mu1 + (var1/(var1+var2))*(mu2 - mu1), pt.sqrt((var1*var2)/(var1+var2))
+    return mu1 + (var1 / (var1 + var2)) * (mu2 - mu1), pt.sqrt((var1 * var2) / (var1 + var2))
+
 
 def get_posterior_np(mu1, sd1, mu2, sd2):
     var1, var2 = sd1**2, sd2**2
-    return mu1 + (var1/(var1+var2))*(mu2 - mu1), np.sqrt((var1*var2)/(var1+var2))
+    return mu1 + (var1 / (var1 + var2)) * (mu2 - mu1), np.sqrt((var1 * var2) / (var1 + var2))
+
 
 def get_diff_dist(mu1, sd1, mu2, sd2):
-    return mu2 - mu1, pt.sqrt(sd1**2+sd2**2)
+    return mu2 - mu1, pt.sqrt(sd1**2 + sd2**2)
+
 
 def get_diff_dist_np(mu1, sd1, mu2, sd2):
-    return mu2 - mu1, np.sqrt(sd1**2+sd2**2)
+    return mu2 - mu1, np.sqrt(sd1**2 + sd2**2)
 
 
 def posterior_mean_sd(prior_sd, evidence_sd):
@@ -50,16 +54,20 @@ def posterior_mean_sd_np(prior_sd, evidence_sd):
     w = var_p / (var_p + var_e)
     return w * np.asarray(evidence_sd)
 
+
 def cumulative_normal(x, mu, sd, s=pt.sqrt(2.)):
-#     Cumulative distribution function for the standard normal distribution
-    return pt.clip(0.5 + 0.5 *
-                   pt.erf((x - mu) / (sd*s)), 1e-9, 1-1e-9)
+    #     Cumulative distribution function for the standard normal distribution
+    return pt.clip(0.5 + 0.5
+                   * pt.erf((x - mu) / (sd * s)), 1e-9, 1 - 1e-9)
 
-def softplus(x): 
-    return np.log(1 + np.exp(-np.abs(x))) + np.maximum(x,0) 
 
-def logistic(x): 
+def softplus(x):
+    return np.log(1 + np.exp(-np.abs(x))) + np.maximum(x, 0)
+
+
+def logistic(x):
     return expit(x)
+
 
 def summarize_ppc(ppc, groupby=None):
     """Single-step PPC summary (legacy).  Prefer summarize_ppc_group for group-level PPCs."""
@@ -155,4 +163,4 @@ def summarize_ppc_group(ppc, condition_cols, subject_col='subject', hdi_prob=0.9
 
 def get_posterior_np(mu1, sd1, mu2, sd2):
     var1, var2 = sd1**2, sd2**2
-    return mu1 + (var1/(var1+var2))*(mu2 - mu1), np.sqrt((var1*var2)/(var1+var2))
+    return mu1 + (var1 / (var1 + var2)) * (mu2 - mu1), np.sqrt((var1 * var2) / (var1 + var2))

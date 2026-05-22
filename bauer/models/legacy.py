@@ -186,7 +186,7 @@ class SafeVsRiskyRegressionModel(RegressionModel, SafeVsRiskyModel):
 
     def get_trialwise_variable(self, key):
         return super().get_trialwise_variable(key)
-    
+
 
 class SafeVsRiskyMemoryModel(SafeVsRiskyModel):
     """Safe-vs-risky model with encoding noise shared across both options
@@ -198,8 +198,8 @@ class SafeVsRiskyMemoryModel(SafeVsRiskyModel):
     """
 
     def __init__(self, data=None, domain="gain",
-        separate_priors=True, fix_prior_mus=False, fix_prior_sds=False,
-        separate_evidence_sd=True, memory_model="shared_perceptual_noise", combine_noise="add_sd"):
+            separate_priors=True, fix_prior_mus=False, fix_prior_sds=False,
+            separate_evidence_sd=True, memory_model="shared_perceptual_noise", combine_noise="add_sd"):
         self.memory_model = memory_model
         self.combine_noise = combine_noise
 
@@ -275,7 +275,6 @@ class SafeVsRiskyMemoryModel(SafeVsRiskyModel):
         else:
             prior_sd_risky = prior_sd_safe = parameters["prior_sd"]
 
-
         if self.memory_model == "independent":
             if self.separate_evidence_sd:
                 noise1 = parameters["evidence_sd_n1"]
@@ -301,7 +300,6 @@ class SafeVsRiskyMemoryModel(SafeVsRiskyModel):
 
         return {"prior_mu_risky": prior_mu_risky, "prior_sd_risky": prior_sd_risky, "prior_mu_safe": prior_mu_safe, "prior_sd_safe": prior_sd_safe,
                 "logn1": logn1, "logn2": logn2, "ev_sd1": noise1, "ev_sd2": noise2, "p1": p1, "p2": p2, "risky_first": risky_first}
-    
 
 
 class JointSafeVsRiskyModel(BaseModel):
@@ -465,7 +463,6 @@ class JointSafeVsRiskyModel(BaseModel):
 
         return free
 
-
     @staticmethod
     def _masked_mean(x, mask):
         """PyTensor-safe masked mean."""
@@ -519,7 +516,6 @@ class JointSafeVsRiskyModel(BaseModel):
             )
             return prior_mu_risky, prior_mu_safe
 
-
     def get_model_inputs(self, parameters):
         model = pm.Model.get_context()
 
@@ -532,7 +528,6 @@ class JointSafeVsRiskyModel(BaseModel):
         logn2 = pt.log(pt.abs(n2))
 
         risky_first = p1 < p2
-
 
         if self.fix_prior_mus:
             prior_mu_risky, prior_mu_safe = self._fixed_prior_mus(
@@ -605,7 +600,6 @@ class JointSafeVsRiskyModel(BaseModel):
                     parameters["gain_prior_sd_safe"],
                     parameters["loss_prior_sd_safe"]
                 )
-
 
         if self.evidence_scope == "global":
             ev_sd1 = parameters["evidence_sd"]
@@ -735,5 +729,3 @@ class JointSafeVsRiskyModel(BaseModel):
         )
 
         return p_risky
-    
-

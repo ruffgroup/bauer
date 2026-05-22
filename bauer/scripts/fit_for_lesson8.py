@@ -63,7 +63,7 @@ def main():
     tag = f'garcia_n{n_subj}_rtmin{int(args.rt_min*1000)}'
 
     for name, cls in [('probit', MagnitudeComparisonModel),
-                      ('ddm',    DDMMagnitudeComparisonModel)]:
+                      ('ddm', DDMMagnitudeComparisonModel)]:
         path = os.path.join(cache_dir, f'{tag}_{name}.nc')
         if os.path.exists(path):
             print(f"{name}: cached, skipping ({path})", flush=True)
@@ -80,7 +80,8 @@ def main():
                              target_accept=args.target_accept,
                              backend=args.backend)
         finally:
-            stop.set(); hb.join(timeout=2)
+            stop.set()
+            hb.join(timeout=2)
         dt = time.time() - t0
         idata.to_netcdf(path)
         print(f"{name}: saved in {dt/60:.1f} min -> {path}", flush=True)

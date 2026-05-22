@@ -4,21 +4,19 @@ Pure-numerical tests for the NumPy helpers that bauer's models rely on
 (transforms, posterior combination, PPC summarizers). No pymc/pytensor
 context required.
 """
-import warnings
-warnings.filterwarnings('ignore')
-
-import numpy as np
-import pandas as pd
-import pytest
-
-from bauer.utils.math import (
-    softplus_np, inverse_softplus_np,
-    logistic_np, logit_np,
-)
 from bauer.utils.bayes import (
     get_posterior_np, get_diff_dist_np, posterior_mean_sd_np,
     summarize_ppc, summarize_ppc_group,
 )
+from bauer.utils.math import (
+    softplus_np, inverse_softplus_np,
+    logistic_np, logit_np,
+)
+import pytest
+import pandas as pd
+import numpy as np
+import warnings
+warnings.filterwarnings('ignore')
 
 
 # ---------------------------------------------------------------------------

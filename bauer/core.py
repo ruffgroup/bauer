@@ -7,6 +7,7 @@ from .utils.math import logistic, softplus_np, logistic_np, logit_np, inverse_so
 import pytensor.tensor as pt
 from patsy import dmatrix, build_design_matrices
 
+
 class BaseModel(object):
 
     paradigm_keys = []
@@ -34,7 +35,7 @@ class BaseModel(object):
         data should contain ['n1', 'n2'] and 'choice'.
         The latter should be a boolean that indicates whether the *second*
         option was chosen.
-        
+
         """
         self.paradigm = paradigm
         self.save_trialwise_n_estimates = save_trialwise_n_estimates
@@ -59,7 +60,7 @@ class BaseModel(object):
         else:
             # Make sure all subjects in the paradigm are in the subject_mapping
             new_subject_ids = paradigm['subject'].unique()
-            assert(np.array_equal(new_subject_ids, list(subject_mapping.keys()))), "The unique subjects in the paradigm do not match the subjects in the subject_mapping."
+            assert (np.array_equal(new_subject_ids, list(subject_mapping.keys()))), "The unique subjects in the paradigm do not match the subjects in the subject_mapping."
             if 'subject' in paradigm.index.names:
                 paradigm_['subject_ix'] = [subject_mapping[subject] for subject in paradigm.index.get_level_values('subject')]
             else:
@@ -96,7 +97,7 @@ class BaseModel(object):
     def build_likelihood(self, parameters, save_p_choice=False):
         model = pm.Model.get_context()
         model_inputs = self.get_model_inputs(parameters)
-        
+
         if save_p_choice:
             p = pm.Deterministic('p', var=self._get_choice_predictions(model_inputs))
         else:
@@ -130,7 +131,7 @@ class BaseModel(object):
                 )
 
         if hierarchical and (coords is None):
-            assert('subject' in data.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
+            assert ('subject' in data.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
             coords = {'subject': data.index.unique(level='subject')}
 
         with pm.Model(coords=coords) as self.estimation_model:
@@ -174,14 +175,13 @@ class BaseModel(object):
         if transform == 'identity':
             pm.Normal(name, mu=mu_intercept, sigma=sigma_intercept)
         elif transform == 'softplus':
-            pm.Normal(name+'_untransformed', mu=mu_intercept, sigma=sigma_intercept)
-            pm.Deterministic(name, var=pt.softplus(model[name+'_untransformed']))
+            pm.Normal(name + '_untransformed', mu=mu_intercept, sigma=sigma_intercept)
+            pm.Deterministic(name, var=pt.softplus(model[name + '_untransformed']))
         elif transform == 'logistic':
-            pm.Normal(name+'_untransformed', mu=mu_intercept, sigma=sigma_intercept)
-            pm.Deterministic(name, var=logistic(model[name+'_untransformed']))
+            pm.Normal(name + '_untransformed', mu=mu_intercept, sigma=sigma_intercept)
+            pm.Deterministic(name, var=logistic(model[name + '_untransformed']))
         else:
             raise NotImplementedError
-
 
     def set_paradigm(self, paradigm=None):
         for key, value in paradigm.items():
@@ -192,7 +192,7 @@ class BaseModel(object):
 
     def build_prediction_model(self, paradigm, parameters,):
 
-        assert(isinstance(parameters, dict) or isinstance(parameters, pd.DataFrame)), "Parameters should be a dictionary or a DataFrame."
+        assert (isinstance(parameters, dict) or isinstance(parameters, pd.DataFrame)), "Parameters should be a dictionary or a DataFrame."
 
         if paradigm is None:
             paradigm = self.data
@@ -202,13 +202,12 @@ class BaseModel(object):
 
             # Make sure that the unique levels in 'subject' (either index or column) of the paradigm align with the subjects in the parameters
             if 'subject' in paradigm.index.names:
-                assert(np.array_equal(paradigm.index.unique(level='subject'), parameter_subjects)), "The unique subjects in the paradigm do not match the subjects in the parameters."
+                assert (np.array_equal(paradigm.index.unique(level='subject'), parameter_subjects)), "The unique subjects in the paradigm do not match the subjects in the parameters."
             elif 'subject' in paradigm.columns:
-                assert(np.array_equal(paradigm.subject.unique(), parameter_subjects)), "The unique subjects in the paradigm do not match the subjects in the parameters."
+                assert (np.array_equal(paradigm.subject.unique(), parameter_subjects)), "The unique subjects in the paradigm do not match the subjects in the parameters."
 
             parameters = parameters.to_dict(orient='list')
 
-                                              
         with pm.Model() as self.prediction_model:
             paradigm = self._get_paradigm(paradigm=paradigm)
             self.set_paradigm(paradigm)
@@ -219,7 +218,7 @@ class BaseModel(object):
 
             parameters = self.get_parameter_values()
             model_inputs = self.get_model_inputs(parameters)
-        
+
             p = pm.Deterministic('p', var=self._get_choice_predictions(model_inputs))
             pm.Bernoulli('ll_bernoulli', p=p)
 
@@ -245,7 +244,7 @@ class BaseModel(object):
         if not paradigm.index.name:
             paradigm.index.name = 'trial'
 
-        data = pd.DataFrame(data.T, index=paradigm.index, columns=pd.Index(np.arange(n_samples)+1, name='sample'))
+        data = pd.DataFrame(data.T, index=paradigm.index, columns=pd.Index(np.arange(n_samples) + 1, name='sample'))
         data = data.stack().to_frame('simulated_choice').astype(bool)
         data = data.join(paradigm)
 
@@ -329,7 +328,7 @@ class BaseModel(object):
         if 'subject' in self.estimation_model.coords:
             pars = pd.DataFrame(pars, index=pd.Index(self.estimation_model.coords['subject'], name='subject'))
             pars.columns.name = 'parameter'
-        
+
         return pars
 
     def fit_map_individual(self, data=None, flat_prior=True, **kwargs):
@@ -441,9 +440,8 @@ class BaseModel(object):
 
     def get_trialwise_variable(self, key):
 
-
         model = pm.Model.get_context()
-        
+
         n_trials = pt.cast(model['_data_n'], int)
 
         if key == 'n1_evidence_mu':
@@ -501,12 +499,11 @@ class BaseModel(object):
         else:
             raise NotImplementedError
 
-
         group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma_intercept)
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject',))
 
         if transform == 'identity':
-             return pm.Deterministic(f'{name}', group_mu + group_sd * subject_offset, dims=('subject',))
+            return pm.Deterministic(f'{name}', group_mu + group_sd * subject_offset, dims=('subject',))
         else:
             subjectwise_untrans = pm.Deterministic(f'{name}_untransformed', group_mu + group_sd * subject_offset, dims=('subject',))
 
@@ -532,10 +529,10 @@ class BaseModel(object):
         idata = self._get_idata(idata)
         parameters = self._get_parameters(parameters)
 
-        mu_pars = pd.concat([idata.posterior[par+'_mu'].to_dataframe() for par in self.free_parameters], axis=1, keys=parameters, names=['parameter']).droplevel(1, axis=1)
+        mu_pars = pd.concat([idata.posterior[par + '_mu'].to_dataframe() for par in self.free_parameters], axis=1, keys=parameters, names=['parameter']).droplevel(1, axis=1)
 
         if include_sd:
-            sd_pars = pd.concat([idata.posterior[par+'_sd'].to_dataframe() for par in self.free_parameters], axis=1, keys=self.free_parameters, names=['parameter']).droplevel(1, axis=1)
+            sd_pars = pd.concat([idata.posterior[par + '_sd'].to_dataframe() for par in self.free_parameters], axis=1, keys=self.free_parameters, names=['parameter']).droplevel(1, axis=1)
             pars = pd.concat((mu_pars, sd_pars), keys=['mu', 'sd'], names=['type'], axis=1)
 
         else:
@@ -575,7 +572,7 @@ class BaseModel(object):
                 samples_pars[key] = logistic_np(samples_pars[key])
 
         if n_subjects:
-            sample_pars =  pd.DataFrame(samples_pars, index=pd.Index(np.arange(1, n_subjects+1), name='subject'))
+            sample_pars = pd.DataFrame(samples_pars, index=pd.Index(np.arange(1, n_subjects + 1), name='subject'))
             sample_pars.columns.name = 'parameter'
             return sample_pars
         else:
@@ -601,12 +598,11 @@ class BaseModel(object):
         elif transform == 'logistic':
             return logit_np(data)
 
-
     def get_example_paradigm(self, n_subjects=None):
         if n_subjects is None:
             return self._get_example_paradigm()
         else:
-            return pd.concat([self._get_example_paradigm() for _ in range(n_subjects)], keys=np.arange(1, n_subjects+1), names=['subject'])
+            return pd.concat([self._get_example_paradigm() for _ in range(n_subjects)], keys=np.arange(1, n_subjects + 1), names=['subject'])
 
     def get_model_inputs(self, parameters):
 
@@ -616,18 +612,19 @@ class BaseModel(object):
 
         for key in self.base_parameters:
             model_inputs[key] = parameters[key]
-        
+
         for key in self.paradigm_keys:
             model_inputs[key] = model[key]
 
         return model_inputs
+
 
 class LapseModel(BaseModel):
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
 
-        pars['p_lapse'] = {'mu_intercept':logit_np(0.02), 'transform':'logistic'}
+        pars['p_lapse'] = {'mu_intercept': logit_np(0.02), 'transform': 'logistic'}
         return pars
 
     def _get_choice_predictions(self, model_inputs):
@@ -651,7 +648,7 @@ class RegressionModel(BaseModel):
             self.regressors = regressors
 
         self.design_matrices = {}
-        
+
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
         # Forward subject_mapping only when the next class in the MRO accepts
         # it (DDMMixin does; plain MagnitudeComparisonModel doesn't). Without
@@ -664,7 +661,6 @@ class RegressionModel(BaseModel):
 
         free_parameters = self.get_free_parameters()
 
-
         for key in free_parameters:
             dm = self.build_design_matrix(paradigm, key)
             self.design_matrices[key] = dm
@@ -675,11 +671,11 @@ class RegressionModel(BaseModel):
     def build_design_matrix(self, data, parameter):
         if parameter not in self.regressors:
             self.regressors[parameter] = '1'
-        
+
         return dmatrix(self.regressors[parameter], data)
 
     def rebuild_design_matrix(self, paradigm, parameter):
-        assert(hasattr(self, 'design_matrices')), 'Model needs to have design matrices as an attribute (model.design_matrices...) based on original data for rebuilding design matrices (HINT: use `.build_estimation_model()`)'
+        assert (hasattr(self, 'design_matrices')), 'Model needs to have design matrices as an attribute (model.design_matrices...) based on original data for rebuilding design matrices (HINT: use `.build_estimation_model()`)'
 
         design_info = self.design_matrices[parameter].design_info
 
@@ -729,12 +725,11 @@ class RegressionModel(BaseModel):
 
         return trialwise_pars
 
-
-    def build_prior(self, name, mu_intercept=None, sigma_intercept=None, sigma_regressors=1.,  transform='identity'):
+    def build_prior(self, name, mu_intercept=None, sigma_intercept=None, sigma_regressors=1., transform='identity'):
 
         model = pm.Model.get_context()
         model.add_coord(f'{name}_regressors', self.design_matrices[name].design_info.column_names)
-        
+
         mu = np.zeros(self.design_matrices[name].shape[1])
         sigma = np.ones(self.design_matrices[name].shape[1]) * sigma_regressors
 
@@ -753,7 +748,6 @@ class RegressionModel(BaseModel):
 
         pm.Normal(name, mu=mu, sigma=sigma, dims=(f'{name}_regressors',))
 
-
     def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=1.,
                                   cauchy_sigma_intercept=0.25, sigma_regressors=1.,
                                   cauchy_sigma_regressors=0.25, transform='identity',
@@ -765,7 +759,7 @@ class RegressionModel(BaseModel):
 
         model = pm.Model.get_context()
         model.add_coord(f'{name}_regressors', self.design_matrices[name].design_info.column_names)
-        
+
         mu = np.zeros(self.design_matrices[name].shape[1])
         sigma = np.ones(self.design_matrices[name].shape[1]) * sigma_regressors
         cauchy_sigma = np.ones(self.design_matrices[name].shape[1]) * cauchy_sigma_regressors
@@ -784,12 +778,11 @@ class RegressionModel(BaseModel):
                 sigma[0] = sigma_intercept
             # Possibly use inverse of softplus
 
-        group_mu = pm.Normal(f"{name}_mu", 
-                                        mu=mu, 
+        group_mu = pm.Normal(f"{name}_mu",
+                                        mu=mu,
                                         sigma=sigma,
                                         dims=(f'{name}_regressors',))
 
-        
         group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma, dims=(f'{name}_regressors',))
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject', f'{name}_regressors'))
 
@@ -808,10 +801,10 @@ class RegressionModel(BaseModel):
             parameters = self.design_matrices.keys()
             for parameter, dm in self.design_matrices.items():
                 if hierarchical:
-                    df.append(pd.DataFrame(map_parameters[parameter], 
+                    df.append(pd.DataFrame(map_parameters[parameter],
                                             index=pd.Index(subjects, name='subject'), columns=pd.Index(dm.design_info.column_names, name='dm_key')))
                 else:
-                    df.append(pd.Series(map_parameters[parameter], 
+                    df.append(pd.Series(map_parameters[parameter],
                                             index=pd.Index(dm.design_info.column_names, name='dm_key')))
 
             df = pd.concat(df, keys=parameters, axis=1)
@@ -825,9 +818,8 @@ class RegressionModel(BaseModel):
 
         with self.estimation_model:
             pars = pm.find_MAP(**kwargs)
-        
-        return convert_map(pars)
 
+        return convert_map(pars)
 
     def build_prediction_model(self, paradigm, parameters,):
 
@@ -837,14 +829,14 @@ class RegressionModel(BaseModel):
             hierarchical = False
         else:
             raise ValueError("Parameters should be a dictionary or a DataFrame.")
-        
+
         with pm.Model() as self.prediction_model:
             paradigm = self._get_paradigm(paradigm=paradigm)
             self.set_paradigm(paradigm)
-            
+
             if hierarchical:
                 n_subjects = np.unique(self.prediction_model['subject_ix'].eval()).shape[0]
-                assert(len(parameters) == n_subjects), f'Number of subjects in data ({n_subjects}) does not match number of subjects in parameters ({len(parameters)})'
+                assert (len(parameters) == n_subjects), f'Number of subjects in data ({n_subjects}) does not match number of subjects in parameters ({len(parameters)})'
 
             for key in self.free_parameters.keys():
                 dm_keys = self.design_matrices[key].design_info.column_names
@@ -857,7 +849,7 @@ class RegressionModel(BaseModel):
 
             parameters = self.get_parameter_values()
             model_inputs = self.get_model_inputs(parameters)
-        
+
             p = pm.Deterministic('p', var=self._get_choice_predictions(model_inputs))
             pm.Bernoulli('ll_bernoulli', p=p)
 
@@ -882,7 +874,7 @@ class RegressionModel(BaseModel):
                     samples_pars[key] = np.random.normal(0, 1, n_subjects)
 
         if n_subjects:
-            return pd.DataFrame(samples_pars, index=pd.Index(np.arange(1, n_subjects+1), name='subject'))
+            return pd.DataFrame(samples_pars, index=pd.Index(np.arange(1, n_subjects + 1), name='subject'))
         else:
             return samples_pars
 
@@ -891,7 +883,7 @@ class RegressionModel(BaseModel):
         parameter_values = []
         free_parameters = self.get_free_parameters()
 
-        assert(hasattr(self, 'paradigm')), 'Model needs to have original paradigm as an attribute (model.paradigm...) for calcuating conditionwise parameters'
+        assert (hasattr(self, 'paradigm')), 'Model needs to have original paradigm as an attribute (model.paradigm...) for calcuating conditionwise parameters'
 
         for parameter in free_parameters.keys():
             dm = self.rebuild_design_matrix(conditions, parameter)
