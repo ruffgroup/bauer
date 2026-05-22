@@ -253,9 +253,9 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">patsy</span><span class="w"> </span><span class="kn">import</span> <span class="n">dmatrix</span><span class="p">,</span> <span class="n">build_design_matrices</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">warnings</span><span class="w"> </span><span class="kn">import</span> <span class="n">warn</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">..core</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">LapseModel</span><span class="p">,</span> <span class="n">RegressionModel</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">..utils.bayes</span><span class="w"> </span><span class="kn">import</span> <span class="n">cumulative_normal</span><span class="p">,</span> <span class="n">get_posterior</span><span class="p">,</span> <span class="n">get_diff_dist</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">..utils.math</span><span class="w"> </span><span class="kn">import</span> <span class="n">inverse_softplus_np</span><span class="p">,</span> <span class="n">softplus_np</span><span class="p">,</span> <span class="n">inverse_softplus</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..utils.math</span><span class="w"> </span><span class="kn">import</span> <span class="n">softplus_np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">..utils.plotting</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_prediction</span>
+
 
 <div class="viewcode-block" id="MagnitudeComparisonModel">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.models.MagnitudeComparisonModel">[docs]</a>
@@ -335,8 +335,8 @@
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_mu&#39;</span><span class="p">]</span>
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_mu&#39;</span><span class="p">]</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_prior_mu_only</span><span class="p">:</span>
-                <span class="n">empirical_sd</span> <span class="o">=</span> <span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]))</span> <span class="o">+</span>
-                                <span class="n">pt</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">])))</span> <span class="o">/</span> <span class="mf">2.</span>
+                <span class="n">empirical_sd</span> <span class="o">=</span> <span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]))</span>
+                                <span class="o">+</span> <span class="n">pt</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">])))</span> <span class="o">/</span> <span class="mf">2.</span>
                 <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">empirical_sd</span>
                 <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">empirical_sd</span>
             <span class="k">else</span><span class="p">:</span>
@@ -356,12 +356,12 @@
         <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;log(n1)&#39;</span><span class="p">]</span>
         <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;log(n2)&#39;</span><span class="p">]</span>
 
-        <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;threshold&#39;</span><span class="p">]</span> <span class="o">=</span>  <span class="mf">0.0</span>
+        <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;threshold&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s1">&#39;independent&#39;</span><span class="p">:</span>
                 <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">]</span>
-                <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">]</span><span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">]</span>
+                <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">]</span>
             <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s1">&#39;shared_perceptual_noise&#39;</span><span class="p">:</span>
                 <span class="n">perceptual_sd</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;perceptual_noise_sd&#39;</span><span class="p">]</span>
                 <span class="n">memory_sd</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;memory_noise_sd&#39;</span><span class="p">]</span>
@@ -420,9 +420,10 @@
         <span class="n">n1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">base_ns</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">fractions</span><span class="p">))</span>
         <span class="n">n2</span> <span class="o">=</span> <span class="p">(</span><span class="n">base_ns</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">fractions</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:])</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
 
-        <span class="n">paradigm</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;n1&#39;</span><span class="p">:</span><span class="n">n1</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">:</span><span class="n">n2</span><span class="p">})</span>
+        <span class="n">paradigm</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;n1&#39;</span><span class="p">:</span> <span class="n">n1</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">:</span> <span class="n">n2</span><span class="p">})</span>
 
         <span class="k">return</span> <span class="n">paradigm</span></div>
+
 
 
 <div class="viewcode-block" id="MagnitudeComparisonRegressionModel">
@@ -430,9 +431,10 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">MagnitudeComparisonRegressionModel</span><span class="p">(</span><span class="n">RegressionModel</span><span class="p">,</span> <span class="n">MagnitudeComparisonModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;MagnitudeComparisonModel with patsy formula regression on noise/prior parameters.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">regressors</span><span class="p">,</span> <span class="n">fit_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">memory_model</span> <span class="o">=</span> <span class="s1">&#39;independent&#39;</span><span class="p">,</span><span class="n">save_trialwise_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">regressors</span><span class="p">,</span> <span class="n">fit_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">save_trialwise_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="n">RegressionModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="p">)</span>
         <span class="n">MagnitudeComparisonModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">fit_prior</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">,</span> <span class="n">memory_model</span><span class="p">,</span> <span class="n">save_trialwise_estimates</span><span class="p">)</span></div>
+
 
 
 <div class="viewcode-block" id="MagnitudeComparisonLapseModel">
@@ -442,11 +444,13 @@
     <span class="o">...</span></div>
 
 
+
 <div class="viewcode-block" id="MagnitudeComparisonLapseRegressionModel">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.models.MagnitudeComparisonLapseRegressionModel">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MagnitudeComparisonLapseRegressionModel</span><span class="p">(</span><span class="n">LapseModel</span><span class="p">,</span> <span class="n">MagnitudeComparisonRegressionModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;MagnitudeComparisonModel with both a lapse rate and patsy formula regression.&quot;&quot;&quot;</span>
     <span class="o">...</span></div>
+
 
 
 <div class="viewcode-block" id="FlexibleNoiseComparisonModel">
@@ -567,7 +571,7 @@
             <span class="n">paradigm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span>
 
         <span class="k">if</span> <span class="n">hierarchical</span> <span class="ow">and</span> <span class="p">(</span><span class="s1">&#39;subject&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">coords</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
-            <span class="k">assert</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span> <span class="ow">in</span> <span class="n">paradigm</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">),</span> <span class="s2">&quot;Hierarchical estimation requires a multi-index with a &#39;subject&#39; level.&quot;</span>
+            <span class="k">assert</span> <span class="p">(</span><span class="s1">&#39;subject&#39;</span> <span class="ow">in</span> <span class="n">paradigm</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">),</span> <span class="s2">&quot;Hierarchical estimation requires a multi-index with a &#39;subject&#39; level.&quot;</span>
             <span class="n">coords</span><span class="p">[</span><span class="s1">&#39;subject&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">paradigm</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span>
 
         <span class="n">coords</span><span class="p">[</span><span class="s1">&#39;poly_order&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_spline_order</span><span class="p">)</span>
@@ -606,7 +610,7 @@
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">prior_sd</span>
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">prior_sd</span>
 
-        <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;threshold&#39;</span><span class="p">]</span> <span class="o">=</span>  <span class="mf">0.0</span>
+        <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;threshold&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
 
         <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span>
         <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]</span>
@@ -623,14 +627,14 @@
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
             <span class="n">key1</span><span class="p">,</span> <span class="n">key2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_evidence_sd_labels</span><span class="p">()</span>
 
-            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
                 <span class="n">free_parameters</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">key1</span><span class="si">}</span><span class="s1">_spline</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="mf">5.</span><span class="p">,</span> <span class="s1">&#39;sigma_intercept&#39;</span><span class="p">:</span> <span class="mf">5.</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;identity&#39;</span><span class="p">}</span>
 
-            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
                 <span class="n">free_parameters</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">key2</span><span class="si">}</span><span class="s1">_spline</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="mf">5.</span><span class="p">,</span> <span class="s1">&#39;sigma_intercept&#39;</span><span class="p">:</span> <span class="mf">5.</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;identity&#39;</span><span class="p">}</span>
 
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
                 <span class="n">free_parameters</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;evidence_sd_spline</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="mf">5.</span><span class="p">,</span> <span class="s1">&#39;sigma_intercept&#39;</span><span class="p">:</span> <span class="mf">5.</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;identity&#39;</span><span class="p">}</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_prior</span><span class="p">:</span>
@@ -652,11 +656,11 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_evidence_sd_spline_par_labels</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
             <span class="n">key1</span><span class="p">,</span> <span class="n">key2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_evidence_sd_labels</span><span class="p">()</span>
-            <span class="n">label1</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">key1</span><span class="si">}</span><span class="s1">_spline</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">)]</span>
-            <span class="n">label2</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">key2</span><span class="si">}</span><span class="s1">_spline</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">)]</span>
+            <span class="n">label1</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">key1</span><span class="si">}</span><span class="s1">_spline</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
+            <span class="n">label2</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">key2</span><span class="si">}</span><span class="s1">_spline</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
             <span class="k">return</span> <span class="n">label1</span><span class="p">,</span> <span class="n">label2</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;evidence_sd_spline</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span><span class="o">+</span><span class="mi">1</span><span class="p">)]</span>
+            <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;evidence_sd_spline</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
             <span class="k">return</span> <span class="n">labels</span><span class="p">,</span> <span class="n">labels</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_evidence_sd_labels</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -739,7 +743,7 @@
         <span class="k">if</span> <span class="p">(</span><span class="n">idata</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">pars</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Only one of idata or pars must be provided.&#39;</span><span class="p">)</span>
 
-        <span class="k">assert</span><span class="p">(</span><span class="n">variable</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;both&#39;</span><span class="p">,</span> <span class="s1">&#39;perceptual_noise_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;memory_noise_sd&#39;</span><span class="p">]),</span> <span class="s2">&quot;Variable must be &#39;n1_evidence_sd&#39;, &#39;n2_evidence_sd&#39;, &#39;both&#39;, &#39;perceptual_noise_sd&#39;, or &#39;memory_noise_sd&#39;.&quot;</span>
+        <span class="k">assert</span> <span class="p">(</span><span class="n">variable</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;both&#39;</span><span class="p">,</span> <span class="s1">&#39;perceptual_noise_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;memory_noise_sd&#39;</span><span class="p">]),</span> <span class="s2">&quot;Variable must be &#39;n1_evidence_sd&#39;, &#39;n2_evidence_sd&#39;, &#39;both&#39;, &#39;perceptual_noise_sd&#39;, or &#39;memory_noise_sd&#39;.&quot;</span>
 
         <span class="k">if</span> <span class="n">variable</span> <span class="o">==</span> <span class="s1">&#39;both&#39;</span><span class="p">:</span>
             <span class="n">n1_evidence_sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_sd_curve</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">pars</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">group</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="n">hierarchical</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
@@ -748,7 +752,7 @@
             <span class="k">return</span> <span class="n">n1_evidence_sd</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">n2_evidence_sd</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">variable</span> <span class="o">==</span> <span class="s1">&#39;evidence_sd&#39;</span><span class="p">:</span>
-            <span class="k">assert</span><span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span><span class="p">),</span> <span class="s2">&quot;Single evidence_sd only when not fit_seperate_evidence_sd.&quot;</span>
+            <span class="k">assert</span> <span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span><span class="p">),</span> <span class="s2">&quot;Single evidence_sd only when not fit_seperate_evidence_sd.&quot;</span>
 
             <span class="n">evidence_sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_sd_curve</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">group</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="n">hierarchical</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
 
@@ -756,9 +760,8 @@
 
             <span class="k">return</span> <span class="n">evidence_sd</span>
 
-
         <span class="k">if</span> <span class="n">x</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">assert</span><span class="p">((</span><span class="n">data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;data&#39;</span><span class="p">))),</span> <span class="s2">&quot;If x is not provided, data must be provided.&quot;</span>
+            <span class="k">assert</span> <span class="p">((</span><span class="n">data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;data&#39;</span><span class="p">))),</span> <span class="s2">&quot;If x is not provided, data must be provided.&quot;</span>
 
             <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span>
@@ -820,44 +823,6 @@
 
         <span class="k">return</span> <span class="n">output</span>
 
-    <span class="nd">@classmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_sd_curve_stats</span><span class="p">(</span><span class="n">n_sd</span><span class="p">,</span> <span class="n">groupby</span><span class="o">=</span><span class="p">[]):</span>
-        <span class="n">keys</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span>
-
-        <span class="k">if</span> <span class="s1">&#39;subject&#39;</span> <span class="ow">in</span> <span class="n">n_sd</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">:</span>
-            <span class="n">keys</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="s1">&#39;variable&#39;</span> <span class="ow">in</span> <span class="n">n_sd</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">:</span>
-            <span class="n">keys</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;variable&#39;</span><span class="p">)</span>
-
-        <span class="n">keys</span> <span class="o">+=</span> <span class="n">groupby</span>
-
-        <span class="n">sd_ci</span> <span class="o">=</span> <span class="n">n_sd</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">keys</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">d</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">hdi</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">())))</span><span class="c1">#, index=pd.Index([&#39;hdi025&#39;, &#39;hdi975&#39;]))))</span>
-        <span class="n">sd_ci</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;hdi025&#39;</span><span class="p">,</span> <span class="s1">&#39;hdi975&#39;</span><span class="p">]</span>
-        <span class="n">sd_mean</span> <span class="o">=</span> <span class="n">n_sd</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">keys</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
-
-        <span class="k">return</span> <span class="n">sd_mean</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">sd_ci</span><span class="p">)</span>
-
-    <span class="nd">@classmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">plot_sd_curve_stats</span><span class="p">(</span><span class="n">n_sd_stats</span><span class="p">,</span> <span class="n">ylim</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span> <span class="n">y</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-
-        <span class="k">if</span> <span class="n">y</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">y</span> <span class="o">=</span> <span class="n">n_sd_stats</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-
-        <span class="n">hue</span> <span class="o">=</span> <span class="s1">&#39;variable&#39;</span> <span class="k">if</span> <span class="s1">&#39;variable&#39;</span> <span class="ow">in</span> <span class="n">n_sd_stats</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">names</span> <span class="k">else</span> <span class="kc">None</span>
-        <span class="n">col</span> <span class="o">=</span> <span class="s1">&#39;subject&#39;</span> <span class="k">if</span> <span class="s1">&#39;subject&#39;</span> <span class="ow">in</span> <span class="n">n_sd_stats</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">names</span> <span class="k">else</span> <span class="kc">None</span>
-
-        <span class="n">g</span> <span class="o">=</span> <span class="n">sns</span><span class="o">.</span><span class="n">FacetGrid</span><span class="p">(</span><span class="n">n_sd_stats</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(),</span> <span class="n">hue</span><span class="o">=</span><span class="n">hue</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="n">col</span><span class="p">,</span> <span class="n">col_wrap</span><span class="o">=</span><span class="mi">3</span> <span class="k">if</span> <span class="n">col</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span> <span class="n">sharex</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sharey</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                        <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-
-        <span class="n">g</span><span class="o">.</span><span class="n">map_dataframe</span><span class="p">(</span><span class="n">plot_prediction</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">)</span>
-        <span class="n">g</span><span class="o">.</span><span class="n">map_dataframe</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">,</span> <span class="s1">&#39;x&#39;</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
-
-        <span class="n">g</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">ylim</span><span class="o">=</span><span class="n">ylim</span><span class="p">)</span>
-        <span class="n">g</span><span class="o">.</span><span class="n">fig</span><span class="o">.</span><span class="n">set_size_inches</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">g</span>
-
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_sd_curve_stats</span><span class="p">(</span><span class="n">n_sd</span><span class="p">,</span> <span class="n">groupby</span><span class="o">=</span><span class="p">[]):</span>
         <span class="n">keys</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span>
@@ -870,7 +835,7 @@
 
         <span class="n">keys</span> <span class="o">+=</span> <span class="n">groupby</span>
 
-        <span class="n">sd_ci</span> <span class="o">=</span> <span class="n">n_sd</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">keys</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">d</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">hdi</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">())))</span><span class="c1">#, index=pd.Index([&#39;hdi025&#39;, &#39;hdi975&#39;]))))</span>
+        <span class="n">sd_ci</span> <span class="o">=</span> <span class="n">n_sd</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">keys</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">d</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">hdi</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">())))</span>  <span class="c1"># , index=pd.Index([&#39;hdi025&#39;, &#39;hdi975&#39;]))))</span>
         <span class="n">sd_ci</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;hdi025&#39;</span><span class="p">,</span> <span class="s1">&#39;hdi975&#39;</span><span class="p">]</span>
         <span class="n">sd_mean</span> <span class="o">=</span> <span class="n">n_sd</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">keys</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
 
@@ -902,6 +867,7 @@
         <span class="k">return</span> <span class="n">paradigm_</span></div>
 
 
+
 <div class="viewcode-block" id="FlexibleNoiseComparisonRegressionModel">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.models.FlexibleNoiseComparisonRegressionModel">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FlexibleNoiseComparisonRegressionModel</span><span class="p">(</span><span class="n">RegressionModel</span><span class="p">,</span> <span class="n">FlexibleNoiseComparisonModel</span><span class="p">):</span>
@@ -917,7 +883,6 @@
         <span class="k">if</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">spline_order</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
             <span class="n">spline_order</span> <span class="o">=</span> <span class="n">spline_order</span><span class="p">,</span> <span class="n">spline_order</span>
 
-
         <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">regressors</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
 
             <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;memory_noise&#39;</span><span class="p">,</span> <span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;perceptual_noise&#39;</span><span class="p">]:</span>
@@ -931,11 +896,10 @@
 
                 <span class="n">warn</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Found </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s1"> in regressors, will add it for all </span><span class="si">{</span><span class="n">po</span><span class="si">}</span><span class="s1"> splines!&#39;</span><span class="p">)</span>
 
-                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">po</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">po</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
                     <span class="n">regressors</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s1">_spline</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">regressors</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
 
                 <span class="n">regressors</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
-
 
         <span class="n">RegressionModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="p">)</span>
         <span class="n">FlexibleNoiseComparisonModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">,</span> <span class="n">fit_prior</span><span class="p">,</span>
@@ -1031,8 +995,8 @@
                 <span class="n">memory_log_sd</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;memory_log_sd_intercept&#39;</span><span class="p">]</span>
                 <span class="c1"># Combine perceptual and memory noise in variance (linear) space</span>
                 <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span>
-                    <span class="n">pt</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">perceptual_log_sd</span> <span class="o">+</span> <span class="n">noise_exponent</span> <span class="o">*</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])))</span> <span class="o">+</span>
-                    <span class="n">pt</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">memory_log_sd</span> <span class="o">+</span> <span class="n">noise_exponent</span> <span class="o">*</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]))))</span>
+                    <span class="n">pt</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">perceptual_log_sd</span> <span class="o">+</span> <span class="n">noise_exponent</span> <span class="o">*</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])))</span>
+                    <span class="o">+</span> <span class="n">pt</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">memory_log_sd</span> <span class="o">+</span> <span class="n">noise_exponent</span> <span class="o">*</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]))))</span>
                 <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span>
                     <span class="n">perceptual_log_sd</span> <span class="o">+</span> <span class="n">noise_exponent</span> <span class="o">*</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]))</span>
             <span class="k">else</span><span class="p">:</span>
@@ -1146,7 +1110,6 @@
         <span class="n">RegressionModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="p">)</span>
         <span class="n">PowerLawNoiseComparisonModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">,</span>
                                               <span class="n">fit_prior</span><span class="p">,</span> <span class="n">memory_model</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="p">)</span>
-
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">PowerLawEncodingComparisonModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
@@ -1279,8 +1242,6 @@
         <span class="n">RegressionModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="p">)</span>
         <span class="n">PowerLawEncodingComparisonModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">,</span>
                                                  <span class="n">fit_prior</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="p">)</span>
-
-
 </pre></div>
         </article>
       </div>

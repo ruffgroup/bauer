@@ -246,10 +246,12 @@
 <span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pytensor.tensor</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pt</span>
 
+
 <div class="viewcode-block" id="logistic">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.math.logistic">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">logistic</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
     <span class="k">return</span> <span class="mf">1.</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">+</span> <span class="n">pt</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">x</span><span class="p">))</span></div>
+
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">inverse_softplus</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
@@ -261,10 +263,12 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">softplus_np</span><span class="p">(</span><span class="n">x</span><span class="p">):</span> <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">x</span><span class="p">)))</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span></div>
 
 
+
 <div class="viewcode-block" id="inverse_softplus_np">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.math.inverse_softplus_np">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">inverse_softplus_np</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-</span> <span class="mf">1.</span><span class="p">)</span></div>
+
 
 
 <div class="viewcode-block" id="logistic_np">
@@ -272,9 +276,11 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">logistic_np</span><span class="p">(</span><span class="n">x</span><span class="p">):</span> <span class="k">return</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">x</span><span class="p">))</span></div>
 
 
+
 <div class="viewcode-block" id="logit_np">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.math.logit_np">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">logit_np</span><span class="p">(</span><span class="n">p</span><span class="p">):</span> <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">p</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">))</span></div>
+
 
 
 <div class="viewcode-block" id="logit">
@@ -283,10 +289,12 @@
     <span class="k">return</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">p</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">))</span></div>
 
 
+
 <div class="viewcode-block" id="logit_derivative">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.math.logit_derivative">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">logit_derivative</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
-    <span class="k">return</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="n">p</span><span class="o">-</span><span class="n">p</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span></div>
+    <span class="k">return</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="n">p</span> <span class="o">-</span> <span class="n">p</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span></div>
+
 
 
 <div class="viewcode-block" id="gaussian_pdf">
