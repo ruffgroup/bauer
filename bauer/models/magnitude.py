@@ -582,7 +582,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
     @classmethod
     def plot_sd_curve_stats(n_sd_stats, ylim=(0, 20), y=None, **kwargs):
 
-        if y == None:
+        if y is None:
             y = n_sd_stats.columns[0]
 
         hue = 'variable' if 'variable' in n_sd_stats.index.names else None
