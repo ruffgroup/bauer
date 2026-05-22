@@ -30,7 +30,8 @@ from .magnitude import (
     PowerLawNoiseComparisonModel, PowerLawNoiseComparisonRegressionModel,
 )
 from .risky_choice import (
-    RiskModel, FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
+    RiskModel, RiskRegressionModel,
+    FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
     PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
 )
 from ..utils.bayes import get_posterior, posterior_mean_sd
@@ -676,6 +677,42 @@ class DDMRiskModel(DDMMixin, RiskModel):
         self.fix_z = fix_z
         super().__init__(
             paradigm=paradigm, prior_estimate=prior_estimate,
+            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            memory_model=memory_model,
+        )
+
+    def _get_drift(self, model_inputs, parameters):
+        v_scale = parameters['v_scale'] if self.fit_v_scale else None
+        return _drift_from_snr(model_inputs, v_scale=v_scale,
+                               flat_observer_prior=getattr(self, 'flat_observer_prior', False))
+
+
+class DDMRiskRegressionModel(DDMMixin, RiskRegressionModel):
+    """DDM variant of :class:`RiskRegressionModel`.
+
+    Patsy-formula regression on the cognitive front-end
+    (``n1_evidence_sd``, ``n2_evidence_sd``, prior params) and on the
+    accumulator params (``a``, ``t0``, ``v_scale`` if ``fit_v_scale``).
+    Use this for two-group / condition-comparison designs where the
+    noise function shape itself is *not* the focus.
+
+    For richer noise-curve-shape comparisons see
+    :class:`DDMFlexibleNoiseRiskRegressionModel` (B-spline noise).
+
+    Paradigm columns required: ``n1``, ``n2``, ``p1``, ``p2``,
+    ``choice`` (bool), ``rt`` (seconds).
+    """
+
+    def __init__(self, paradigm, regressors, prior_estimate='objective',
+                 fit_seperate_evidence_sd=True,
+                 save_trialwise_n_estimates=False, memory_model='independent',
+                 fit_v_scale=False, fix_z=True):
+        self.fit_v_scale = fit_v_scale
+        self.fix_z = fix_z
+        RiskRegressionModel.__init__(
+            self, paradigm, regressors,
+            prior_estimate=prior_estimate,
             fit_seperate_evidence_sd=fit_seperate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
