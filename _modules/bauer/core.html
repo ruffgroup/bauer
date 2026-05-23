@@ -915,14 +915,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">design_matrices</span> <span class="o">=</span> <span class="p">{}</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_paradigm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">subject_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="c1"># Forward subject_mapping only when the next class in the MRO accepts</span>
-        <span class="c1"># it (DDMMixin does; plain MagnitudeComparisonModel doesn&#39;t). Without</span>
-        <span class="c1"># this fallback, multiple-inheritance combinations like</span>
-        <span class="c1"># DDMMagnitudeComparisonRegressionModel raise TypeError on build.</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">paradigm_</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_get_paradigm</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="n">subject_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-        <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
-            <span class="n">paradigm_</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_get_paradigm</span><span class="p">(</span><span class="n">paradigm</span><span class="p">)</span>
+        <span class="n">paradigm_</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_get_paradigm</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="n">subject_mapping</span><span class="o">=</span><span class="n">subject_mapping</span><span class="p">)</span>
 
         <span class="n">free_parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_free_parameters</span><span class="p">()</span>
 
@@ -990,8 +983,15 @@
 
         <span class="k">return</span> <span class="n">trialwise_pars</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">build_prior</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">mu_intercept</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sigma_intercept</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sigma_regressors</span><span class="o">=</span><span class="mf">1.</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="s1">&#39;identity&#39;</span><span class="p">):</span>
-
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_prior</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">mu_intercept</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sigma_intercept</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                    <span class="n">sigma_regressors</span><span class="o">=</span><span class="mf">1.</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="s1">&#39;identity&#39;</span><span class="p">,</span>
+                    <span class="n">flat_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">_unused</span><span class="p">):</span>
+        <span class="c1"># ``flat_prior`` is accepted (and currently ignored) so the</span>
+        <span class="c1"># non-hierarchical dispatch (``build_priors(hierarchical=False)``)</span>
+        <span class="c1"># works for regression models too; the legacy hierarchical path</span>
+        <span class="c1"># already supports it.</span>
+        <span class="k">if</span> <span class="n">sigma_intercept</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">sigma_intercept</span> <span class="o">=</span> <span class="mf">1.0</span>
         <span class="n">model</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span>
         <span class="n">model</span><span class="o">.</span><span class="n">add_coord</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_regressors&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">design_matrices</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">design_info</span><span class="o">.</span><span class="n">column_names</span><span class="p">)</span>
 
@@ -1003,26 +1003,37 @@
             <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;n1_evidence_mu&#39;</span><span class="p">,</span> <span class="s1">&#39;n2_evidence_mu&#39;</span><span class="p">]:</span>
                 <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1"> has an Intercept-regressors. This is most likely NOT a good idea.&#39;</span><span class="p">)</span>
 
-            <span class="k">if</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;identity&#39;</span><span class="p">:</span>
-                <span class="n">mu</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">mu_intercept</span>
-                <span class="n">sigma</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sigma_intercept</span>
-            <span class="k">elif</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;logistic&#39;</span><span class="p">:</span>
-                <span class="n">mu</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">mu_intercept</span>
-                <span class="n">sigma</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sigma_intercept</span>
-            <span class="c1"># Possibly use inverse of softplus</span>
+            <span class="c1"># The regression happens on the *untransformed* scale (the</span>
+            <span class="c1"># transform — softplus / logistic / identity — is applied later</span>
+            <span class="c1"># in get_trialwise_variable after the design-matrix product), so</span>
+            <span class="c1"># the Intercept prior is always Normal(mu_intercept,</span>
+            <span class="c1"># sigma_intercept) regardless of which transform the parameter</span>
+            <span class="c1"># uses. Previously the softplus branch was missing, silently</span>
+            <span class="c1"># defaulting softplus parameters to Normal(0, sigma_regressors)</span>
+            <span class="c1"># — which wrecked NUTS mixing on every regression DDM fit.</span>
+            <span class="n">mu</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">mu_intercept</span>
+            <span class="n">sigma</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sigma_intercept</span>
 
         <span class="n">pm</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="n">mu</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="n">sigma</span><span class="p">,</span> <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_regressors&#39;</span><span class="p">,))</span>
 
 <div class="viewcode-block" id="RegressionModel.build_hierarchical_nodes">
 <a class="viewcode-back" href="../../api_reference.html#bauer.core.RegressionModel.build_hierarchical_nodes">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">build_hierarchical_nodes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">mu_intercept</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">sigma_intercept</span><span class="o">=</span><span class="mf">1.</span><span class="p">,</span>
-                                 <span class="n">cauchy_sigma_intercept</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">sigma_regressors</span><span class="o">=</span><span class="mf">1.</span><span class="p">,</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_hierarchical_nodes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">mu_intercept</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">sigma_intercept</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                                 <span class="n">cauchy_sigma_intercept</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sigma_regressors</span><span class="o">=</span><span class="mf">1.</span><span class="p">,</span>
                                  <span class="n">cauchy_sigma_regressors</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="s1">&#39;identity&#39;</span><span class="p">,</span>
                                  <span class="n">min_value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="c1"># `min_value` and the transform are applied in get_trialwise_variable</span>
         <span class="c1"># (which sees the design-matrix product); accepted here so that</span>
         <span class="c1"># parameters carrying these kwargs (e.g. DDM `a`, `t0`) don&#39;t crash the</span>
         <span class="c1"># regression-model dispatch.</span>
+        <span class="c1"># sigma_intercept / cauchy_sigma_intercept default to None (resolved</span>
+        <span class="c1"># to 0.5 / 0.25 below) to match BaseModel.build_hierarchical_nodes,</span>
+        <span class="c1"># so that intercept-only regression models have the same Intercept</span>
+        <span class="c1"># prior as the equivalent basic model.</span>
+        <span class="k">if</span> <span class="n">sigma_intercept</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">sigma_intercept</span> <span class="o">=</span> <span class="mf">0.5</span>
+        <span class="k">if</span> <span class="n">cauchy_sigma_intercept</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cauchy_sigma_intercept</span> <span class="o">=</span> <span class="mf">0.25</span>
 
         <span class="n">model</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span>
         <span class="n">model</span><span class="o">.</span><span class="n">add_coord</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_regressors&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">design_matrices</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">design_info</span><span class="o">.</span><span class="n">column_names</span><span class="p">)</span>
@@ -1037,13 +1048,13 @@
             <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;n1_evidence_mu&#39;</span><span class="p">,</span> <span class="s1">&#39;n2_evidence_mu&#39;</span><span class="p">]:</span>
                 <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1"> has an Intercept-regressors. This is most likely NOT a good idea.&#39;</span><span class="p">)</span>
 
-            <span class="k">if</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;identity&#39;</span><span class="p">:</span>
-                <span class="n">mu</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">mu_intercept</span>
-                <span class="n">sigma</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sigma_intercept</span>
-            <span class="k">elif</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;logistic&#39;</span><span class="p">:</span>
-                <span class="n">mu</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">mu_intercept</span>
-                <span class="n">sigma</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sigma_intercept</span>
-            <span class="c1"># Possibly use inverse of softplus</span>
+            <span class="c1"># See note in build_prior: the regression operates on the</span>
+            <span class="c1"># *untransformed* scale, so the Intercept prior is the same</span>
+            <span class="c1"># Normal(mu_intercept, sigma_intercept) for all three</span>
+            <span class="c1"># transforms. The previously-missing softplus branch was the</span>
+            <span class="c1"># source of the regression-DDM convergence pathology.</span>
+            <span class="n">mu</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">mu_intercept</span>
+            <span class="n">sigma</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sigma_intercept</span>
 
         <span class="n">group_mu</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_mu&quot;</span><span class="p">,</span>
                              <span class="n">mu</span><span class="o">=</span><span class="n">mu</span><span class="p">,</span>
