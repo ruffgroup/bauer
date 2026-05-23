@@ -650,14 +650,7 @@ class RegressionModel(BaseModel):
         self.design_matrices = {}
 
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
-        # Forward subject_mapping only when the next class in the MRO accepts
-        # it (DDMMixin does; plain MagnitudeComparisonModel doesn't). Without
-        # this fallback, multiple-inheritance combinations like
-        # DDMMagnitudeComparisonRegressionModel raise TypeError on build.
-        try:
-            paradigm_ = super()._get_paradigm(paradigm, subject_mapping=None)
-        except TypeError:
-            paradigm_ = super()._get_paradigm(paradigm)
+        paradigm_ = super()._get_paradigm(paradigm, subject_mapping=subject_mapping)
 
         free_parameters = self.get_free_parameters()
 
@@ -725,8 +718,15 @@ class RegressionModel(BaseModel):
 
         return trialwise_pars
 
-    def build_prior(self, name, mu_intercept=None, sigma_intercept=None, sigma_regressors=1., transform='identity'):
-
+    def build_prior(self, name, mu_intercept=None, sigma_intercept=None,
+                    sigma_regressors=1., transform='identity',
+                    flat_prior=False, **_unused):
+        # ``flat_prior`` is accepted (and currently ignored) so the
+        # non-hierarchical dispatch (``build_priors(hierarchical=False)``)
+        # works for regression models too; the legacy hierarchical path
+        # already supports it.
+        if sigma_intercept is None:
+            sigma_intercept = 1.0
         model = pm.Model.get_context()
         model.add_coord(f'{name}_regressors', self.design_matrices[name].design_info.column_names)
 
@@ -738,24 +738,35 @@ class RegressionModel(BaseModel):
             if name in ['n1_evidence_mu', 'n2_evidence_mu']:
                 warnings.warn(f'{name} has an Intercept-regressors. This is most likely NOT a good idea.')
 
-            if transform == 'identity':
-                mu[0] = mu_intercept
-                sigma[0] = sigma_intercept
-            elif transform == 'logistic':
-                mu[0] = mu_intercept
-                sigma[0] = sigma_intercept
-            # Possibly use inverse of softplus
+            # The regression happens on the *untransformed* scale (the
+            # transform — softplus / logistic / identity — is applied later
+            # in get_trialwise_variable after the design-matrix product), so
+            # the Intercept prior is always Normal(mu_intercept,
+            # sigma_intercept) regardless of which transform the parameter
+            # uses. Previously the softplus branch was missing, silently
+            # defaulting softplus parameters to Normal(0, sigma_regressors)
+            # — which wrecked NUTS mixing on every regression DDM fit.
+            mu[0] = mu_intercept
+            sigma[0] = sigma_intercept
 
         pm.Normal(name, mu=mu, sigma=sigma, dims=(f'{name}_regressors',))
 
-    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=1.,
-                                 cauchy_sigma_intercept=0.25, sigma_regressors=1.,
+    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=None,
+                                 cauchy_sigma_intercept=None, sigma_regressors=1.,
                                  cauchy_sigma_regressors=0.25, transform='identity',
                                  min_value=0.0, **kwargs):
         # `min_value` and the transform are applied in get_trialwise_variable
         # (which sees the design-matrix product); accepted here so that
         # parameters carrying these kwargs (e.g. DDM `a`, `t0`) don't crash the
         # regression-model dispatch.
+        # sigma_intercept / cauchy_sigma_intercept default to None (resolved
+        # to 0.5 / 0.25 below) to match BaseModel.build_hierarchical_nodes,
+        # so that intercept-only regression models have the same Intercept
+        # prior as the equivalent basic model.
+        if sigma_intercept is None:
+            sigma_intercept = 0.5
+        if cauchy_sigma_intercept is None:
+            cauchy_sigma_intercept = 0.25
 
         model = pm.Model.get_context()
         model.add_coord(f'{name}_regressors', self.design_matrices[name].design_info.column_names)
@@ -770,13 +781,13 @@ class RegressionModel(BaseModel):
             if name in ['n1_evidence_mu', 'n2_evidence_mu']:
                 warnings.warn(f'{name} has an Intercept-regressors. This is most likely NOT a good idea.')
 
-            if transform == 'identity':
-                mu[0] = mu_intercept
-                sigma[0] = sigma_intercept
-            elif transform == 'logistic':
-                mu[0] = mu_intercept
-                sigma[0] = sigma_intercept
-            # Possibly use inverse of softplus
+            # See note in build_prior: the regression operates on the
+            # *untransformed* scale, so the Intercept prior is the same
+            # Normal(mu_intercept, sigma_intercept) for all three
+            # transforms. The previously-missing softplus branch was the
+            # source of the regression-DDM convergence pathology.
+            mu[0] = mu_intercept
+            sigma[0] = sigma_intercept
 
         group_mu = pm.Normal(f"{name}_mu",
                              mu=mu,
