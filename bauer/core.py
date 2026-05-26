@@ -984,7 +984,11 @@ class RegressionModel(BaseModel):
         for parameter in free_parameters.keys():
             dm = self.rebuild_design_matrix(conditions, parameter)
 
-            if group:
+            # Hierarchical regression fits store the group-mean coefficients as
+            # `{parameter}_mu`; per-subject (non-hierarchical) fits only have
+            # `{parameter}`. Prefer the group-mean when asked for the group and
+            # it exists, otherwise fall back to the per-subject coefficients.
+            if group and f'{parameter}_mu' in idata.posterior:
                 trace = idata.posterior[f'{parameter}_mu'].to_dataframe().unstack(-1)
             else:
                 trace = idata.posterior[f'{parameter}'].to_dataframe().unstack(-1)
