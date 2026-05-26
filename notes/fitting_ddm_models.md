@@ -18,10 +18,12 @@ Canonical runnable examples:
 Drop trials with `rt < 0.20 s`; make sure `choice` is boolean and `rt` is in
 seconds. Build the DDM model with `fit_separate_evidence_sd=True` and
 `fit_prior=True` (risk models: `prior_estimate='full'`). Sample with
-**numpyro, vectorized, on a GPU**, `tune=2000, draws=1000, chains=4,
-target_accept=0.99` for a real-sized dataset (~50+ subjects). Then **check
-r̂ ≤ 1.01 and ESS ≥ 400 before believing any number**. That config is the
-default for a reason — see below.
+**numpyro on a GPU**, `tune=2000, draws=1000, chains=4, target_accept=0.99`
+for a real-sized dataset (~50+ subjects). Use
+`chain_method='vectorized'` for a **basic** DDM, but
+**`chain_method='parallel'` for any regression or hierarchical-regression
+DDM** (vectorized leaves those stuck at r̂≈1.6–2.5 — see §3). Then **check
+r̂ ≤ 1.01 and ESS ≥ 400 before believing any number**.
 
 ---
 
@@ -77,12 +79,21 @@ idata = m.sample(
 )
 ```
 
-- **numpyro vectorized on GPU is the workhorse and the right default.** On
-  an L4 a Garcia n=64 fit is ~45 min; on CPU it's many hours. It converges
-  the basic *and* the regression DDM (the regression DDM only ever "needed"
-  parallel/slice because of the softplus bug in §6.3 — that's fixed).
-- **`tune=2000`, not 1000.** The default `tune=1000` gives r̂≈2.6 on n=64 —
-  non-convergence, not a result. Warmup is where the
+- **numpyro on GPU is the workhorse.** On an L4 a Garcia n=64 fit is
+  ~45 min (vectorized); on CPU it's many hours.
+- **Basic (non-regression) DDM → `chain_method='vectorized'` is fine.**
+- **Regression OR hierarchical-regression DDM → use `chain_method='parallel'`.**
+  This is the empirically load-bearing setting, verified on two independent
+  cases: Garcia n=64 `ddm_isi` and the Alina per-subject gain/loss fits. On
+  **vectorized**, both stick at **r̂≈1.6–2.5** even *after* the softplus fix
+  and even with `tune=4000` — vectorized shares one RNG seed across chains
+  (§6.3 / §4 of `ddm_convergence_lessons.md`), so a bad seed freezes several
+  at once. `parallel` gives each chain its own seed and converges. The
+  softplus fix is **necessary but not sufficient** for regression DDMs.
+  (On a single GPU, `parallel` runs chains sequentially → ~4× wall time, but
+  it's the reliable choice.)
+- **`tune` ≥ 2000 (4000 for regression).** The default `tune=1000` gives
+  r̂≈2.6 on n=64 — non-convergence, not a result. Warmup is where the
   `a ↔ t0 ↔ drift` identifiability ridge gets adapted.
 - **`target_accept=0.99`** for hierarchical DDMs (smaller step, deeper
   trees, fewer divergences on the ridge). 0.95 is fine for the simpler
@@ -136,9 +147,12 @@ Work top to bottom; stop at the first that applies.
    `RegressionModel` softplus-prior bug silently zeroed Intercept priors
    (e.g. drove `t0`'s prior mean to 0.69 s, into the LOGP_LB zone). Fixed
    in `bauer/core.py` (commit `34f8777`). **Re-fit it** on current code.
-3. **Bad seed catching vectorized chains?** Re-run with a different
-   `random_seed`, or `chain_method='parallel'` (CPU / small model), or just
-   bump `tune` to 2000–4000.
+3. **Regression / hierarchical-regression DDM on `vectorized`?** Switch to
+   **`chain_method='parallel'`**. This is the most common cause of a
+   regression DDM stuck at r̂≈1.6–2.5 after the data/prior are correct —
+   vectorized's shared RNG seed couples the chains. (Confirmed on Garcia
+   n=64 `ddm_isi` and the Alina per-subject fits.) Bumping `tune` or
+   changing `random_seed` does *not* reliably fix it; `parallel` does.
 4. **Genuinely weak data (a parameter is unidentified)?** Symptom:
    `P(choice) ≈ 0.5` in some condition → flat drift signal → intrinsically
    broad WFPT posterior. No sampler fixes this. Options, in order:

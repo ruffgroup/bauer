@@ -192,7 +192,9 @@ bash bauer/scripts/slurm_jobs/submit_all_production.sh
 > why, convergence checks, and a "won't converge" decision tree). For the longer
 > retrospective on *why* each rule exists, see `notes/ddm_convergence_lessons.md`.
 > Short version: filter `rt < 0.20 s`, `fit_separate_evidence_sd=True`, numpyro
-> vectorized on a GPU L4, `tune=2000 target_accept=0.99` for n≈64. The default
+> on a GPU L4, `tune=2000 target_accept=0.99` for n≈64. Use `chain_method='vectorized'`
+> for a basic DDM but **`parallel` for any regression/hierarchical-regression DDM**
+> (vectorized leaves those at r̂≈1.6–2.5 even after the softplus fix). The default
 > `tune=1000` gives r̂≈2.6 — non-convergence, not a result.
 
 ### Output filenames

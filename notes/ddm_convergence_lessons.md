@@ -182,8 +182,18 @@ Same model, same data, varied sampler config:
 |---|---|---|
 | numpyro vec, tune=1000 (default) | 2.64 / 5 | 3.93 / 4 |
 | numpyro vec, tune=2000, target=0.99 | **1.00 / 463** | 3.99 / 4 |
+| numpyro vec, tune=2000, target=0.99 **(post-softplus-fix, 2026-05-26)** | 1.013 / 332 | **1.60 / 6** |
 | numpyro parallel, tune=1000 | **1.00 / 1561** | (timeout — needs more time) |
 | blackjax vec | crashed (jax bug, `IO effect not supported in vmap-of-cond`) |
+
+> **Post-fix confirmation (2026-05-26).** The regression-DDM (`ddm_isi`) rows
+> above are NOT just pre-fix artifacts: re-run on *current* code (softplus fix
+> in) with vectorized + tune=2000, `ddm_isi` still came back **r̂=1.60, ESS=6**,
+> while the basic DDM was fine (r̂=1.013). The same pattern showed up
+> independently on the Alina per-subject gain/loss regression DDMs. Conclusion:
+> for a **regression / hierarchical-regression** DDM the load-bearing setting is
+> `chain_method='parallel'` (independent RNG per chain) — the softplus fix is
+> necessary but not sufficient. Vectorized is fine only for the *basic* DDM.
 
 **Conclusions:**
 
