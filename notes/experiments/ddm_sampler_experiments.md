@@ -48,27 +48,57 @@ incrementally).
 
 ## Results
 
-_(Pending the run — table + plot inserted here, then the conclusion. The
-guidance in `notes/fitting_ddm_models.md` will be reconciled to whatever this
-shows: if `vectorized` at tune=4000 converges the regression model, the
-recommendation becomes "more warmup", not "parallel".)_
+**Convergence is seed-dominated, and the lever is initialization — not
+`chain_method` and not `tune`.** pil03 regression DDM, `tune=2000`,
+`target_accept=0.99`; convergence = `max r̂ ≤ 1.01` on the cognitive params:
+
+| init scheme | chain_method | seeds | converged | rate | median r̂ | median walltime |
+|---|---|---|---|---|---|---|
+| default (bauer's old generic jitter) | vectorized | 16 | 2 | **12 %** | 2.02 | 647 s |
+| default | parallel | 2 | 2 | (100 %, n=2) | 1.004 | 639 s |
+| **finder** (MAP centre + prior-scaled jitter) | vectorized | 8 | 8 | **100 %** | 1.005 | **174 s** |
+
+Reading this:
+
+- **Same config, different seed → r̂ from 1.00 to 3.4.** With default init,
+  vectorized converged 2/16 (12 %). It was a lottery, which is why earlier
+  single runs looked like "vectorized is broken."
+- **`parallel` is not the fix.** It looked better only because independent
+  per-chain seeds make it less likely *all* chains lose the lottery at once —
+  but it's the same underlying fragility (and Alina pil02 had failed on
+  parallel earlier). Chasing `chain_method` was chasing the symptom.
+- **The starting-point finder is the fix: 8/8 (100 %) on the exact config that
+  failed 7/8 of the time** — and ~3.7× faster (174 s vs 647 s), because
+  well-initialised chains don't fall into the max-tree-depth stall. This is
+  bauer's `get_initial_points` / `recommended_init='mapjitter'` (MAP centre +
+  per-parameter prior-SD jitter), the same idea HSSM uses.
+
+Independent confirmation on real data: the **Alina** gain/loss DDMs — which
+had lost the seed lottery (pil02 failed on parallel) — both converge with the
+finder on vectorized (pil02 r̂=1.002, pil03 r̂=1.003).
+
+**Conclusion → guidance:** leave bauer's finder on (default for DDM/Race);
+`chain_method='vectorized'` is fine; check r̂. This is reconciled into
+`notes/fitting_ddm_models.md`, `CLAUDE.md`, `ddm_convergence_lessons.md §3b`,
+and the `ddm-sampler-choice` memory.
 
 ## n=64 arm (production headline)
 
 The pil03 arm is a **fast stress-test on a degenerate, near-chance subject** —
 useful for cheap iteration, but not representative of a normal fit. The real
 target is **Garcia n=64, hierarchical**, basic DDM vs ISI-regression DDM
-(`run_ddm_sampler_experiment_n64.py`). Because each n=64 regression fit is slow
-(hours — the hierarchical funnel drives NUTS to max tree depth), we run the
-**decisive 2×2** rather than a full crossing, reusing data points already
-measured:
+(`run_ddm_sampler_experiment_n64.py`). Each n=64 regression fit is slow (the hierarchical funnel drives NUTS to max
+tree depth with default init), so once the pil03 arm pinned the cause on
+initialization, the full old-init n=64 crossing was no longer worth the GPU-hours
+(those cells were cancelled). The n=64 evidence we keep:
 
-| n=64 `ddm_isi` (regression) | tune=2000 | tune=4000 |
-|---|---|---|
-| **vectorized** | r̂=1.60 (lesson-8 fit) | _3429449_ |
-| **parallel**   | _3429450_ | _3428563_ |
+| n=64 `ddm_isi` (regression), tune=2000 | r̂ |
+|---|---|
+| vectorized, **default init** | **1.60** (the lottery, on the production case) |
+| vectorized, basic DDM (contrast) | 1.013 (basic is easy; regression is the hard one) |
+| vectorized, **finder** | _from job 3432017 (lesson-8 re-fit), recorded on landing_ |
 
-Basic DDM, vectorized, tune=2000: r̂=1.013 (the basic-vs-regression contrast).
-
-Reading **across a row** isolates the effect of `tune`; reading **down a
-column** isolates `chain_method`. _(Results pending; table filled on landing.)_
+The pattern matches pil03: default init makes the n=64 regression DDM a lottery
+(r̂=1.60), while the basic DDM is fine — and the finder re-fit (well-behaved so
+far: steady ~1.5 s/it, no max-depth stalls) is expected to converge it on
+vectorized, confirming init is the lever at production scale too.

@@ -1,181 +1,98 @@
-# How to fit DDM models in bauer on real data
+# Fitting DDM models in bauer
 
-**Read this before fitting any DDM/RDM.** It is the prescriptive recipe;
-`ddm_convergence_lessons.md` is the longer retrospective on *why* each step
-is here. If a fit won't converge, 90% of the time it's one of the four
-pitfalls in §6 — check those before inventing a new theory.
+A short, prescriptive recipe for fitting drift-diffusion (and race) models.
+Runnable examples: `bauer/scripts/fit_for_lesson8.py` (magnitude comparison
+with a regressor) and `examples/for_alina/fit_ddm.py` (risky choice, gain/loss
+regression).
 
-Canonical runnable examples:
-- `bauer/scripts/fit_for_lesson8.py` — magnitude comparison, hierarchical,
-  with an ISI regressor (Garcia n=64).
-- `examples/for_alina/fit_ddm.py` — risky choice, per-subject, gain/loss
-  regression.
-
----
-
-## 0. The one-paragraph recipe
-
-Drop trials with `rt < 0.20 s`; make sure `choice` is boolean and `rt` is in
-seconds. Build the DDM model with `fit_separate_evidence_sd=True` and
-`fit_prior=True` (risk models: `prior_estimate='full'`). Sample with
-**numpyro on a GPU**, `tune=2000, draws=1000, chains=4, target_accept=0.99`
-for a real-sized dataset (~50+ subjects). Use
-`chain_method='vectorized'` for a **basic** DDM, but
-**`chain_method='parallel'` for any regression or hierarchical-regression
-DDM** (vectorized leaves those stuck at r̂≈1.6–2.5 — see §3). Then **check
-r̂ ≤ 1.01 and ESS ≥ 400 before believing any number**.
-
----
-
-## 1. Prepare the data (do this first, every time)
+## Recipe
 
 ```python
-df = df[df['rt'] >= 0.20].copy()        # see §6.1 — the #1 cause of stuck chains
-assert df['choice'].dtype == bool        # True = chose option 2
-assert (df['rt'] > 0).all()              # seconds, not ms
+df = df[df['rt'] >= 0.20].copy()          # 1. drop fast RTs (see notes)
+m = DDMRiskRegressionModel(               # 2. pick the class (table below)
+        paradigm=df, fit_separate_evidence_sd=True, prior_estimate='full',
+        regressors={'n1_evidence_sd': 'C(domain)'})   # only params you expect to move
+m.build_estimation_model(data=df, hierarchical=True)  # 3. build
+idata = m.sample(draws=1000, tune=2000, chains=4,     # 4. sample
+                 target_accept=0.99, backend='numpyro')
+# 5. CHECK before interpreting: max r̂ ≤ 1.01, min ESS ≥ 400, few divergences
 ```
 
-- **RT filter is not optional.** bauer reuses HSSM's analytical WFPT, which
-  *floors* the log-likelihood at `LOGP_LB = -66.1` (flat, zero-gradient)
-  whenever the sampler proposes `t0 > min(rt)` for any subject. NUTS sees a
-  zero gradient and the chain freezes. Dropping fast trials (0.20 s is a
-  sane motor floor; tune per task) keeps the sampler out of that dead zone.
-- **Hierarchical fits** need `subject` in the index or a column.
-- Paradigm columns by family: magnitude `n1/n2`; risk `n1/n2/p1/p2`
-  (+ `rt`, `choice`).
-
----
-
-## 2. Pick the model class
+`choice` is boolean (`True` = option 2); `rt` is in seconds; hierarchical fits
+need `subject` in the index or as a column. Paradigm columns: magnitude
+`n1/n2`, risk `n1/n2/p1/p2`.
 
 | Task | Class |
 |---|---|
-| Magnitude comparison | `DDMMagnitudeComparisonModel` |
-| …with a covariate on a parameter | `DDMMagnitudeComparisonRegressionModel` |
-| Risky choice | `DDMRiskModel` |
-| …with a covariate (group, condition, domain) | `DDMRiskRegressionModel` |
+| Magnitude comparison | `DDMMagnitudeComparisonModel` (`…RegressionModel` to add a covariate) |
+| Risky choice | `DDMRiskModel` (`…RegressionModel` to add a covariate) |
 | Stimulus-dependent (B-spline) noise | the `*FlexibleNoise*` variants |
 
-Standard front-end kwargs: `fit_separate_evidence_sd=True` (lets
-`n1_evidence_sd ≠ n2_evidence_sd`, absorbing working-memory effects on the
-first-presented option) and `fit_prior=True` / `prior_estimate='full'`
-(estimate the Bayesian-observer prior).
+Use `fit_separate_evidence_sd=True` (lets `n1`/`n2` encoding noise differ) and
+`fit_prior=True` / `prior_estimate='full'` (estimate the Bayesian-observer
+prior). For regression, only regress a parameter on a covariate you have a
+prior reason to expect it to move — don't data-mine every parameter.
 
-**Regression**: pass `regressors={param: 'patsy_formula'}`, e.g.
-`{'n1_evidence_sd': 'C(domain)', 'a': 'C(domain)'}`. Only regress a
-parameter on a covariate you have a prior reason to expect it to move —
-pre-register that, don't data-mine every parameter.
+## What matters for convergence
 
----
+1. **Filter fast RTs (`rt < 0.20 s`).** The WFPT likelihood has a flat,
+   zero-gradient region when the non-decision time `t0` exceeds the fastest
+   RT, and the sampler gets stuck there. Dropping implausibly fast trials
+   keeps it out. Tune the cutoff to your task's motor floor.
+2. **Good starting points (on by default).** bauer initialises each chain at a
+   data-informed plausible point and disperses the chains around it (see next
+   section). This is what makes DDM/regression posteriors converge reliably —
+   leave it on.
+3. **`tune=2000`, `target_accept=0.99`** for hierarchical DDMs. `numpyro`
+   `chain_method='vectorized'` on a GPU is the fast default (~45 min for
+   n≈64 on an L4). Then **always check r̂ and ESS** before trusting a fit.
 
-## 3. Sampler and settings — and why these defaults
+## Starting points (initial values)
 
-```python
-m.build_estimation_model(data=df, hierarchical=True)
-idata = m.sample(
-    draws=1000, tune=2000, chains=4,
-    target_accept=0.99,
-    backend='numpyro',          # JAX NUTS; chain_method='vectorized' is the bauer default
-)
-```
+A DDM/regression posterior is a long, curved ridge, so *where the chains
+start* strongly affects whether they converge. bauer handles this for you:
+`BaseModel.get_initial_points` (enabled by default on DDM/Race via
+`recommended_init='mapjitter'`) starts each chain at a **data-informed
+plausible centre** — the posterior mode from `find_MAP`, falling back to the
+prior-central point — and **disperses the chains around it by a fraction of
+each parameter's prior SD**. Chains sit around the typical set rather than all
+at the mode, so r̂ stays meaningful.
 
-- **numpyro on GPU is the workhorse.** On an L4 a Garcia n=64 fit is
-  ~45 min (vectorized); on CPU it's many hours.
-- **Basic (non-regression) DDM → `chain_method='vectorized'` is fine.**
-- **Regression OR hierarchical-regression DDM → use `chain_method='parallel'`.**
-  This is the empirically load-bearing setting, verified on two independent
-  cases: Garcia n=64 `ddm_isi` and the Alina per-subject gain/loss fits. On
-  **vectorized**, both stick at **r̂≈1.6–2.5** even *after* the softplus fix
-  and even with `tune=4000` — vectorized shares one RNG seed across chains
-  (§6.3 / §4 of `ddm_convergence_lessons.md`), so a bad seed freezes several
-  at once. `parallel` gives each chain its own seed and converges. The
-  softplus fix is **necessary but not sufficient** for regression DDMs.
-  (On a single GPU, `parallel` runs chains sequentially → ~4× wall time, but
-  it's the reliable choice.)
-- **`tune` ≥ 2000 (4000 for regression).** The default `tune=1000` gives
-  r̂≈2.6 on n=64 — non-convergence, not a result. Warmup is where the
-  `a ↔ t0 ↔ drift` identifiability ridge gets adapted.
-- **`target_accept=0.99`** for hierarchical DDMs (smaller step, deeper
-  trees, fewer divergences on the ridge). 0.95 is fine for the simpler
-  static-choice models.
-- **Do NOT use `backend='blackjax'`** — broken on GPU with HSSM's
-  progressbar (JAX "IO effect not supported in vmap-of-cond").
-- **`chain_method='parallel'`** = one process per chain, robust to a bad
-  shared RNG seed, but 4× VRAM (won't fit n=64 on a 24 GB L4). Use only on
-  CPU or small models.
-- **`pm.Slice` (pymc, CPU)** = gradient-free, immune to the LOGP_LB
-  pathology. Slow (hours). Keep it as a *robustness reference* when you
-  suspect NUTS is misleading, not as a default.
+It works for **every parameter automatically** — core DDM (`a`, `t0`),
+front-end (`prior_mu/sd`, `evidence_sd`), B-spline noise coefficients, lapse —
+with no per-parameter tuning. Pass `find_init=False` to turn it off, or your
+own `initvals` to override.
 
----
+For flexible-noise models, note the B-spline **basis is fixed at model
+construction from the paradigm** (not the fit data), so build the model with a
+paradigm that spans your stimulus range; the spline coefficients are defined
+relative to that basis.
 
-## 4. Check convergence (before interpreting anything)
+## If a fit won't converge
 
-```python
-import arviz as az
-s = az.summary(idata, var_names=['n1_evidence_sd_mu', 'a_mu', 't0_mu'])  # + your params
-print('max r_hat', s['r_hat'].max(), '| min ess', s['ess_bulk'].min())
-print('divergences', int(idata.sample_stats['diverging'].sum()))
-```
+1. Confirm you filtered `rt < 0.20 s`.
+2. **Weak data?** If `P(choice) ≈ 0.5` in some condition, the drift carries
+   little information and the posterior is genuinely broad — no sampler setting
+   fixes that. Drop the regression on parameters the covariate shouldn't move
+   (often `a`, `t0`), and/or fit a pilot subject as-is and re-fit
+   hierarchically once more subjects are available.
 
-Ship only if **max r̂ ≤ 1.01**, **min ESS_bulk ≥ 400** (≈100/chain), and
-divergences are a small fraction of post-warmup draws. A PPC that
-mispredicts wildly (e.g. simulated RT 2× the data) is almost always a
-*non-converged fit*, not a model-misfit story — check r̂ first.
+`backend='numpyro'` is the default; avoid `blackjax` (incompatible with HSSM's
+progress bar on GPU). `pm.Slice` (CPU, gradient-free) is a slow robustness
+check, not a default.
 
----
-
-## 5. PPC notes specific to DDMs
-
-- `model.ppc(df, idata, n_posterior_samples=60)` returns `simulated_choice`
-  (bool) and `simulated_rt`. Regression models work too (the 2D-parameter
-  ppc path was fixed).
-- Simulated RT has a **heavy right tail** (WFPT) that real data doesn't,
-  because the experiment truncates slow trials. Summarize simulated RT with
-  the **median or a matched-support mean**, not the raw mean, or the PPC
-  will look biased even when the fit is fine.
-
----
-
-## 6. When it won't converge — decision tree
-
-Work top to bottom; stop at the first that applies.
-
-1. **Did you filter `rt < 0.20 s`?** If not, do it (§1). This is the most
-   common cause, full stop.
-2. **Is r̂ bad on a *regression* model fit before 2026-05-23?** The
-   `RegressionModel` softplus-prior bug silently zeroed Intercept priors
-   (e.g. drove `t0`'s prior mean to 0.69 s, into the LOGP_LB zone). Fixed
-   in `bauer/core.py` (commit `34f8777`). **Re-fit it** on current code.
-3. **Regression / hierarchical-regression DDM on `vectorized`?** Switch to
-   **`chain_method='parallel'`**. This is the most common cause of a
-   regression DDM stuck at r̂≈1.6–2.5 after the data/prior are correct —
-   vectorized's shared RNG seed couples the chains. (Confirmed on Garcia
-   n=64 `ddm_isi` and the Alina per-subject fits.) Bumping `tune` or
-   changing `random_seed` does *not* reliably fix it; `parallel` does.
-4. **Genuinely weak data (a parameter is unidentified)?** Symptom:
-   `P(choice) ≈ 0.5` in some condition → flat drift signal → intrinsically
-   broad WFPT posterior. No sampler fixes this. Options, in order:
-   a. Drop the regression on parameters the covariate shouldn't move
-      (often `a`, `t0`) — get to the minimal model that answers your
-      question.
-   b. Tighten the `t0` prior (subclass, set `sigma_intercept ≈ 0.3` on
-      `t0`) so it can't wander toward the dead zone.
-   c. For a pilot/small-N subject: accept the wide posterior, label it as
-      pilot, and re-fit when more subjects arrive (the hierarchical fit
-      usually behaves once the group constrains it).
-
----
-
-## 7. Cluster submission (sciencecluster)
+## Cluster (sciencecluster)
 
 ```bash
-# one GPU fit via the generic runner (logs to ~/logs/<jobname>_<id>.txt)
 sbatch --job-name=myfit --gres=gpu:L4:1 --partition=lowprio --time=04:00:00 \
     bauer/scripts/slurm_jobs/run_fit.sh bauer_cuda \
     bauer.scripts.fit_for_lesson8 --tune 2000 --target-accept 0.99
 ```
 
-`bauer_cuda` is the GPU conda env. Always `git pull` on the cluster first;
-verify `import bauer` works before burning a GPU slot (a broken import
-fails in ~10 s but wastes the queue wait).
+`git pull` on the cluster first; the GPU env is `bauer_cuda`.
+
+---
+
+*Background:* the empirical convergence experiment behind these defaults is in
+`experiments/ddm_sampler_experiments.md`; the longer history is in
+`ddm_convergence_lessons.md`.
