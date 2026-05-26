@@ -79,7 +79,7 @@ def load_garcia2022(task='magnitude', remove_non_responses=True, min_rt=0.15,
 
 def load_dehollander2024_risk(sessions=None, remove_non_responses=True,
                               min_rt=0.15, max_rt=None):
-    """De Hollander et al. (2024 Nature Communications) dotcloud risky-choice
+    """De Hollander et al. (2024, bioRxiv preprint) dotcloud risky-choice
     task — N=30 subjects across 3T and 7T sessions, ~256 trials/subject.
 
     ``choice = True`` means option 2 chosen (bauer's risk convention).

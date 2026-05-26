@@ -107,7 +107,7 @@ Generate via `python docs/tutorial/make_notebooks.py`.
 If you use a bundled dataset, please cite the original source:
 
 - **Garcia 2022** (`load_garcia2022`): Barreto-Garcia, Pelin, et al. "Cognitive imprecision and small-stakes risk aversion." *Journal of Economic Behaviour & Organization* (2023).
-- **de Hollander 2024 dotcloud / symbolic** (`load_dehollander2024_*`): de Hollander, G., et al. "Bayesian inference on parietal magnitude representations shapes risk attitudes." *Nature Communications* (2024).
+- **de Hollander 2024 dotcloud / symbolic** (`load_dehollander2024_*`): de Hollander, G., et al. "Bayesian inference on parietal magnitude representations shapes risk attitudes." *bioRxiv* preprint (2024).
 - **de Hollander TMS** (`load_dehollander_tms_risk`): de Hollander et al., *in prep*.
 - **Bedi 2026** (`load_bedi2026`): Bedi et al., *in prep* (orientation→value pilot).
 

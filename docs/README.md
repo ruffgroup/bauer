@@ -1,8 +1,17 @@
 # bauer documentation
 
-The docs are built with **Sphinx** and hosted on **ReadTheDocs**.
+The docs are built with **Sphinx** and published to **GitHub Pages** automatically:
+the `.github/workflows/docs.yml` Action builds them and deploys to the `gh-pages`
+branch **on every push to `main`** — no manual step required. Live site:
+<https://ruffgroup.github.io/bauer/>. (A `.readthedocs.yaml` is also present as an
+optional alternative host; see [Alternative hosting: ReadTheDocs](#alternative-hosting-readthedocs).)
+
 Tutorial pages are Jupyter notebooks that are pre-executed locally and committed
 with outputs; Sphinx renders them via `nbsphinx` without re-executing.
+
+**TL;DR**
+- *Build locally:* `cd docs && make html` (or `make docs` from the repo root).
+- *Publish:* `git push origin main` — the Action rebuilds and deploys to GitHub Pages.
 
 ---
 
@@ -14,6 +23,29 @@ cd docs
 make html                     # output in _build/html/
 open _build/html/index.html   # macOS quick-view
 ```
+
+---
+
+## Publishing
+
+**You don't push the built HTML — you push the source.** The GitHub Action
+`.github/workflows/docs.yml` rebuilds the docs and deploys them to the `gh-pages`
+branch on every push to `main`:
+
+```bash
+git push origin main          # → Action builds & deploys to GitHub Pages
+```
+
+Watch the deploy under the repo's **Actions** tab (the "Build and deploy docs" run),
+or `gh run watch`. The live site is <https://ruffgroup.github.io/bauer/>; it updates
+a minute or two after the Action finishes.
+
+Notes:
+- The Action only **deploys** on `main`; on PRs it builds (to catch errors) but
+  does not publish.
+- Notebooks are **not** re-executed by the Action — it renders the committed
+  `.ipynb` outputs. Re-execute them locally (see [Editing tutorials](#editing-tutorials))
+  and commit the updated `.ipynb` before pushing.
 
 ---
 
@@ -29,11 +61,7 @@ docs/
 ├── tutorial/
 │   ├── index.rst         # Tutorial toctree (add new lessons here)
 │   ├── make_notebooks.py # Single source of truth for all tutorial notebooks
-│   ├── lesson1.ipynb     # Pre-executed notebook — psychophysics / NLC
-│   ├── lesson2.ipynb     # Pre-executed notebook — KLW / Barreto-García 2023
-│   ├── lesson3.ipynb     # Pre-executed notebook — PMCM / de Hollander 2024
-│   ├── lesson4.ipynb     # Pre-executed notebook — Flexible noise model
-│   └── lesson5.ipynb     # Pre-executed notebook — Hierarchical vs MLE
+│   └── lesson{1..9}.ipynb # Pre-executed notebooks (source: make_notebooks.py)
 └── requirements.txt      # Sphinx + nbsphinx + nbconvert (for ReadTheDocs)
 ```
 
@@ -103,9 +131,11 @@ the docs will pick them up on the next build.
 
 ---
 
-## ReadTheDocs
+## Alternative hosting: ReadTheDocs
 
-The repo contains `.readthedocs.yaml` which configures the build:
+The live site is **GitHub Pages** (see [Publishing](#publishing)). ReadTheDocs is
+*not* required, but the repo ships a `.readthedocs.yaml` so it can be hosted there
+too if desired. The config:
 - Python 3.11, installs `pip install -e ".[docs]"`
 - Runs `sphinx-build` on `docs/conf.py`
 - Does **not** re-execute notebooks (`nbsphinx_execute = 'never'` in `conf.py`)
@@ -125,7 +155,7 @@ Runtime dependencies for building docs (also in `pyproject.toml [docs]`):
 | Package | Purpose |
 |---------|---------|
 | `sphinx` | Core doc builder |
-| `sphinx-rtd-theme` | ReadTheDocs theme |
+| `furo` | HTML theme (set in `conf.py`) |
 | `nbsphinx` | Renders Jupyter notebooks |
 | `nbconvert` | Executes notebooks locally |
 | `nbformat` | Reads/writes `.ipynb` files |
