@@ -53,9 +53,22 @@ guidance in `notes/fitting_ddm_models.md` will be reconciled to whatever this
 shows: if `vectorized` at tune=4000 converges the regression model, the
 recommendation becomes "more warmup", not "parallel".)_
 
-## Confirmation on the production case
+## n=64 arm (production headline)
 
-The fast pil03 testbed is cross-checked against the real target — Garcia n=64
-hierarchical `ddm_isi` — via the lesson-8 fits (`fit_for_lesson8.py`): vectorized
-tune=2000 gave r̂=1.60; the parallel tune=4000 re-fit result will be recorded
-here once it lands.
+The pil03 arm is a **fast stress-test on a degenerate, near-chance subject** —
+useful for cheap iteration, but not representative of a normal fit. The real
+target is **Garcia n=64, hierarchical**, basic DDM vs ISI-regression DDM
+(`run_ddm_sampler_experiment_n64.py`). Because each n=64 regression fit is slow
+(hours — the hierarchical funnel drives NUTS to max tree depth), we run the
+**decisive 2×2** rather than a full crossing, reusing data points already
+measured:
+
+| n=64 `ddm_isi` (regression) | tune=2000 | tune=4000 |
+|---|---|---|
+| **vectorized** | r̂=1.60 (lesson-8 fit) | _3429449_ |
+| **parallel**   | _3429450_ | _3428563_ |
+
+Basic DDM, vectorized, tune=2000: r̂=1.013 (the basic-vs-regression contrast).
+
+Reading **across a row** isolates the effect of `tune`; reading **down a
+column** isolates `chain_method`. _(Results pending; table filled on landing.)_
