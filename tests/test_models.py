@@ -219,3 +219,61 @@ def test_data_loaders():
     assert df5.index.get_level_values('subject').nunique() == 35
     df6 = load_dehollander_tms_risk(tms_only=False)
     assert df6.index.get_level_values('subject').nunique() == 73
+
+
+# ---------------------------------------------------------------------------
+# Regression-model prior equivalence
+# ---------------------------------------------------------------------------
+
+def test_intercept_only_regression_matches_basic_priors(paradigm_magnitude):
+    """Regression model with intercept-only formulas should produce the same
+    Normal priors as the basic hierarchical model.
+
+    Regression-tests a real bug (2026-05-23) where
+    RegressionModel.build_hierarchical_nodes silently dropped the
+    mu_intercept/sigma_intercept for softplus-transformed parameters,
+    leaving them at Normal(0, sigma_regressors). For DDM t0 this set the
+    prior mean to ~0.69 s — larger than most RTs — and produced r̂ ≈ 4
+    on every regression-DDM fit until the bug was found.
+    """
+    from bauer.models import (DDMMagnitudeComparisonModel,
+                              DDMMagnitudeComparisonRegressionModel)
+
+    m_basic = DDMMagnitudeComparisonModel(
+        paradigm=paradigm_magnitude,
+        fit_separate_evidence_sd=True, fit_prior=True)
+    m_basic.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
+
+    m_reg = DDMMagnitudeComparisonRegressionModel(
+        paradigm=paradigm_magnitude,
+        fit_separate_evidence_sd=True, fit_prior=True,
+        regressors={'n1_evidence_sd': '1'})  # intercept-only formula
+    m_reg.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
+
+    def basic_normal_params(model, name):
+        for v in (f'{name}_mu_untransformed', f'{name}_mu'):
+            if v in model.named_vars:
+                rv = model.named_vars[v]
+                return (float(rv.owner.inputs[-2].eval()),
+                        float(rv.owner.inputs[-1].eval()))
+        raise KeyError(name)
+
+    def reg_intercept_params(model, name):
+        rv = model.named_vars[f'{name}_mu']
+        return (float(rv.owner.inputs[-2].eval()[0]),
+                float(rv.owner.inputs[-1].eval()[0]))
+
+    for param in ('n1_evidence_sd', 't0', 'a', 'prior_mu', 'prior_sd'):
+        mu_b, sd_b = basic_normal_params(m_basic.estimation_model, param)
+        mu_r, sd_r = reg_intercept_params(m_reg.estimation_model, param)
+        assert abs(mu_b - mu_r) < 1e-6, (
+            f'Intercept prior mu for {param!r} differs between basic '
+            f'({mu_b:.6f}) and intercept-only regression ({mu_r:.6f}) — '
+            f'the RegressionModel softplus-branch bug has regressed.'
+        )
+        assert abs(sd_b - sd_r) < 1e-6, (
+            f'Intercept prior sigma for {param!r} differs between basic '
+            f'({sd_b:.6f}) and intercept-only regression ({sd_r:.6f}) — '
+            f'check the sigma_intercept default in '
+            f'RegressionModel.build_hierarchical_nodes.'
+        )

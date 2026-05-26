@@ -175,12 +175,7 @@ class DDMMixin:
         return pars
 
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
-        # MagnitudeComparisonModel._get_paradigm doesn't accept subject_mapping;
-        # try with the kwarg, fall back to positional for older overrides.
-        try:
-            p = super()._get_paradigm(paradigm, subject_mapping=subject_mapping)
-        except TypeError:
-            p = super()._get_paradigm(paradigm)
+        p = super()._get_paradigm(paradigm, subject_mapping=subject_mapping)
         # rt is required for fitting but optional for prediction/simulation.
         if 'rt' in paradigm.columns:
             rt = np.asarray(paradigm['rt'].values, dtype=float)
@@ -458,11 +453,27 @@ class DDMMixin:
                 subjects = post.coords['subject'].values
                 par_dict = {name: post[name].isel(chain=ci, draw=di).values
                             for name in param_names}
-                pars_df = pd.DataFrame(par_dict, index=pd.Index(subjects, name='subject'))
-                sim = self.simulate(paradigm, pars_df, n_samples=inner_samples,
-                                    random_seed=int(rng.integers(0, 2**31 - 1)))
+                # If any parameter is 2D (per-subject × per-regressor — i.e. a
+                # regression model), pass the dict-of-arrays through directly.
+                # build_prediction_model + pm.Data already accept multi-dim
+                # values; only the legacy DataFrame wrapping path collapses to
+                # 1D-per-subject and would break here.
+                any_regression = any(np.asarray(v).ndim > 1
+                                     for v in par_dict.values())
+                if any_regression:
+                    sim = self.simulate(paradigm, par_dict, n_samples=inner_samples,
+                                        random_seed=int(rng.integers(0, 2**31 - 1)))
+                else:
+                    pars_df = pd.DataFrame(par_dict,
+                                            index=pd.Index(subjects, name='subject'))
+                    sim = self.simulate(paradigm, pars_df, n_samples=inner_samples,
+                                        random_seed=int(rng.integers(0, 2**31 - 1)))
             else:
-                par_dict = {name: float(post[name].isel(chain=ci, draw=di).values)
+                # Non-hierarchical: per-parameter values are scalar in the
+                # plain-likelihood case but 1D (n_regressors,) for regression
+                # models. ``np.asarray(...)`` accepts both; we pass the raw
+                # array through and let build_prediction_model handle the dim.
+                par_dict = {name: np.asarray(post[name].isel(chain=ci, draw=di).values)
                             for name in param_names}
                 sim = self.simulate(paradigm, par_dict, n_samples=inner_samples,
                                     random_seed=int(rng.integers(0, 2**31 - 1)))
@@ -589,14 +600,17 @@ class DDMMagnitudeComparisonRegressionModel(DDMMixin, MagnitudeComparisonRegress
     """
 
     def __init__(self, paradigm, regressors, fit_prior=False,
-                 fit_seperate_evidence_sd=True, memory_model='independent',
+                 fit_separate_evidence_sd=None, memory_model='independent',
                  save_trialwise_estimates=False,
-                 fit_v_scale=False, fix_z=True):
+                 fit_v_scale=False, fix_z=True,
+                 fit_seperate_evidence_sd=None):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
+        # Both spellings forwarded; the alias-handling happens one level down.
         MagnitudeComparisonRegressionModel.__init__(
             self, paradigm, regressors,
             fit_prior=fit_prior,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             fit_seperate_evidence_sd=fit_seperate_evidence_sd,
             memory_model=memory_model,
             save_trialwise_estimates=save_trialwise_estimates,
@@ -691,17 +705,25 @@ class DDMRiskModel(DDMMixin, RiskModel):
 class DDMRiskRegressionModel(DDMMixin, RiskRegressionModel):
     """DDM variant of :class:`RiskRegressionModel`.
 
-    Patsy-formula regression on the cognitive front-end
-    (``n1_evidence_sd``, ``n2_evidence_sd``, prior params) and on the
-    accumulator params (``a``, ``t0``, ``v_scale`` if ``fit_v_scale``).
-    Use this for two-group / condition-comparison designs where the
-    noise function shape itself is *not* the focus.
+    Patsy-formula regression on the cognitive front-end (``n1_evidence_sd``,
+    ``n2_evidence_sd``, prior parameters depending on ``prior_estimate``) and
+    on the accumulator params (``a``, ``t0``, ``v_scale`` if ``fit_v_scale``).
+    Use this for two-group / condition-comparison designs where the noise
+    function shape itself is *not* the focus — e.g. testing whether
+    boundary, drift scale, or encoding noise differs between gain and loss
+    blocks of a risky-choice task::
 
-    For richer noise-curve-shape comparisons see
+        regressors = {
+            'n1_evidence_sd': 'C(domain)',
+            'n2_evidence_sd': 'C(domain)',
+            'a':              'C(domain)',
+        }
+
+    For richer noise-curve-shape comparisons use
     :class:`DDMFlexibleNoiseRiskRegressionModel` (B-spline noise).
 
-    Paradigm columns required: ``n1``, ``n2``, ``p1``, ``p2``,
-    ``choice`` (bool), ``rt`` (seconds).
+    Paradigm columns required: ``n1``, ``n2``, ``p1``, ``p2``, ``choice``
+    (bool), ``rt`` (seconds).
     """
 
     def __init__(self, paradigm, regressors, prior_estimate='objective',

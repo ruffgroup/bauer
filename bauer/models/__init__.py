@@ -1,4 +1,7 @@
 from .psychophysics import (
+    PsychophysicalModel, PsychophysicalLapseModel,
+    PsychophysicalRegressionModel, PsychophysicalLapseRegressionModel,
+    # Deprecated aliases — emit DeprecationWarning on instantiation
     PsychometricModel, PsychometricLapseModel,
     PsychometricRegressionModel, PsychometricLapseRegressionModel,
 )

@@ -16,6 +16,7 @@ import time
 import threading
 import warnings
 import argparse
+import pandas as pd
 
 warnings.filterwarnings('ignore')
 
@@ -35,6 +36,10 @@ def main():
                     help='Drop trials below this RT in seconds (default 0.20).')
     ap.add_argument('--backend', default='numpyro',
                     choices=['pymc', 'numpyro', 'blackjax'])
+    ap.add_argument('--chain-method', default=None,
+                    choices=['vectorized', 'parallel', 'sequential'],
+                    help='JAX-backend chain method (numpyro/blackjax only). '
+                         'Default = vectorized (bauer default).')
     ap.add_argument('--cache-dir', default='~/.bauer_tutorial_cache')
     ap.add_argument('--draws', type=int, default=1000)
     ap.add_argument('--tune', type=int, default=1000)
@@ -42,9 +47,11 @@ def main():
     ap.add_argument('--target-accept', type=float, default=0.95)
     args = ap.parse_args()
 
+    import numpy as np
     from bauer.utils.data import load_garcia2022
     from bauer.models import (
         MagnitudeComparisonModel, DDMMagnitudeComparisonModel,
+        DDMMagnitudeComparisonRegressionModel,
     )
 
     cache_dir = os.path.expanduser(args.cache_dir)
@@ -60,31 +67,51 @@ def main():
           f"{df['rt'].min():.3f}s.",
           flush=True)
 
+    # Categorical ISI for the regression-DDM demo (median split).
+    df['isi_cat'] = pd.Categorical(
+        np.where(df['isi'] >= df['isi'].median(), 'long', 'short'),
+        categories=['short', 'long'],   # 'short' is reference level
+    )
+
     tag = f'garcia_n{n_subj}_rtmin{int(args.rt_min*1000)}'
 
-    for name, cls in [('probit', MagnitudeComparisonModel),
-                      ('ddm', DDMMagnitudeComparisonModel)]:
+    def fit_one(name, build):
         path = os.path.join(cache_dir, f'{tag}_{name}.nc')
         if os.path.exists(path):
             print(f"{name}: cached, skipping ({path})", flush=True)
-            continue
-        m = cls(paradigm=df, fit_seperate_evidence_sd=True, fit_prior=True)
+            return
+        m = build()
         m.build_estimation_model(data=df, hierarchical=True)
         stop = threading.Event()
         hb = threading.Thread(target=heartbeat, args=(stop, name), daemon=True)
         hb.start()
         t0 = time.time()
+        sample_kw = dict(draws=args.draws, tune=args.tune,
+                         chains=args.chains,
+                         target_accept=args.target_accept,
+                         backend=args.backend)
+        if args.chain_method is not None and args.backend != 'pymc':
+            sample_kw['chain_method'] = args.chain_method
+        if args.backend == 'blackjax':
+            # blackjax 1.x + HSSM progress bar = JAX vmap/cond crash
+            # ("IO effect not supported in vmap-of-cond"). The heartbeat
+            # thread above gives us tail-able progress regardless.
+            sample_kw['progressbar'] = False
         try:
-            idata = m.sample(draws=args.draws, tune=args.tune,
-                             chains=args.chains,
-                             target_accept=args.target_accept,
-                             backend=args.backend)
+            idata = m.sample(**sample_kw)
         finally:
-            stop.set()
-            hb.join(timeout=2)
+            stop.set(); hb.join(timeout=2)
         dt = time.time() - t0
         idata.to_netcdf(path)
         print(f"{name}: saved in {dt/60:.1f} min -> {path}", flush=True)
+
+    fit_one('probit', lambda: MagnitudeComparisonModel(
+        paradigm=df, fit_separate_evidence_sd=True, fit_prior=True))
+    fit_one('ddm', lambda: DDMMagnitudeComparisonModel(
+        paradigm=df, fit_separate_evidence_sd=True, fit_prior=True))
+    fit_one('ddm_isi', lambda: DDMMagnitudeComparisonRegressionModel(
+        paradigm=df, fit_separate_evidence_sd=True, fit_prior=True,
+        regressors={'n1_evidence_sd': 'isi_cat'}))
 
 
 if __name__ == '__main__':
