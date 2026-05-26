@@ -63,8 +63,13 @@ bauer/
 make lint          # flake8 bauer tests
 make test          # unittest discovery
 make coverage      # coverage report
-make docs          # Sphinx HTML
+make docs          # Sphinx HTML (build locally)
 ```
+
+Docs **publish automatically**: pushing to `main` triggers `.github/workflows/docs.yml`,
+which builds and deploys to GitHub Pages (`gh-pages` branch) → <https://ruffgroup.github.io/bauer/>.
+You don't push built HTML; you push source. Notebooks are rendered from committed
+outputs (not re-executed in CI) — re-run them locally first. Full docs workflow: `docs/README.md`.
 
 ## Architecture
 
@@ -181,6 +186,13 @@ bash bauer/scripts/slurm_jobs/submit_all_production.sh
 
 - `target_accept=0.95` — 0.99 was overkill on cluster; 0.95 is well-behaved here.
 - `tune=1000, draws=1000, chains=4` — solid for these sample sizes. **Bump warmup to 1500-2000 if any fit shows `r̂ > 1.01` or `min ESS < 100/chain` post-hoc.**
+
+> **Hierarchical DDM/RDM won't converge?** Read `notes/ddm_convergence_lessons.md`
+> first — the playbook for this codebase (RT-filter `LOGP_LB` pathology, HSSM-style
+> `a`/`t0` priors, the softplus-prior bug, a sampler-comparison table, and a
+> "which sampler when" decision guide). Known-good for Garcia n=64: numpyro
+> vectorized on a GPU L4 with `--tune 2000 --target-accept 0.99`. The default
+> `tune=1000` gives r̂≈2.6 (basic) / 3.9 (regression) — non-convergence, not a result.
 
 ### Output filenames
 
