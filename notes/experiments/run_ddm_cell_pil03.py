@@ -8,6 +8,7 @@ array tasks never collide). Aggregate the rows afterwards.
 import argparse, time, traceback
 from pathlib import Path
 import numpy as np, pandas as pd, arviz as az
+import pymc as pm
 from bauer.models import DDMRiskModel, DDMRiskRegressionModel
 
 DIAG = ['n1_evidence_sd', 'n2_evidence_sd', 'a', 't0',
@@ -23,6 +24,13 @@ def main():
     ap.add_argument('--draws', type=int, default=1000)
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--target-accept', type=float, default=0.99)
+    ap.add_argument('--init', choices=('default', 'map_jitter', 'prior_scaled'),
+                    default='default',
+                    help="default=bauer current (moment + pymc jitter); "
+                         "map_jitter=MAP center, dispersed by pymc jitter (NOT at-mode); "
+                         "prior_scaled=center + per-param jitter = frac*prior_sd.")
+    ap.add_argument('--jitter-frac', type=float, default=0.25,
+                    help='prior_scaled: jitter SD as a fraction of each param prior SD.')
     ap.add_argument('--subject', default='pil03')
     ap.add_argument('--data', type=Path,
                     default=Path(__file__).resolve().parents[1].parent
@@ -49,10 +57,12 @@ def main():
     m.build_estimation_model(data=df, hierarchical=False)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    tag = f"{args.subject}_{args.model}_{args.backend}_{args.chain_method}_t{args.tune}_s{args.seed}"
+    tag = (f"{args.subject}_{args.model}_{args.backend}_{args.chain_method}"
+           f"_t{args.tune}_init-{args.init}_s{args.seed}")
     rec = dict(subject=args.subject, model=args.model, backend=args.backend,
                chain_method=args.chain_method, tune=args.tune, draws=args.draws,
-               seed=args.seed, max_rhat=np.nan, min_ess=np.nan,
+               seed=args.seed, init=args.init,
+               max_rhat=np.nan, min_ess=np.nan,
                divergences=np.nan, walltime_s=np.nan, status='')
     try:
         sk = dict(draws=args.draws, tune=args.tune, chains=4,
@@ -60,6 +70,31 @@ def main():
                   chain_method=args.chain_method, random_seed=args.seed)
         if args.backend == 'blackjax':
             sk['progressbar'] = False
+
+        # --- initialization scheme (never start AT the MAP; always disperse) ---
+        if args.init in ('map_jitter', 'prior_scaled'):
+            with m.estimation_model:
+                mp = pm.find_MAP(progressbar=False)
+            rvs = [v.name for v in m.estimation_model.free_RVs]
+            center = {k: np.asarray(mp[k]) for k in rvs if k in mp}
+            if args.init == 'map_jitter':
+                # MAP center; let pymc's jitter disperse the 4 chains off it.
+                sk['initvals'] = center
+                sk['jitter'] = True
+            else:  # prior_scaled: per-param jitter SD = frac * prior SD
+                with m.estimation_model:
+                    pr = pm.sample_prior_predictive(draws=400, var_names=list(center),
+                                                    random_seed=args.seed)
+                psd = {k: np.asarray(pr.prior[k]).std(axis=(0, 1))
+                       for k in center if k in pr.prior}
+                rng = np.random.default_rng(args.seed)
+                sk['initvals'] = [
+                    {k: center[k] + rng.normal(0, args.jitter_frac * np.broadcast_to(
+                        psd.get(k, 0.1), center[k].shape), size=center[k].shape)
+                     for k in center}
+                    for _ in range(sk['chains'])]
+                sk['jitter'] = False   # we supplied our own dispersed inits
+
         t0 = time.time()
         idata = m.sample(**sk)
         rec['walltime_s'] = round(time.time() - t0, 1)
