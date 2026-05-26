@@ -131,6 +131,7 @@ class DDMMixin:
     # BaseModel for the rationale; both backends get auto-routed defaults.
     recommended_nuts_kwargs = {'dense_mass': True}     # numpyro / blackjax
     recommended_pymc_init = 'jitter+adapt_full'        # pymc
+    recommended_init = 'mapjitter'                     # MAP centre + prior-scaled jitter
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()

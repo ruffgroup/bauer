@@ -160,6 +160,7 @@ class RaceMixin:
     # advantage=True) so dense mass adaptation helps for the same reasons.
     recommended_nuts_kwargs = {'dense_mass': True}
     recommended_pymc_init = 'jitter+adapt_full'
+    recommended_init = 'mapjitter'                     # MAP centre + prior-scaled jitter
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()

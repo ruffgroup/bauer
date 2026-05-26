@@ -30,6 +30,14 @@ class BaseModel(object):
     recommended_nuts_kwargs: dict = {}
     recommended_pymc_init: str | None = None
 
+    # ``recommended_init`` enables bauer's starting-point finder by default for
+    # this model class (see ``BaseModel.get_initial_points`` and ``sample``).
+    # DDM/RDM mixins set this to 'mapjitter' because their posteriors are nasty
+    # enough that pymc's generic jitter init makes convergence a seed lottery
+    # (verified: vectorized regression-DDM converges ~1/7 seeds without it).
+    # ``None`` = use the backend's default init.
+    recommended_init: str | None = None
+
     def __init__(self, paradigm, save_trialwise_n_estimates=False):
         """
         data should contain ['n1', 'n2'] and 'choice'.
@@ -255,7 +263,7 @@ class BaseModel(object):
         return data
 
     def sample(self, draws=1000, tune=1000, target_accept=0.8, chains=4,
-               backend='pymc', **kwargs):
+               backend='pymc', find_init=None, **kwargs):
         """Sample from the posterior using the requested NUTS backend.
 
         Parameters
@@ -287,9 +295,27 @@ class BaseModel(object):
         explicitly. DDMMixin / RaceMixin do this for full mass-matrix
         adaptation.
         """
+        # Starting-point finder. ``find_init`` (or the class default
+        # ``recommended_init``) builds dispersed per-chain initial values
+        # around a data-informed plausible centre (see get_initial_points),
+        # instead of relying on the backend's generic jitter init. This is
+        # what stops hard DDM/regression posteriors from being a seed
+        # lottery. Skipped if the user supplied their own ``initvals``.
+        if find_init is None:
+            find_init = self.recommended_init
+        if find_init and 'initvals' not in kwargs:
+            seed = kwargs.get('random_seed', None)
+            kwargs['initvals'] = self.get_initial_points(
+                chains=chains, use_map=(find_init != 'priorjitter'),
+                seed=seed if isinstance(seed, int) else None)
+
         if backend == 'pymc':
-            kwargs.setdefault('init', getattr(self, 'recommended_pymc_init', None)
-                              or 'auto')
+            # When we supply our own dispersed initvals, avoid a jitter-adding
+            # init method (we already jittered); else keep the recommendation.
+            default_init = getattr(self, 'recommended_pymc_init', None) or 'auto'
+            if 'initvals' in kwargs and isinstance(default_init, str):
+                default_init = default_init.replace('jitter+', '')
+            kwargs.setdefault('init', default_init)
             with self.estimation_model:
                 self.idata = pm.sample(
                     draws, tune=tune, chains=chains,
@@ -307,6 +333,8 @@ class BaseModel(object):
             user = kwargs.pop('nuts_kwargs', None) or {}
             nuts_kwargs = {**rec, **user}
             kwargs.setdefault('chain_method', 'vectorized')
+            if 'initvals' in kwargs:
+                kwargs.setdefault('jitter', False)  # initvals already dispersed
             with self.estimation_model:
                 self.idata = sampler(
                     draws=draws, tune=tune, chains=chains,
@@ -317,6 +345,63 @@ class BaseModel(object):
         else:
             raise ValueError(f"backend must be 'pymc'/'numpyro'/'blackjax', got {backend!r}")
         return self.idata
+
+    def get_initial_points(self, chains=4, jitter_frac=0.1, use_map=True,
+                           n_prior=500, seed=None):
+        """Dispersed per-chain starting points for the sampler.
+
+        Returns a list of ``chains`` initval dicts (keyed by the model's
+        free-RV value-variable names). Each is a *plausible centre* plus
+        per-parameter Gaussian jitter whose SD is ``jitter_frac`` times that
+        parameter's prior SD. Chains are dispersed around the centre — never
+        all placed *at* it — so the mode (which is not in the typical set) is
+        not the start, and between-chain r̂ stays meaningful.
+
+        centre
+            ``find_MAP`` (the data-informed posterior mode / plausible value)
+            when ``use_map``; otherwise the model's prior-central
+            ``initial_point()``. Falls back to ``initial_point()`` if MAP fails.
+        jitter scale
+            Each free parameter is a plain unconstrained Normal in bauer's
+            models (softplus/logistic links are applied downstream as
+            Deterministics), so prior draws live in the same space as the
+            initvals and their SD is a natural, safe jitter scale.
+
+        Mirrors the init strategy HSSM uses (curated centre + small jitter) —
+        which bauer otherwise omits, leaving convergence of hard posteriors a
+        seed lottery.
+        """
+        rng = np.random.default_rng(seed)
+        with self.estimation_model:
+            ip = self.estimation_model.initial_point()
+            centre = {k: np.asarray(v, dtype='float64') for k, v in ip.items()}
+            if use_map:
+                try:
+                    mp = pm.find_MAP(progressbar=False)
+                    for k in centre:
+                        if k in mp:
+                            centre[k] = np.asarray(mp[k], dtype='float64')
+                except Exception as e:  # pragma: no cover - robustness
+                    warnings.warn(f"find_MAP failed ({e}); using prior-central "
+                                  "centre for initial points.")
+            try:
+                pr = pm.sample_prior_predictive(
+                    draws=n_prior, var_names=list(centre), random_seed=seed)
+                psd = {k: np.asarray(pr.prior[k]).std(axis=(0, 1))
+                       for k in centre if k in pr.prior}
+            except Exception:  # pragma: no cover - robustness
+                psd = {}
+
+        points = []
+        for _ in range(chains):
+            pt = {}
+            for k in centre:
+                scale = np.broadcast_to(np.asarray(psd.get(k, 1.0)), centre[k].shape)
+                scale = np.where(scale > 0, scale, 1.0)
+                jit = rng.normal(0.0, jitter_frac * scale, size=centre[k].shape)
+                pt[k] = (centre[k] + jit).astype(ip[k].dtype)
+            points.append(pt)
+        return points
 
     def fit_map(self, filter_pars=True, progressbar=True, **kwargs):
         with self.estimation_model:

@@ -24,11 +24,11 @@ def main():
     ap.add_argument('--draws', type=int, default=1000)
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--target-accept', type=float, default=0.99)
-    ap.add_argument('--init', choices=('default', 'map_jitter', 'prior_scaled'),
+    ap.add_argument('--init', choices=('default', 'core', 'map_jitter', 'prior_scaled'),
                     default='default',
-                    help="default=bauer current (moment + pymc jitter); "
-                         "map_jitter=MAP center, dispersed by pymc jitter (NOT at-mode); "
-                         "prior_scaled=center + per-param jitter = frac*prior_sd.")
+                    help="default=OLD bauer baseline (find_init disabled, pymc jitter); "
+                         "core=bauer's shipped starting-point finder (recommended_init); "
+                         "map_jitter / prior_scaled=manual schemes (legacy comparison).")
     ap.add_argument('--jitter-frac', type=float, default=0.25,
                     help='prior_scaled: jitter SD as a fraction of each param prior SD.')
     ap.add_argument('--subject', default='pil03')
@@ -72,6 +72,10 @@ def main():
             sk['progressbar'] = False
 
         # --- initialization scheme (never start AT the MAP; always disperse) ---
+        if args.init == 'default':
+            sk['find_init'] = False     # true OLD baseline (disable the finder)
+        elif args.init == 'core':
+            pass                         # use bauer's shipped finder (recommended_init)
         if args.init in ('map_jitter', 'prior_scaled'):
             with m.estimation_model:
                 mp = pm.find_MAP(progressbar=False)
