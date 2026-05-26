@@ -187,15 +187,19 @@ bash bauer/scripts/slurm_jobs/submit_all_production.sh
 - `target_accept=0.95` — 0.99 was overkill on cluster; 0.95 is well-behaved here.
 - `tune=1000, draws=1000, chains=4` — solid for these sample sizes. **Bump warmup to 1500-2000 if any fit shows `r̂ > 1.01` or `min ESS < 100/chain` post-hoc.**
 
-> **Fitting a DDM/RDM on real data?** Start with **`notes/fitting_ddm_models.md`** —
-> the prescriptive recipe (data prep, model choice, the default sampler settings and
-> why, convergence checks, and a "won't converge" decision tree). For the longer
-> retrospective on *why* each rule exists, see `notes/ddm_convergence_lessons.md`.
+> **Fitting a DDM/RDM on real data?** Start with **`notes/fitting_ddm_models.md`**
+> (prescriptive recipe + the "starting points" explanation); the empirical
+> experiment behind the defaults is `notes/experiments/ddm_sampler_experiments.md`.
 > Short version: filter `rt < 0.20 s`, `fit_separate_evidence_sd=True`, numpyro
-> on a GPU L4, `tune=2000 target_accept=0.99` for n≈64. Use `chain_method='vectorized'`
-> for a basic DDM but **`parallel` for any regression/hierarchical-regression DDM**
-> (vectorized leaves those at r̂≈1.6–2.5 even after the softplus fix). The default
-> `tune=1000` gives r̂≈2.6 — non-convergence, not a result.
+> on a GPU L4, `tune=2000 target_accept=0.99`, `chain_method='vectorized'`.
+> The thing that makes hard/regression posteriors converge is **bauer's
+> starting-point finder** (`recommended_init='mapjitter'`, on by default for
+> DDM/Race: MAP centre + prior-scaled jitter). Without it, convergence is a seed
+> lottery (a regression DDM converged ~12% of seeds; with the finder, 100%).
+> The finder is also **~3.7× faster** (174 s vs 647 s — converged chains avoid
+> max-tree-depth stalls), and on a single GPU `vectorized` beats `parallel`
+> (sequential chains). So finder+vectorized = most reliable AND fastest;
+> `chain_method` is not the lever. Always check r̂/ESS.
 
 ### Output filenames
 

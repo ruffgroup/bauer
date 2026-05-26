@@ -186,14 +186,19 @@ Same model, same data, varied sampler config:
 | numpyro parallel, tune=1000 | **1.00 / 1561** | (timeout — needs more time) |
 | blackjax vec | crashed (jax bug, `IO effect not supported in vmap-of-cond`) |
 
-> **Post-fix confirmation (2026-05-26).** The regression-DDM (`ddm_isi`) rows
-> above are NOT just pre-fix artifacts: re-run on *current* code (softplus fix
-> in) with vectorized + tune=2000, `ddm_isi` still came back **r̂=1.60, ESS=6**,
-> while the basic DDM was fine (r̂=1.013). The same pattern showed up
-> independently on the Alina per-subject gain/loss regression DDMs. Conclusion:
-> for a **regression / hierarchical-regression** DDM the load-bearing setting is
-> `chain_method='parallel'` (independent RNG per chain) — the softplus fix is
-> necessary but not sufficient. Vectorized is fine only for the *basic* DDM.
+> **RESOLVED — the lever is initialization, not `chain_method` (2026-05-26).**
+> A controlled multi-seed experiment (see `experiments/ddm_sampler_experiments.md`)
+> settled this. Convergence is **seed-dominated**: with the old generic-jitter
+> init, the regression DDM converged in only **2/16 seeds (12%)** on vectorized —
+> the *same config*, different seed, gave r̂ from 1.00 to 3.4. `parallel` merely
+> decorrelates the chains' seeds so it loses the lottery less often; it is **not**
+> the fix (and Alina pil02 failed on parallel). The fix is **bauer's
+> starting-point finder** (`get_initial_points` / `recommended_init='mapjitter'`,
+> now default-on for DDM/Race): MAP centre + per-parameter prior-scaled jitter,
+> mirroring HSSM. On the exact config that failed 7/8 of the time it gives
+> **8/8 (100%)** and ~3.7× faster. So: leave the finder on, `vectorized` is fine,
+> check r̂. The rows above (incl. the `tune=4000` parallel "successes") were the
+> lottery, not a real `chain_method` effect.
 
 **Conclusions:**
 
