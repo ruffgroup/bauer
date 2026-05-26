@@ -277,6 +277,14 @@
     <span class="n">recommended_nuts_kwargs</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">recommended_pymc_init</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 
+    <span class="c1"># ``recommended_init`` enables bauer&#39;s starting-point finder by default for</span>
+    <span class="c1"># this model class (see ``BaseModel.get_initial_points`` and ``sample``).</span>
+    <span class="c1"># DDM/RDM mixins set this to &#39;mapjitter&#39; because their posteriors are nasty</span>
+    <span class="c1"># enough that pymc&#39;s generic jitter init makes convergence a seed lottery</span>
+    <span class="c1"># (verified: vectorized regression-DDM converges ~1/7 seeds without it).</span>
+    <span class="c1"># ``None`` = use the backend&#39;s default init.</span>
+    <span class="n">recommended_init</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        data should contain [&#39;n1&#39;, &#39;n2&#39;] and &#39;choice&#39;.</span>
@@ -504,7 +512,7 @@
 <div class="viewcode-block" id="BaseModel.sample">
 <a class="viewcode-back" href="../../api_reference.html#bauer.core.BaseModel.sample">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">draws</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">target_accept</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
-               <span class="n">backend</span><span class="o">=</span><span class="s1">&#39;pymc&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+               <span class="n">backend</span><span class="o">=</span><span class="s1">&#39;pymc&#39;</span><span class="p">,</span> <span class="n">find_init</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Sample from the posterior using the requested NUTS backend.</span>
 
 <span class="sd">        Parameters</span>
@@ -536,9 +544,27 @@
 <span class="sd">        explicitly. DDMMixin / RaceMixin do this for full mass-matrix</span>
 <span class="sd">        adaptation.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Starting-point finder. ``find_init`` (or the class default</span>
+        <span class="c1"># ``recommended_init``) builds dispersed per-chain initial values</span>
+        <span class="c1"># around a data-informed plausible centre (see get_initial_points),</span>
+        <span class="c1"># instead of relying on the backend&#39;s generic jitter init. This is</span>
+        <span class="c1"># what stops hard DDM/regression posteriors from being a seed</span>
+        <span class="c1"># lottery. Skipped if the user supplied their own ``initvals``.</span>
+        <span class="k">if</span> <span class="n">find_init</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">find_init</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">recommended_init</span>
+        <span class="k">if</span> <span class="n">find_init</span> <span class="ow">and</span> <span class="s1">&#39;initvals&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">seed</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;random_seed&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;initvals&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_initial_points</span><span class="p">(</span>
+                <span class="n">chains</span><span class="o">=</span><span class="n">chains</span><span class="p">,</span> <span class="n">use_map</span><span class="o">=</span><span class="p">(</span><span class="n">find_init</span> <span class="o">!=</span> <span class="s1">&#39;priorjitter&#39;</span><span class="p">),</span>
+                <span class="n">seed</span><span class="o">=</span><span class="n">seed</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">seed</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+
         <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s1">&#39;pymc&#39;</span><span class="p">:</span>
-            <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;init&#39;</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;recommended_pymc_init&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-                              <span class="ow">or</span> <span class="s1">&#39;auto&#39;</span><span class="p">)</span>
+            <span class="c1"># When we supply our own dispersed initvals, avoid a jitter-adding</span>
+            <span class="c1"># init method (we already jittered); else keep the recommendation.</span>
+            <span class="n">default_init</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;recommended_pymc_init&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">&#39;auto&#39;</span>
+            <span class="k">if</span> <span class="s1">&#39;initvals&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">default_init</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">default_init</span> <span class="o">=</span> <span class="n">default_init</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;jitter+&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+            <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;init&#39;</span><span class="p">,</span> <span class="n">default_init</span><span class="p">)</span>
             <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimation_model</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">idata</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span>
                     <span class="n">draws</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="n">tune</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="n">chains</span><span class="p">,</span>
@@ -556,6 +582,8 @@
             <span class="n">user</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;nuts_kwargs&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
             <span class="n">nuts_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">rec</span><span class="p">,</span> <span class="o">**</span><span class="n">user</span><span class="p">}</span>
             <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;chain_method&#39;</span><span class="p">,</span> <span class="s1">&#39;vectorized&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s1">&#39;initvals&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;jitter&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>  <span class="c1"># initvals already dispersed</span>
             <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimation_model</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">idata</span> <span class="o">=</span> <span class="n">sampler</span><span class="p">(</span>
                     <span class="n">draws</span><span class="o">=</span><span class="n">draws</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="n">tune</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="n">chains</span><span class="p">,</span>
@@ -566,6 +594,66 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;backend must be &#39;pymc&#39;/&#39;numpyro&#39;/&#39;blackjax&#39;, got </span><span class="si">{</span><span class="n">backend</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">idata</span></div>
+
+
+<div class="viewcode-block" id="BaseModel.get_initial_points">
+<a class="viewcode-back" href="../../api_reference.html#bauer.core.BaseModel.get_initial_points">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_initial_points</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">jitter_frac</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">use_map</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                           <span class="n">n_prior</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Dispersed per-chain starting points for the sampler.</span>
+
+<span class="sd">        Returns a list of ``chains`` initval dicts (keyed by the model&#39;s</span>
+<span class="sd">        free-RV value-variable names). Each is a *plausible centre* plus</span>
+<span class="sd">        per-parameter Gaussian jitter whose SD is ``jitter_frac`` times that</span>
+<span class="sd">        parameter&#39;s prior SD. Chains are dispersed around the centre — never</span>
+<span class="sd">        all placed *at* it — so the mode (which is not in the typical set) is</span>
+<span class="sd">        not the start, and between-chain r̂ stays meaningful.</span>
+
+<span class="sd">        centre</span>
+<span class="sd">            ``find_MAP`` (the data-informed posterior mode / plausible value)</span>
+<span class="sd">            when ``use_map``; otherwise the model&#39;s prior-central</span>
+<span class="sd">            ``initial_point()``. Falls back to ``initial_point()`` if MAP fails.</span>
+<span class="sd">        jitter scale</span>
+<span class="sd">            Each free parameter is a plain unconstrained Normal in bauer&#39;s</span>
+<span class="sd">            models (softplus/logistic links are applied downstream as</span>
+<span class="sd">            Deterministics), so prior draws live in the same space as the</span>
+<span class="sd">            initvals and their SD is a natural, safe jitter scale.</span>
+
+<span class="sd">        Mirrors the init strategy HSSM uses (curated centre + small jitter) —</span>
+<span class="sd">        which bauer otherwise omits, leaving convergence of hard posteriors a</span>
+<span class="sd">        seed lottery.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimation_model</span><span class="p">:</span>
+            <span class="n">ip</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimation_model</span><span class="o">.</span><span class="n">initial_point</span><span class="p">()</span>
+            <span class="n">centre</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;float64&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">ip</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+            <span class="k">if</span> <span class="n">use_map</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">mp</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">find_MAP</span><span class="p">(</span><span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">centre</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">mp</span><span class="p">:</span>
+                            <span class="n">centre</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">mp</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;float64&#39;</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># pragma: no cover - robustness</span>
+                    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;find_MAP failed (</span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">); using prior-central &quot;</span>
+                                  <span class="s2">&quot;centre for initial points.&quot;</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">pr</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">sample_prior_predictive</span><span class="p">(</span>
+                    <span class="n">draws</span><span class="o">=</span><span class="n">n_prior</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">centre</span><span class="p">),</span> <span class="n">random_seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+                <span class="n">psd</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">pr</span><span class="o">.</span><span class="n">prior</span><span class="p">[</span><span class="n">k</span><span class="p">])</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+                       <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">centre</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">pr</span><span class="o">.</span><span class="n">prior</span><span class="p">}</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># pragma: no cover - robustness</span>
+                <span class="n">psd</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">points</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">chains</span><span class="p">):</span>
+            <span class="n">pt</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">centre</span><span class="p">:</span>
+                <span class="n">scale</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">broadcast_to</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">psd</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)),</span> <span class="n">centre</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+                <span class="n">scale</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">scale</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="n">scale</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+                <span class="n">jit</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">jitter_frac</span> <span class="o">*</span> <span class="n">scale</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">centre</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+                <span class="n">pt</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">centre</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">+</span> <span class="n">jit</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">ip</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="n">points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pt</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">points</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fit_map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filter_pars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
