@@ -332,8 +332,8 @@ Half A: 6912 trials,  Half B: 6912 trials
 </pre></div></div>
 </div>
 </section>
-<section id="Split-half-analysis:-10-random-splits-\times-5-trial-counts">
-<h2>Split-half analysis: 10 random splits <span class="math notranslate nohighlight">\(\times\)</span> 5 trial counts<a class="headerlink" href="#Split-half-analysis:-10-random-splits-\times-5-trial-counts" title="Link to this heading">¶</a></h2>
+<section id="Split-half-analysis:-3-random-splits-\times-3-trial-counts">
+<h2>Split-half analysis: 3 random splits <span class="math notranslate nohighlight">\(\times\)</span> 3 trial counts<a class="headerlink" href="#Split-half-analysis:-3-random-splits-\times-3-trial-counts" title="Link to this heading">¶</a></h2>
 <p>For each trial count (25, 50, 108) we:</p>
 <ol class="arabic simple">
 <li><p>Randomly split each subject’s data into two halves</p></li>
@@ -341,7 +341,7 @@ Half A: 6912 trials,  Half B: 6912 trials
 <li><p>Fit MLE and hierarchical Bayes on each half</p></li>
 <li><p>Correlate the parameter estimates across halves</p></li>
 </ol>
-<p>We repeat this 10 times with different random splits to get a stable estimate of reliability. Three correlation metrics are shown: Spearman <span class="math notranslate nohighlight">\(\rho\)</span>, Pearson <span class="math notranslate nohighlight">\(r\)</span>, and <span class="math notranslate nohighlight">\(R^2\)</span>.</p>
+<p>We repeat this 3 times with different random splits to get a stable estimate of reliability. Three correlation metrics are shown: Spearman <span class="math notranslate nohighlight">\(\rho\)</span>, Pearson <span class="math notranslate nohighlight">\(r\)</span>, and <span class="math notranslate nohighlight">\(R^2\)</span>.</p>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
@@ -996,7 +996,7 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 <li><a class="reference internal" href="#">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</a><ul>
 <li><a class="reference internal" href="#The-problem-with-individual-fitting">The problem with individual fitting</a></li>
 <li><a class="reference internal" href="#Empirical-demonstration:-split-half-reliability">Empirical demonstration: split-half reliability</a></li>
-<li><a class="reference internal" href="#Split-half-analysis:-10-random-splits-\times-5-trial-counts">Split-half analysis: 10 random splits <span class="math notranslate nohighlight">\(\times\)</span> 5 trial counts</a><ul>
+<li><a class="reference internal" href="#Split-half-analysis:-3-random-splits-\times-3-trial-counts">Split-half analysis: 3 random splits <span class="math notranslate nohighlight">\(\times\)</span> 3 trial counts</a><ul>
 <li><a class="reference internal" href="#The-boundary-collapse-problem">The boundary-collapse problem</a></li>
 </ul>
 </li>

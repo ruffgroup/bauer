@@ -254,7 +254,7 @@
 <h1>Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv)<a class="headerlink" href="#Lesson-3:-Stake-effects-and-presentation-order-—-de-Hollander-et-al.-(2024,-bioRxiv)" title="Link to this heading">¶</a></h1>
 <section id="Background">
 <h2>Background<a class="headerlink" href="#Background" title="Link to this heading">¶</a></h2>
-<p>De Hollander et al. (2024, <em>Nature Human Behaviour</em>) tested whether perceptual noise during the encoding of numerical magnitudes explains risk aversion and its interaction with presentation order. The key design feature: the <strong>order</strong> in which the safe and risky options are presented is randomised across trials, allowing the model to disentangle <span class="math notranslate nohighlight">\(\nu_1\)</span> (noise on the first-presented option) from <span class="math notranslate nohighlight">\(\nu_2\)</span> (noise on the second-presented option).</p>
+<p>De Hollander et al. (2024, <em>bioRxiv</em> preprint) tested whether perceptual noise during the encoding of numerical magnitudes explains risk aversion and its interaction with presentation order. The key design feature: the <strong>order</strong> in which the safe and risky options are presented is randomised across trials, allowing the model to disentangle <span class="math notranslate nohighlight">\(\nu_1\)</span> (noise on the first-presented option) from <span class="math notranslate nohighlight">\(\nu_2\)</span> (noise on the second-presented option).</p>
 <p>This produces a distinctive <strong>presentation-order × stake-size interaction</strong>: when the safe option comes first, high safe stakes are compressed downward more strongly by the prior → safe looks less attractive → the observer becomes more risk-seeking for high stakes. When the risky option comes first, the same mechanism operates on the risky stakes → risk aversion for high stakes.</p>
 <p>Standard models (EU, KLW with a shared noise) <strong>cannot</strong> capture this asymmetry.</p>
 <section id="Models-compared">
@@ -276,7 +276,7 @@
 <td><p><code class="docutils literal notranslate"><span class="pre">RiskModel(prior_estimate='klw',</span> <span class="pre">fit_seperate_evidence_sd=False)</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">evidence_sd</span></code>, <code class="docutils literal notranslate"><span class="pre">prior_sd</span></code> (shared)</p></td>
 </tr>
-<tr class="row-even"><td><p>PMCM</p></td>
+<tr class="row-even"><td><p>Perceptual and Memory-based Choice Model (PMCM)</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">RiskModel(prior_estimate='full',</span> <span class="pre">fit_seperate_evidence_sd=True)</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">n1_evidence_sd</span></code>, <code class="docutils literal notranslate"><span class="pre">n2_evidence_sd</span></code>, <code class="docutils literal notranslate"><span class="pre">risky/safe_prior_mu/sd</span></code></p></td>
 </tr>
