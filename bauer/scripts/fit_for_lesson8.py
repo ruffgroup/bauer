@@ -45,6 +45,9 @@ def main():
     ap.add_argument('--tune', type=int, default=1000)
     ap.add_argument('--chains', type=int, default=4)
     ap.add_argument('--target-accept', type=float, default=0.95)
+    ap.add_argument('--seed', type=int, default=None,
+                    help='random_seed for sampling + the finder jitter. Vary it '
+                         'to re-roll if one chain gets stuck on a hard fit.')
     args = ap.parse_args()
 
     import numpy as np
@@ -90,6 +93,8 @@ def main():
                          chains=args.chains,
                          target_accept=args.target_accept,
                          backend=args.backend)
+        if args.seed is not None:
+            sample_kw['random_seed'] = args.seed
         if args.chain_method is not None and args.backend != 'pymc':
             sample_kw['chain_method'] = args.chain_method
         if args.backend == 'blackjax':
