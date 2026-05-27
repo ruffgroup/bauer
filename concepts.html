@@ -287,8 +287,9 @@ constructing the model.</p>
 <section id="model-families">
 <h2>Model families<a class="headerlink" href="#model-families" title="Link to this heading">¶</a></h2>
 <dl class="simple">
-<dt><strong>Psychometric models</strong> (<code class="docutils literal notranslate"><span class="pre">PsychometricModel</span></code> and variants)</dt><dd><p>Two-alternative forced choice with a sensitivity parameter <code class="docutils literal notranslate"><span class="pre">nu</span></code> and a
-bias <code class="docutils literal notranslate"><span class="pre">bias</span></code>.  Requires columns <code class="docutils literal notranslate"><span class="pre">x1</span></code>, <code class="docutils literal notranslate"><span class="pre">x2</span></code>, <code class="docutils literal notranslate"><span class="pre">choice</span></code>.</p>
+<dt><strong>Psychophysical models</strong> (<code class="docutils literal notranslate"><span class="pre">PsychophysicalModel</span></code> and variants)</dt><dd><p>Two-alternative forced choice fitting a <strong>psychometric function</strong> with a
+sensitivity parameter <code class="docutils literal notranslate"><span class="pre">nu</span></code> and a bias <code class="docutils literal notranslate"><span class="pre">bias</span></code>.  Requires columns
+<code class="docutils literal notranslate"><span class="pre">x1</span></code>, <code class="docutils literal notranslate"><span class="pre">x2</span></code>, <code class="docutils literal notranslate"><span class="pre">choice</span></code>.</p>
 </dd>
 <dt><strong>Magnitude comparison models</strong> (<code class="docutils literal notranslate"><span class="pre">MagnitudeComparisonModel</span></code>, <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseComparisonModel</span></code>)</dt><dd><p>Bayesian observer models for choosing between two numerical quantities.
 Stimuli are represented in log space, corrupted by Gaussian noise, and
@@ -335,9 +336,29 @@ normal prior to a valid range:</p>
 <ul class="simple">
 <li><p>The <code class="docutils literal notranslate"><span class="pre">choice</span></code> column must be <strong>boolean</strong> (<code class="docutils literal notranslate"><span class="pre">True</span></code> = chose option 2 / second alternative).</p></li>
 <li><p>For hierarchical models, <code class="docutils literal notranslate"><span class="pre">subject</span></code> must appear either as an index level or as a column.</p></li>
-<li><p>All paradigm-specific columns (<code class="docutils literal notranslate"><span class="pre">n1</span></code>, <code class="docutils literal notranslate"><span class="pre">n2</span></code>, <code class="docutils literal notranslate"><span class="pre">p1</span></code>, <code class="docutils literal notranslate"><span class="pre">p2</span></code>, …) must be present
-and named exactly as the model expects.</p></li>
+<li><p>All paradigm-specific columns must be present and named exactly: magnitude
+<code class="docutils literal notranslate"><span class="pre">n1</span></code>/<code class="docutils literal notranslate"><span class="pre">n2</span></code>; risky choice <code class="docutils literal notranslate"><span class="pre">n1</span></code>/<code class="docutils literal notranslate"><span class="pre">n2</span></code>/<code class="docutils literal notranslate"><span class="pre">p1</span></code>/<code class="docutils literal notranslate"><span class="pre">p2</span></code>.</p></li>
+<li><p><strong>For DDM/RDM (reaction-time) models</strong>, also include <code class="docutils literal notranslate"><span class="pre">rt</span></code> in <strong>seconds</strong>
+(&gt; 0). Always <strong>drop implausibly fast trials</strong> (e.g. <code class="docutils literal notranslate"><span class="pre">df</span> <span class="pre">=</span> <span class="pre">df[df['rt']</span> <span class="pre">&gt;=</span> <span class="pre">0.20]</span></code>):
+the WFPT likelihood has a flat, zero-gradient region when the non-decision
+time exceeds the fastest RT, and the sampler gets stuck there.</p></li>
 </ul>
+</section>
+<section id="using-your-own-data">
+<h2>Using your own data<a class="headerlink" href="#using-your-own-data" title="Link to this heading">¶</a></h2>
+<p>Point a model at any DataFrame that follows the conventions above:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">RiskModel</span>              <span class="c1"># or DDMRiskModel, etc.</span>
+
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;my_choices.tsv&#39;</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">)</span>    <span class="c1"># your data</span>
+<span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;chose_second&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>  <span class="c1"># boolean: True = option 2</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span>                    <span class="c1"># subject as index (hierarchical)</span>
+<span class="c1"># df must have n1, n2, p1, p2  (+ rt in seconds for DDM/RDM models)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">RiskModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">df</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
 </section>
 <section id="typical-workflow">
 <h2>Typical workflow<a class="headerlink" href="#typical-workflow" title="Link to this heading">¶</a></h2>
@@ -349,11 +370,13 @@ and named exactly as the model expects.</p></li>
 <span class="n">model</span> <span class="o">=</span> <span class="n">MagnitudeComparisonModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
 <span class="n">model</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-<span class="c1"># Quick MAP estimate</span>
-<span class="n">pars</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit_map</span><span class="p">()</span>
+<span class="c1"># Full MCMC. backend=&#39;numpyro&#39; is much faster than the default &#39;pymc&#39;</span>
+<span class="c1"># (and uses the GPU automatically if jax[cuda12] is installed) — see below.</span>
+<span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s1">&#39;numpyro&#39;</span><span class="p">)</span>
 
-<span class="c1"># Full MCMC</span>
-<span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<span class="c1"># ALWAYS check convergence before interpreting anything:</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">az</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;diagnostics&#39;</span><span class="p">))</span>    <span class="c1"># want r̂ ≤ 1.01, ESS ≥ ~400</span>
 
 <span class="c1"># Parameter summaries</span>
 <span class="n">subj_pars</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">get_subjectwise_parameter_estimates</span><span class="p">(</span><span class="n">idata</span><span class="p">)</span>
@@ -363,6 +386,21 @@ and named exactly as the model expects.</p></li>
 <span class="n">ppc</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">ppc</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">idata</span><span class="p">)</span>
 </pre></div>
 </div>
+</section>
+<section id="sampler-backends-and-speed">
+<h2>Sampler backends and speed<a class="headerlink" href="#sampler-backends-and-speed" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">model.sample(backend=...)</span></code> chooses the NUTS engine:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">'pymc'</span></code> (<strong>default</strong>) — reliable but <strong>slow</strong>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">'numpyro'</span></code> — JAX-backed, <strong>much faster</strong> (~3–10× on CPU, ~5–30× on GPU),
+and it parallelises the chains for you (<code class="docutils literal notranslate"><span class="pre">chain_method</span></code> is auto-set to
+<code class="docutils literal notranslate"><span class="pre">'vectorized'</span></code>).</p></li>
+</ul>
+<p>Use <code class="docutils literal notranslate"><span class="pre">backend='numpyro'</span></code> for any non-trivial fit. <strong>GPU</strong> needs no code change
+— install <code class="docutils literal notranslate"><span class="pre">jax[cuda12]</span></code> (see <a class="reference internal" href="installation.html"><span class="doc">Installation</span></a>) and the same call uses the
+GPU. For DDM/RDM fits use <code class="docutils literal notranslate"><span class="pre">tune=2000</span></code> (not the <code class="docutils literal notranslate"><span class="pre">tune=1000</span></code> default — too low
+for those), keep the default starting-point finder on (next section), and check
+r̂.</p>
 </section>
 <section id="sampling-starting-points-initial-values">
 <h2>Sampling: starting points (initial values)<a class="headerlink" href="#sampling-starting-points-initial-values" title="Link to this heading">¶</a></h2>
@@ -460,7 +498,9 @@ uncertainty, not a failed fit.</p>
 <li><a class="reference internal" href="#model-families">Model families</a></li>
 <li><a class="reference internal" href="#parameter-transforms">Parameter transforms</a></li>
 <li><a class="reference internal" href="#data-conventions">Data conventions</a></li>
+<li><a class="reference internal" href="#using-your-own-data">Using your own data</a></li>
 <li><a class="reference internal" href="#typical-workflow">Typical workflow</a></li>
+<li><a class="reference internal" href="#sampler-backends-and-speed">Sampler backends and speed</a></li>
 <li><a class="reference internal" href="#sampling-starting-points-initial-values">Sampling: starting points (initial values)</a></li>
 </ul>
 </li>

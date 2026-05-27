@@ -251,54 +251,78 @@
         <article role="main" id="furo-main-content">
           <section id="installation">
 <h1>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h1>
-<section id="recommended-conda-environment">
-<h2>Recommended: conda environment<a class="headerlink" href="#recommended-conda-environment" title="Link to this heading">¶</a></h2>
-<p>The easiest way to get a fully working environment is to clone the repo and create
-the bundled conda environment:</p>
+<p>bauer has three install “profiles” depending on what you need. Pick one.</p>
+<section id="choice-only-models-cpu">
+<h2>1. Choice-only models (CPU)<a class="headerlink" href="#choice-only-models-cpu" title="Link to this heading">¶</a></h2>
+<p>For the static (cumulative-normal) choice models — psychophysical, magnitude
+comparison, risky choice — the base install is enough:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ruffgroup/bauer
 <span class="nb">cd</span><span class="w"> </span>bauer
-conda<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>environment.yml<span class="w">   </span><span class="c1"># creates the &#39;bauer&#39; env</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.<span class="w">          </span><span class="c1"># (or: pip install bauer, once on PyPI)</span>
+</pre></div>
+</div>
+</section>
+<section id="ddm-rdm-models-the-fast-sampler-cpu-laptop">
+<h2>2. DDM / RDM models + the fast sampler (CPU laptop)<a class="headerlink" href="#ddm-rdm-models-the-fast-sampler-cpu-laptop" title="Link to this heading">¶</a></h2>
+<p>The reaction-time models (drift-diffusion, race-diffusion) need the WFPT
+likelihood from <strong>HSSM</strong>, and you’ll want the <strong>numpyro (JAX) backend</strong>, which
+is far faster than the default <code class="docutils literal notranslate"><span class="pre">pymc</span></code> backend (see
+<a class="reference internal" href="#backend-speed"><span class="std std-ref">Choosing a sampler backend (this is the speed knob)</span></a> below). The <code class="docutils literal notranslate"><span class="pre">[ddm]</span></code> extra pulls all of this:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[ddm]&quot;</span><span class="w">   </span><span class="c1"># hssm + jax (CPU) + numpyro + blackjax</span>
+</pre></div>
+</div>
+</section>
+<section id="gpu-workstation-or-cluster">
+<h2>3. GPU (workstation or cluster)<a class="headerlink" href="#gpu-workstation-or-cluster" title="Link to this heading">¶</a></h2>
+<p>A single GPU gives a large additional speedup (a hierarchical n=64 DDM is
+~45 min on an L4 GPU vs many hours on CPU). <strong>GPU use is decided entirely by
+which JAX you install</strong> — there is no code flag. Install the CUDA build of
+JAX on top of the <code class="docutils literal notranslate"><span class="pre">[ddm]</span></code> extra:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[ddm]&quot;</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;jax[cuda12]&quot;</span><span class="w">     </span><span class="c1"># CUDA 12 build of JAX</span>
+</pre></div>
+</div>
+<p>Then just fit with <code class="docutils literal notranslate"><span class="pre">backend='numpyro'</span></code> (below) — bauer uses the GPU
+automatically; you do <strong>not</strong> pass a device argument, and <code class="docutils literal notranslate"><span class="pre">chain_method</span></code> is
+auto-set to <code class="docutils literal notranslate"><span class="pre">'vectorized'</span></code> so the chains run together on the one GPU.</p>
+</section>
+<section id="choosing-a-sampler-backend-this-is-the-speed-knob">
+<span id="backend-speed"></span><h2>Choosing a sampler backend (this is the speed knob)<a class="headerlink" href="#choosing-a-sampler-backend-this-is-the-speed-knob" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">model.sample()</span></code> takes a <code class="docutils literal notranslate"><span class="pre">backend</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">backend='pymc'</span></code> (the <strong>default</strong>) — PyMC’s NUTS. Reliable but <strong>slow</strong>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">backend='numpyro'</span></code> — JAX-backed NUTS. <strong>Much faster</strong> (~3–10× on CPU,
+~5–30× on GPU), and it parallelises the chains automatically.</p></li>
+</ul>
+<p>So for any non-trivial fit you want <code class="docutils literal notranslate"><span class="pre">backend='numpyro'</span></code>; on a GPU machine it
+then uses the GPU with no further changes. (<code class="docutils literal notranslate"><span class="pre">blackjax</span></code> is an alternative
+JAX backend; not generally needed.)</p>
+</section>
+<section id="conda-environments">
+<h2>Conda environments<a class="headerlink" href="#conda-environments" title="Link to this heading">¶</a></h2>
+<p>Equivalent conda envs are bundled: <code class="docutils literal notranslate"><span class="pre">environment.yml</span></code> (CPU) and
+<code class="docutils literal notranslate"><span class="pre">environment_cuda.yml</span></code> (GPU, with <code class="docutils literal notranslate"><span class="pre">jax[cuda12]</span></code>). Each ends by installing
+bauer editable:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>environment.yml<span class="w">        </span><span class="c1"># CPU, &#39;bauer&#39; env</span>
+<span class="c1"># or, on a GPU box:</span>
+conda<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>environment_cuda.yml<span class="w">   </span><span class="c1"># GPU, &#39;bauer_cuda&#39; env</span>
 conda<span class="w"> </span>activate<span class="w"> </span>bauer
 </pre></div>
 </div>
-<p>This installs all runtime and documentation dependencies automatically.</p>
 </section>
-<section id="pip-install-pypi">
-<h2>pip install (PyPI)<a class="headerlink" href="#pip-install-pypi" title="Link to this heading">¶</a></h2>
-<p>Once released on PyPI you can install with:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>bauer
-</pre></div>
-</div>
-<p>And then add the optional extras you need:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;bauer[docs]&quot;</span><span class="w">    </span><span class="c1"># sphinx / nbsphinx for documentation</span>
-pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;bauer[dev]&quot;</span><span class="w">     </span><span class="c1"># flake8 / pytest for development</span>
-</pre></div>
-</div>
-</section>
-<section id="install-from-source-development">
-<h2>Install from source (development)<a class="headerlink" href="#install-from-source-development" title="Link to this heading">¶</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ruffgroup/bauer
-<span class="nb">cd</span><span class="w"> </span>bauer
-pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[docs,dev]&quot;</span>
+<section id="development-docs">
+<h2>Development / docs<a class="headerlink" href="#development-docs" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span><span class="w">      </span><span class="c1"># flake8 / pytest / pre-commit</span>
+pre-commit<span class="w"> </span>install<span class="w">           </span><span class="c1"># run flake8 on every commit (matches CI)</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[docs]&quot;</span><span class="w">     </span><span class="c1"># sphinx / nbsphinx, to build these docs</span>
 </pre></div>
 </div>
 </section>
 <section id="runtime-dependencies">
 <h2>Runtime dependencies<a class="headerlink" href="#runtime-dependencies" title="Link to this heading">¶</a></h2>
-<p>The core package requires:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">pymc</span> <span class="pre">&gt;=</span> <span class="pre">5</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">pytensor</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">pandas</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">numpy</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">patsy</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">arviz</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">scipy</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">seaborn</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">matplotlib</span></code></p></li>
-</ul>
-<p>Building the documentation additionally requires <code class="docutils literal notranslate"><span class="pre">sphinx</span></code>, <code class="docutils literal notranslate"><span class="pre">nbsphinx</span></code>,
-<code class="docutils literal notranslate"><span class="pre">nbconvert</span></code>, and <code class="docutils literal notranslate"><span class="pre">nbformat</span></code>.</p>
+<p>Core (always): <code class="docutils literal notranslate"><span class="pre">pymc</span> <span class="pre">&gt;=</span> <span class="pre">5</span></code>, <code class="docutils literal notranslate"><span class="pre">pytensor</span></code>, <code class="docutils literal notranslate"><span class="pre">pandas</span></code>, <code class="docutils literal notranslate"><span class="pre">numpy</span></code>, <code class="docutils literal notranslate"><span class="pre">patsy</span></code>,
+<code class="docutils literal notranslate"><span class="pre">arviz</span> <span class="pre">&lt;</span> <span class="pre">1.0</span></code>, <code class="docutils literal notranslate"><span class="pre">scipy</span></code>, <code class="docutils literal notranslate"><span class="pre">seaborn</span></code>, <code class="docutils literal notranslate"><span class="pre">matplotlib</span></code>. The <code class="docutils literal notranslate"><span class="pre">[ddm]</span></code> extra
+adds <code class="docutils literal notranslate"><span class="pre">hssm</span></code>, <code class="docutils literal notranslate"><span class="pre">jax</span></code>, <code class="docutils literal notranslate"><span class="pre">numpyro</span></code>, <code class="docutils literal notranslate"><span class="pre">blackjax</span></code>.</p>
 </section>
 </section>
 
@@ -358,9 +382,12 @@ pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </s
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">Installation</a><ul>
-<li><a class="reference internal" href="#recommended-conda-environment">Recommended: conda environment</a></li>
-<li><a class="reference internal" href="#pip-install-pypi">pip install (PyPI)</a></li>
-<li><a class="reference internal" href="#install-from-source-development">Install from source (development)</a></li>
+<li><a class="reference internal" href="#choice-only-models-cpu">1. Choice-only models (CPU)</a></li>
+<li><a class="reference internal" href="#ddm-rdm-models-the-fast-sampler-cpu-laptop">2. DDM / RDM models + the fast sampler (CPU laptop)</a></li>
+<li><a class="reference internal" href="#gpu-workstation-or-cluster">3. GPU (workstation or cluster)</a></li>
+<li><a class="reference internal" href="#choosing-a-sampler-backend-this-is-the-speed-knob">Choosing a sampler backend (this is the speed knob)</a></li>
+<li><a class="reference internal" href="#conda-environments">Conda environments</a></li>
+<li><a class="reference internal" href="#development-docs">Development / docs</a></li>
 <li><a class="reference internal" href="#runtime-dependencies">Runtime dependencies</a></li>
 </ul>
 </li>

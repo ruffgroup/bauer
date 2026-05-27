@@ -400,38 +400,37 @@ DDM/RDM threshold <code class="docutils literal notranslate"><span class="pre">a
 </dd></dl>
 
 </section>
-<section id="psychometric-models">
-<h2>Psychometric models<a class="headerlink" href="#psychometric-models" title="Link to this heading">¶</a></h2>
+<section id="psychophysical-models">
+<h2>Psychophysical models<a class="headerlink" href="#psychophysical-models" title="Link to this heading">¶</a></h2>
 <dl class="py class">
-<dt class="sig sig-object py" id="bauer.models.PsychometricModel">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychometricModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#bauer.models.PsychometricModel" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">PsychophysicalModel</span></code></p>
-<p>Deprecated alias for <code class="xref py py-class docutils literal notranslate"><span class="pre">PsychophysicalModel</span></code>.</p>
-<p>Will be removed in a future release. Use <code class="docutils literal notranslate"><span class="pre">PsychophysicalModel</span></code>.</p>
+<dt class="sig sig-object py" id="bauer.models.PsychophysicalModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychophysicalModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/psychophysics.html#PsychophysicalModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.PsychophysicalModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.BaseModel" title="bauer.core.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a></p>
+<p>Psychophysical model for two-alternative forced choice with a sensitivity and bias parameter.</p>
+<p>Parameters <code class="docutils literal notranslate"><span class="pre">nu</span></code> (discrimination sensitivity, softplus-transformed) and <code class="docutils literal notranslate"><span class="pre">bias</span></code>
+(decision criterion) describe the probability of choosing option 2 given stimuli x1 and x2.
+Paradigm requires columns <code class="docutils literal notranslate"><span class="pre">x1</span></code>, <code class="docutils literal notranslate"><span class="pre">x2</span></code>, and <code class="docutils literal notranslate"><span class="pre">choice</span></code>.</p>
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="bauer.models.PsychometricLapseModel">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychometricLapseModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#bauer.models.PsychometricLapseModel" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">PsychophysicalLapseModel</span></code></p>
-<p>Deprecated alias for <code class="xref py py-class docutils literal notranslate"><span class="pre">PsychophysicalLapseModel</span></code>.</p>
-<p>Will be removed in a future release. Use <code class="docutils literal notranslate"><span class="pre">PsychophysicalLapseModel</span></code>.</p>
+<dt class="sig sig-object py" id="bauer.models.PsychophysicalLapseModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychophysicalLapseModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/psychophysics.html#PsychophysicalLapseModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.PsychophysicalLapseModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.LapseModel" title="bauer.core.LapseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">LapseModel</span></code></a>, <a class="reference internal" href="#bauer.models.PsychophysicalModel" title="bauer.models.psychophysics.PsychophysicalModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">PsychophysicalModel</span></code></a></p>
+<p>PsychophysicalModel extended with a lapse rate parameter.</p>
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="bauer.models.PsychometricRegressionModel">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychometricRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#bauer.models.PsychometricRegressionModel" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">PsychophysicalRegressionModel</span></code></p>
-<p>Deprecated alias for <code class="xref py py-class docutils literal notranslate"><span class="pre">PsychophysicalRegressionModel</span></code>.</p>
-<p>Will be removed in a future release. Use <code class="docutils literal notranslate"><span class="pre">PsychophysicalRegressionModel</span></code>.</p>
+<dt class="sig sig-object py" id="bauer.models.PsychophysicalRegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychophysicalRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/psychophysics.html#PsychophysicalRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.PsychophysicalRegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.RegressionModel" title="bauer.core.RegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RegressionModel</span></code></a>, <a class="reference internal" href="#bauer.models.PsychophysicalModel" title="bauer.models.psychophysics.PsychophysicalModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">PsychophysicalModel</span></code></a></p>
+<p>PsychophysicalModel with patsy formula regression on nu and/or bias.</p>
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="bauer.models.PsychometricLapseRegressionModel">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychometricLapseRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#bauer.models.PsychometricLapseRegressionModel" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">PsychophysicalLapseRegressionModel</span></code></p>
-<p>Deprecated alias for <code class="xref py py-class docutils literal notranslate"><span class="pre">PsychophysicalLapseRegressionModel</span></code>.</p>
-<p>Will be removed in a future release. Use <code class="docutils literal notranslate"><span class="pre">PsychophysicalLapseRegressionModel</span></code>.</p>
+<dt class="sig sig-object py" id="bauer.models.PsychophysicalLapseRegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychophysicalLapseRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/psychophysics.html#PsychophysicalLapseRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.PsychophysicalLapseRegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.LapseModel" title="bauer.core.LapseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">LapseModel</span></code></a>, <a class="reference internal" href="#bauer.models.PsychophysicalRegressionModel" title="bauer.models.psychophysics.PsychophysicalRegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">PsychophysicalRegressionModel</span></code></a></p>
+<p>PsychophysicalModel with both a lapse rate and patsy formula regression.</p>
 </dd></dl>
 
 </section>
@@ -857,11 +856,11 @@ draw a dashed horizontal line at the group-mean posterior mean.</p></li>
 </li>
 </ul>
 </li>
-<li><a class="reference internal" href="#psychometric-models">Psychometric models</a><ul>
-<li><a class="reference internal" href="#bauer.models.PsychometricModel"><code class="docutils literal notranslate"><span class="pre">PsychometricModel</span></code></a></li>
-<li><a class="reference internal" href="#bauer.models.PsychometricLapseModel"><code class="docutils literal notranslate"><span class="pre">PsychometricLapseModel</span></code></a></li>
-<li><a class="reference internal" href="#bauer.models.PsychometricRegressionModel"><code class="docutils literal notranslate"><span class="pre">PsychometricRegressionModel</span></code></a></li>
-<li><a class="reference internal" href="#bauer.models.PsychometricLapseRegressionModel"><code class="docutils literal notranslate"><span class="pre">PsychometricLapseRegressionModel</span></code></a></li>
+<li><a class="reference internal" href="#psychophysical-models">Psychophysical models</a><ul>
+<li><a class="reference internal" href="#bauer.models.PsychophysicalModel"><code class="docutils literal notranslate"><span class="pre">PsychophysicalModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.PsychophysicalLapseModel"><code class="docutils literal notranslate"><span class="pre">PsychophysicalLapseModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.PsychophysicalRegressionModel"><code class="docutils literal notranslate"><span class="pre">PsychophysicalRegressionModel</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.PsychophysicalLapseRegressionModel"><code class="docutils literal notranslate"><span class="pre">PsychophysicalLapseRegressionModel</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#magnitude-comparison-models">Magnitude comparison models</a><ul>

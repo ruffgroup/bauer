@@ -294,7 +294,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">scipy.stats</span><span class="w"> </span><span class="kn">import</span> <span class="n">norm</span> <span class="k">as</span> <span class="n">scipy_norm</span><span class="p">,</span> <span class="n">spearmanr</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_garcia2022</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">PsychometricModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">PsychophysicalModel</span>
 
 <span class="n">data_risk</span> <span class="o">=</span> <span class="n">load_garcia2022</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s1">&#39;risk&#39;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Subjects: </span><span class="si">{</span><span class="n">data_risk</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span><span class="si">}</span><span class="s2">,  &quot;</span>
@@ -356,7 +356,7 @@ Subjects: 64,  Trials: 30311,  Formats: [&#39;symbolic&#39;, &#39;non-symbolic&#
 </section>
 <section id="The-psychometric-function-for-risky-choice">
 <h2>The psychometric function for risky choice<a class="headerlink" href="#The-psychometric-function-for-risky-choice" title="Link to this heading">¶</a></h2>
-<p>bauer’s <code class="docutils literal notranslate"><span class="pre">PsychometricModel</span></code> fits:</p>
+<p>bauer’s <code class="docutils literal notranslate"><span class="pre">PsychophysicalModel</span></code> fits:</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
 \[P(\text{chose risky}) = \Phi\!\left(\frac{\log(n_\text{risky}/n_\text{safe}) - \delta^*}{\sqrt{2}\,\nu}\right)\]</div>
@@ -446,7 +446,7 @@ Subjects: 64,  Trials: 30311,  Formats: [&#39;symbolic&#39;, &#39;non-symbolic&#
 </section>
 <section id="Fitting-psychometric-functions-—-separately-per-format">
 <h2>Fitting psychometric functions — separately per format<a class="headerlink" href="#Fitting-psychometric-functions-—-separately-per-format" title="Link to this heading">¶</a></h2>
-<p>Because symbolic and non-symbolic formats produce different noise levels, we fit <code class="docutils literal notranslate"><span class="pre">PsychometricModel</span></code> <strong>separately</strong> for each format. This gives us per-subject estimates of <span class="math notranslate nohighlight">\(\nu\)</span> (noise) and <span class="math notranslate nohighlight">\(\delta^*\)</span> (indifference point) within each format, which we can then correlate with each other and with magnitude-task precision.</p>
+<p>Because symbolic and non-symbolic formats produce different noise levels, we fit <code class="docutils literal notranslate"><span class="pre">PsychophysicalModel</span></code> <strong>separately</strong> for each format. This gives us per-subject estimates of <span class="math notranslate nohighlight">\(\nu\)</span> (noise) and <span class="math notranslate nohighlight">\(\delta^*\)</span> (indifference point) within each format, which we can then correlate with each other and with magnitude-task precision.</p>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
 </pre></div>
@@ -482,14 +482,14 @@ Non-symbolic:  15150 trials, 64 subjects
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Fit psychometric models — one per format</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">PsychometricModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">PsychophysicalModel</span>
 
-<span class="n">model_sym</span> <span class="o">=</span> <span class="n">PsychometricModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">data_sym</span><span class="p">)</span>
+<span class="n">model_sym</span> <span class="o">=</span> <span class="n">PsychophysicalModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">data_sym</span><span class="p">)</span>
 <span class="n">model_sym</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data_sym</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">idata_sym</span> <span class="o">=</span> <span class="n">model_sym</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Symbolic fit done&quot;</span><span class="p">)</span>
 
-<span class="n">model_nonsym</span> <span class="o">=</span> <span class="n">PsychometricModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">data_nonsym</span><span class="p">)</span>
+<span class="n">model_nonsym</span> <span class="o">=</span> <span class="n">PsychophysicalModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">data_nonsym</span><span class="p">)</span>
 <span class="n">model_nonsym</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data_nonsym</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">idata_nonsym</span> <span class="o">=</span> <span class="n">model_nonsym</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Non-symbolic fit done&quot;</span><span class="p">)</span>

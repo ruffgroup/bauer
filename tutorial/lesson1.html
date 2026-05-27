@@ -867,7 +867,7 @@ Subjects: 64,  Trials: 13824
 <section id="Recovering-Weber's-law-non-parametrically">
 <h3>Recovering Weber’s law non-parametrically<a class="headerlink" href="#Recovering-Weber's-law-non-parametrically" title="Link to this heading">¶</a></h3>
 <p>The NLC model assumes log-space encoding and derives Weber’s law as a consequence. But we can also test Weber’s law <em>without</em> assuming log encoding, by fitting a model that works in <strong>natural space</strong> — that is, the space of raw stimulus magnitudes <span class="math notranslate nohighlight">\(n\)</span>, not <span class="math notranslate nohighlight">\(\log n\)</span>.</p>
-<p><code class="docutils literal notranslate"><span class="pre">PsychometricRegressionModel</span></code> is a simple psychometric-function model that takes two stimuli <span class="math notranslate nohighlight">\(x_1, x_2\)</span> and fits the probability of choosing <span class="math notranslate nohighlight">\(x_2\)</span> as:</p>
+<p><code class="docutils literal notranslate"><span class="pre">PsychophysicalRegressionModel</span></code> is a simple psychometric-function model that takes two stimuli <span class="math notranslate nohighlight">\(x_1, x_2\)</span> and fits the probability of choosing <span class="math notranslate nohighlight">\(x_2\)</span> as:</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
 \[P(\text{chose}\; x_2) = \Phi\!\left(\frac{x_2 - x_1}{\nu}\right)\]</div>
@@ -878,7 +878,7 @@ Subjects: 64,  Trials: 13824
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">PsychometricRegressionModel</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">PsychophysicalRegressionModel</span>
 
 <span class="c1"># x1 = n1, x2 = n2 in natural space (raw magnitudes, not log-transformed)</span>
 <span class="n">data_lin</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
@@ -886,7 +886,7 @@ Subjects: 64,  Trials: 13824
 <span class="n">data_lin</span><span class="p">[</span><span class="s1">&#39;x2&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_lin</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
 
 <span class="c1"># C(n1): categorical coding — separate nu per n1 level, no linearity assumption</span>
-<span class="n">model_lin_reg</span> <span class="o">=</span> <span class="n">PsychometricRegressionModel</span><span class="p">(</span>
+<span class="n">model_lin_reg</span> <span class="o">=</span> <span class="n">PsychophysicalRegressionModel</span><span class="p">(</span>
     <span class="n">paradigm</span><span class="o">=</span><span class="n">data_lin</span><span class="p">,</span>
     <span class="n">regressors</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;nu&#39;</span><span class="p">:</span> <span class="s1">&#39;C(n1)&#39;</span><span class="p">},</span>
 <span class="p">)</span>
