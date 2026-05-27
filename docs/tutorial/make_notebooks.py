@@ -450,7 +450,7 @@ But we can also test Weber's law *without* assuming log encoding, by fitting a m
 that works in **natural space** — that is, the space of raw stimulus magnitudes $n$,
 not $\log n$.
 
-`PsychometricRegressionModel` is a simple psychometric-function model that takes two
+`PsychophysicalRegressionModel` is a simple psychometric-function model that takes two
 stimuli $x_1, x_2$ and fits the probability of choosing $x_2$ as:
 
 $$P(\text{chose}\; x_2) = \Phi\!\left(\frac{x_2 - x_1}{\nu}\right)$$
@@ -465,7 +465,7 @@ when measured from outside, in the raw stimulus space.
 """),
 
 code("""\
-from bauer.models import PsychometricRegressionModel
+from bauer.models import PsychophysicalRegressionModel
 
 # x1 = n1, x2 = n2 in natural space (raw magnitudes, not log-transformed)
 data_lin = data.copy()
@@ -473,7 +473,7 @@ data_lin['x1'] = data_lin['n1'].astype(float)
 data_lin['x2'] = data_lin['n2'].astype(float)
 
 # C(n1): categorical coding — separate nu per n1 level, no linearity assumption
-model_lin_reg = PsychometricRegressionModel(
+model_lin_reg = PsychophysicalRegressionModel(
     paradigm=data_lin,
     regressors={'nu': 'C(n1)'},
 )
@@ -828,7 +828,7 @@ import seaborn as sns
 import arviz as az
 from scipy.stats import norm as scipy_norm, spearmanr
 from bauer.utils.data import load_garcia2022
-from bauer.models import PsychometricModel
+from bauer.models import PsychophysicalModel
 
 data_risk = load_garcia2022(task='risk')
 print(f"Subjects: {data_risk.index.get_level_values('subject').nunique()},  "
@@ -872,7 +872,7 @@ plt.tight_layout()
 
 md(r"""## The psychometric function for risky choice
 
-bauer's `PsychometricModel` fits:
+bauer's `PsychophysicalModel` fits:
 
 $$P(\text{chose risky}) = \Phi\!\left(\frac{\log(n_\text{risky}/n_\text{safe}) - \delta^*}{\sqrt{2}\,\nu}\right)$$
 
@@ -942,7 +942,7 @@ plt.tight_layout()
 md(r"""## Fitting psychometric functions — separately per format
 
 Because symbolic and non-symbolic formats produce different noise levels, we fit
-`PsychometricModel` **separately** for each format.  This gives us per-subject estimates
+`PsychophysicalModel` **separately** for each format.  This gives us per-subject estimates
 of $\nu$ (noise) and $\delta^*$ (indifference point) within each format, which we can
 then correlate with each other and with magnitude-task precision.
 """),
@@ -966,14 +966,14 @@ print(f"Non-symbolic:  {len(data_nonsym)} trials, "
 
 code("""\
 # Fit psychometric models — one per format
-from bauer.models import PsychometricModel
+from bauer.models import PsychophysicalModel
 
-model_sym = PsychometricModel(paradigm=data_sym)
+model_sym = PsychophysicalModel(paradigm=data_sym)
 model_sym.build_estimation_model(data=data_sym, hierarchical=True)
 idata_sym = model_sym.sample(draws=500, tune=500, chains=4, progressbar=False)
 print("Symbolic fit done")
 
-model_nonsym = PsychometricModel(paradigm=data_nonsym)
+model_nonsym = PsychophysicalModel(paradigm=data_nonsym)
 model_nonsym.build_estimation_model(data=data_nonsym, hierarchical=True)
 idata_nonsym = model_nonsym.sample(draws=500, tune=500, chains=4, progressbar=False)
 print("Non-symbolic fit done")

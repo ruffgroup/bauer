@@ -39,9 +39,10 @@ Concrete models are created via multiple inheritance, e.g.::
 Model families
 --------------
 
-**Psychometric models** (``PsychometricModel`` and variants)
-    Two-alternative forced choice with a sensitivity parameter ``nu`` and a
-    bias ``bias``.  Requires columns ``x1``, ``x2``, ``choice``.
+**Psychophysical models** (``PsychophysicalModel`` and variants)
+    Two-alternative forced choice fitting a **psychometric function** with a
+    sensitivity parameter ``nu`` and a bias ``bias``.  Requires columns
+    ``x1``, ``x2``, ``choice``.
 
 **Magnitude comparison models** (``MagnitudeComparisonModel``, ``FlexibleNoiseComparisonModel``)
     Bayesian observer models for choosing between two numerical quantities.

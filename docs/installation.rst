@@ -6,8 +6,9 @@ bauer has three install "profiles" depending on what you need. Pick one.
 1. Choice-only models (CPU)
 ---------------------------
 
-For the static (cumulative-normal) choice models — psychometric, magnitude
+For the static (cumulative-normal) choice models — psychophysical, magnitude
 comparison, risky choice — the base install is enough:
+
 
 .. code-block:: bash
 
