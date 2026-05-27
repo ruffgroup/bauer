@@ -364,6 +364,40 @@ and named exactly as the model expects.</p></li>
 </pre></div>
 </div>
 </section>
+<section id="sampling-starting-points-initial-values">
+<h2>Sampling: starting points (initial values)<a class="headerlink" href="#sampling-starting-points-initial-values" title="Link to this heading">¶</a></h2>
+<p>DDM and regression posteriors are long, curved ridges, and <em>where the chains
+start</em> strongly affects whether they converge. With a generic initialization
+this is effectively a lottery: the same model and settings can give
+<span class="math notranslate nohighlight">\(\hat r \approx 1.0\)</span> on one random seed and <span class="math notranslate nohighlight">\(\hat r &gt; 3\)</span> on the
+next.</p>
+<p>bauer handles this with a <strong>starting-point finder</strong>, enabled by default on the
+DDM/race models (<code class="xref py py-attr docutils literal notranslate"><span class="pre">recommended_init</span> <span class="pre">=</span> <span class="pre">'mapjitter'</span></code>). It starts each chain
+at a <strong>data-informed plausible value</strong> — the posterior mode from
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">fit_map()</span></code>, falling back to the prior-central point —
+and <strong>disperses the chains around it by a fraction of each parameter’s prior
+SD</strong>. Chains sit around the typical set rather than all at the mode, so
+<span class="math notranslate nohighlight">\(\hat r\)</span> stays meaningful. This is the same idea HSSM uses (curated
+initial values plus a small jitter). It works for <em>every</em> parameter
+automatically — core DDM, the Bayesian-observer front-end, and flexible
+(B-spline) noise coefficients — with no per-parameter tuning.</p>
+<p>You normally do nothing; it is on by default. To override:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="n">find_init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>   <span class="c1"># disable</span>
+<span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="n">initvals</span><span class="o">=</span><span class="n">my_initvals</span><span class="p">)</span>  <span class="c1"># your own</span>
+</pre></div>
+</div>
+<p>It is built by <a class="reference internal" href="api_reference.html#bauer.core.BaseModel.get_initial_points" title="bauer.core.BaseModel.get_initial_points"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_initial_points()</span></code></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For large hierarchical fits a single chain can still occasionally wander off
+and get stuck (chance) — inflating <span class="math notranslate nohighlight">\(\hat r\)</span> across many parameters at
+once. Check the <strong>group-level</strong> (<code class="docutils literal notranslate"><span class="pre">*_mu</span></code>) <span class="math notranslate nohighlight">\(\hat r\)</span> and, if one chain
+is stuck, simply re-run with a different <code class="docutils literal notranslate"><span class="pre">random_seed</span></code> (and/or a longer
+<code class="docutils literal notranslate"><span class="pre">tune</span></code>). A handful of weakly-identified subject-level parameters with
+mildly elevated <span class="math notranslate nohighlight">\(\hat r\)</span> is normal and fine — that is honest
+uncertainty, not a failed fit.</p>
+</div>
+</section>
 </section>
 
         </article>
@@ -427,6 +461,7 @@ and named exactly as the model expects.</p></li>
 <li><a class="reference internal" href="#parameter-transforms">Parameter transforms</a></li>
 <li><a class="reference internal" href="#data-conventions">Data conventions</a></li>
 <li><a class="reference internal" href="#typical-workflow">Typical workflow</a></li>
+<li><a class="reference internal" href="#sampling-starting-points-initial-values">Sampling: starting points (initial values)</a></li>
 </ul>
 </li>
 </ul>

@@ -109,3 +109,41 @@ Typical workflow
 
     # Posterior predictive check
     ppc = model.ppc(data, idata)
+
+
+Sampling: starting points (initial values)
+------------------------------------------
+
+DDM and regression posteriors are long, curved ridges, and *where the chains
+start* strongly affects whether they converge. With a generic initialization
+this is effectively a lottery: the same model and settings can give
+:math:`\hat r \approx 1.0` on one random seed and :math:`\hat r > 3` on the
+next.
+
+bauer handles this with a **starting-point finder**, enabled by default on the
+DDM/race models (:attr:`recommended_init = 'mapjitter'`). It starts each chain
+at a **data-informed plausible value** — the posterior mode from
+:meth:`~bauer.core.BaseModel.fit_map`, falling back to the prior-central point —
+and **disperses the chains around it by a fraction of each parameter's prior
+SD**. Chains sit around the typical set rather than all at the mode, so
+:math:`\hat r` stays meaningful. This is the same idea HSSM uses (curated
+initial values plus a small jitter). It works for *every* parameter
+automatically — core DDM, the Bayesian-observer front-end, and flexible
+(B-spline) noise coefficients — with no per-parameter tuning.
+
+You normally do nothing; it is on by default. To override::
+
+    idata = model.sample(draws=1000, tune=2000, find_init=False)   # disable
+    idata = model.sample(draws=1000, tune=2000, initvals=my_initvals)  # your own
+
+It is built by :meth:`~bauer.core.BaseModel.get_initial_points`.
+
+.. note::
+
+   For large hierarchical fits a single chain can still occasionally wander off
+   and get stuck (chance) — inflating :math:`\hat r` across many parameters at
+   once. Check the **group-level** (``*_mu``) :math:`\hat r` and, if one chain
+   is stuck, simply re-run with a different ``random_seed`` (and/or a longer
+   ``tune``). A handful of weakly-identified subject-level parameters with
+   mildly elevated :math:`\hat r` is normal and fine — that is honest
+   uncertainty, not a failed fit.
