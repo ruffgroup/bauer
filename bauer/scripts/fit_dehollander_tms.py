@@ -167,10 +167,13 @@ def main():
 
     if not args.no_ppc:
         print('Computing PPC...', flush=True)
+        # Regression fits need stimulation_condition as a COLUMN (patsy rebuilds
+        # the design matrix during prediction), same as the fit used df_use.
+        ppc_df = df_use if args.regression else df
         if args.model == 'choice':
-            ppc = m.ppc(df, idata, progressbar=False)
+            ppc = m.ppc(ppc_df, idata, progressbar=False)
         else:
-            ppc = m.ppc(df, idata, n_posterior_samples=200,
+            ppc = m.ppc(ppc_df, idata, n_posterior_samples=200,
                         inner_samples=1, random_seed=args.seed,
                         progressbar=False)
         ppc_path = out_path.replace('.nc', '_ppc.pickle')
