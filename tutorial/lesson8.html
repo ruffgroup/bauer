@@ -313,7 +313,7 @@ posterior mode. We diagnosed this the hard way on a first attempt at fitting Gar
 </div>
 <p>If you have an extra design factor (group, condition, ISI, …) keep it as a column too — the regression-DDM section below shows how to use it.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span><span class="p">;</span> <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span>
@@ -389,8 +389,7 @@ Dropped 285 / 13410 trials with rt &lt; 0.20s (2.1%); global min rt now 0.200s.
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
-</pre></div>
+<div class="prompt empty docutils container">
 </div>
 <div class="output_area rendered_html docutils container">
 <div>
@@ -522,7 +521,7 @@ v = \frac{\mu_{\text{post},2} - \mu_{\text{post},1}}{\sqrt{\nu_1^2 + \nu_2^2}}\]
 </ul>
 <p>Crucially the perceptual parameters <span class="math notranslate nohighlight">\(\nu_k, \mu_p, \sigma_p\)</span> play exactly the same role in both models. So if we fit both, those four should land in roughly the same place — and the DDM should give us tighter intervals, because RT carries additional information about the perceived SNR.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ── Fit the probit model (choice only, fast) ──────────────────────────────</span>
@@ -544,7 +543,7 @@ Loading cached probit fit from /Users/gdehol/.bauer_tutorial_cache/garcia_n64_rt
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ── Fit the DDM (joint choice + RT, slower; ~10–15 min on a laptop) ───────</span>
@@ -578,7 +577,7 @@ this is the single most important reason your fit converges — leave it on.</st
 <h2>Diagnostics — did both models sample cleanly?<a class="headerlink" href="#Diagnostics-—-did-both-models-sample-cleanly?" title="Link to this heading">¶</a></h2>
 <p>Before interpreting any posterior, check <span class="math notranslate nohighlight">\(\hat r \le 1.01\)</span> on the group-level means and ESS bulk <span class="math notranslate nohighlight">\(\ge 100\)</span> per chain. Divergences should be a small fraction of post-warmup draws.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">shared</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;n1_evidence_sd_mu&#39;</span><span class="p">,</span> <span class="s1">&#39;n2_evidence_sd_mu&#39;</span><span class="p">,</span>
@@ -627,7 +626,7 @@ divergences: 0, max r̂: 1.010
 <div><p><strong>Garcia-specific note</strong> — the dense-grid + size-effect cells below assume a paradigm where each trial has a <em>difficulty</em> axis (here <span class="math notranslate nohighlight">\(\log(n_2/n_1)\)</span>) orthogonal to a <em>magnitude / stake</em> axis (here <span class="math notranslate nohighlight">\(\sqrt{n_1 n_2}\)</span>). If your task only has one stimulus per trial (e.g. simple yes/no detection), use just the difficulty axis and skip the size-effect cell.</p>
 </div></blockquote>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Dense, evenly-spaced log-ratio grid at the typical stake. By fixing the</span>
@@ -667,8 +666,7 @@ Synthetic paradigm: 2560 rows (64 subjects × 40 log-ratios), stake = 11.78
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
-</pre></div>
+<div class="prompt empty docutils container">
 </div>
 <div class="output_area rendered_html docutils container">
 <div>
@@ -739,7 +737,7 @@ Synthetic paradigm: 2560 rows (64 subjects × 40 log-ratios), stake = 11.78
 </div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">predict_psychometric</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">idata</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">n_posterior_samples</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
@@ -829,7 +827,7 @@ Synthetic paradigm: 2560 rows (64 subjects × 40 log-ratios), stake = 11.78
 <p>This is the structural difference. The probit’s likelihood doesn’t include RT, so its posterior has nothing to predict on the RT axis. The DDM does: its joint WFPT likelihood ties the perceived SNR to first-passage times.</p>
 <p>The classic empirical signature in numerical comparison is the <strong>size effect</strong>: at fixed log-ratio difficulty, RT decreases with stimulus magnitude. This is what a Bayesian-observer DDM is built to reproduce: bigger numbers <span class="math notranslate nohighlight">\(\Rightarrow\)</span> larger posterior log-mean <span class="math notranslate nohighlight">\(\Rightarrow\)</span> bigger drift <span class="math notranslate nohighlight">\(\Rightarrow\)</span> faster races.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">add_bins</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">n_stake_bins</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">n_diff_bins</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
@@ -902,7 +900,7 @@ Synthetic paradigm: 2560 rows (64 subjects × 40 log-ratios), stake = 11.78
 <p>This is the most important comparison for a methods-paper audience. Both models fit the <em>same</em> perceptual parameters (<span class="math notranslate nohighlight">\(\nu_1, \nu_2, \mu_p, \sigma_p\)</span>) to the <em>same</em> data. If the front-end is well-identified from choice alone, their per-subject posterior means should fall on the identity line — and the DDM’s HDIs should be <strong>tighter</strong>, because RT carries information about the perceived SNR.</p>
 <p>We extract per-subject posterior summaries (mean + 94% HDI) from each model, join them, and plot probit-mean vs DDM-mean for each shared parameter.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">shared_params</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">,</span> <span class="s1">&#39;prior_mu&#39;</span><span class="p">,</span> <span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span>
@@ -921,8 +919,7 @@ Synthetic paradigm: 2560 rows (64 subjects × 40 log-ratios), stake = 11.78
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
-</pre></div>
+<div class="prompt empty docutils container">
 </div>
 <div class="output_area rendered_html docutils container">
 <div>
@@ -1026,7 +1023,7 @@ Synthetic paradigm: 2560 rows (64 subjects × 40 log-ratios), stake = 11.78
 </div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">scatter_panel</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">par</span><span class="p">):</span>
@@ -1073,7 +1070,7 @@ Synthetic paradigm: 2560 rows (64 subjects × 40 log-ratios), stake = 11.78
 <h3>How much tighter is the DDM?<a class="headerlink" href="#How-much-tighter-is-the-DDM?" title="Link to this heading">¶</a></h3>
 <p>Direct comparison: for each (subject × parameter) cell, what is the ratio of the DDM HDI width to the probit HDI width? Values <span class="math notranslate nohighlight">\(&lt; 1\)</span> mean the DDM gives a tighter estimate; values close to 1 mean RT didn’t buy much; values <span class="math notranslate nohighlight">\(&gt; 1\)</span> would be surprising (RT <em>hurting</em> identification — e.g. a posterior trade-off between <span class="math notranslate nohighlight">\(\nu_k\)</span> and the new <span class="math notranslate nohighlight">\(a\)</span>/<span class="math notranslate nohighlight">\(t_0\)</span> parameters).</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ratio</span> <span class="o">=</span> <span class="n">joined</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
@@ -1146,7 +1143,7 @@ prior_sd        0.865149  0.865481  0.598325  1.192231
 <li><p>Per-subject <strong>DDM :math:`nu_k` should NOT correlate strongly with mean RT</strong> — acuity should be largely orthogonal to RT magnitude.</p></li>
 </ol>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">mean_rt</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)[</span><span class="s1">&#39;rt&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="s1">&#39;mean_rt&#39;</span><span class="p">)</span>
@@ -1239,7 +1236,7 @@ analysis where response caution may itself covary with the experimental manipula
 <p>Garcia 2022 doesn’t have a clinical-group covariate, but <strong>it does have an inter-stimulus interval (ISI)</strong> that jitters between 6 and 9 s across trials (loaded as <code class="docutils literal notranslate"><span class="pre">df['isi']</span></code> since the bundled CSV now carries it). That’s a natural within-subject covariate: longer ISI means more time over which the first stimulus has to be held in working memory before <span class="math notranslate nohighlight">\(n_2\)</span> is shown. <em>If</em> memory decays during the delay, we’d expect the encoding noise <span class="math notranslate nohighlight">\(\nu_1\)</span> on the first stimulus to grow with ISI.
 The expected null is also informative: a clean “no effect” would mean memory for these number displays is stable across this delay range — and the DDM regression is the right test, because a probit would lump any ISI effect on <span class="math notranslate nohighlight">\(\nu_1\)</span> into the bigger pot of trial-to-trial choice variability.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Categorical ISI: short = 6–7 s, long = 8–9 s (median split).</span>
@@ -1267,7 +1264,7 @@ ISI range long:  7.5–9.0s
 </div>
 <p><strong>Fit the regression DDM.</strong> This adds one regressor on <code class="docutils literal notranslate"><span class="pre">n1_evidence_sd</span></code> — the encoding noise on the first stimulus, the parameter most likely to grow if working-memory representations decay during the longer ISI delays. We don’t regress on <code class="docutils literal notranslate"><span class="pre">a</span></code> (response caution shouldn’t depend on the ISI scheduled by the experiment) — pre-registering which parameter the covariate is allowed to move keeps this honest.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">DDMMagnitudeComparisonRegressionModel</span>
@@ -1290,7 +1287,7 @@ Loading cached ddm_isi fit from /Users/gdehol/.bauer_tutorial_cache/garcia_n64_r
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># bauer&#39;s regression model stores coefficients as a *coord* on the</span>
@@ -1335,7 +1332,7 @@ n1_evidence_sd_mu[isi_cat[T.long]] -0.004  0.031  -0.063    0.051      0.000    
 <h3>From contrast coefficient → on-scale noise per condition<a class="headerlink" href="#From-contrast-coefficient-→-on-scale-noise-per-condition" title="Link to this heading">¶</a></h3>
 <p>The summary above is on the un-softplus scale (so contrasts are additive). For interpretation it’s easier to read the actual <span class="math notranslate nohighlight">\(\nu_1\)</span> in each ISI condition. bauer’s <code class="docutils literal notranslate"><span class="pre">model.get_conditionwise_parameters(idata,</span> <span class="pre">conditions,</span> <span class="pre">group=True)</span></code> does that for you — it rebuilds the design matrix at the conditions you pass, multiplies in the posterior coefficients, and <strong>applies the transform</strong> (softplus here, so the result is in the natural noise units used by the cognitive model).</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Group-level n1_evidence_sd per ISI condition, with the softplus</span>
@@ -1376,7 +1373,7 @@ long − short difference: mean = -0.0012, 94% HDI = [-0.0179, +0.0158]
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Figure: per-condition posteriors of n1_evidence_sd, plus the difference.</span>
@@ -1419,7 +1416,7 @@ long − short difference: mean = -0.0012, 94% HDI = [-0.0179, +0.0158]
 <h3>Visualising the coefficient posterior<a class="headerlink" href="#Visualising-the-coefficient-posterior" title="Link to this heading">¶</a></h3>
 <p>The <code class="docutils literal notranslate"><span class="pre">az.summary</span></code> table above is the formal test; a forest plot makes the same contrast legible at a glance. Both group-level coefficients on <span class="math notranslate nohighlight">\(n_1\)</span>’s encoding noise are shown on the model’s internal (pre-softplus) scale: the <code class="docutils literal notranslate"><span class="pre">Intercept</span></code> is the short-ISI baseline, and <code class="docutils literal notranslate"><span class="pre">isi_cat[T.long]</span></code> is the long-vs-short contrast whose 94% HDI relative to 0 <em>is</em> the test.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">az</span><span class="o">.</span><span class="n">plot_forest</span><span class="p">(</span><span class="n">idata_isi</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd_mu&#39;</span><span class="p">],</span>
@@ -1442,7 +1439,7 @@ long − short difference: mean = -0.0012, 94% HDI = [-0.0179, +0.0158]
 <h3>Does the fit still track the data <em>within each condition</em>?<a class="headerlink" href="#Does-the-fit-still-track-the-data-within-each-condition?" title="Link to this heading">¶</a></h3>
 <p>A regression fit is only trustworthy if it reproduces behaviour at every level of the regressor — not just on average. Below we run a posterior predictive check and split both the data and the predictions by ISI condition. Two things to look for: (i) the bands cover the data points in <strong>both</strong> conditions (the fit is adequate on choice <em>and</em> RT), and (ii) the short and long curves nearly coincide — the visual counterpart of the near-null contrast we just measured.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># PPC on the original paradigm; DDM PPCs carry simulated_choice + simulated_rt.</span>
@@ -1686,7 +1683,6 @@ long − short difference: mean = -0.0012, 94% HDI = [-0.0179, +0.0158]
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
     <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
     <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     </body>

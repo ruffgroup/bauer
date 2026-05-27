@@ -289,7 +289,7 @@ noise level.</p></li>
 </div>
 <p>at increasing trial counts (25, 50, 108 per half). The Garcia et al. magnitude data have 216 trials per subject, so 108 per half is the natural split.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span><span class="p">;</span> <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span>
@@ -343,7 +343,7 @@ Half A: 6912 trials,  Half B: 6912 trials
 </ol>
 <p>We repeat this 10 times with different random splits to get a stable estimate of reliability. Three correlation metrics are shown: Spearman <span class="math notranslate nohighlight">\(\rho\)</span>, Pearson <span class="math notranslate nohighlight">\(r\)</span>, and <span class="math notranslate nohighlight">\(R^2\)</span>.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.stats</span><span class="w"> </span><span class="kn">import</span> <span class="n">pearsonr</span>
@@ -598,7 +598,7 @@ Total fits: 54
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ── Reliability vs trial count: Pearson r and R² x 3 parameters ──────────────</span>
@@ -655,7 +655,7 @@ Total fits: 54
 optimiser that ran out of data.</p>
 <p>The plot below shows how many subjects (out of <span class="math notranslate nohighlight">\(N \times 2\)</span> halves) have <span class="math notranslate nohighlight">\(\nu &lt; 0.01\)</span> at each trial count:</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ── Boundary collapse diagnostic ─────────────────────────────────────────────</span>
@@ -717,7 +717,7 @@ optimiser that ran out of data.</p>
 <h3>Rule of thumb<a class="headerlink" href="#Rule-of-thumb" title="Link to this heading">¶</a></h3>
 <p>If you have &lt; 200 trials per subject per condition, <strong>always use hierarchical fitting</strong>. If you have &lt; 100, individual fitting is essentially meaningless for models with more than one or two parameters. bauer makes hierarchical fitting the default for exactly this reason.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ── Scatter: half A vs half B at every trial count, all 3 params ─────────────</span>
@@ -1022,7 +1022,6 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
     <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
     <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     </body>

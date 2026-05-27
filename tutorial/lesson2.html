@@ -283,7 +283,7 @@
 </ol>
 <p>If noise drives risk aversion, then noisier observers (higher <span class="math notranslate nohighlight">\(\nu\)</span>, lower precision) should have a higher <span class="math notranslate nohighlight">\(\delta^*\)</span> (shifted rightward = more risk-averse).</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span><span class="p">;</span> <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span>
@@ -320,7 +320,7 @@ Subjects: 64,  Trials: 30311,  Formats: [&#39;symbolic&#39;, &#39;non-symbolic&#
 <li><p>Curve crosses 0.5 <strong>to the left</strong> → risk-seeking</p></li>
 </ul>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">plot_data</span> <span class="o">=</span> <span class="n">data_risk</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s1">&#39;format&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
@@ -392,7 +392,7 @@ Subjects: 64,  Trials: 30311,  Formats: [&#39;symbolic&#39;, &#39;non-symbolic&#
 </div>
 <p>i.e. when the risky payoff is large enough to compensate for the lower winning probability. But this comparison is done with <strong>noisy internal representations</strong>, and the observer may also have a <strong>bias</strong> toward or away from risk. The psychometric function captures both effects in a single curve.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Illustrate: how noise and bias shape the risky-choice curve</span>
@@ -448,7 +448,7 @@ Subjects: 64,  Trials: 30311,  Formats: [&#39;symbolic&#39;, &#39;non-symbolic&#
 <h2>Fitting psychometric functions — separately per format<a class="headerlink" href="#Fitting-psychometric-functions-—-separately-per-format" title="Link to this heading">¶</a></h2>
 <p>Because symbolic and non-symbolic formats produce different noise levels, we fit <code class="docutils literal notranslate"><span class="pre">PsychophysicalModel</span></code> <strong>separately</strong> for each format. This gives us per-subject estimates of <span class="math notranslate nohighlight">\(\nu\)</span> (noise) and <span class="math notranslate nohighlight">\(\delta^*\)</span> (indifference point) within each format, which we can then correlate with each other and with magnitude-task precision.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Prepare data: x1 = log(safe), x2 = log(risky), split by format</span>
@@ -478,7 +478,7 @@ Non-symbolic:  15150 trials, 64 subjects
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Fit psychometric models — one per format</span>
@@ -539,7 +539,7 @@ Non-symbolic fit done
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Group-level posteriors: compare formats</span>
@@ -576,7 +576,7 @@ Non-symbolic fit done
 <h3>Difference distributions<a class="headerlink" href="#Difference-distributions" title="Link to this heading">¶</a></h3>
 <p>Overlaying two posteriors can be misleading: even when the marginals overlap substantially, the <strong>difference</strong> may be clearly non-zero. This is especially important when the two quantities are correlated (e.g. because they come from the same participants). Here the two formats are fitted as separate models, so the posteriors are independent — but showing the difference distribution is still clearer than eyeballing overlap.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Difference distributions: symbolic minus non-symbolic</span>
@@ -617,7 +617,7 @@ Non-symbolic fit done
 <h2>Key result: noise predicts risk aversion (within each format)<a class="headerlink" href="#Key-result:-noise-predicts-risk-aversion-(within-each-format)" title="Link to this heading">¶</a></h2>
 <p>We extract each subject’s posterior mean for <code class="docutils literal notranslate"><span class="pre">nu</span></code> and <code class="docutils literal notranslate"><span class="pre">bias</span></code>, separately for each format, and test whether noisier observers are more risk-averse <strong>within</strong> each format.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">extract_subject_params</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">format_label</span><span class="p">):</span>
@@ -658,7 +658,7 @@ Non-symbolic     noise-bias ρ = -0.383 (p = 0.0018)
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">scatter_hdi</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">xerr</span><span class="p">,</span> <span class="n">yerr</span><span class="p">,</span> <span class="n">color</span><span class="p">,</span> <span class="n">xlabel</span><span class="p">,</span> <span class="n">ylabel</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span>
@@ -741,7 +741,7 @@ Non-symbolic     noise-bias ρ = -0.383 (p = 0.0018)
 <h3>3. Certainty equivalent discount<a class="headerlink" href="#3.-Certainty-equivalent-discount" title="Link to this heading">¶</a></h3>
 <p>How many cents on the euro does the observer implicitly discount the risky option? <span class="math notranslate nohighlight">\(\text{CE discount} = 1 - \text{RNP} / p_\text{risky} = 1 - e^{\text{bias}} / 0.55\)</span>. A discount of 20 % means the observer treats every risky euro as worth only 80 cents.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Posterior distributions of the reparameterised group-level bias</span>
@@ -802,7 +802,7 @@ Non-symbolic     noise-bias ρ = -0.383 (p = 0.0018)
 <h2>Bonus: RiskRegressionModel for the format effect<a class="headerlink" href="#Bonus:-RiskRegressionModel-for-the-format-effect" title="Link to this heading">¶</a></h2>
 <p>Instead of fitting two separate models, bauer’s <code class="docutils literal notranslate"><span class="pre">RiskRegressionModel</span></code> lets you test the format effect <em>within a single model</em> using a patsy formula. This gives a direct posterior on the format contrast — cleaner than comparing two separate fits.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">RiskRegressionModel</span>
@@ -974,7 +974,6 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
     <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
     <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     </body>

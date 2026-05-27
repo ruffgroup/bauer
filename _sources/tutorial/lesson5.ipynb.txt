@@ -2,7 +2,7 @@
  "cells": [
   {
    "cell_type": "markdown",
-   "id": "78bce0e3",
+   "id": "0",
    "metadata": {},
    "source": [
     "# Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood\n",
@@ -53,16 +53,9 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 1,
-   "id": "0cc30d54",
-   "metadata": {
-    "execution": {
-     "iopub.execute_input": "2026-04-10T06:20:46.193800Z",
-     "iopub.status.busy": "2026-04-10T06:20:46.193612Z",
-     "iopub.status.idle": "2026-04-10T06:20:50.770550Z",
-     "shell.execute_reply": "2026-04-10T06:20:50.770139Z"
-    }
-   },
+   "execution_count": null,
+   "id": "1",
+   "metadata": {},
    "outputs": [
     {
      "name": "stdout",
@@ -105,7 +98,7 @@
   },
   {
    "cell_type": "markdown",
-   "id": "86bf24ab",
+   "id": "2",
    "metadata": {},
    "source": [
     "## Split-half analysis: 10 random splits $\\times$ 5 trial counts\n",
@@ -123,16 +116,9 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 2,
-   "id": "9f59d84f",
-   "metadata": {
-    "execution": {
-     "iopub.execute_input": "2026-04-10T06:20:50.772792Z",
-     "iopub.status.busy": "2026-04-10T06:20:50.772571Z",
-     "iopub.status.idle": "2026-04-10T07:52:03.126311Z",
-     "shell.execute_reply": "2026-04-10T07:52:03.125979Z"
-    }
-   },
+   "execution_count": null,
+   "id": "3",
+   "metadata": {},
    "outputs": [
     {
      "name": "stderr",
@@ -1192,16 +1178,9 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 3,
-   "id": "48c4ff21",
-   "metadata": {
-    "execution": {
-     "iopub.execute_input": "2026-04-10T07:52:03.131002Z",
-     "iopub.status.busy": "2026-04-10T07:52:03.130864Z",
-     "iopub.status.idle": "2026-04-10T07:52:03.738943Z",
-     "shell.execute_reply": "2026-04-10T07:52:03.738671Z"
-    }
-   },
+   "execution_count": null,
+   "id": "4",
+   "metadata": {},
    "outputs": [
     {
      "data": {
@@ -1257,7 +1236,7 @@
   },
   {
    "cell_type": "markdown",
-   "id": "60fcc7e4",
+   "id": "5",
    "metadata": {},
    "source": [
     "### The boundary-collapse problem\n",
@@ -1275,16 +1254,9 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 4,
-   "id": "ef8434d0",
-   "metadata": {
-    "execution": {
-     "iopub.execute_input": "2026-04-10T07:52:03.740613Z",
-     "iopub.status.busy": "2026-04-10T07:52:03.740495Z",
-     "iopub.status.idle": "2026-04-10T07:52:03.922300Z",
-     "shell.execute_reply": "2026-04-10T07:52:03.921956Z"
-    }
-   },
+   "execution_count": null,
+   "id": "6",
+   "metadata": {},
    "outputs": [
     {
      "data": {
@@ -1327,7 +1299,7 @@
   },
   {
    "cell_type": "markdown",
-   "id": "a38a1cfb",
+   "id": "7",
    "metadata": {},
    "source": [
     "## What this means in practice\n",
@@ -1376,16 +1348,9 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 5,
-   "id": "ce5b9486",
-   "metadata": {
-    "execution": {
-     "iopub.execute_input": "2026-04-10T07:52:03.923959Z",
-     "iopub.status.busy": "2026-04-10T07:52:03.923851Z",
-     "iopub.status.idle": "2026-04-10T08:13:39.195604Z",
-     "shell.execute_reply": "2026-04-10T08:13:39.195028Z"
-    }
-   },
+   "execution_count": null,
+   "id": "8",
+   "metadata": {},
    "outputs": [
     {
      "name": "stderr",
@@ -2425,7 +2390,7 @@
   },
   {
    "cell_type": "markdown",
-   "id": "9ab4f4f9",
+   "id": "9",
    "metadata": {},
    "source": [
     "## Take-aways\n",

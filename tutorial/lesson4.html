@@ -309,7 +309,7 @@
 <li><p><strong>Super-linear</strong> <span class="math notranslate nohighlight">\(\nu(n)\)</span> <span class="math notranslate nohighlight">\(\Rightarrow\)</span> worse precision at large <span class="math notranslate nohighlight">\(n\)</span> (super-Weber)</p></li>
 </ul>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span><span class="p">;</span> <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span>
@@ -388,7 +388,7 @@ Arabic numerals   |  subjects: 58,  trials: 14722
 <h2>Illustrating flexible noise curves<a class="headerlink" href="#Illustrating-flexible-noise-curves" title="Link to this heading">¶</a></h2>
 <p>The left panel shows the three canonical noise-vs-magnitude shapes. The right panel shows the <strong>key signature of Weber’s law</strong>: when noise is linear (<span class="math notranslate nohighlight">\(\nu \propto n\)</span>), psychometric curves plotted against the <em>relative</em> difference <span class="math notranslate nohighlight">\((n_2 - n_1)/n_1\)</span> collapse onto a single curve regardless of the reference magnitude <span class="math notranslate nohighlight">\(n_1\)</span> — scale invariance. Flat or super-linear noise breaks this collapse.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.stats</span><span class="w"> </span><span class="kn">import</span> <span class="n">norm</span> <span class="k">as</span> <span class="n">scipy_norm</span>
@@ -455,7 +455,7 @@ Arabic numerals   |  subjects: 58,  trials: 14722
 <h2>Part A: Dot-array magnitude comparison (Garcia et al. 2022)<a class="headerlink" href="#Part-A:-Dot-array-magnitude-comparison-(Garcia-et-al.-2022)" title="Link to this heading">¶</a></h2>
 <p>Dot arrays are a classic <strong>perceptual</strong> numerosity stimulus where Weber’s law is well-established. Fitting the Flexible Noise model here serves as a sanity check: the recovered <span class="math notranslate nohighlight">\(\nu(n)\)</span> should be approximately <strong>linear</strong>. The MCM baseline assumes log-space noise, which translates to <span class="math notranslate nohighlight">\(\sigma_\text{MCM}(n) = \nu_\text{log} \times n\)</span> (a line through the origin) — the same Weber’s-law prediction.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># MagnitudeComparisonModel (MCM) — fixed log-space noise (Weber&#39;s-law null)</span>
@@ -482,7 +482,7 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># FlexibleNoiseComparisonModel — free noise curve fitted to dot arrays</span>
@@ -509,7 +509,7 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># AffineNoiseComparisonModel — intercept + linear noise (defined above)</span>
@@ -539,7 +539,7 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 <h3>Posterior noise curves — dot arrays<a class="headerlink" href="#Posterior-noise-curves-—-dot-arrays" title="Link to this heading">¶</a></h3>
 <p>If Weber’s law holds, all three curves should overlap: both the FlexNoise (red) and AffineNoise (green) should track the MCM reference line <span class="math notranslate nohighlight">\(\sigma = \nu_\text{log} \times n\)</span> (dashed blue). A non-zero intercept in the AffineNoise curve would indicate baseline noise that does not scale with magnitude.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sd_curves_mag</span> <span class="o">=</span> <span class="n">model_flex_mag</span><span class="o">.</span><span class="n">get_sd_curve</span><span class="p">(</span><span class="n">idata</span><span class="o">=</span><span class="n">idata_flex_mag</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span>
@@ -603,7 +603,7 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 </ol>
 <p>If AffineNoise matches FlexNoise on ELPD while beating MCM, the deviation from Weber’s law is well-described by a noise floor — a simple, interpretable parameter.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ELPD model comparison — dot arrays (3-way)</span>
@@ -626,7 +626,7 @@ AffineNoise -3573.241605  232.238865  182.677793  22.417787     True
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ax</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">plot_compare</span><span class="p">(</span><span class="n">compare_mag</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mf">3.5</span><span class="p">))</span>
@@ -643,7 +643,7 @@ AffineNoise -3573.241605  232.238865  182.677793  22.417787     True
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ── Interpret the dot-array ELPD result (3-way) ─────────────────────────────</span>
@@ -703,7 +703,7 @@ AffineNoise -3573.241605  232.238865  182.677793  22.417787     True
 <p>Arabic numerals are <strong>symbolic</strong>: participants read a printed digit rather than estimating numerosity from a visual display. The internal noise on symbolic number representations need not scale proportionally with magnitude, so we expect a potential <strong>deviation from the linear Weber’s-law prediction</strong>.</p>
 <p>We compare <code class="docutils literal notranslate"><span class="pre">FlexibleNoiseRiskModel</span></code> and <code class="docutils literal notranslate"><span class="pre">AffineNoiseRiskModel</span></code> against the standard <code class="docutils literal notranslate"><span class="pre">RiskModel</span></code> (PMCM) on the same data.</p>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">prep_df</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
@@ -727,7 +727,7 @@ AffineNoise -3573.241605  232.238865  182.677793  22.417787     True
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># PMCM (fixed log-space noise) — log_likelihood stored for ELPD comparison</span>
@@ -753,7 +753,7 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># FlexibleNoiseRiskModel — free noise curve on Arabic-numeral data</span>
@@ -780,7 +780,7 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># AffineNoiseRiskModel — intercept + linear noise for Arabic-numeral gambles</span>
@@ -810,7 +810,7 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 <h3>Posterior noise curves — Arabic numerals<a class="headerlink" href="#Posterior-noise-curves-—-Arabic-numerals" title="Link to this heading">¶</a></h3>
 <p>Three models are overlaid: the B-spline FlexNoise (red), the two-parameter AffineNoise (green), and the PMCM Weber reference (dashed blue).</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sd_curves</span> <span class="o">=</span> <span class="n">model_flex</span><span class="o">.</span><span class="n">get_sd_curve</span><span class="p">(</span><span class="n">idata</span><span class="o">=</span><span class="n">idata_flex</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span>
@@ -870,7 +870,7 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 <h2>Posterior predictive comparison (Arabic numerals)<a class="headerlink" href="#Posterior-predictive-comparison-(Arabic-numerals)" title="Link to this heading">¶</a></h2>
 <p>We overlay both models’ predictions against the observed presentation-order × stake-size pattern — the same diagnostic used in lesson 3.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">summarize_ppc_group</span>
@@ -1014,7 +1014,7 @@ Sampling: [ll_bernoulli]
 <h3>Model comparison: PMCM vs AffineNoise vs FlexNoise (Arabic numerals)<a class="headerlink" href="#Model-comparison:-PMCM-vs-AffineNoise-vs-FlexNoise-(Arabic-numerals)" title="Link to this heading">¶</a></h3>
 <p>The same three-way ELPD comparison for the risk models.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ELPD comparison — Arabic numerals risky choice (3-way)</span>
@@ -1037,7 +1037,7 @@ AffineNoise  -5289.984210  305.939075  34.847193  16.043618     True
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ax</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">plot_compare</span><span class="p">(</span><span class="n">compare_sym</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mf">3.5</span><span class="p">))</span>
@@ -1054,7 +1054,7 @@ AffineNoise  -5289.984210  305.939075  34.847193  16.043618     True
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ── Interpret the Arabic-numeral ELPD result (3-way) ─────────────────────────</span>
@@ -1116,9 +1116,7 @@ AffineNoise ELPD: -5290.0,  FlexNoise ELPD: -5255.1
 <li><p>Rhat and ESS warnings in these notebooks reflect the deliberately short chain settings (draws=200, tune=200) chosen for speed. For real analyses use at least draws=1000, tune=1000.</p></li>
 <li><p>Sampling with <code class="docutils literal notranslate"><span class="pre">idata_kwargs={{'log_likelihood':</span> <span class="pre">True}}</span></code> is all that is needed to unlock <code class="docutils literal notranslate"><span class="pre">az.compare</span></code> — bauer handles everything else.</p></li>
 </ul>
-<script type="application/vnd.jupyter.widget-state+json">
-{"state": {"7957d1684d0c40df99333b5f18170c89": {"model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "model_name": "LayoutModel", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "863d3ead8fdf4b50a66e127ede01a253": {"model_module": "@jupyter-widgets/output", "model_module_version": "1.0.0", "model_name": "OutputModel", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/output", "_model_module_version": "1.0.0", "_model_name": "OutputModel", "_view_count": null, "_view_module": "@jupyter-widgets/output", "_view_module_version": "1.0.0", "_view_name": "OutputView", "layout": "IPY_MODEL_7957d1684d0c40df99333b5f18170c89", "msg_id": "", "outputs": [{"data": {"text/html": "<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\">Sampling ... <span style=\"color: #008000; text-decoration-color: #008000\">\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501</span> <span style=\"color: #800080; text-decoration-color: #800080\">100%</span> 0:00:00 / 0:00:00\n</pre>\n", "text/plain": "Sampling ... \u001b[32m\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u001b[0m \u001b[35m100%\u001b[0m 0:00:00 / 0:00:00\n"}, "metadata": {}, "output_type": "display_data"}], "tabbable": null, "tooltip": null}}, "b3b53f793f8e421088a38d997c906e01": {"model_module": "@jupyter-widgets/base", "model_module_version": "2.0.0", "model_name": "LayoutModel", "state": {"_model_module": "@jupyter-widgets/base", "_model_module_version": "2.0.0", "_model_name": "LayoutModel", "_view_count": null, "_view_module": "@jupyter-widgets/base", "_view_module_version": "2.0.0", "_view_name": "LayoutView", "align_content": null, "align_items": null, "align_self": null, "border_bottom": null, "border_left": null, "border_right": null, "border_top": null, "bottom": null, "display": null, "flex": null, "flex_flow": null, "grid_area": null, "grid_auto_columns": null, "grid_auto_flow": null, "grid_auto_rows": null, "grid_column": null, "grid_gap": null, "grid_row": null, "grid_template_areas": null, "grid_template_columns": null, "grid_template_rows": null, "height": null, "justify_content": null, "justify_items": null, "left": null, "margin": null, "max_height": null, "max_width": null, "min_height": null, "min_width": null, "object_fit": null, "object_position": null, "order": null, "overflow": null, "padding": null, "right": null, "top": null, "visibility": null, "width": null}}, "ca13a77661734e6397d37a5d32472099": {"model_module": "@jupyter-widgets/output", "model_module_version": "1.0.0", "model_name": "OutputModel", "state": {"_dom_classes": [], "_model_module": "@jupyter-widgets/output", "_model_module_version": "1.0.0", "_model_name": "OutputModel", "_view_count": null, "_view_module": "@jupyter-widgets/output", "_view_module_version": "1.0.0", "_view_name": "OutputView", "layout": "IPY_MODEL_b3b53f793f8e421088a38d997c906e01", "msg_id": "", "outputs": [{"data": {"text/html": "<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\">Sampling ... <span style=\"color: #008000; text-decoration-color: #008000\">\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501</span> <span style=\"color: #800080; text-decoration-color: #800080\">100%</span> 0:00:00 / 0:00:00\n</pre>\n", "text/plain": "Sampling ... \u001b[32m\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u001b[0m \u001b[35m100%\u001b[0m 0:00:00 / 0:00:00\n"}, "metadata": {}, "output_type": "display_data"}], "tabbable": null, "tooltip": null}}}, "version_major": 2, "version_minor": 0}
-</script></section>
+</section>
 </section>
 
         </article>
@@ -1209,7 +1207,6 @@ AffineNoise ELPD: -5290.0,  FlexNoise ELPD: -5255.1
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
     <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
     <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     </body>
