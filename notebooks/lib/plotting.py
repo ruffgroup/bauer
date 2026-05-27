@@ -137,12 +137,20 @@ def implied_noise(model, idata, variable='n1_evidence_sd', n_grid=None,
     posterior of group-level coefficients (`{variable}_spline{i}_mu`),
     then softplus-transforms to get σ values.
 
+    The grid is **restricted to the variable's own support** (the column the
+    spline was anchored to) to avoid extrapolation artefacts. n1_evidence_sd
+    is anchored to paradigm['n1'], n2_evidence_sd to paradigm['n2']; if these
+    have different ranges (e.g. Garcia with fixed n1 set vs wider n2), the
+    σ_1 and σ_2 curves cover different x-ranges. This is correct.
+
     Returns a DataFrame with columns: n, mean, lo, hi.
     """
     if n_grid is None:
-        n_grid = np.linspace(model.paradigm['n1'].min(),
-                             max(model.paradigm['n1'].max(),
-                                  model.paradigm['n2'].max()), 60)
+        # Restrict to the column actually used to build the basis. Avoid
+        # extrapolating σ_k(n) outside its training range.
+        col = 'n1' if variable in ('n1_evidence_sd', 'memory_noise_sd') else 'n2'
+        nmin, nmax = model.paradigm[col].min(), model.paradigm[col].max()
+        n_grid = np.linspace(nmin, nmax, 60)
     dm = np.asarray(model.make_dm(x=n_grid, variable=variable))
     so = model.spline_order
     so_v = so[0] if variable == 'n1_evidence_sd' else so[1]
