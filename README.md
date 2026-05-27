@@ -16,7 +16,9 @@ All models hierarchical by default: each participant gets their own parameters, 
 
 ```bash
 pip install git+https://github.com/ruffgroup/bauer.git
-pip install hssm jax numpyro       # optional: DDM + JAX-NUTS support
+# For DDM/RDM models + the fast numpyro backend:
+pip install "bauer[ddm] @ git+https://github.com/ruffgroup/bauer.git"
+# GPU: additionally  pip install "jax[cuda12]"   (see docs/installation)
 ```
 
 ```python
@@ -37,14 +39,15 @@ idata = m.sample(draws=1000, tune=1000, chains=4)
 ppc = m.ppc(df, idata, n_posterior_samples=200)
 ```
 
-Want it 10× faster on a GPU? Use `--backend numpyro`:
+Want it much faster? Pass `backend='numpyro'` (JAX NUTS — ~3–10× on CPU,
+~5–30× on GPU; chains are parallelised automatically):
 
 ```python
-from pymc.sampling.jax import sample_numpyro_nuts
-with m.estimation_model:
-    idata = sample_numpyro_nuts(draws=1000, tune=1000, chains=4,
-                                 chain_method='vectorized')
+idata = m.sample(draws=1000, tune=1000, backend='numpyro')
 ```
+
+On a GPU machine, install `jax[cuda12]` (see the docs) and the same call uses
+the GPU — no code change.
 
 ## Model families
 
@@ -92,13 +95,15 @@ For cluster-scale GPU fitting, see `bauer/scripts/slurm_jobs/` (sbatch wrappers,
 
 ## Tutorials
 
-`docs/tutorial/` contains five Jupyter notebooks building up from first principles:
+`docs/tutorial/` builds up from first principles:
 
 1. **Psychophysical modelling** — NLC model, Weber's law, asymmetric noise, hierarchical fitting
 2. **Risky choice** — KLW model, noise-driven risk aversion, format effects
 3. **Stake effects** — presentation-order interactions, EU vs KLW vs PMCM
 4. **Flexible noise curves** — `FlexibleNoiseComparisonModel`, ELPD model comparison
 5. **Hierarchical vs MLE** — split-half reliability
+8. **DDM vs probit** — adding reaction times (drift-diffusion), acuity vs caution, regression DDM
+9. **DDM + race-diffusion** — the RDM, advantage decomposition, choice-conditional RT
 
 Generate via `python docs/tutorial/make_notebooks.py`.
 

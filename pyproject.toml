@@ -39,6 +39,9 @@ dev = [
 ]
 ddm = [
     "hssm>=0.2",
+    "jax",        # CPU build; for GPU additionally `pip install "jax[cuda12]"`
+    "numpyro",    # the fast NUTS backend (backend='numpyro')
+    "blackjax",
 ]
 
 [project.urls]
