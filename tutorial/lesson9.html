@@ -349,7 +349,7 @@
 <div class="highlight"><pre>
 Subjects: 8
 Trials:   1635  (~204 per subject)
-Columns:  [&#39;n1&#39;, &#39;n2&#39;, &#39;choice&#39;, &#39;rt&#39;, &#39;accuracy&#39;, &#39;correct&#39;]
+Columns:  [&#39;n1&#39;, &#39;n2&#39;, &#39;choice&#39;, &#39;rt&#39;, &#39;accuracy&#39;, &#39;correct&#39;, &#39;isi&#39;]
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
@@ -383,12 +383,14 @@ Columns:  [&#39;n1&#39;, &#39;n2&#39;, &#39;choice&#39;, &#39;rt&#39;, &#39;accu
       <th>rt</th>
       <th>accuracy</th>
       <th>correct</th>
+      <th>isi</th>
     </tr>
     <tr>
       <th>subject</th>
       <th>format</th>
       <th>run</th>
       <th>trial_nr</th>
+      <th></th>
       <th></th>
       <th></th>
       <th></th>
@@ -409,6 +411,7 @@ Columns:  [&#39;n1&#39;, &#39;n2&#39;, &#39;choice&#39;, &#39;rt&#39;, &#39;accu
       <td>0.775</td>
       <td>1</td>
       <td>-1</td>
+      <td>8.033</td>
     </tr>
     <tr>
       <th>2</th>
@@ -418,6 +421,7 @@ Columns:  [&#39;n1&#39;, &#39;n2&#39;, &#39;choice&#39;, &#39;rt&#39;, &#39;accu
       <td>0.892</td>
       <td>0</td>
       <td>-1</td>
+      <td>8.532</td>
     </tr>
     <tr>
       <th>3</th>
@@ -427,6 +431,7 @@ Columns:  [&#39;n1&#39;, &#39;n2&#39;, &#39;choice&#39;, &#39;rt&#39;, &#39;accu
       <td>0.611</td>
       <td>1</td>
       <td>-1</td>
+      <td>6.533</td>
     </tr>
     <tr>
       <th>4</th>
@@ -436,6 +441,7 @@ Columns:  [&#39;n1&#39;, &#39;n2&#39;, &#39;choice&#39;, &#39;rt&#39;, &#39;accu
       <td>0.660</td>
       <td>1</td>
       <td>-1</td>
+      <td>7.033</td>
     </tr>
     <tr>
       <th>5</th>
@@ -445,6 +451,7 @@ Columns:  [&#39;n1&#39;, &#39;n2&#39;, &#39;choice&#39;, &#39;rt&#39;, &#39;accu
       <td>0.830</td>
       <td>1</td>
       <td>-1</td>
+      <td>9.033</td>
     </tr>
   </tbody>
 </table>
@@ -550,12 +557,52 @@ Columns:  [&#39;n1&#39;, &#39;n2&#39;, &#39;choice&#39;, &#39;rt&#39;, &#39;accu
 </pre></div>
 </div>
 </div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+
+*** bauer DDM/RDM warning ***
+  Fastest RT in paradigm: 0.151 s (4.1% of trials below 0.20 s).
+  The default t0 prior is centred at 0.20 s; when t0 wanders above min(rt), the HSSM
+  WFPT likelihood floors at LOGP_LB=-66.1 with ZERO gradient w.r.t. t0, which can trap NUTS chains.
+  Recommended: drop trials with rt &lt; 0.20 s (typical HDDM convention, below motor non-decision time).
+  See docs/tutorial/lesson8.ipynb for the explanation.
+
+Initializing NUTS using adapt_full...
+Multiprocess sampling (4 chains in 4 jobs)
+NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset, n2_evidence_sd_mu_untransformed, n2_evidence_sd_sd, n2_evidence_sd_offset, prior_mu_mu, prior_mu_sd, prior_mu_offset, prior_sd_mu_untransformed, prior_sd_sd, prior_sd_offset, a_mu_untransformed, a_sd, a_offset, t0_mu_untransformed, t0_sd, t0_offset]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "9922c85de4974faebbceead983282462", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Sampling 4 chains for 600 tune and 600 draw iterations (2_400 + 2_400 draws total) took 122 seconds.
+There were 3 divergences after tuning. Increase `target_accept` or reparameterize.
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+</pre></div></div>
+</div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Loading cached ddm fit from /Users/gdehol/.bauer_tutorial_cache/garcia_8subj_ddm.nc
+Saved ddm fit to /Users/gdehol/.bauer_tutorial_cache/garcia_8subj_ddm.nc
 </pre></div></div>
 </div>
 <p>(We use <code class="docutils literal notranslate"><span class="pre">draws=600,</span> <span class="pre">tune=600</span></code> to keep tutorial wall time manageable. For production fits, use the bauer defaults <code class="docutils literal notranslate"><span class="pre">draws=1000,</span> <span class="pre">tune=1000</span></code> — see lesson 4.)</p>
@@ -587,16 +634,16 @@ Loading cached ddm fit from /Users/gdehol/.bauer_tutorial_cache/garcia_8subj_ddm
 <div class="output_area docutils container">
 <div class="highlight"><pre>
                    mcse_mean  mcse_sd  ess_bulk  ess_tail  r_hat
-a_mu                   0.003    0.002     568.0     721.0   1.00
-t0_mu                  0.001    0.001     520.0     768.0   1.01
-n1_evidence_sd_mu      0.001    0.001     895.0    1188.0   1.01
-n2_evidence_sd_mu      0.001    0.002    1065.0    1114.0   1.00
-prior_mu_mu            0.008    0.006    1217.0    1209.0   1.00
-prior_sd_mu            0.004    0.004    1312.0    1381.0   1.01
+a_mu                   0.002    0.002    1428.0     984.0    1.0
+t0_mu                  0.000    0.000    1280.0    1232.0    1.0
+n1_evidence_sd_mu      0.001    0.001    1715.0    1571.0    1.0
+n2_evidence_sd_mu      0.002    0.002     781.0    1029.0    1.0
+prior_mu_mu            0.007    0.007    1639.0    1187.0    1.0
+prior_sd_mu            0.006    0.008     907.0    1223.0    1.0
 
-Divergences: 0
-Max r̂:       1.010
-Min ESS bulk: 520
+Divergences: 3
+Max r̂:       1.000
+Min ESS bulk: 781
 </pre></div></div>
 </div>
 <p><strong>Rules of thumb</strong> (from the bauer convention, see CLAUDE.md):</p>
@@ -823,7 +870,7 @@ al. 2012).</p>
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
-Initializing NUTS using jitter+adapt_full...
+Initializing NUTS using adapt_full...
 Multiprocess sampling (4 chains in 4 jobs)
 NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset, n2_evidence_sd_mu_untransformed, n2_evidence_sd_sd, n2_evidence_sd_offset, prior_mu_mu, prior_mu_sd, prior_mu_offset, prior_sd_mu_untransformed, prior_sd_sd, prior_sd_offset, w_0_mu_untransformed, w_0_sd, w_0_offset, w_d_mu_untransformed, w_d_sd, w_d_offset, w_s_mu, w_s_sd, w_s_offset, a_mu_untransformed, a_sd, a_offset, t0_mu_untransformed, t0_sd, t0_offset]
 </pre></div></div>
@@ -832,7 +879,7 @@ NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "5927593b1b464cfca9ecb2c53edd4234", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "e1acf721a34d4081bbaa37f3131f2625", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
@@ -857,18 +904,18 @@ NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset
 <div class="output_area docutils container">
 <div class="highlight"><pre>
                    mcse_mean  mcse_sd  ess_bulk  ess_tail  r_hat
-a_mu                   0.006    0.002     402.0    1591.0   1.02
-t0_mu                  0.002    0.002    1891.0     918.0   1.00
-w_0_mu                 0.020    0.022     277.0     347.0   1.01
-w_d_mu                 0.007    0.003     622.0    1573.0   1.01
-w_s_mu                 0.001    0.001    1895.0    1309.0   1.00
-n1_evidence_sd_mu      0.018    0.002      31.0     164.0   1.09
-n2_evidence_sd_mu      0.002    0.001    1554.0    1765.0   1.01
-prior_mu_mu            0.088    0.047      20.0      41.0   1.14
-prior_sd_mu            0.055    0.024      16.0      44.0   1.18
+a_mu                   0.002    0.002    2348.0    1911.0   1.00
+t0_mu                  0.002    0.002    1563.0     875.0   1.00
+w_0_mu                 0.014    0.027     488.0     248.0   1.01
+w_d_mu                 0.004    0.003    1801.0    1832.0   1.00
+w_s_mu                 0.001    0.001    1385.0    1009.0   1.00
+n1_evidence_sd_mu      0.002    0.001    1466.0    1766.0   1.00
+n2_evidence_sd_mu      0.002    0.001    1547.0    1481.0   1.00
+prior_mu_mu            0.008    0.008    2369.0    1822.0   1.00
+prior_sd_mu            0.006    0.005    1314.0    1468.0   1.00
 
-Divergences: 49
-Max r̂:       1.180
+Divergences: 80
+Max r̂:       1.010
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
@@ -1048,12 +1095,46 @@ Max r̂:       1.180
 </pre></div>
 </div>
 </div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Initializing NUTS using adapt_full...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset, n2_evidence_sd_mu_untransformed, n2_evidence_sd_sd, n2_evidence_sd_offset, prior_mu_mu, prior_mu_sd, prior_mu_offset, prior_sd_mu_untransformed, prior_sd_sd, prior_sd_offset, w_0_mu_untransformed, w_0_sd, w_0_offset, a_mu_untransformed, a_sd, a_offset, t0_mu_untransformed, t0_sd, t0_offset]
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "6e69164d0e2d4943b9ea6a3db71851cb", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 118 seconds.
+There were 26 divergences after tuning. Increase `target_accept` or reparameterize.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
+</pre></div></div>
+</div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Loading cached rdm_noadv fit from /Users/gdehol/.bauer_tutorial_cache/garcia_8subj_rdm_noadv.nc
+Saved rdm_noadv fit to /Users/gdehol/.bauer_tutorial_cache/garcia_8subj_rdm_noadv.nc
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
