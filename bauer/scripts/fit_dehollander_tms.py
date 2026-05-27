@@ -168,8 +168,14 @@ def main():
     if not args.no_ppc:
         print('Computing PPC...', flush=True)
         # Regression fits need stimulation_condition as a COLUMN (patsy rebuilds
-        # the design matrix during prediction), same as the fit used df_use.
-        ppc_df = df_use if args.regression else df
+        # the design matrix during prediction). But the PPC join also needs a
+        # UNIQUE index — df_use's set_index('subject') is non-unique (many trials
+        # per subject) and breaks the join. So keep df's unique trial-level
+        # multi-index and just promote the condition to a column.
+        ppc_df = df
+        if args.regression:
+            ppc_df = df.copy()
+            ppc_df['stimulation_condition'] = df.index.get_level_values('stimulation_condition')
         if args.model == 'choice':
             ppc = m.ppc(ppc_df, idata, progressbar=False)
         else:
