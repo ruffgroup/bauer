@@ -3152,6 +3152,33 @@ m_ddm = DDMMagnitudeComparisonModel(
 idata_ddm = fit_or_load(m_ddm, 'ddm')
 """),
 
+md(r"""## Why this hierarchical DDM converges: the starting-point finder
+
+Hierarchical DDM (and especially regression-DDM) posteriors are long, curved
+ridges. *Where the chains start* largely decides whether they find the bulk of
+the mass or get stuck in a bad corner at maximum tree depth. With a naive,
+generic initialization this is effectively a **seed lottery** — the same model
+and settings can give $\hat r \approx 1.0$ on one random seed and
+$\hat r > 3$ on the next.
+
+bauer handles this for you. On DDM/race models, `model.sample` is **on by
+default** backed by a *starting-point finder* (`get_initial_points`,
+`recommended_init='mapjitter'`): it places each chain at a **data-informed
+plausible value** (the posterior mode from `find_MAP`) and then **disperses the
+chains by a fraction of each parameter's prior SD** — so chains sit around the
+typical set (never all exactly at the mode), and $\hat r$ stays meaningful.
+This is the same idea HSSM uses (curated initial values + small jitter).
+
+In a controlled experiment it took a regression DDM from ~12 % to **100 %**
+seed-convergence, and made fits ~3.7× faster (converged chains avoid the
+max-tree-depth stalls). You don't have to do anything — it's the default. To
+disable it, pass `m.sample(..., find_init=False)`; to supply your own, pass
+`initvals=`. It works for every parameter (DDM, front-end, B-spline noise
+coefficients) with no per-parameter tuning. **For a large hierarchical fit
+(e.g. a full TMS or multi-condition dataset), this is the single most important
+reason your fit converges — leave it on.**
+"""),
+
 md(r"""## Diagnostics — did both models sample cleanly?
 
 Before interpreting any posterior, check $\hat r \le 1.01$ on the group-level
@@ -3645,40 +3672,222 @@ print(f"ISI range long:  {df.loc[df['isi_cat']=='long','isi'].min():.1f}–"
       f"{df.loc[df['isi_cat']=='long','isi'].max():.1f}s")
 """),
 
-md(r"""And the recipe — we *show* this rather than running it inside the
-tutorial (another full DDM fit would add another ~45 min on GPU). On your
-own data, this is a complete drop-in:
+md(r"""**Fit the regression DDM.** This adds one regressor on
+`n1_evidence_sd` — the encoding noise on the first stimulus, the
+parameter most likely to grow if working-memory representations decay
+during the longer ISI delays. We don't regress on `a` (response caution
+shouldn't depend on the ISI scheduled by the experiment) — pre-registering
+which parameter the covariate is allowed to move keeps this honest.
+"""),
 
-```python
+code("""\
 from bauer.models import DDMMagnitudeComparisonRegressionModel
 
 m_isi = DDMMagnitudeComparisonRegressionModel(
     paradigm=df,
     fit_separate_evidence_sd=True, fit_prior=True,
-    regressors={'n1_evidence_sd': 'isi_cat'},   # only the first-stim noise
+    regressors={'n1_evidence_sd': 'isi_cat'},
 )
-m_isi.build_estimation_model(data=df, hierarchical=True)
-idata_isi = m_isi.sample(backend='numpyro', target_accept=0.95)
+idata_isi = fit_or_load(m_isi, 'ddm_isi')
+"""),
 
-# The relevant contrast is the 'long' coefficient (with 'short' as the
-# reference level — same convention as patsy / statsmodels).
-az.summary(idata_isi, var_names=['n1_evidence_sd_mu_isi_cat[T.long]'])
-# HDI excludes 0 → significant memory decay across this ISI range.
-# HDI includes 0 → no measurable decay (the expected null, given the
-# essentially-flat mean RT / accuracy across ISIs we saw earlier).
-```
+code("""\
+# bauer's regression model stores coefficients as a *coord* on the
+# parameter posterior (here 'n1_evidence_sd_regressors'), not as separate
+# variables. The 'isi_cat[T.long]' level is the contrast vs the 'short'
+# reference level (same convention as patsy / statsmodels).
+print(az.summary(idata_isi, var_names=['n1_evidence_sd_mu'],
+                  hdi_prob=0.94).to_string())
 
-Two practical notes for your own data:
+# Plain-English readout of the long-vs-short contrast on the
+# untransformed (pre-softplus) scale.
+post = idata_isi.posterior['n1_evidence_sd_mu'].sel(
+    n1_evidence_sd_regressors='isi_cat[T.long]').values.ravel()
+hdi_lo, hdi_hi = np.percentile(post, [3, 97])
+print(f"\\n94% HDI on long-vs-short ISI effect on n1_evidence_sd_mu: "
+      f"[{hdi_lo:+.3f}, {hdi_hi:+.3f}]")
+if hdi_lo > 0:
+    print("→ Long ISIs INCREASE n1 encoding noise (memory decay detected).")
+elif hdi_hi < 0:
+    print("→ Long ISIs DECREASE n1 encoding noise (unexpected — investigate).")
+else:
+    print("→ HDI includes 0: no detectable ISI effect on n1 noise across "
+          "6-9 s delays (the expected null, given the flat empirical "
+          "RT / accuracy seen earlier).")
+"""),
 
-1. **Pick the right parameter to regress.** Here ISI plausibly affects only
-   $\nu_1$ (memory for the first stimulus across the delay) — there's no
-   prior reason ISI would change response caution. Adding `'a': 'isi_cat'`
-   would be data-mining; pre-register which parameter the covariate should
-   move and only regress that one.
-2. **Continuous covariates work too** — replace `'isi_cat'` with
-   `'isi'` (the raw seconds column) to get a linear ISI slope on $\nu_1$.
-   For non-linear effects, patsy formulas like `'bs(isi, df=3)'` give a
+md(r"""### From contrast coefficient → on-scale noise per condition
+
+The summary above is on the un-softplus scale (so contrasts are
+additive). For interpretation it's easier to read the actual
+$\nu_1$ in each ISI condition. bauer's
+`model.get_conditionwise_parameters(idata, conditions, group=True)`
+does that for you — it rebuilds the design matrix at the conditions
+you pass, multiplies in the posterior coefficients, and **applies the
+transform** (softplus here, so the result is in the natural noise
+units used by the cognitive model).
+"""),
+
+code("""\
+# Group-level n1_evidence_sd per ISI condition, with the softplus
+# transform applied — i.e. the actual noise the cognitive model uses.
+isi_conditions = pd.DataFrame({'isi_cat': ['short', 'long']})
+cond_pars = m_isi.get_conditionwise_parameters(idata_isi, isi_conditions,
+                                                group=True)
+# cond_pars rows are (parameter, posterior_index); columns are conditions
+nu1 = cond_pars.loc['n1_evidence_sd']          # shape (n_post, 2)
+nu1.columns = ['short', 'long']
+diff = nu1['long'] - nu1['short']
+summary = pd.DataFrame({
+    'mean':   nu1.mean(),
+    'median': nu1.median(),
+    'hdi_3%': np.percentile(nu1, 3, axis=0),
+    'hdi_97%': np.percentile(nu1, 97, axis=0),
+})
+print('Group-level n1_evidence_sd per ISI condition (natural scale):')
+print(summary.round(3).to_string())
+print()
+print(f"long − short difference: mean = {diff.mean():+.4f}, "
+      f"94% HDI = [{np.percentile(diff, 3):+.4f}, "
+      f"{np.percentile(diff, 97):+.4f}]")
+"""),
+
+code("""\
+# Figure: per-condition posteriors of n1_evidence_sd, plus the difference.
+fig, (ax_pdf, ax_diff) = plt.subplots(1, 2, figsize=(10.5, 4.0))
+
+palette = {'short': '#377eb8', 'long': '#e41a1c'}
+for cond in ['short', 'long']:
+    sns.kdeplot(nu1[cond], ax=ax_pdf, fill=True, alpha=0.25,
+                 color=palette[cond], label=f'{cond} ISI', clip=(0, None))
+    ax_pdf.axvline(nu1[cond].median(), color=palette[cond], lw=1.2, ls='--')
+ax_pdf.set_xlabel(r'Group-level $\\nu_1$ (n1 encoding SD)')
+ax_pdf.set_ylabel('Posterior density')
+ax_pdf.set_title('Per-condition posterior')
+ax_pdf.legend()
+sns.despine(ax=ax_pdf)
+
+sns.kdeplot(diff, ax=ax_diff, fill=True, color='#666666', alpha=0.4,
+             clip=(diff.min(), diff.max()))
+ax_diff.axvline(0, color='black', ls=':', lw=1.2)
+hdi_lo, hdi_hi = np.percentile(diff, [3, 97])
+ax_diff.axvspan(hdi_lo, hdi_hi, color='gray', alpha=0.15,
+                 label=f'94% HDI [{hdi_lo:+.3f}, {hdi_hi:+.3f}]')
+ax_diff.set_xlabel(r'$\\nu_1$(long) − $\\nu_1$(short)')
+ax_diff.set_title('Long − short contrast posterior')
+ax_diff.legend(loc='upper left', fontsize=9)
+sns.despine(ax=ax_diff)
+plt.tight_layout()
+"""),
+
+md(r"""### Visualising the coefficient posterior
+
+The `az.summary` table above is the formal test; a forest plot makes the
+same contrast legible at a glance. Both group-level coefficients on $n_1$'s
+encoding noise are shown on the model's internal (pre-softplus) scale: the
+`Intercept` is the short-ISI baseline, and `isi_cat[T.long]` is the
+long-vs-short contrast whose 94% HDI relative to 0 *is* the test.
+"""),
+
+code("""\
+az.plot_forest(idata_isi, var_names=['n1_evidence_sd_mu'],
+               combined=True, hdi_prob=0.94, figsize=(7, 2.4))
+plt.axvline(0, color='black', ls=':', lw=1)
+plt.title('Group-level regression coefficients on $n_1$ encoding noise')
+plt.tight_layout()
+"""),
+
+md(r"""### Does the fit still track the data *within each condition*?
+
+A regression fit is only trustworthy if it reproduces behaviour at every
+level of the regressor — not just on average. Below we run a posterior
+predictive check and split both the data and the predictions by ISI
+condition. Two things to look for: (i) the bands cover the data points in
+**both** conditions (the fit is adequate on choice *and* RT), and (ii) the
+short and long curves nearly coincide — the visual counterpart of the
+near-null contrast we just measured.
+"""),
+
+code("""\
+# PPC on the original paradigm; DDM PPCs carry simulated_choice + simulated_rt.
+ppc_isi = m_isi.ppc(df, idata_isi, n_posterior_samples=60, progressbar=False)
+d_isi = add_bins(df)               # keeps isi_cat; adds diff_bin, correct, stake
+
+# Attach difficulty + ISI condition to every PPC draw (same join as the
+# size-effect PPC earlier — d_isi is indexed by the trial keys).
+p = (ppc_isi.join(d_isi[['diff_bin', 'isi_cat', 'n1', 'n2']], how='left')
+            .reset_index())
+p['sim_correct'] = p['simulated_choice'].astype(bool) == (p['n2'] > p['n1'])
+
+# Per-draw condition means → spread across draws gives the posterior PI band.
+acc_pp = (p.groupby(['ppc_sample', 'isi_cat', 'diff_bin'], observed=True)
+            ['sim_correct'].mean().reset_index())
+rt_pp  = (p[p['sim_correct']]
+            .groupby(['ppc_sample', 'isi_cat', 'diff_bin'], observed=True)
+            ['simulated_rt'].mean().reset_index())
+# Observed condition means (correct trials for RT, matching the PPC).
+acc_obs = (d_isi.groupby(['isi_cat', 'diff_bin'], observed=True)
+                 ['correct'].mean().reset_index())
+rt_obs  = (d_isi.query('correct')
+                .groupby(['isi_cat', 'diff_bin'], observed=True)
+                ['rt'].mean().reset_index())
+
+isi_pal = {'short': '#377eb8', 'long': '#e41a1c'}
+fig, (ax_c, ax_rt) = plt.subplots(1, 2, figsize=(11, 4.2))
+
+# Left: choice (accuracy) PPC.
+sns.lineplot(data=acc_pp, x='diff_bin', y='sim_correct',
+             hue='isi_cat', hue_order=['short', 'long'], palette=isi_pal,
+             errorbar=('pi', 90), err_style='band', err_kws={'alpha': 0.18},
+             lw=2, ax=ax_c)
+sns.scatterplot(data=acc_obs, x='diff_bin', y='correct',
+                hue='isi_cat', hue_order=['short', 'long'], palette=isi_pal,
+                s=90, edgecolor='black', zorder=5, legend=False, ax=ax_c)
+ax_c.set_xlabel('Difficulty'); ax_c.set_ylabel('P(correct)')
+ax_c.set_title('Choice PPC by ISI')
+ax_c.legend(title='ISI', loc='lower right')
+
+# Right: RT (difficulty) PPC, correct trials.
+sns.lineplot(data=rt_pp, x='diff_bin', y='simulated_rt',
+             hue='isi_cat', hue_order=['short', 'long'], palette=isi_pal,
+             errorbar=('pi', 90), err_style='band', err_kws={'alpha': 0.18},
+             lw=2, ax=ax_rt, legend=False)
+sns.scatterplot(data=rt_obs, x='diff_bin', y='rt',
+                hue='isi_cat', hue_order=['short', 'long'], palette=isi_pal,
+                s=90, edgecolor='black', zorder=5, legend=False, ax=ax_rt)
+ax_rt.set_xlabel('Difficulty'); ax_rt.set_ylabel('Mean RT (s, correct)')
+ax_rt.set_title('RT PPC by ISI')
+
+for ax in (ax_c, ax_rt):
+    sns.despine(ax=ax)
+fig.suptitle('Regression DDM PPC — points = data, bands = 90% posterior PI',
+             y=1.02)
+plt.tight_layout()
+"""),
+
+md(r"""Three practical notes for your own data:
+
+1. **Pick the right parameter to regress.** ISI here plausibly affects
+   only $\nu_1$ (memory for the first stimulus across the delay) — there's
+   no prior reason ISI would change response caution. Adding `'a':
+   'isi_cat'` would be data-mining; pre-register which parameter the
+   covariate should move and only regress that one.
+2. **Continuous covariates work too** — replace `'isi_cat'` with `'isi'`
+   (the raw seconds column) to get a linear ISI slope on $\nu_1$. For
+   non-linear effects, patsy formulas like `'bs(isi, df=3)'` give a
    B-spline; bauer auto-expands the design matrix.
+3. **Priors are conventions + judgment, not derivations.** bauer's `a`/`t0`
+   priors mirror HDDM (Wiecki, Sofer & Frank 2013): wide group-mean +
+   tight group-SD. The front-end (`n*_evidence_sd`, `prior_*`) priors are
+   bauer-specific judgment calls and were tuned partly to make this
+   tutorial converge. For a real publication, run a **prior-sensitivity
+   check** — refit at 2–3 prior strengths and confirm the contrast HDI
+   barely moves.
+
+The regression DDM fit takes about as long as the basic DDM (one extra
+parameter, vmap dimensions unchanged) — budget another ~45 min on a GPU
+L4, or pre-fit on the cluster with `fit_for_lesson8.py` (which now also
+produces this `ddm_isi` cache).
 """),
 
 md(r"""## When is RT modelling worth it?
