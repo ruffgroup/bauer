@@ -59,6 +59,11 @@ bauer/
 
 ## Commands
 
+**Pre-commit hook** (catches lint before it reaches CI): once per clone, run
+`pip install -e ".[dev]" && pre-commit install`. Then every `git commit` runs
+flake8 (same `setup.cfg` config as CI) on staged `bauer/`/`tests/` files and
+blocks on violations. Run over everything: `pre-commit run --all-files`.
+
 ```bash
 make lint          # flake8 bauer tests
 make test          # unittest discovery
