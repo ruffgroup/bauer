@@ -73,8 +73,8 @@ def _deprecated_alias(old_cls, new_cls):
     return _Aliased
 
 
-PsychometricModel              = _deprecated_alias('PsychometricModel',              PsychophysicalModel)
-PsychometricLapseModel         = _deprecated_alias('PsychometricLapseModel',         PsychophysicalLapseModel)
-PsychometricRegressionModel    = _deprecated_alias('PsychometricRegressionModel',    PsychophysicalRegressionModel)
+PsychometricModel = _deprecated_alias('PsychometricModel', PsychophysicalModel)
+PsychometricLapseModel = _deprecated_alias('PsychometricLapseModel', PsychophysicalLapseModel)
+PsychometricRegressionModel = _deprecated_alias('PsychometricRegressionModel', PsychophysicalRegressionModel)
 PsychometricLapseRegressionModel = _deprecated_alias('PsychometricLapseRegressionModel',
-                                                      PsychophysicalLapseRegressionModel)
+                                                     PsychophysicalLapseRegressionModel)

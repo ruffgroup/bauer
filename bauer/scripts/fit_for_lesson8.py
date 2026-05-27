@@ -105,7 +105,8 @@ def main():
         try:
             idata = m.sample(**sample_kw)
         finally:
-            stop.set(); hb.join(timeout=2)
+            stop.set()
+            hb.join(timeout=2)
         dt = time.time() - t0
         idata.to_netcdf(path)
         print(f"{name}: saved in {dt/60:.1f} min -> {path}", flush=True)

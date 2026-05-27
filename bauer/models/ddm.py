@@ -466,7 +466,7 @@ class DDMMixin:
                                         random_seed=int(rng.integers(0, 2**31 - 1)))
                 else:
                     pars_df = pd.DataFrame(par_dict,
-                                            index=pd.Index(subjects, name='subject'))
+                                           index=pd.Index(subjects, name='subject'))
                     sim = self.simulate(paradigm, pars_df, n_samples=inner_samples,
                                         random_seed=int(rng.integers(0, 2**31 - 1)))
             else:
