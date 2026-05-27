@@ -64,6 +64,14 @@ bauer/
 flake8 (same `setup.cfg` config as CI) on staged `bauer/`/`tests/` files and
 blocks on violations. Run over everything: `pre-commit run --all-files`.
 
+**Notebook hygiene** (once per clone): `pip install nbstripout && nbstripout
+--install --keep-output`. This wires a git clean filter (via the committed
+`.gitattributes`) that strips `execution_count`/cell-ids/volatile metadata on
+`git add` — killing diff churn — **but keeps cell outputs** (the docs site
+renders committed outputs, so figures must stay). The filter lives in your
+per-clone `.git/config`, so every collaborator must run the install line once;
+`.gitattributes` alone is a no-op without it.
+
 ```bash
 make lint          # flake8 bauer tests
 make test          # unittest discovery
