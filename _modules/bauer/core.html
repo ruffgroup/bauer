@@ -243,7 +243,8 @@
         </div>
         <article role="main" id="furo-main-content">
           <h1>Source code for bauer.core</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">functools</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pymc</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pm</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
@@ -251,6 +252,47 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">.utils.math</span><span class="w"> </span><span class="kn">import</span> <span class="n">logistic</span><span class="p">,</span> <span class="n">softplus_np</span><span class="p">,</span> <span class="n">logistic_np</span><span class="p">,</span> <span class="n">logit_np</span><span class="p">,</span> <span class="n">inverse_softplus_np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pytensor.tensor</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pt</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">patsy</span><span class="w"> </span><span class="kn">import</span> <span class="n">dmatrix</span><span class="p">,</span> <span class="n">build_design_matrices</span>
+
+
+<span class="c1"># Mapping of deprecated (old) __init__ keyword names -&gt; their current names.</span>
+<span class="c1"># Add a new entry here to retire another misspelled / renamed kwarg; the</span>
+<span class="c1"># translation + DeprecationWarning are handled automatically for every</span>
+<span class="c1"># BaseModel subclass via __init_subclass__ (and for BaseModel itself).</span>
+<span class="n">_DEPRECATED_INIT_KWARGS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;fit_seperate_evidence_sd&#39;</span><span class="p">:</span> <span class="s1">&#39;fit_separate_evidence_sd&#39;</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_translate_deprecated_kwargs</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Wrap an ``__init__`` so deprecated kwarg names are translated.</span>
+
+<span class="sd">    Emits a :class:`DeprecationWarning` and forwards the value under the new</span>
+<span class="sd">    name. If both the old and new names are supplied, the old one is dropped</span>
+<span class="sd">    and the new one wins. The wrapper is idempotent (re-wrapping is a no-op)</span>
+<span class="sd">    so cooperative multiple inheritance doesn&#39;t double-wrap, and because the</span>
+<span class="sd">    outer ``__init__`` already renames before calling ``super().__init__``,</span>
+<span class="sd">    inner ``__init__``s only ever see the new name (no double-warning).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="s1">&#39;_bauer_alias_wrapped&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">func</span>
+
+    <span class="nd">@functools</span><span class="o">.</span><span class="n">wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">old</span><span class="p">,</span> <span class="n">new</span> <span class="ow">in</span> <span class="n">_DEPRECATED_INIT_KWARGS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">old</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;&#39;</span><span class="si">{</span><span class="n">old</span><span class="si">}</span><span class="s2">&#39; is deprecated and will be removed; use &#39;</span><span class="si">{</span><span class="n">new</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">,</span>
+                    <span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">new</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                    <span class="c1"># Both passed: keep the new spelling, drop the old.</span>
+                    <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">old</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">kwargs</span><span class="p">[</span><span class="n">new</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">old</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">wrapper</span><span class="o">.</span><span class="n">_bauer_alias_wrapped</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">return</span> <span class="n">wrapper</span>
 
 
 <div class="viewcode-block" id="BaseModel">
@@ -284,6 +326,15 @@
     <span class="c1"># (verified: vectorized regression-DDM converges ~1/7 seeds without it).</span>
     <span class="c1"># ``None`` = use the backend&#39;s default init.</span>
     <span class="n">recommended_init</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__init_subclass__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init_subclass__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="c1"># Wrap each subclass&#39;s own __init__ (if it defines one) so the</span>
+        <span class="c1"># deprecated kwarg translation runs before the real body. Mixins /</span>
+        <span class="c1"># diamond inheritance are fine: the outermost __init__ renames first,</span>
+        <span class="c1"># so inner __init__s see only the new name.</span>
+        <span class="k">if</span> <span class="s1">&#39;__init__&#39;</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">:</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="fm">__init__</span> <span class="o">=</span> <span class="n">_translate_deprecated_kwargs</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">[</span><span class="s1">&#39;__init__&#39;</span><span class="p">])</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -369,10 +420,11 @@
 
         <span class="k">return</span> <span class="n">parameters</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">build_estimation_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coords</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_p_choice</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">flat_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_estimation_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coords</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_p_choice</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">flat_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">paradigm</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 
+        <span class="c1"># `data` and `paradigm` are accepted synonyms (no deprecation); data wins if both given.</span>
         <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">paradigm</span> <span class="k">if</span> <span class="n">paradigm</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">hierarchical</span> <span class="ow">and</span> <span class="s1">&#39;subject&#39;</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s1">&#39;index&#39;</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Index</span><span class="p">([]))</span><span class="o">.</span><span class="n">names</span><span class="p">:</span>
             <span class="n">n_subjects</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span>
@@ -965,6 +1017,11 @@
 
         <span class="k">return</span> <span class="n">model_inputs</span></div>
 
+
+
+<span class="c1"># BaseModel can&#39;t translate its own __init__ via __init_subclass__ (that hook</span>
+<span class="c1"># only fires for subclasses), so wrap it explicitly here.</span>
+<span class="n">BaseModel</span><span class="o">.</span><span class="fm">__init__</span> <span class="o">=</span> <span class="n">_translate_deprecated_kwargs</span><span class="p">(</span><span class="n">BaseModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="LapseModel">

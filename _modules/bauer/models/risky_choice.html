@@ -803,7 +803,7 @@
 <span class="sd">        Gaussian shared across options; ``klw`` = Khaw-Li-Woodford style</span>
 <span class="sd">        (empirical ``mu``, fitted ``sd``); ``full`` = separate fitted</span>
 <span class="sd">        ``(mu, sd)`` for the risky and safe options.</span>
-<span class="sd">    fit_seperate_evidence_sd : bool</span>
+<span class="sd">    fit_separate_evidence_sd : bool</span>
 <span class="sd">        Fit separate encoding noise for n1 and n2 (default ``True``).</span>
 <span class="sd">    memory_model : {&#39;independent&#39;, &#39;shared_perceptual_noise&#39;}</span>
 <span class="sd">        Noise structure; see :class:`MagnitudeComparisonModel`.</span>
@@ -813,11 +813,11 @@
     <span class="n">_VALID_PRIORS</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;objective&#39;</span><span class="p">,</span> <span class="s1">&#39;shared&#39;</span><span class="p">,</span> <span class="s1">&#39;full&#39;</span><span class="p">,</span> <span class="s1">&#39;klw&#39;</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;objective&#39;</span><span class="p">,</span>
-                 <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                 <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
                  <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">):</span>
         <span class="k">assert</span> <span class="n">prior_estimate</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_VALID_PRIORS</span><span class="p">,</span> \
             <span class="sa">f</span><span class="s1">&#39;prior_estimate must be one of </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_VALID_PRIORS</span><span class="si">}</span><span class="s1">&#39;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span> <span class="o">=</span> <span class="n">fit_seperate_evidence_sd</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit_separate_evidence_sd</span> <span class="o">=</span> <span class="n">fit_separate_evidence_sd</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">=</span> <span class="n">memory_model</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="o">=</span> <span class="n">prior_estimate</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="n">save_trialwise_n_estimates</span><span class="p">)</span>
@@ -868,7 +868,7 @@
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;prior_sd&#39;</span><span class="p">]</span>
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">]</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_separate_evidence_sd</span><span class="p">:</span>
 
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s1">&#39;independent&#39;</span><span class="p">:</span>
                 <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">]</span>
@@ -892,7 +892,7 @@
 
         <span class="n">free_parameters</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_separate_evidence_sd</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory_model</span> <span class="o">==</span> <span class="s1">&#39;independent&#39;</span><span class="p">:</span>
                 <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mf">1.</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span><span class="p">}</span>
                 <span class="n">free_parameters</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mf">1.</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span><span class="p">}</span>
@@ -971,10 +971,10 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;RiskModel with patsy formula regression on noise, prior, or bias parameters.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">regressors</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;objective&#39;</span><span class="p">,</span>
-                 <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                 <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
                  <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">):</span>
         <span class="n">RegressionModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="p">)</span>
-        <span class="n">RiskModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">,</span>
+        <span class="n">RiskModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="p">,</span> <span class="n">fit_separate_evidence_sd</span><span class="p">,</span>
                            <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="n">save_trialwise_n_estimates</span><span class="p">,</span>
                            <span class="n">memory_model</span><span class="o">=</span><span class="n">memory_model</span><span class="p">)</span>
 
@@ -1032,7 +1032,7 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Risky choice model combining flexible (polynomial) noise with Bayesian magnitude inference.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
-                 <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">spline_order</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+                 <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">spline_order</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
                  <span class="n">representational_noise</span><span class="o">=</span><span class="s1">&#39;payoff&#39;</span><span class="p">,</span>
                  <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">):</span>
 
@@ -1042,7 +1042,7 @@
         <span class="k">if</span> <span class="n">representational_noise</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;payoff&#39;</span><span class="p">,</span> <span class="s1">&#39;ev&#39;</span><span class="p">]:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unknown representational noise: </span><span class="si">{</span><span class="n">representational_noise</span><span class="si">}</span><span class="s1"> (should be &quot;payoff&quot; or &quot;ev&quot;)&#39;</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">spline_order</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">spline_order</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">fit_separate_evidence_sd</span><span class="p">:</span>
             <span class="n">spline_order</span> <span class="o">=</span> <span class="n">spline_order</span><span class="p">,</span> <span class="n">spline_order</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">spline_order</span> <span class="o">=</span> <span class="n">spline_order</span>
@@ -1050,7 +1050,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">representational_noise</span> <span class="o">=</span> <span class="n">representational_noise</span>
 
         <span class="n">RiskModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="n">save_trialwise_n_estimates</span><span class="p">,</span>
-                           <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="n">fit_seperate_evidence_sd</span><span class="p">,</span>
+                           <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="n">fit_separate_evidence_sd</span><span class="p">,</span>
                            <span class="n">prior_estimate</span><span class="o">=</span><span class="n">prior_estimate</span><span class="p">,</span>
                            <span class="n">memory_model</span><span class="o">=</span><span class="n">memory_model</span><span class="p">)</span>
         <span class="c1"># FlexibleNoiseComparisonModel.__init__ is skipped by the explicit</span>
@@ -1217,11 +1217,11 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span>
                  <span class="n">regressors</span><span class="p">,</span>
                  <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
-                 <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">spline_order</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+                 <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">spline_order</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
                  <span class="n">representational_noise</span><span class="o">=</span><span class="s1">&#39;payoff&#39;</span><span class="p">,</span>
                  <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">):</span>
 
-        <span class="k">if</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">spline_order</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">spline_order</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">fit_separate_evidence_sd</span><span class="p">:</span>
             <span class="n">spline_order</span> <span class="o">=</span> <span class="n">spline_order</span><span class="p">,</span> <span class="n">spline_order</span>
 
         <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">regressors</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
@@ -1241,7 +1241,7 @@
                 <span class="n">regressors</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
 
         <span class="n">RegressionModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="p">)</span>
-        <span class="n">FlexibleNoiseRiskModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="p">,</span>
+        <span class="n">FlexibleNoiseRiskModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="p">,</span> <span class="n">fit_separate_evidence_sd</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="p">,</span>
                                         <span class="n">spline_order</span><span class="p">,</span> <span class="n">representational_noise</span><span class="p">,</span> <span class="n">memory_model</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_sd_curve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conditions</span><span class="p">,</span> <span class="n">idata</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pars</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
@@ -1456,12 +1456,12 @@
 <span class="sd">    paradigm : pd.DataFrame</span>
 <span class="sd">    prior_estimate : str</span>
 <span class="sd">        ``&#39;full&#39;`` (default), ``&#39;shared&#39;``, or ``&#39;fix_prior_sd&#39;``.</span>
-<span class="sd">    fit_seperate_evidence_sd : bool</span>
+<span class="sd">    fit_separate_evidence_sd : bool</span>
 <span class="sd">    memory_model : str</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
-                 <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                 <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                  <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">):</span>
 
         <span class="k">if</span> <span class="n">prior_estimate</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;shared&#39;</span><span class="p">,</span> <span class="s1">&#39;full&#39;</span><span class="p">,</span> <span class="s1">&#39;fix_prior_sd&#39;</span><span class="p">]:</span>
@@ -1470,7 +1470,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">prior_estimate</span> <span class="o">=</span> <span class="n">prior_estimate</span>
 
         <span class="n">RiskModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="n">save_trialwise_n_estimates</span><span class="p">,</span>
-                           <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="n">fit_seperate_evidence_sd</span><span class="p">,</span>
+                           <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="n">fit_separate_evidence_sd</span><span class="p">,</span>
                            <span class="n">prior_estimate</span><span class="o">=</span><span class="n">prior_estimate</span><span class="p">,</span>
                            <span class="n">memory_model</span><span class="o">=</span><span class="n">memory_model</span><span class="p">)</span>
 
@@ -1503,7 +1503,7 @@
 
         <span class="n">noise_exponent</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;noise_exponent&#39;</span><span class="p">]</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_seperate_evidence_sd</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_separate_evidence_sd</span><span class="p">:</span>
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span>
                 <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;n1_log_sd_intercept&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">noise_exponent</span> <span class="o">*</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]))</span>
             <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span>
@@ -1588,10 +1588,10 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">PowerLawNoiseRiskRegressionModel</span><span class="p">(</span><span class="n">RegressionModel</span><span class="p">,</span> <span class="n">PowerLawNoiseRiskModel</span><span class="p">):</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">regressors</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
-                 <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                 <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                  <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">):</span>
         <span class="n">RegressionModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="p">)</span>
-        <span class="n">PowerLawNoiseRiskModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="p">,</span> <span class="n">fit_seperate_evidence_sd</span><span class="p">,</span>
+        <span class="n">PowerLawNoiseRiskModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="p">,</span> <span class="n">fit_separate_evidence_sd</span><span class="p">,</span>
                                         <span class="n">save_trialwise_n_estimates</span><span class="p">,</span> <span class="n">memory_model</span><span class="p">)</span>
 
 
@@ -1606,10 +1606,10 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
-                 <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                 <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                  <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="n">prior_estimate</span><span class="p">,</span>
-                         <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="n">fit_seperate_evidence_sd</span><span class="p">,</span>
+                         <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="n">fit_separate_evidence_sd</span><span class="p">,</span>
                          <span class="n">save_trialwise_n_estimates</span><span class="o">=</span><span class="n">save_trialwise_n_estimates</span><span class="p">,</span>
                          <span class="n">spline_order</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
                          <span class="n">memory_model</span><span class="o">=</span><span class="n">memory_model</span><span class="p">)</span>
