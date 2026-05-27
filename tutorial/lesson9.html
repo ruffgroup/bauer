@@ -543,7 +543,7 @@ Columns:  [&#39;n1&#39;, &#39;n2&#39;, &#39;choice&#39;, &#39;rt&#39;, &#39;accu
 
 <span class="n">m_ddm</span> <span class="o">=</span> <span class="n">DDMMagnitudeComparisonModel</span><span class="p">(</span>
     <span class="n">paradigm</span><span class="o">=</span><span class="n">df</span><span class="p">,</span>
-    <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>   <span class="c1"># allow ν_1 ≠ ν_2 (sequential task)</span>
+    <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>   <span class="c1"># allow ν_1 ≠ ν_2 (sequential task)</span>
     <span class="n">fit_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>                  <span class="c1"># estimate Bayesian-observer prior μ_p, σ_p</span>
 <span class="p">)</span>
 <span class="n">idata_ddm</span> <span class="o">=</span> <span class="n">fit_or_load</span><span class="p">(</span><span class="n">m_ddm</span><span class="p">,</span> <span class="s1">&#39;ddm&#39;</span><span class="p">)</span>
@@ -810,7 +810,7 @@ al. 2012).</p>
 <span class="c1"># notes/race_diffusion_math.md §5 for the identifiability geometry.</span>
 <span class="n">m_rdm</span> <span class="o">=</span> <span class="n">RaceDiffusionMagnitudeComparisonModel</span><span class="p">(</span>
     <span class="n">paradigm</span><span class="o">=</span><span class="n">df</span><span class="p">,</span>
-    <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">fit_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">advantage</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
@@ -1039,7 +1039,7 @@ Max r̂:       1.180
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">m_rdm_noadv</span> <span class="o">=</span> <span class="n">RaceDiffusionMagnitudeComparisonModel</span><span class="p">(</span>
     <span class="n">paradigm</span><span class="o">=</span><span class="n">df</span><span class="p">,</span>
-    <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">fit_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">advantage</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>   <span class="c1"># the ablation</span>
 <span class="p">)</span>

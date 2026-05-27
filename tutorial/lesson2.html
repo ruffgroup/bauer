@@ -812,7 +812,7 @@ Non-symbolic     noise-bias ρ = -0.383 (p = 0.0018)
     <span class="n">paradigm</span><span class="o">=</span><span class="n">data_reg</span><span class="p">,</span>
     <span class="n">regressors</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;evidence_sd&#39;</span><span class="p">:</span> <span class="s1">&#39;C(format)&#39;</span><span class="p">},</span>
     <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;klw&#39;</span><span class="p">,</span>
-    <span class="n">fit_seperate_evidence_sd</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="n">model_reg</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data_reg</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">idata_reg</span> <span class="o">=</span> <span class="n">model_reg</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
