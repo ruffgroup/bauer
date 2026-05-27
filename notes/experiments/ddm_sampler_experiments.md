@@ -31,7 +31,7 @@ fit in minutes on an L4 so we can run a real grid. Same data fit two ways:
 crossed with **backend** {numpyro, blackjax} × **chain_method**
 {vectorized, parallel} × **tune** {2000, 4000} × **seed** {0,1,2} (fractional —
 see `run_ddm_sampler_experiment.py` for the exact cell list). All:
-`target_accept=0.99`, `draws=tune/2`, 4 chains, `fit_seperate_evidence_sd`,
+`target_accept=0.99`, `draws=tune/2`, 4 chains, `fit_separate_evidence_sd`,
 `prior_estimate='full'`, `hierarchical=False`. Convergence judged on the
 cognitive parameters (`n*_evidence_sd`, `a`, `t0`, prior μ/σ): **max r̂** and
 **min ESS_bulk**, plus divergences and wall-time.

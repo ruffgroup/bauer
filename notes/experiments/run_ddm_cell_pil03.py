@@ -45,7 +45,7 @@ def main():
     is_loss = df['domain'] == 'loss'
     df.loc[is_loss, 'choice'] = ~df.loc[is_loss, 'choice'].astype(bool)
 
-    common = dict(prior_estimate='full', fit_seperate_evidence_sd=True,
+    common = dict(prior_estimate='full', fit_separate_evidence_sd=True,
                   fit_v_scale=False, fix_z=True)
     if args.model == 'basic':
         m = DDMRiskModel(paradigm=df.reset_index(), **common)

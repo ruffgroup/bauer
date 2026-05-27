@@ -55,17 +55,17 @@ NOISE_REG = {'n1_evidence_sd': 'stimulation_condition',
 
 FITS = {
     # baseline (no regression)
-    'choice':       ('choice_full.nc',                      RiskModel,                                  df,      dict(prior_estimate='full', fit_seperate_evidence_sd=True)),
-    'choice-flex':  ('choice_flex_full.nc',                 FlexibleNoiseRiskModel,                     df,      dict(prior_estimate='full', fit_seperate_evidence_sd=True, spline_order=5)),
-    'DDM':          ('ddm_freescale_full.nc',               DDMRiskModel,                               df,      dict(prior_estimate='full', fit_seperate_evidence_sd=True, fit_v_scale=True)),
-    'DDM-flex':     ('ddm_flex_freescale_full.nc',          DDMFlexibleNoiseRiskModel,                  df,      dict(prior_estimate='full', fit_seperate_evidence_sd=True, spline_order=5, fit_v_scale=True)),
-    'RDM':          ('rdm_full.nc',                         RaceDiffusionRiskModel,                     df,      dict(prior_estimate='full', fit_seperate_evidence_sd=True, advantage=True)),
-    'RDM-flex':     ('rdm_flex_full.nc',                    RaceDiffusionFlexibleNoiseRiskModel,        df,      dict(prior_estimate='full', fit_seperate_evidence_sd=True, spline_order=5, advantage=True)),
+    'choice':       ('choice_full.nc',                      RiskModel,                                  df,      dict(prior_estimate='full', fit_separate_evidence_sd=True)),
+    'choice-flex':  ('choice_flex_full.nc',                 FlexibleNoiseRiskModel,                     df,      dict(prior_estimate='full', fit_separate_evidence_sd=True, spline_order=5)),
+    'DDM':          ('ddm_freescale_full.nc',               DDMRiskModel,                               df,      dict(prior_estimate='full', fit_separate_evidence_sd=True, fit_v_scale=True)),
+    'DDM-flex':     ('ddm_flex_freescale_full.nc',          DDMFlexibleNoiseRiskModel,                  df,      dict(prior_estimate='full', fit_separate_evidence_sd=True, spline_order=5, fit_v_scale=True)),
+    'RDM':          ('rdm_full.nc',                         RaceDiffusionRiskModel,                     df,      dict(prior_estimate='full', fit_separate_evidence_sd=True, advantage=True)),
+    'RDM-flex':     ('rdm_flex_full.nc',                    RaceDiffusionFlexibleNoiseRiskModel,        df,      dict(prior_estimate='full', fit_separate_evidence_sd=True, spline_order=5, advantage=True)),
     # regression on stimulation_condition (noise-only)
-    'choice-reg':       ('choice_reg_full.nc',                  RiskRegressionModel,                                df_reg, dict(regressors=NOISE_REG, prior_estimate='full', fit_seperate_evidence_sd=True)),
-    'choice-flex-reg':  ('choice_flex_reg_full.nc',             FlexibleNoiseRiskRegressionModel,                   df_reg, dict(regressors=NOISE_REG, prior_estimate='full', fit_seperate_evidence_sd=True, spline_order=5)),
-    'DDM-flex-reg':     ('ddm_flex_reg_freescale_full.nc',      DDMFlexibleNoiseRiskRegressionModel,                df_reg, dict(regressors=NOISE_REG, prior_estimate='full', fit_seperate_evidence_sd=True, spline_order=5, fit_v_scale=True)),
-    'RDM-flex-reg':     ('rdm_flex_reg_full.nc',                RaceDiffusionFlexibleNoiseRiskRegressionModel,      df_reg, dict(regressors=NOISE_REG, prior_estimate='full', fit_seperate_evidence_sd=True, spline_order=5, advantage=True)),
+    'choice-reg':       ('choice_reg_full.nc',                  RiskRegressionModel,                                df_reg, dict(regressors=NOISE_REG, prior_estimate='full', fit_separate_evidence_sd=True)),
+    'choice-flex-reg':  ('choice_flex_reg_full.nc',             FlexibleNoiseRiskRegressionModel,                   df_reg, dict(regressors=NOISE_REG, prior_estimate='full', fit_separate_evidence_sd=True, spline_order=5)),
+    'DDM-flex-reg':     ('ddm_flex_reg_freescale_full.nc',      DDMFlexibleNoiseRiskRegressionModel,                df_reg, dict(regressors=NOISE_REG, prior_estimate='full', fit_separate_evidence_sd=True, spline_order=5, fit_v_scale=True)),
+    'RDM-flex-reg':     ('rdm_flex_reg_full.nc',                RaceDiffusionFlexibleNoiseRiskRegressionModel,      df_reg, dict(regressors=NOISE_REG, prior_estimate='full', fit_separate_evidence_sd=True, spline_order=5, advantage=True)),
 }
 
 idatas, models = {}, {}

@@ -251,7 +251,7 @@ def main():
     print(f'  {len(df)} trials, {len(fit_subs)} subjects', flush=True)
 
     m_choice = RiskModel(paradigm=df, prior_estimate=args.prior_estimate,
-                          fit_seperate_evidence_sd=True)
+                          fit_separate_evidence_sd=True)
     m_choice.build_estimation_model(data=df, hierarchical=True)
     print('  Choice PPC...', flush=True)
     ppc_c = m_choice.ppc(df, idata_choice, progressbar=False)
@@ -263,7 +263,7 @@ def main():
         print(f'Loading {nc_ddm} ...', flush=True)
         idata_ddm = az.from_netcdf(nc_ddm)
         m_ddm = DDMRiskModel(paradigm=df, prior_estimate=args.prior_estimate,
-                              fit_seperate_evidence_sd=True, fit_v_scale=True)
+                              fit_separate_evidence_sd=True, fit_v_scale=True)
         m_ddm.build_estimation_model(data=df, hierarchical=True)
         print('  DDM PPC...', flush=True)
         ppc_d = m_ddm.ppc(df, idata_ddm, n_posterior_samples=120,

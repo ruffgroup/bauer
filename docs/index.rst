@@ -32,7 +32,7 @@ Quick start
    from bauer.utils.data import load_garcia2022
 
    data = load_garcia2022(task='magnitude')
-   model = MagnitudeComparisonModel(paradigm=data, fit_seperate_evidence_sd=True)
+   model = MagnitudeComparisonModel(paradigm=data, fit_separate_evidence_sd=True)
    model.build_estimation_model(data=data, hierarchical=True)
    idata = model.sample(draws=1000, tune=1000)
 

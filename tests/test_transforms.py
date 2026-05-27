@@ -33,7 +33,7 @@ def model(paradigm):
     transforms — built once, parameters annotated on construction."""
     from bauer.models import RiskModel
     return RiskModel(paradigm=paradigm, prior_estimate='shared',
-                     fit_seperate_evidence_sd=True)
+                     fit_separate_evidence_sd=True)
 
 
 def test_transforms_known_for_every_free_parameter(model):

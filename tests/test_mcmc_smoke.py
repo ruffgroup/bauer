@@ -135,7 +135,7 @@ def test_risk_model_sample(paradigm_risk):
     from bauer.models import RiskModel
     # RiskModel still accepts only the historical-spelling kwarg
     m = RiskModel(paradigm=paradigm_risk, prior_estimate='shared',
-                  fit_seperate_evidence_sd=True)
+                  fit_separate_evidence_sd=True)
     m.build_estimation_model(data=paradigm_risk, hierarchical=True)
     idata = m.sample(**SAMPLE_KWARGS)
     assert {'prior_mu', 'prior_sd'}.issubset(idata.posterior.data_vars)
@@ -177,7 +177,7 @@ def test_ddm_magnitude_model_sample_and_ppc(paradigm_magnitude):
 def test_race_diffusion_magnitude_model_sample(paradigm_magnitude):
     from bauer.models import RaceDiffusionMagnitudeComparisonModel
     m = RaceDiffusionMagnitudeComparisonModel(
-        paradigm=paradigm_magnitude, fit_seperate_evidence_sd=True,
+        paradigm=paradigm_magnitude, fit_separate_evidence_sd=True,
         fit_prior=True,
     )
     try:

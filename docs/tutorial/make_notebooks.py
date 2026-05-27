@@ -1220,7 +1220,7 @@ model_reg = RiskRegressionModel(
     paradigm=data_reg,
     regressors={'evidence_sd': 'C(format)'},
     prior_estimate='klw',
-    fit_seperate_evidence_sd=False,
+    fit_separate_evidence_sd=False,
 )
 model_reg.build_estimation_model(data=data_reg, hierarchical=True)
 idata_reg = model_reg.sample(draws=500, tune=500, chains=4, progressbar=False)
@@ -1317,8 +1317,8 @@ Standard models (EU, KLW with a shared noise) **cannot** capture this asymmetry.
 | Model | Class | Key parameters |
 |-------|-------|----------------|
 | Expected Utility (EU) | `ExpectedUtilityRiskModel` | `alpha`, `sigma` |
-| KLW | `RiskModel(prior_estimate='klw', fit_seperate_evidence_sd=False)` | `evidence_sd`, `prior_sd` (shared) |
-| Perceptual and Memory-based Choice Model (PMCM) | `RiskModel(prior_estimate='full', fit_seperate_evidence_sd=True)` | `n1_evidence_sd`, `n2_evidence_sd`, `risky/safe_prior_mu/sd` |
+| KLW | `RiskModel(prior_estimate='klw', fit_separate_evidence_sd=False)` | `evidence_sd`, `prior_sd` (shared) |
+| Perceptual and Memory-based Choice Model (PMCM) | `RiskModel(prior_estimate='full', fit_separate_evidence_sd=True)` | `n1_evidence_sd`, `n2_evidence_sd`, `risky/safe_prior_mu/sd` |
 
 We fit all three on both the **dot-cloud** (fMRI sessions 3T+7T) and the **symbolic**
 (Arabic numerals) datasets, then compare posterior predictives against the interaction
@@ -1483,7 +1483,7 @@ idata_eu = model_eu.sample(draws=100, tune=100, chains=2, progressbar=False,
 code("""\
 # ── 2. KLW (shared noise, shared prior) ─────────────────────────────────────
 model_klw = RiskModel(paradigm=df_dot, prior_estimate='klw',
-                      fit_seperate_evidence_sd=False)
+                      fit_separate_evidence_sd=False)
 model_klw.build_estimation_model(data=df_dot, hierarchical=True, save_p_choice=True)
 idata_klw = model_klw.sample(draws=100, tune=100, chains=2, progressbar=False,
                               idata_kwargs={'log_likelihood': True})
@@ -1492,7 +1492,7 @@ idata_klw = model_klw.sample(draws=100, tune=100, chains=2, progressbar=False,
 code("""\
 # ── 3. PMCM (separate noise + separate priors) ────────────────────
 model_full = RiskModel(paradigm=df_dot, prior_estimate='full',
-                       fit_seperate_evidence_sd=True)
+                       fit_separate_evidence_sd=True)
 model_full.build_estimation_model(data=df_dot, hierarchical=True, save_p_choice=True)
 idata_full = model_full.sample(draws=100, tune=100, chains=2, progressbar=False,
                                 idata_kwargs={'log_likelihood': True})
@@ -1633,7 +1633,7 @@ idata_eu_sym = model_eu_sym.sample(draws=100, tune=100, chains=2, progressbar=Fa
 code("""\
 # ── 2. KLW ───────────────────────────────────────────────────────────────────
 model_klw_sym = RiskModel(paradigm=df_sym, prior_estimate='klw',
-                           fit_seperate_evidence_sd=False)
+                           fit_separate_evidence_sd=False)
 model_klw_sym.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
 idata_klw_sym = model_klw_sym.sample(draws=100, tune=100, chains=2, progressbar=False,
                                           idata_kwargs={'log_likelihood': True})
@@ -1642,7 +1642,7 @@ idata_klw_sym = model_klw_sym.sample(draws=100, tune=100, chains=2, progressbar=
 code("""\
 # ── 3. PMCM ────────────────────────────────────────────────────────
 model_full_sym = RiskModel(paradigm=df_sym, prior_estimate='full',
-                            fit_seperate_evidence_sd=True)
+                            fit_separate_evidence_sd=True)
 model_full_sym.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
 idata_full_sym = model_full_sym.sample(draws=100, tune=100, chains=2, progressbar=False,
                                             idata_kwargs={'log_likelihood': True})
@@ -2063,9 +2063,9 @@ from bauer.models import (MagnitudeComparisonModel, FlexibleNoiseComparisonModel
 
 class AffineNoiseComparisonModel(FlexibleNoiseComparisonModel):
     # Magnitude-comparison model with affine noise: v(n) = softplus(b0 + b1*n_hat)
-    def __init__(self, paradigm, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm, fit_separate_evidence_sd=True,
                  fit_prior=False, memory_model='independent'):
-        super().__init__(paradigm, fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+        super().__init__(paradigm, fit_separate_evidence_sd=fit_separate_evidence_sd,
                          fit_prior=fit_prior, spline_order=2,
                          memory_model=memory_model)
 
@@ -2080,9 +2080,9 @@ class AffineNoiseComparisonModel(FlexibleNoiseComparisonModel):
 class AffineNoiseRiskModel(FlexibleNoiseRiskModel):
     # Risky-choice model with affine noise: v(n) = softplus(b0 + b1*n_hat)
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True, memory_model='independent'):
+                 fit_separate_evidence_sd=True, memory_model='independent'):
         super().__init__(paradigm, prior_estimate=prior_estimate,
-                         fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+                         fit_separate_evidence_sd=fit_separate_evidence_sd,
                          spline_order=2, memory_model=memory_model)
 
     def make_dm(self, x, variable='n1_evidence_sd'):
@@ -2178,7 +2178,7 @@ code("""\
 # MagnitudeComparisonModel (MCM) — fixed log-space noise (Weber's-law null)
 # idata_kwargs passes extra arguments to pymc.sample_posterior_predictive;
 # log_likelihood=True stores trial-level log-likelihoods needed for ELPD comparison.
-model_mcm = MagnitudeComparisonModel(paradigm=df_mag, fit_seperate_evidence_sd=True)
+model_mcm = MagnitudeComparisonModel(paradigm=df_mag, fit_separate_evidence_sd=True)
 model_mcm.build_estimation_model(data=df_mag, hierarchical=True)
 idata_mcm = model_mcm.sample(draws=200, tune=200, chains=4, progressbar=False,
                               idata_kwargs={'log_likelihood': True})
@@ -2187,7 +2187,7 @@ idata_mcm = model_mcm.sample(draws=200, tune=200, chains=4, progressbar=False,
 code("""\
 # FlexibleNoiseComparisonModel — free noise curve fitted to dot arrays
 model_flex_mag = FlexibleNoiseComparisonModel(paradigm=df_mag,
-                                               fit_seperate_evidence_sd=True,
+                                               fit_separate_evidence_sd=True,
                                                spline_order=5)
 model_flex_mag.build_estimation_model(paradigm=df_mag, hierarchical=True)
 idata_flex_mag = model_flex_mag.sample(draws=200, tune=200, chains=4, progressbar=False,
@@ -2197,7 +2197,7 @@ idata_flex_mag = model_flex_mag.sample(draws=200, tune=200, chains=4, progressba
 code("""\
 # AffineNoiseComparisonModel — intercept + linear noise (defined above)
 model_affine_mag = AffineNoiseComparisonModel(paradigm=df_mag,
-                                               fit_seperate_evidence_sd=True)
+                                               fit_separate_evidence_sd=True)
 model_affine_mag.build_estimation_model(paradigm=df_mag, hierarchical=True)
 idata_affine_mag = model_affine_mag.sample(draws=200, tune=200, chains=4, progressbar=False,
                                             idata_kwargs={'log_likelihood': True})
@@ -2351,7 +2351,7 @@ df_sym_p = prep_df(df_sym)
 code("""\
 # PMCM (fixed log-space noise) — log_likelihood stored for ELPD comparison
 model_pmcm = RiskModel(paradigm=df_sym, prior_estimate='full',
-                        fit_seperate_evidence_sd=True)
+                        fit_separate_evidence_sd=True)
 model_pmcm.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
 idata_pmcm = model_pmcm.sample(draws=200, tune=200, chains=4, progressbar=False,
                                 idata_kwargs={'log_likelihood': True})
@@ -2360,7 +2360,7 @@ idata_pmcm = model_pmcm.sample(draws=200, tune=200, chains=4, progressbar=False,
 code("""\
 # FlexibleNoiseRiskModel — free noise curve on Arabic-numeral data
 model_flex = FlexibleNoiseRiskModel(paradigm=df_sym, prior_estimate='full',
-                                     fit_seperate_evidence_sd=True, spline_order=5)
+                                     fit_separate_evidence_sd=True, spline_order=5)
 model_flex.build_estimation_model(paradigm=df_sym, hierarchical=True, save_p_choice=True)
 idata_flex = model_flex.sample(draws=200, tune=200, chains=4, progressbar=False,
                                 idata_kwargs={'log_likelihood': True})
@@ -2369,7 +2369,7 @@ idata_flex = model_flex.sample(draws=200, tune=200, chains=4, progressbar=False,
 code("""\
 # AffineNoiseRiskModel — intercept + linear noise for Arabic-numeral gambles
 model_affine = AffineNoiseRiskModel(paradigm=df_sym, prior_estimate='full',
-                                     fit_seperate_evidence_sd=True)
+                                     fit_separate_evidence_sd=True)
 model_affine.build_estimation_model(paradigm=df_sym, hierarchical=True, save_p_choice=True)
 idata_affine = model_affine.sample(draws=200, tune=200, chains=4, progressbar=False,
                                     idata_kwargs={'log_likelihood': True})
@@ -2700,11 +2700,11 @@ def split_data(df_mag, seed):
     return df_mag.iloc[a_rows], df_mag.iloc[b_rows]
 
 def fit_mle(data):
-    model = MagnitudeComparisonModel(paradigm=data, fit_seperate_evidence_sd=True)
+    model = MagnitudeComparisonModel(paradigm=data, fit_separate_evidence_sd=True)
     return model.fit_map_individual(data=data, flat_prior=True)
 
 def fit_hierarchical(data, draws=500, tune=500, chains=2):
-    model = MagnitudeComparisonModel(paradigm=data, fit_seperate_evidence_sd=True)
+    model = MagnitudeComparisonModel(paradigm=data, fit_separate_evidence_sd=True)
     model.build_estimation_model(data=data, hierarchical=True)
     idata = model.sample(draws=draws, tune=tune, chains=chains, progressbar=False)
     n_subj = len(data.index.unique(level='subject'))
@@ -4161,7 +4161,7 @@ code("""\
 
 m_ddm = DDMMagnitudeComparisonModel(
     paradigm=df,
-    fit_seperate_evidence_sd=True,   # allow ν_1 ≠ ν_2 (sequential task)
+    fit_separate_evidence_sd=True,   # allow ν_1 ≠ ν_2 (sequential task)
     fit_prior=True,                  # estimate Bayesian-observer prior μ_p, σ_p
 )
 idata_ddm = fit_or_load(m_ddm, 'ddm')
@@ -4404,7 +4404,7 @@ code("""\
 # notes/race_diffusion_math.md §5 for the identifiability geometry.
 m_rdm = RaceDiffusionMagnitudeComparisonModel(
     paradigm=df,
-    fit_seperate_evidence_sd=True,
+    fit_separate_evidence_sd=True,
     fit_prior=True,
     advantage=True,
 )
@@ -4585,7 +4585,7 @@ conclusions from the posterior.
 code("""\
 m_rdm_noadv = RaceDiffusionMagnitudeComparisonModel(
     paradigm=df,
-    fit_seperate_evidence_sd=True,
+    fit_separate_evidence_sd=True,
     fit_prior=True,
     advantage=False,   # the ablation
 )

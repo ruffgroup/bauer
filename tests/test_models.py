@@ -55,7 +55,7 @@ def paradigm_risk():
 def test_magnitude_model_builds(paradigm_magnitude):
     from bauer.models import MagnitudeComparisonModel
     m = MagnitudeComparisonModel(paradigm=paradigm_magnitude,
-                                 fit_seperate_evidence_sd=True, fit_prior=True)
+                                 fit_separate_evidence_sd=True, fit_prior=True)
     m.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
     assert 'a' not in m.free_parameters
     assert 'n1_evidence_sd' in m.free_parameters
@@ -68,7 +68,7 @@ def test_flexible_noise_builds(paradigm_magnitude):
     # spline_order=4 (df>=4) — patsy requires df >= degree+1 when an Intercept
     # is included.
     m = FlexibleNoiseComparisonModel(
-        paradigm=paradigm_magnitude, fit_seperate_evidence_sd=True,
+        paradigm=paradigm_magnitude, fit_separate_evidence_sd=True,
         spline_order=4, fit_prior=True,
     )
     m.build_estimation_model(paradigm=paradigm_magnitude, hierarchical=True)
@@ -79,7 +79,7 @@ def test_flexible_noise_builds(paradigm_magnitude):
 def test_risk_model_prior_estimates(paradigm_risk, prior_estimate):
     from bauer.models import RiskModel
     m = RiskModel(paradigm=paradigm_risk, prior_estimate=prior_estimate,
-                  fit_seperate_evidence_sd=True)
+                  fit_separate_evidence_sd=True)
     m.build_estimation_model(data=paradigm_risk, hierarchical=True)
     pars = set(m.free_parameters)
     expected_priors = {
@@ -100,7 +100,7 @@ def test_ddm_magnitude_models_build(paradigm_magnitude, cls_name, extras):
     pytest.importorskip('hssm')
     import bauer.models as M
     Cls = getattr(M, cls_name)
-    m = Cls(paradigm=paradigm_magnitude, fit_seperate_evidence_sd=True, **extras)
+    m = Cls(paradigm=paradigm_magnitude, fit_separate_evidence_sd=True, **extras)
     try:
         m.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
     except TypeError:
@@ -117,7 +117,7 @@ def test_ddm_risk_model_builds(paradigm_risk, cls_name, extras):
     import bauer.models as M
     Cls = getattr(M, cls_name)
     m = Cls(paradigm=paradigm_risk, prior_estimate='full',
-            fit_seperate_evidence_sd=True, **extras)
+            fit_separate_evidence_sd=True, **extras)
     m.build_estimation_model(data=paradigm_risk, hierarchical=True)
     assert {'a', 't0', 'risky_prior_mu', 'safe_prior_mu'}.issubset(m.free_parameters)
 
@@ -134,13 +134,13 @@ def test_rdm_models_build(paradigm_magnitude, paradigm_risk, cls_name):
     # to DDM only).
     if 'Risk' in cls_name:
         m = Cls(paradigm=paradigm_risk, prior_estimate='shared',
-                fit_seperate_evidence_sd=True)
+                fit_separate_evidence_sd=True)
         try:
             m.build_estimation_model(data=paradigm_risk, hierarchical=True)
         except TypeError:
             m.build_estimation_model(paradigm=paradigm_risk, hierarchical=True)
     else:
-        kwargs = {'fit_seperate_evidence_sd': True}
+        kwargs = {'fit_separate_evidence_sd': True}
         if 'Flexible' in cls_name:
             kwargs['spline_order'] = 4
         else:

@@ -179,7 +179,7 @@ DDMRiskRegressionModel(
     regressors={'n1_evidence_sd': 'C(domain)',
                 'n2_evidence_sd': 'C(domain)',
                 'a':              'C(domain)'},   # t0 NOT regressed (motor delay)
-    prior_estimate='full', fit_seperate_evidence_sd=True,
+    prior_estimate='full', fit_separate_evidence_sd=True,
     fit_v_scale=False, fix_z=True,
 )
 model.build_estimation_model(data=df, hierarchical=True)
@@ -213,7 +213,7 @@ regressors = {'n1_evidence_sd': 'C(domain)',
               'a':              'C(domain)'}
 model = DDMRiskRegressionModel(
     paradigm=df.reset_index(), regressors=regressors,
-    prior_estimate='full', fit_seperate_evidence_sd=True,
+    prior_estimate='full', fit_separate_evidence_sd=True,
     fit_v_scale=False, fix_z=True)
 model.build_estimation_model(data=df, hierarchical=True)
 

@@ -134,7 +134,7 @@ def main():
     def make_model(paradigm):
         return DDMRiskRegressionModel(
             paradigm=paradigm.reset_index(), regressors=regressors,
-            prior_estimate='full', fit_seperate_evidence_sd=True,
+            prior_estimate='full', fit_separate_evidence_sd=True,
             fit_v_scale=False, fix_z=True)
 
     def fit(model):

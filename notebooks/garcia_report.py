@@ -60,12 +60,12 @@ print(f'{len(df)} trials, {df.index.get_level_values("subject").nunique()} subje
 
 # %% Load all fits
 FITS = {
-    'choice':       (op.join(RES, 'choice.nc'),                   MagnitudeComparisonModel,                   dict(fit_seperate_evidence_sd=True, fit_prior=True)),
-    'DDM':          (op.join(RES, 'ddm_freescale.nc'),            DDMMagnitudeComparisonModel,                dict(fit_seperate_evidence_sd=True, fit_prior=True, fit_v_scale=True)),
-    'RDM':          (op.join(RES, 'rdm.nc'),                      RaceDiffusionMagnitudeComparisonModel,      dict(fit_seperate_evidence_sd=True, fit_prior=True, advantage=True)),
-    'choice-flex':  (op.join(RES, 'choice_flex.nc'),              FlexibleNoiseComparisonModel,               dict(fit_seperate_evidence_sd=True, fit_prior=True, spline_order=5)),
-    'DDM-flex':     (op.join(RES, 'ddm_flex_fixedscale.nc'),      DDMFlexibleNoiseComparisonModel,            dict(fit_seperate_evidence_sd=True, fit_prior=True, spline_order=5, fit_v_scale=False)),
-    'RDM-flex':     (op.join(RES, 'rdm_flex.nc'),                 RaceDiffusionFlexibleNoiseComparisonModel,  dict(fit_seperate_evidence_sd=True, fit_prior=True, spline_order=5, advantage=True)),
+    'choice':       (op.join(RES, 'choice.nc'),                   MagnitudeComparisonModel,                   dict(fit_separate_evidence_sd=True, fit_prior=True)),
+    'DDM':          (op.join(RES, 'ddm_freescale.nc'),            DDMMagnitudeComparisonModel,                dict(fit_separate_evidence_sd=True, fit_prior=True, fit_v_scale=True)),
+    'RDM':          (op.join(RES, 'rdm.nc'),                      RaceDiffusionMagnitudeComparisonModel,      dict(fit_separate_evidence_sd=True, fit_prior=True, advantage=True)),
+    'choice-flex':  (op.join(RES, 'choice_flex.nc'),              FlexibleNoiseComparisonModel,               dict(fit_separate_evidence_sd=True, fit_prior=True, spline_order=5)),
+    'DDM-flex':     (op.join(RES, 'ddm_flex_fixedscale.nc'),      DDMFlexibleNoiseComparisonModel,            dict(fit_separate_evidence_sd=True, fit_prior=True, spline_order=5, fit_v_scale=False)),
+    'RDM-flex':     (op.join(RES, 'rdm_flex.nc'),                 RaceDiffusionFlexibleNoiseComparisonModel,  dict(fit_separate_evidence_sd=True, fit_prior=True, spline_order=5, advantage=True)),
 }
 
 idatas, models = {}, {}

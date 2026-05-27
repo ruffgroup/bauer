@@ -62,7 +62,7 @@ def prepare(df):
 
 
 def build(model_kind, df):
-    common = dict(prior_estimate='full', fit_seperate_evidence_sd=True,
+    common = dict(prior_estimate='full', fit_separate_evidence_sd=True,
                   fit_v_scale=False, fix_z=True)
     if model_kind == 'basic':
         m = DDMRiskModel(paradigm=df.reset_index(), **common)

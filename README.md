@@ -30,7 +30,7 @@ df = load_garcia2022(task='magnitude')
 
 # Race-diffusion with advantage decomposition (default)
 m = RaceDiffusionMagnitudeComparisonModel(
-    paradigm=df, fit_prior=True, fit_seperate_evidence_sd=True,
+    paradigm=df, fit_prior=True, fit_separate_evidence_sd=True,
 )
 m.build_estimation_model(data=df, hierarchical=True)
 idata = m.sample(draws=1000, tune=1000, chains=4)
