@@ -71,7 +71,15 @@ relative to that basis.
 ## If a fit won't converge
 
 1. Confirm you filtered `rt < 0.20 s`.
-2. **Weak data?** If `P(choice) ≈ 0.5` in some condition, the drift carries
+2. **One stuck chain on a big hierarchical fit?** Even with the finder, a single
+   chain can occasionally wander off and stay there (chance), inflating r̂ across
+   many parameters at once. Diagnose with an outlier-chain tally (if ~one chain
+   accounts for most of the high-r̂ params, that's it); the other chains are
+   fine. Just re-run with a different `random_seed` (and/or a longer `tune`).
+   Judge convergence on the **group-level** (`*_mu`) r̂; a handful of
+   weakly-identified subject params with mild r̂ (≤~1.05) is normal — don't
+   chase it.
+3. **Weak data?** If `P(choice) ≈ 0.5` in some condition, the drift carries
    little information and the posterior is genuinely broad — no sampler setting
    fixes that. Drop the regression on parameters the covariate shouldn't move
    (often `a`, `t0`), and/or fit a pilot subject as-is and re-fit
