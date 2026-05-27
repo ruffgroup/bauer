@@ -1297,7 +1297,7 @@ md(r"""# Lesson 3: Stake effects and presentation order — de Hollander et al. 
 
 ## Background
 
-De Hollander et al. (2024, *Nature Human Behaviour*) tested whether perceptual noise
+De Hollander et al. (2024, *bioRxiv* preprint) tested whether perceptual noise
 during the encoding of numerical magnitudes explains risk aversion and its interaction
 with presentation order.  The key design feature: the **order** in which the safe and
 risky options are presented is randomised across trials, allowing the model to disentangle
@@ -1318,7 +1318,7 @@ Standard models (EU, KLW with a shared noise) **cannot** capture this asymmetry.
 |-------|-------|----------------|
 | Expected Utility (EU) | `ExpectedUtilityRiskModel` | `alpha`, `sigma` |
 | KLW | `RiskModel(prior_estimate='klw', fit_seperate_evidence_sd=False)` | `evidence_sd`, `prior_sd` (shared) |
-| PMCM | `RiskModel(prior_estimate='full', fit_seperate_evidence_sd=True)` | `n1_evidence_sd`, `n2_evidence_sd`, `risky/safe_prior_mu/sd` |
+| Perceptual and Memory-based Choice Model (PMCM) | `RiskModel(prior_estimate='full', fit_seperate_evidence_sd=True)` | `n1_evidence_sd`, `n2_evidence_sd`, `risky/safe_prior_mu/sd` |
 
 We fit all three on both the **dot-cloud** (fMRI sessions 3T+7T) and the **symbolic**
 (Arabic numerals) datasets, then compare posterior predictives against the interaction
@@ -2667,7 +2667,7 @@ half_b_full = df_mag.iloc[half_b_rows]
 print(f"Half A: {len(half_a_full)} trials,  Half B: {len(half_b_full)} trials")
 """),
 
-md(r"""## Split-half analysis: 10 random splits $\times$ 5 trial counts
+md(r"""## Split-half analysis: 3 random splits $\times$ 3 trial counts
 
 For each trial count (25, 50, 108) we:
 1. Randomly split each subject's data into two halves
@@ -2675,7 +2675,7 @@ For each trial count (25, 50, 108) we:
 3. Fit MLE and hierarchical Bayes on each half
 4. Correlate the parameter estimates across halves
 
-We repeat this 10 times with different random splits to get a stable estimate of
+We repeat this 3 times with different random splits to get a stable estimate of
 reliability.  Three correlation metrics are shown: Spearman $\rho$, Pearson $r$,
 and $R^2$.
 """),
