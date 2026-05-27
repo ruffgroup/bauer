@@ -146,9 +146,9 @@ class LogEncodingEstimationModel(EstimationBaseModel):
         self.unique_stimuli = np.sort(paradigm['n'].unique().astype(float))
 
     def build_estimation_model(self, data=None, coords=None, hierarchical=True,
-                               save_p_choice=False, flat_prior=False):
+                               save_p_choice=False, flat_prior=False, paradigm=None):
         if data is None:
-            data = self.paradigm
+            data = paradigm if paradigm is not None else self.paradigm
         self._setup_grids(data)
         super().build_estimation_model(data, coords, hierarchical, save_p_choice, flat_prior)
 
@@ -390,9 +390,9 @@ class FlexibleEncodingEstimationModel(LogEncodingEstimationModel):
         return super().get_trialwise_variable(key)
 
     def build_estimation_model(self, data=None, coords=None, hierarchical=True,
-                               save_p_choice=False, flat_prior=False):
+                               save_p_choice=False, flat_prior=False, paradigm=None):
         if data is None:
-            data = self.paradigm
+            data = paradigm if paradigm is not None else self.paradigm
         self._setup_grids(data)
 
         if coords is None and hierarchical:

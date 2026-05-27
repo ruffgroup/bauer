@@ -25,7 +25,7 @@ class MagnitudeComparisonModel(BaseModel):
         Must contain columns ``n1``, ``n2``, and ``choice``.
     fit_prior : bool
         If True, fit ``prior_mu`` and ``prior_sd`` as free parameters.
-    fit_seperate_evidence_sd : bool
+    fit_separate_evidence_sd : bool
         If True, fit separate noise parameters for n1 and n2 (or perceptual/memory noise
         when ``memory_model='shared_perceptual_noise'``).
     memory_model : {'independent', 'shared_perceptual_noise'}
@@ -33,22 +33,9 @@ class MagnitudeComparisonModel(BaseModel):
         ``'shared_perceptual_noise'`` decomposes into perceptual and memory noise.
     """
 
-    def __init__(self, paradigm=None, fit_prior=False, fit_seperate_evidence_sd=None,
+    def __init__(self, paradigm=None, fit_prior=False, fit_separate_evidence_sd=None,
                  memory_model='independent', save_trialwise_n_estimates=False,
-                 fit_prior_mu_only=False, flat_observer_prior=False,
-                 fit_separate_evidence_sd=None):
-        # Accept both spellings — `fit_separate_evidence_sd` (correct) is the
-        # canonical kwarg; `fit_seperate_evidence_sd` (the historical typo)
-        # is still accepted but emits a DeprecationWarning.
-        if fit_seperate_evidence_sd is not None and fit_separate_evidence_sd is None:
-            import warnings
-            warnings.warn(
-                "`fit_seperate_evidence_sd` is misspelled; use "
-                "`fit_separate_evidence_sd` instead. The old spelling will "
-                "be removed in a future bauer release.",
-                DeprecationWarning, stacklevel=2,
-            )
-            fit_separate_evidence_sd = fit_seperate_evidence_sd
+                 fit_prior_mu_only=False, flat_observer_prior=False):
         if fit_separate_evidence_sd is None:
             fit_separate_evidence_sd = True
 
@@ -63,9 +50,6 @@ class MagnitudeComparisonModel(BaseModel):
         self.fit_prior = fit_prior
         self.fit_prior_mu_only = fit_prior_mu_only
         self.fit_separate_evidence_sd = fit_separate_evidence_sd
-        # Backward-compat attribute alias — existing subclasses/scripts
-        # read `self.fit_seperate_evidence_sd`; keep both attributes in sync.
-        self.fit_seperate_evidence_sd = fit_separate_evidence_sd
         self.memory_model = memory_model
         self.flat_observer_prior = flat_observer_prior
 
@@ -111,7 +95,7 @@ class MagnitudeComparisonModel(BaseModel):
 
         model_inputs['threshold'] = 0.0
 
-        if self.fit_seperate_evidence_sd:
+        if self.fit_separate_evidence_sd:
             if self.memory_model == 'independent':
                 model_inputs['n1_evidence_sd'] = parameters['n1_evidence_sd']
                 model_inputs['n2_evidence_sd'] = parameters['n2_evidence_sd']
@@ -145,7 +129,7 @@ class MagnitudeComparisonModel(BaseModel):
         # which breaks the basic DDM (subjects genuinely differ).
         TIGHT_SLOPE = {'cauchy_sigma_regressors': 0.1}
 
-        if self.fit_seperate_evidence_sd:
+        if self.fit_separate_evidence_sd:
             if self.memory_model == 'independent':
                 free_parameters['n1_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus', **TIGHT_SLOPE}
                 free_parameters['n2_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus', **TIGHT_SLOPE}
@@ -195,15 +179,11 @@ class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonMod
 
     def __init__(self, paradigm, regressors, fit_prior=False,
                  fit_separate_evidence_sd=None, memory_model='independent',
-                 save_trialwise_estimates=False,
-                 fit_seperate_evidence_sd=None):
-        # Accept both spellings; MagnitudeComparisonModel emits the
-        # DeprecationWarning on the old one.
+                 save_trialwise_estimates=False):
         RegressionModel.__init__(self, regressors)
         MagnitudeComparisonModel.__init__(
             self, paradigm=paradigm, fit_prior=fit_prior,
             fit_separate_evidence_sd=fit_separate_evidence_sd,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
             memory_model=memory_model,
             save_trialwise_n_estimates=save_trialwise_estimates,
         )
@@ -231,12 +211,12 @@ class FlexibleNoiseComparisonModel(BaseModel):
         Must contain columns ``n1``, ``n2``, and ``choice``.
     spline_order : int or tuple of int
         Order(s) of the polynomial for the noise curve (one per prospect when
-        ``fit_seperate_evidence_sd=True``).
+        ``fit_separate_evidence_sd=True``).
     memory_model : {'independent', 'shared_perceptual_noise'}
         Noise decomposition; see :class:`MagnitudeComparisonModel`.
     """
 
-    def __init__(self, paradigm, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm, fit_separate_evidence_sd=True,
                  fit_prior=False,
                  spline_order=5,
                  memory_model='independent',
@@ -251,12 +231,12 @@ class FlexibleNoiseComparisonModel(BaseModel):
         self.fit_prior = fit_prior
         self.fit_prior_mu_only = fit_prior_mu_only
         self.flat_observer_prior = flat_observer_prior
-        self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
+        self.fit_separate_evidence_sd = fit_separate_evidence_sd
 
-        if ~fit_seperate_evidence_sd and (memory_model != 'independent'):
+        if ~fit_separate_evidence_sd and (memory_model != 'independent'):
             raise ValueError('Single evidence_sd can only be used with memory_model=independent')
 
-        if (type(spline_order) is int) and fit_seperate_evidence_sd:
+        if (type(spline_order) is int) and fit_separate_evidence_sd:
             spline_order = spline_order, spline_order
 
         self.spline_order = spline_order
@@ -290,7 +270,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
         raise ValueError(f"Unknown spline variable {variable!r}")
 
     def _spline_order_for(self, variable):
-        if not self.fit_seperate_evidence_sd:
+        if not self.fit_separate_evidence_sd:
             return self.spline_order
         if variable in ('n1_evidence_sd', 'perceptual_noise_sd'):
             return self.spline_order[0]
@@ -301,7 +281,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
     def _initialize_design_infos(self):
         """Eagerly build and cache spline design_info for each variable this
         model will use, anchored to the paradigm columns."""
-        if self.fit_seperate_evidence_sd:
+        if self.fit_separate_evidence_sd:
             if self.memory_model == 'independent':
                 variables = ['n1_evidence_sd', 'n2_evidence_sd']
             elif self.memory_model == 'shared_perceptual_noise':
@@ -327,12 +307,13 @@ class FlexibleNoiseComparisonModel(BaseModel):
         dm = dmatrix(formula, {"x": x})
         self._dm_design_infos[variable] = dm.design_info
 
-    def build_estimation_model(self, paradigm=None, coords=None, hierarchical=True, save_p_choice=False):
+    def build_estimation_model(self, paradigm=None, coords=None, hierarchical=True, save_p_choice=False, data=None):
 
         coords = {}
 
+        # `data` and `paradigm` are accepted synonyms (no deprecation); paradigm wins if both given.
         if paradigm is None:
-            paradigm = self.paradigm
+            paradigm = data if data is not None else self.paradigm
 
         if hierarchical and ('subject' not in coords.keys()):
             assert ('subject' in paradigm.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
@@ -388,7 +369,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
 
         free_parameters = {}
 
-        if self.fit_seperate_evidence_sd:
+        if self.fit_separate_evidence_sd:
             key1, key2 = self._get_evidence_sd_labels()
 
             for n in range(1, self.spline_order[0]+1):
@@ -418,7 +399,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
         return free_parameters
 
     def _get_evidence_sd_spline_par_labels(self):
-        if self.fit_seperate_evidence_sd:
+        if self.fit_separate_evidence_sd:
             key1, key2 = self._get_evidence_sd_labels()
             label1 = [f'{key1}_spline{n}' for n in range(1, self.spline_order[0]+1)]
             label2 = [f'{key2}_spline{n}' for n in range(1, self.spline_order[1]+1)]
@@ -513,7 +494,7 @@ class FlexibleNoiseComparisonModel(BaseModel):
             return n1_evidence_sd.join(n2_evidence_sd)
 
         if variable == 'evidence_sd':
-            assert (not self.fit_seperate_evidence_sd), "Single evidence_sd only when not fit_seperate_evidence_sd."
+            assert (not self.fit_separate_evidence_sd), "Single evidence_sd only when not fit_separate_evidence_sd."
 
             evidence_sd = self.get_sd_curve(idata, x=x, variable='n1_evidence_sd', group=group, hierarchical=hierarchical, data=data)
 
@@ -633,12 +614,12 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
 
     def __init__(self, paradigm,
                  regressors,
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  fit_prior=False,
                  spline_order=5,
                  memory_model='independent'):
 
-        if (type(spline_order) is int) and fit_seperate_evidence_sd:
+        if (type(spline_order) is int) and fit_separate_evidence_sd:
             spline_order = spline_order, spline_order
 
         for key in list(regressors.keys()):
@@ -660,7 +641,7 @@ class FlexibleNoiseComparisonRegressionModel(RegressionModel, FlexibleNoiseCompa
                 regressors.pop(key)
 
         RegressionModel.__init__(self, regressors)
-        FlexibleNoiseComparisonModel.__init__(self, paradigm, fit_seperate_evidence_sd, fit_prior,
+        FlexibleNoiseComparisonModel.__init__(self, paradigm, fit_separate_evidence_sd, fit_prior,
                                               spline_order, memory_model)
 
 
@@ -696,7 +677,7 @@ class PowerLawNoiseComparisonModel(BaseModel):
     ----------
     paradigm : pd.DataFrame
         Must contain columns ``n1``, ``n2``, ``choice``.
-    fit_seperate_evidence_sd : bool
+    fit_separate_evidence_sd : bool
         If True (default) fit separate log-SD intercepts for n1 and n2.
     fit_prior : bool
         If True, estimate the prior mean and SD as free parameters.
@@ -704,7 +685,7 @@ class PowerLawNoiseComparisonModel(BaseModel):
         ``'independent'`` (default) or ``'shared_perceptual_noise'``.
     """
 
-    def __init__(self, paradigm=None, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm=None, fit_separate_evidence_sd=True,
                  fit_prior=False, memory_model='independent',
                  save_trialwise_n_estimates=False,
                  flat_observer_prior=False):
@@ -713,7 +694,7 @@ class PowerLawNoiseComparisonModel(BaseModel):
                              "(the prior is being switched off entirely).")
         self.fit_prior = fit_prior
         self.flat_observer_prior = flat_observer_prior
-        self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
+        self.fit_separate_evidence_sd = fit_separate_evidence_sd
         self.memory_model = memory_model
         super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
@@ -741,7 +722,7 @@ class PowerLawNoiseComparisonModel(BaseModel):
 
         noise_exponent = parameters['noise_exponent']
 
-        if self.fit_seperate_evidence_sd:
+        if self.fit_separate_evidence_sd:
             if self.memory_model == 'independent':
                 model_inputs['n1_evidence_sd'] = pt.exp(
                     parameters['n1_log_sd_intercept'] + noise_exponent * pt.log(model['n1']))
@@ -770,7 +751,7 @@ class PowerLawNoiseComparisonModel(BaseModel):
 
         free_parameters = {}
 
-        if self.fit_seperate_evidence_sd:
+        if self.fit_separate_evidence_sd:
             if self.memory_model == 'independent':
                 free_parameters['n1_log_sd_intercept'] = {'mu_intercept': 0., 'transform': 'identity'}
                 free_parameters['n2_log_sd_intercept'] = {'mu_intercept': 0., 'transform': 'identity'}
@@ -840,7 +821,7 @@ class PowerLawNoiseComparisonModel(BaseModel):
             x = np.exp(np.linspace(np.log(min_n), np.log(max_n), 50))
         x = np.asarray(x, dtype=float)
 
-        if self.fit_seperate_evidence_sd:
+        if self.fit_separate_evidence_sd:
             intercept_key = 'n1_log_sd_intercept' if variable == 'n1_evidence_sd' else 'n2_log_sd_intercept'
         else:
             intercept_key = 'log_sd_intercept'
@@ -861,11 +842,11 @@ class PowerLawNoiseComparisonModel(BaseModel):
 
 class PowerLawNoiseComparisonRegressionModel(RegressionModel, PowerLawNoiseComparisonModel):
 
-    def __init__(self, paradigm, regressors, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm, regressors, fit_separate_evidence_sd=True,
                  fit_prior=False, memory_model='independent',
                  save_trialwise_n_estimates=False):
         RegressionModel.__init__(self, regressors)
-        PowerLawNoiseComparisonModel.__init__(self, paradigm, fit_seperate_evidence_sd,
+        PowerLawNoiseComparisonModel.__init__(self, paradigm, fit_separate_evidence_sd,
                                               fit_prior, memory_model, save_trialwise_n_estimates)
 
 
@@ -902,7 +883,7 @@ class PowerLawEncodingComparisonModel(BaseModel):
     ----------
     paradigm : pd.DataFrame
         Must contain columns ``n1``, ``n2``, ``choice``.
-    fit_seperate_evidence_sd : bool
+    fit_separate_evidence_sd : bool
         If True (default), fit separate noise SDs for n1 and n2 in representation space.
         Useful when n1 is held in memory (adding memory noise).
     fit_prior : bool
@@ -910,10 +891,10 @@ class PowerLawEncodingComparisonModel(BaseModel):
         If False, the prior is set to the empirical distribution of n^alpha.
     """
 
-    def __init__(self, paradigm=None, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm=None, fit_separate_evidence_sd=True,
                  fit_prior=False, save_trialwise_n_estimates=False):
         self.fit_prior = fit_prior
-        self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
+        self.fit_separate_evidence_sd = fit_separate_evidence_sd
         super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
 
     def get_model_inputs(self, parameters):
@@ -943,7 +924,7 @@ class PowerLawEncodingComparisonModel(BaseModel):
         model_inputs['n1_evidence_mu'] = n1_rep
         model_inputs['n2_evidence_mu'] = n2_rep
 
-        if self.fit_seperate_evidence_sd:
+        if self.fit_separate_evidence_sd:
             model_inputs['n1_evidence_sd'] = parameters['n1_evidence_sd']
             model_inputs['n2_evidence_sd'] = parameters['n2_evidence_sd']
         else:
@@ -958,7 +939,7 @@ class PowerLawEncodingComparisonModel(BaseModel):
 
         free_parameters['alpha'] = {'mu_intercept': 0.5, 'sigma_intercept': 1., 'transform': 'identity'}
 
-        if self.fit_seperate_evidence_sd:
+        if self.fit_separate_evidence_sd:
             free_parameters['n1_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
             free_parameters['n2_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
         else:
@@ -994,8 +975,8 @@ class PowerLawEncodingComparisonModel(BaseModel):
 class PowerLawEncodingComparisonRegressionModel(RegressionModel, PowerLawEncodingComparisonModel):
     """PowerLawEncodingComparisonModel with patsy formula regression on any free parameter."""
 
-    def __init__(self, paradigm, regressors, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm, regressors, fit_separate_evidence_sd=True,
                  fit_prior=False, save_trialwise_n_estimates=False):
         RegressionModel.__init__(self, regressors)
-        PowerLawEncodingComparisonModel.__init__(self, paradigm, fit_seperate_evidence_sd,
+        PowerLawEncodingComparisonModel.__init__(self, paradigm, fit_separate_evidence_sd,
                                                  fit_prior, save_trialwise_n_estimates)

@@ -544,7 +544,7 @@ class RiskModel(BaseModel):
         Gaussian shared across options; ``klw`` = Khaw-Li-Woodford style
         (empirical ``mu``, fitted ``sd``); ``full`` = separate fitted
         ``(mu, sd)`` for the risky and safe options.
-    fit_seperate_evidence_sd : bool
+    fit_separate_evidence_sd : bool
         Fit separate encoding noise for n1 and n2 (default ``True``).
     memory_model : {'independent', 'shared_perceptual_noise'}
         Noise structure; see :class:`MagnitudeComparisonModel`.
@@ -554,11 +554,11 @@ class RiskModel(BaseModel):
     _VALID_PRIORS = ('objective', 'shared', 'full', 'klw')
 
     def __init__(self, paradigm=None, prior_estimate='objective',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, memory_model='independent'):
         assert prior_estimate in self._VALID_PRIORS, \
             f'prior_estimate must be one of {self._VALID_PRIORS}'
-        self.fit_seperate_evidence_sd = fit_seperate_evidence_sd
+        self.fit_separate_evidence_sd = fit_separate_evidence_sd
         self.memory_model = memory_model
         self.prior_estimate = prior_estimate
         super().__init__(paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates)
@@ -609,7 +609,7 @@ class RiskModel(BaseModel):
             model_inputs['n1_prior_sd'] = parameters['prior_sd']
             model_inputs['n2_prior_sd'] = model_inputs['n1_prior_sd']
 
-        if self.fit_seperate_evidence_sd:
+        if self.fit_separate_evidence_sd:
 
             if self.memory_model == 'independent':
                 model_inputs['n1_evidence_sd'] = parameters['n1_evidence_sd']
@@ -633,7 +633,7 @@ class RiskModel(BaseModel):
 
         free_parameters = {}
 
-        if self.fit_seperate_evidence_sd:
+        if self.fit_separate_evidence_sd:
             if self.memory_model == 'independent':
                 free_parameters['n1_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
                 free_parameters['n2_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
@@ -709,10 +709,10 @@ class RiskRegressionModel(RegressionModel, RiskModel):
     """RiskModel with patsy formula regression on noise, prior, or bias parameters."""
 
     def __init__(self, paradigm, regressors, prior_estimate='objective',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, memory_model='independent'):
         RegressionModel.__init__(self, regressors)
-        RiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd,
+        RiskModel.__init__(self, paradigm, prior_estimate, fit_separate_evidence_sd,
                            save_trialwise_n_estimates=save_trialwise_n_estimates,
                            memory_model=memory_model)
 
@@ -761,7 +761,7 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
     """Risky choice model combining flexible (polynomial) noise with Bayesian magnitude inference."""
 
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, spline_order=5,
+                 fit_separate_evidence_sd=True, save_trialwise_n_estimates=False, spline_order=5,
                  representational_noise='payoff',
                  memory_model='independent'):
 
@@ -771,7 +771,7 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
         if representational_noise not in ['payoff', 'ev']:
             raise ValueError(f'Unknown representational noise: {representational_noise} (should be "payoff" or "ev")')
 
-        if (type(spline_order) is int) and fit_seperate_evidence_sd:
+        if (type(spline_order) is int) and fit_separate_evidence_sd:
             spline_order = spline_order, spline_order
 
         self.spline_order = spline_order
@@ -779,7 +779,7 @@ class FlexibleNoiseRiskModel(FlexibleNoiseComparisonModel, RiskModel):
         self.representational_noise = representational_noise
 
         RiskModel.__init__(self, paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates,
-                           fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+                           fit_separate_evidence_sd=fit_separate_evidence_sd,
                            prior_estimate=prior_estimate,
                            memory_model=memory_model)
         # FlexibleNoiseComparisonModel.__init__ is skipped by the explicit
@@ -943,11 +943,11 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
     def __init__(self, paradigm,
                  regressors,
                  prior_estimate='full',
-                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False, spline_order=5,
+                 fit_separate_evidence_sd=True, save_trialwise_n_estimates=False, spline_order=5,
                  representational_noise='payoff',
                  memory_model='independent'):
 
-        if (type(spline_order) is int) and fit_seperate_evidence_sd:
+        if (type(spline_order) is int) and fit_separate_evidence_sd:
             spline_order = spline_order, spline_order
 
         for key in list(regressors.keys()):
@@ -967,7 +967,7 @@ class FlexibleNoiseRiskRegressionModel(RegressionModel, FlexibleNoiseRiskModel):
                 regressors.pop(key)
 
         RegressionModel.__init__(self, regressors)
-        FlexibleNoiseRiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd, save_trialwise_n_estimates,
+        FlexibleNoiseRiskModel.__init__(self, paradigm, prior_estimate, fit_separate_evidence_sd, save_trialwise_n_estimates,
                                         spline_order, representational_noise, memory_model)
 
     def get_sd_curve(self, conditions, idata=None, pars=None, x=None, variable='n1_evidence_sd', group=True, hierarchical=True, data=None):
@@ -1175,12 +1175,12 @@ class PowerLawNoiseRiskModel(PowerLawNoiseComparisonModel, RiskModel):
     paradigm : pd.DataFrame
     prior_estimate : str
         ``'full'`` (default), ``'shared'``, or ``'fix_prior_sd'``.
-    fit_seperate_evidence_sd : bool
+    fit_separate_evidence_sd : bool
     memory_model : str
     """
 
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False,
+                 fit_separate_evidence_sd=True, save_trialwise_n_estimates=False,
                  memory_model='independent'):
 
         if prior_estimate not in ['shared', 'full', 'fix_prior_sd']:
@@ -1189,7 +1189,7 @@ class PowerLawNoiseRiskModel(PowerLawNoiseComparisonModel, RiskModel):
         self.prior_estimate = prior_estimate
 
         RiskModel.__init__(self, paradigm, save_trialwise_n_estimates=save_trialwise_n_estimates,
-                           fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+                           fit_separate_evidence_sd=fit_separate_evidence_sd,
                            prior_estimate=prior_estimate,
                            memory_model=memory_model)
 
@@ -1222,7 +1222,7 @@ class PowerLawNoiseRiskModel(PowerLawNoiseComparisonModel, RiskModel):
 
         noise_exponent = parameters['noise_exponent']
 
-        if self.fit_seperate_evidence_sd:
+        if self.fit_separate_evidence_sd:
             model_inputs['n1_evidence_sd'] = pt.exp(
                 parameters['n1_log_sd_intercept'] + noise_exponent * pt.log(model['n1']))
             model_inputs['n2_evidence_sd'] = pt.exp(
@@ -1307,10 +1307,10 @@ class PowerLawNoiseRiskModel(PowerLawNoiseComparisonModel, RiskModel):
 class PowerLawNoiseRiskRegressionModel(RegressionModel, PowerLawNoiseRiskModel):
 
     def __init__(self, paradigm, regressors, prior_estimate='full',
-                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False,
+                 fit_separate_evidence_sd=True, save_trialwise_n_estimates=False,
                  memory_model='independent'):
         RegressionModel.__init__(self, regressors)
-        PowerLawNoiseRiskModel.__init__(self, paradigm, prior_estimate, fit_seperate_evidence_sd,
+        PowerLawNoiseRiskModel.__init__(self, paradigm, prior_estimate, fit_separate_evidence_sd,
                                         save_trialwise_n_estimates, memory_model)
 
 
@@ -1325,10 +1325,10 @@ class AffineNoiseRiskModel(FlexibleNoiseRiskModel):
     """
 
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True, save_trialwise_n_estimates=False,
+                 fit_separate_evidence_sd=True, save_trialwise_n_estimates=False,
                  memory_model='independent'):
         super().__init__(paradigm, prior_estimate=prior_estimate,
-                         fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+                         fit_separate_evidence_sd=fit_separate_evidence_sd,
                          save_trialwise_n_estimates=save_trialwise_n_estimates,
                          spline_order=2,
                          memory_model=memory_model)

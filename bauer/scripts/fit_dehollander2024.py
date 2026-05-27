@@ -77,7 +77,7 @@ def main():
           f'v_scale={args.v_scale}', flush=True)
 
     common = dict(paradigm=df, prior_estimate=args.prior_estimate,
-                  fit_seperate_evidence_sd=True)
+                  fit_separate_evidence_sd=True)
     if args.flex:
         common['spline_order'] = args.spline_order
     if args.model == 'choice':

@@ -92,7 +92,7 @@ def main():
     df_use = df.reset_index().set_index('subject') if args.regression else df
 
     common = dict(paradigm=df_use, prior_estimate=args.prior_estimate,
-                  fit_seperate_evidence_sd=True)
+                  fit_separate_evidence_sd=True)
     if args.flex:
         common['spline_order'] = args.spline_order
 

@@ -196,9 +196,9 @@ class EfficientPerceptionModel(EstimationBaseModel):
             self.unique_orientations_rad, self.ori_grid, self.ori_cdf)
 
     def build_estimation_model(self, data=None, coords=None, hierarchical=True,
-                               save_p_choice=False, flat_prior=False):
+                               save_p_choice=False, flat_prior=False, paradigm=None):
         if data is None:
-            data = self.paradigm
+            data = paradigm if paradigm is not None else self.paradigm
         self._setup_grids(data)
         super().build_estimation_model(data, coords, hierarchical, save_p_choice, flat_prior)
 
@@ -366,9 +366,9 @@ class EfficientValuationModel(EstimationBaseModel):
             self.val_cdfs[mapping] = cdf
 
     def build_estimation_model(self, data=None, coords=None, hierarchical=True,
-                               save_p_choice=False, flat_prior=False):
+                               save_p_choice=False, flat_prior=False, paradigm=None):
         if data is None:
-            data = self.paradigm
+            data = paradigm if paradigm is not None else self.paradigm
         self._setup_grids(data)
         super().build_estimation_model(data, coords, hierarchical, save_p_choice, flat_prior)
 

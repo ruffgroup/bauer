@@ -603,16 +603,13 @@ class DDMMagnitudeComparisonRegressionModel(DDMMixin, MagnitudeComparisonRegress
     def __init__(self, paradigm, regressors, fit_prior=False,
                  fit_separate_evidence_sd=None, memory_model='independent',
                  save_trialwise_estimates=False,
-                 fit_v_scale=False, fix_z=True,
-                 fit_seperate_evidence_sd=None):
+                 fit_v_scale=False, fix_z=True):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
-        # Both spellings forwarded; the alias-handling happens one level down.
         MagnitudeComparisonRegressionModel.__init__(
             self, paradigm, regressors,
             fit_prior=fit_prior,
             fit_separate_evidence_sd=fit_separate_evidence_sd,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
             memory_model=memory_model,
             save_trialwise_estimates=save_trialwise_estimates,
         )
@@ -638,11 +635,11 @@ class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
     ----------
     fit_v_scale : bool
         See :class:`DDMMagnitudeComparisonModel`. Default ``False``.
-    spline_order, fit_seperate_evidence_sd, fit_prior, memory_model :
+    spline_order, fit_separate_evidence_sd, fit_prior, memory_model :
         Forwarded to :class:`FlexibleNoiseComparisonModel`.
     """
 
-    def __init__(self, paradigm, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm, fit_separate_evidence_sd=True,
                  fit_prior=False, spline_order=5,
                  memory_model='independent', fit_v_scale=False,
                  fix_z=True, flat_observer_prior=False):
@@ -650,7 +647,7 @@ class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
         self.fix_z = fix_z
         FlexibleNoiseComparisonModel.__init__(
             self, paradigm,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             fit_prior=fit_prior,
             spline_order=spline_order,
             memory_model=memory_model,
@@ -685,14 +682,14 @@ class DDMRiskModel(DDMMixin, RiskModel):
     """
 
     def __init__(self, paradigm=None, prior_estimate='objective',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, memory_model='independent',
                  fit_v_scale=False, fix_z=True):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
         super().__init__(
             paradigm=paradigm, prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
         )
@@ -728,7 +725,7 @@ class DDMRiskRegressionModel(DDMMixin, RiskRegressionModel):
     """
 
     def __init__(self, paradigm, regressors, prior_estimate='objective',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, memory_model='independent',
                  fit_v_scale=False, fix_z=True):
         self.fit_v_scale = fit_v_scale
@@ -736,7 +733,7 @@ class DDMRiskRegressionModel(DDMMixin, RiskRegressionModel):
         RiskRegressionModel.__init__(
             self, paradigm, regressors,
             prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
         )
@@ -760,7 +757,7 @@ class DDMFlexibleNoiseRiskModel(DDMMixin, FlexibleNoiseRiskModel):
     """
 
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, spline_order=5,
                  representational_noise='payoff',
                  memory_model='independent',
@@ -770,7 +767,7 @@ class DDMFlexibleNoiseRiskModel(DDMMixin, FlexibleNoiseRiskModel):
         FlexibleNoiseRiskModel.__init__(
             self, paradigm,
             prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             spline_order=spline_order,
             representational_noise=representational_noise,
@@ -801,7 +798,7 @@ class DDMFlexibleNoiseRiskRegressionModel(DDMMixin, FlexibleNoiseRiskRegressionM
     """
 
     def __init__(self, paradigm, regressors, prior_estimate='full',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, spline_order=5,
                  representational_noise='payoff',
                  memory_model='independent',
@@ -811,7 +808,7 @@ class DDMFlexibleNoiseRiskRegressionModel(DDMMixin, FlexibleNoiseRiskRegressionM
         FlexibleNoiseRiskRegressionModel.__init__(
             self, paradigm, regressors,
             prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             spline_order=spline_order,
             representational_noise=representational_noise,
@@ -838,14 +835,14 @@ class DDMPowerLawNoiseComparisonModel(DDMMixin, PowerLawNoiseComparisonModel):
     Weber's law (log scale).
     """
 
-    def __init__(self, paradigm, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm, fit_separate_evidence_sd=True,
                  fit_prior=False, memory_model='independent',
                  fit_v_scale=False, fix_z=True, flat_observer_prior=False):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
         PowerLawNoiseComparisonModel.__init__(
             self, paradigm,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             fit_prior=fit_prior, memory_model=memory_model,
             flat_observer_prior=flat_observer_prior,
         )
@@ -865,14 +862,14 @@ class DDMPowerLawNoiseComparisonRegressionModel(DDMMixin, PowerLawNoiseCompariso
     """
 
     def __init__(self, paradigm, regressors,
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  fit_prior=False, memory_model='independent',
                  fit_v_scale=False, fix_z=True):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
         PowerLawNoiseComparisonRegressionModel.__init__(
             self, paradigm, regressors,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             fit_prior=fit_prior, memory_model=memory_model,
         )
 
@@ -887,7 +884,7 @@ class DDMPowerLawNoiseRiskModel(DDMMixin, PowerLawNoiseRiskModel):
     log-EU difference (same as :class:`DDMRiskModel`)."""
 
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False,
                  memory_model='independent',
                  fit_v_scale=False, fix_z=True):
@@ -896,7 +893,7 @@ class DDMPowerLawNoiseRiskModel(DDMMixin, PowerLawNoiseRiskModel):
         PowerLawNoiseRiskModel.__init__(
             self, paradigm,
             prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
         )
@@ -917,7 +914,7 @@ class DDMPowerLawNoiseRiskRegressionModel(DDMMixin, PowerLawNoiseRiskRegressionM
     """
 
     def __init__(self, paradigm, regressors, prior_estimate='full',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False,
                  memory_model='independent',
                  fit_v_scale=False, fix_z=True):
@@ -926,7 +923,7 @@ class DDMPowerLawNoiseRiskRegressionModel(DDMMixin, PowerLawNoiseRiskRegressionM
         PowerLawNoiseRiskRegressionModel.__init__(
             self, paradigm, regressors,
             prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
         )

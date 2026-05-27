@@ -1,3 +1,4 @@
+import functools
 import warnings
 import pandas as pd
 import pymc as pm
@@ -6,6 +7,47 @@ from .utils.bayes import cumulative_normal, get_diff_dist, get_posterior
 from .utils.math import logistic, softplus_np, logistic_np, logit_np, inverse_softplus_np
 import pytensor.tensor as pt
 from patsy import dmatrix, build_design_matrices
+
+
+# Mapping of deprecated (old) __init__ keyword names -> their current names.
+# Add a new entry here to retire another misspelled / renamed kwarg; the
+# translation + DeprecationWarning are handled automatically for every
+# BaseModel subclass via __init_subclass__ (and for BaseModel itself).
+_DEPRECATED_INIT_KWARGS = {
+    'fit_seperate_evidence_sd': 'fit_separate_evidence_sd',
+}
+
+
+def _translate_deprecated_kwargs(func):
+    """Wrap an ``__init__`` so deprecated kwarg names are translated.
+
+    Emits a :class:`DeprecationWarning` and forwards the value under the new
+    name. If both the old and new names are supplied, the old one is dropped
+    and the new one wins. The wrapper is idempotent (re-wrapping is a no-op)
+    so cooperative multiple inheritance doesn't double-wrap, and because the
+    outer ``__init__`` already renames before calling ``super().__init__``,
+    inner ``__init__``s only ever see the new name (no double-warning).
+    """
+    if getattr(func, '_bauer_alias_wrapped', False):
+        return func
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        for old, new in _DEPRECATED_INIT_KWARGS.items():
+            if old in kwargs:
+                warnings.warn(
+                    f"'{old}' is deprecated and will be removed; use '{new}'.",
+                    DeprecationWarning, stacklevel=2,
+                )
+                if new in kwargs:
+                    # Both passed: keep the new spelling, drop the old.
+                    kwargs.pop(old)
+                else:
+                    kwargs[new] = kwargs.pop(old)
+        return func(*args, **kwargs)
+
+    wrapper._bauer_alias_wrapped = True
+    return wrapper
 
 
 class BaseModel(object):
@@ -37,6 +79,15 @@ class BaseModel(object):
     # (verified: vectorized regression-DDM converges ~1/7 seeds without it).
     # ``None`` = use the backend's default init.
     recommended_init: str | None = None
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # Wrap each subclass's own __init__ (if it defines one) so the
+        # deprecated kwarg translation runs before the real body. Mixins /
+        # diamond inheritance are fine: the outermost __init__ renames first,
+        # so inner __init__s see only the new name.
+        if '__init__' in cls.__dict__:
+            cls.__init__ = _translate_deprecated_kwargs(cls.__dict__['__init__'])
 
     def __init__(self, paradigm, save_trialwise_n_estimates=False):
         """
@@ -122,10 +173,11 @@ class BaseModel(object):
 
         return parameters
 
-    def build_estimation_model(self, data=None, coords=None, hierarchical=True, save_p_choice=False, flat_prior=False):
+    def build_estimation_model(self, data=None, coords=None, hierarchical=True, save_p_choice=False, flat_prior=False, paradigm=None):
 
+        # `data` and `paradigm` are accepted synonyms (no deprecation); data wins if both given.
         if data is None:
-            data = self.paradigm
+            data = paradigm if paradigm is not None else self.paradigm
 
         if not hierarchical and 'subject' in getattr(data, 'index', pd.Index([])).names:
             n_subjects = data.index.get_level_values('subject').nunique()
@@ -702,6 +754,11 @@ class BaseModel(object):
             model_inputs[key] = model[key]
 
         return model_inputs
+
+
+# BaseModel can't translate its own __init__ via __init_subclass__ (that hook
+# only fires for subclasses), so wrap it explicitly here.
+BaseModel.__init__ = _translate_deprecated_kwargs(BaseModel.__init__)
 
 
 class LapseModel(BaseModel):

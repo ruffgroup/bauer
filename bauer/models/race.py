@@ -369,11 +369,11 @@ class RaceDiffusionMagnitudeComparisonModel(RaceMixin, MagnitudeComparisonModel)
     """
 
     def __init__(self, paradigm=None, fit_prior=True,
-                 fit_seperate_evidence_sd=True, memory_model='independent',
+                 fit_separate_evidence_sd=True, memory_model='independent',
                  save_trialwise_n_estimates=False, advantage=True):
         self.advantage = advantage
         super().__init__(paradigm=paradigm, fit_prior=fit_prior,
-                         fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+                         fit_separate_evidence_sd=fit_separate_evidence_sd,
                          memory_model=memory_model,
                          save_trialwise_n_estimates=save_trialwise_n_estimates)
 
@@ -464,7 +464,7 @@ class RaceDiffusionFlexibleNoiseComparisonModel(RaceMixin, FlexibleNoiseComparis
     Paradigm columns required: ``n1``, ``n2``, ``choice`` (bool), ``rt`` (seconds).
     """
 
-    def __init__(self, paradigm, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm, fit_separate_evidence_sd=True,
                  fit_prior=True, spline_order=5,
                  memory_model='independent', advantage=True,
                  flat_observer_prior=False, fit_w_s=True):
@@ -472,7 +472,7 @@ class RaceDiffusionFlexibleNoiseComparisonModel(RaceMixin, FlexibleNoiseComparis
         self.fit_w_s = fit_w_s
         FlexibleNoiseComparisonModel.__init__(
             self, paradigm,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             fit_prior=fit_prior,
             spline_order=spline_order,
             memory_model=memory_model,
@@ -494,13 +494,13 @@ class RaceDiffusionRiskModel(RaceMixin, RiskModel):
     """
 
     def __init__(self, paradigm=None, prior_estimate='objective',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, memory_model='independent',
                  advantage=True):
         self.advantage = advantage
         super().__init__(
             paradigm=paradigm, prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
         )
@@ -529,14 +529,14 @@ class RaceDiffusionRiskRegressionModel(RaceMixin, RiskRegressionModel):
     """
 
     def __init__(self, paradigm, regressors, prior_estimate='objective',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, memory_model='independent',
                  advantage=True):
         self.advantage = advantage
         RiskRegressionModel.__init__(
             self, paradigm, regressors,
             prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
         )
@@ -562,7 +562,7 @@ class RaceDiffusionFlexibleNoiseRiskModel(RaceMixin, FlexibleNoiseRiskModel):
     """
 
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, spline_order=5,
                  representational_noise='payoff',
                  memory_model='independent',
@@ -571,7 +571,7 @@ class RaceDiffusionFlexibleNoiseRiskModel(RaceMixin, FlexibleNoiseRiskModel):
         FlexibleNoiseRiskModel.__init__(
             self, paradigm,
             prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             spline_order=spline_order,
             representational_noise=representational_noise,
@@ -604,7 +604,7 @@ class RaceDiffusionFlexibleNoiseRiskRegressionModel(
     """
 
     def __init__(self, paradigm, regressors, prior_estimate='full',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, spline_order=5,
                  representational_noise='payoff',
                  memory_model='independent',
@@ -613,7 +613,7 @@ class RaceDiffusionFlexibleNoiseRiskRegressionModel(
         FlexibleNoiseRiskRegressionModel.__init__(
             self, paradigm, regressors,
             prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             spline_order=spline_order,
             representational_noise=representational_noise,
@@ -640,14 +640,14 @@ class RaceDiffusionPowerLawNoiseComparisonModel(RaceMixin, PowerLawNoiseComparis
     (alpha = 1 - noise_exponent) jointly with choice + RT.
     """
 
-    def __init__(self, paradigm, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm, fit_separate_evidence_sd=True,
                  fit_prior=False, memory_model='independent',
                  advantage=True, flat_observer_prior=False, fit_w_s=True):
         self.advantage = advantage
         self.fit_w_s = fit_w_s
         PowerLawNoiseComparisonModel.__init__(
             self, paradigm,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             fit_prior=fit_prior, memory_model=memory_model,
             flat_observer_prior=flat_observer_prior,
         )
@@ -669,13 +669,13 @@ class RaceDiffusionPowerLawNoiseComparisonRegressionModel(
     """
 
     def __init__(self, paradigm, regressors,
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  fit_prior=False, memory_model='independent',
                  advantage=True):
         self.advantage = advantage
         PowerLawNoiseComparisonRegressionModel.__init__(
             self, paradigm, regressors,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             fit_prior=fit_prior, memory_model=memory_model,
         )
 
@@ -690,7 +690,7 @@ class RaceDiffusionPowerLawNoiseRiskModel(RaceMixin, PowerLawNoiseRiskModel):
     """Race-diffusion + power-law-noise risky choice."""
 
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False,
                  memory_model='independent',
                  advantage=True):
@@ -698,7 +698,7 @@ class RaceDiffusionPowerLawNoiseRiskModel(RaceMixin, PowerLawNoiseRiskModel):
         PowerLawNoiseRiskModel.__init__(
             self, paradigm,
             prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
         )
@@ -715,7 +715,7 @@ class RaceDiffusionPowerLawNoiseRiskRegressionModel(
     """Race-diffusion + power-law-noise risky choice + regression."""
 
     def __init__(self, paradigm, regressors, prior_estimate='full',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False,
                  memory_model='independent',
                  advantage=True):
@@ -723,7 +723,7 @@ class RaceDiffusionPowerLawNoiseRiskRegressionModel(
         PowerLawNoiseRiskRegressionModel.__init__(
             self, paradigm, regressors,
             prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
         )

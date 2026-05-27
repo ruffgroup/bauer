@@ -9,7 +9,7 @@ CLI:
 ``model`` ∈ {choice, ddm, rdm}.
 
 Canonical kwargs applied to every fit:
-- ``fit_seperate_evidence_sd=True`` — asymmetric encoding noise drives the
+- ``fit_separate_evidence_sd=True`` — asymmetric encoding noise drives the
   order effect (σ_1 > σ_2)
 - ``fit_prior=True`` — fitted Bayesian prior on log(n) (or
   ``fit_prior_mu_only=True`` for RDM, to close the σ_p×ν ridge)
@@ -100,31 +100,31 @@ def main():
     if args.model == 'choice':
         if args.flex:
             from bauer.models import FlexibleNoiseComparisonModel as Cls
-            kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
+            kwargs = dict(paradigm=df, fit_separate_evidence_sd=True,
                           spline_order=args.spline_order, fit_prior=True)
         else:
             from bauer.models import MagnitudeComparisonModel as Cls
-            kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
+            kwargs = dict(paradigm=df, fit_separate_evidence_sd=True,
                           fit_prior=True)
     elif args.model == 'ddm':
         if args.flex:
             from bauer.models import DDMFlexibleNoiseComparisonModel as Cls
-            kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
+            kwargs = dict(paradigm=df, fit_separate_evidence_sd=True,
                           spline_order=args.spline_order, fit_prior=True,
                           fit_v_scale=fit_v_scale)
         else:
             from bauer.models import DDMMagnitudeComparisonModel as Cls
-            kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
+            kwargs = dict(paradigm=df, fit_separate_evidence_sd=True,
                           fit_prior=True, fit_v_scale=fit_v_scale)
     elif args.model == 'rdm':
         adv = not args.no_advantage
         if args.flex:
             from bauer.models import RaceDiffusionFlexibleNoiseComparisonModel as Cls
-            kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
+            kwargs = dict(paradigm=df, fit_separate_evidence_sd=True,
                           spline_order=args.spline_order, fit_prior=True, advantage=adv)
         else:
             from bauer.models import RaceDiffusionMagnitudeComparisonModel as Cls
-            kwargs = dict(paradigm=df, fit_seperate_evidence_sd=True,
+            kwargs = dict(paradigm=df, fit_separate_evidence_sd=True,
                           fit_prior=True, advantage=adv)
     m = Cls(**kwargs)
 
