@@ -2980,11 +2980,11 @@ md(r"""## Before we fit: drop physiologically implausible fast trials
 
 **Critical preprocessing step for any DDM/RDM fit — including yours.**
 
-DDM/RDM likelihoods require the non-decision time $t_0$ to be **below
-$\min(\text{RT})$ for every subject**. When the sampler wanders into a
+DDM/RDM likelihoods require the non-decision time $t_0$ to be below
+$\min(\text{RT})$ for *every* subject. When the sampler wanders into a
 region where $t_0 > \text{rt}$ for some trial, the WFPT log-likelihood
 floors at `LOGP_LB = -66.1` (HSSM's design, inherited by bauer) — and
-**the gradient w.r.t. $t_0$ in that region is exactly zero**. NUTS sees
+the gradient with respect to $t_0$ in that region is *exactly zero*. NUTS sees
 a flat landscape, loses all pull back into the valid region, and the
 chain can permanently stick in a wrong posterior mode. We diagnosed this
 the hard way on a first attempt at fitting Garcia (chains landed in 4
