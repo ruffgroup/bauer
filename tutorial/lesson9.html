@@ -294,20 +294,33 @@
 <span class="n">subs</span> <span class="o">=</span> <span class="n">df_full</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">unique</span><span class="p">()[:</span><span class="mi">8</span><span class="p">]</span>
 <span class="n">df</span> <span class="o">=</span> <span class="n">df_full</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">df_full</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">subs</span><span class="p">)]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
+<span class="c1"># ── Preprocess: drop physiologically implausible fast trials ──────────────</span>
+<span class="c1"># Same RT filter as lesson 8 — see that lesson for the full pedagogical</span>
+<span class="c1"># motivation. Without it, the per-subject _t0_cap (= 0.95 * min rt) sits</span>
+<span class="c1"># below the t0 prior centre for most subjects, squeezing t0 against the cap</span>
+<span class="c1"># and funneling t0_sd through the HalfCauchy heavy tail. Concretely, for</span>
+<span class="c1"># this RDM fit, dropping it cuts divergences from ~80 to ~1.</span>
+<span class="n">RT_MIN</span> <span class="o">=</span> <span class="mf">0.20</span>
+<span class="n">n_before</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">RT_MIN</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 <span class="n">n_subj</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Subjects: </span><span class="si">{</span><span class="n">n_subj</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Trials:   </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="si">}</span><span class="s2">  (~</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">n_subj</span><span class="si">}</span><span class="s2"> per subject)&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Columns:  </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Dropped </span><span class="si">{</span><span class="n">n_before</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="si">}</span><span class="s2"> / </span><span class="si">{</span><span class="n">n_before</span><span class="si">}</span><span class="s2"> trials with rt &lt; </span><span class="si">{</span><span class="n">RT_MIN</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">s &quot;</span>
+      <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="mi">100</span><span class="o">*</span><span class="p">(</span><span class="n">n_before</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">))</span><span class="o">/</span><span class="n">n_before</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">%); min rt now </span><span class="si">{</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">s.&quot;</span><span class="p">)</span>
 
 <span class="c1"># Cache directory for fitted idata, so re-running the notebook after a</span>
 <span class="c1"># downstream cell change doesn&#39;t redo the (~5-15 min) fits. Set</span>
-<span class="c1"># BAUER_TUTORIAL_REFIT=1 in the env to force a fresh fit.</span>
+<span class="c1"># BAUER_TUTORIAL_REFIT=1 in the env to force a fresh fit. Cache key</span>
+<span class="c1"># encodes the RT cutoff so a future change there gets a fresh cache.</span>
 <span class="n">CACHE_DIR</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expanduser</span><span class="p">(</span><span class="s1">&#39;~/.bauer_tutorial_cache&#39;</span><span class="p">)</span>
 <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">CACHE_DIR</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">FORCE_REFIT</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;BAUER_TUTORIAL_REFIT&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+<span class="n">CACHE_TAG</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;garcia_n</span><span class="si">{</span><span class="n">n_subj</span><span class="si">}</span><span class="s1">_rtmin</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">RT_MIN</span><span class="o">*</span><span class="mi">1000</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">fit_or_load</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">draws</span><span class="o">=</span><span class="mi">600</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">600</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">target_accept</span><span class="o">=</span><span class="mf">0.95</span><span class="p">):</span>
-    <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">CACHE_DIR</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;garcia_8subj_</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">.nc&#39;</span><span class="p">)</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">CACHE_DIR</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">CACHE_TAG</span><span class="si">}</span><span class="s1">_</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">.nc&#39;</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">FORCE_REFIT</span><span class="p">:</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading cached </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> fit from </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">az</span><span class="o">.</span><span class="n">from_netcdf</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
@@ -348,8 +361,10 @@
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 Subjects: 8
-Trials:   1635  (~204 per subject)
+Trials:   1568  (~196 per subject)
 Columns:  [&#39;n1&#39;, &#39;n2&#39;, &#39;choice&#39;, &#39;rt&#39;, &#39;accuracy&#39;, &#39;correct&#39;, &#39;isi&#39;]
+
+Dropped 67 / 1635 trials with rt &lt; 0.20s (4.1%); min rt now 0.202s.
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
@@ -562,14 +577,6 @@ Columns:  [&#39;n1&#39;, &#39;n2&#39;, &#39;choice&#39;, &#39;rt&#39;, &#39;accu
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
-
-*** bauer DDM/RDM warning ***
-  Fastest RT in paradigm: 0.151 s (4.1% of trials below 0.20 s).
-  The default t0 prior is centred at 0.20 s; when t0 wanders above min(rt), the HSSM
-  WFPT likelihood floors at LOGP_LB=-66.1 with ZERO gradient w.r.t. t0, which can trap NUTS chains.
-  Recommended: drop trials with rt &lt; 0.20 s (typical HDDM convention, below motor non-decision time).
-  See docs/tutorial/lesson8.ipynb for the explanation.
-
 Initializing NUTS using adapt_full...
 Multiprocess sampling (4 chains in 4 jobs)
 NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset, n2_evidence_sd_mu_untransformed, n2_evidence_sd_sd, n2_evidence_sd_offset, prior_mu_mu, prior_mu_sd, prior_mu_offset, prior_sd_mu_untransformed, prior_sd_sd, prior_sd_offset, a_mu_untransformed, a_sd, a_offset, t0_mu_untransformed, t0_sd, t0_offset]
@@ -579,7 +586,7 @@ NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "9922c85de4974faebbceead983282462", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "d5558157a08b4abc80f9eae8a69223dc", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -592,9 +599,10 @@ NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
-Sampling 4 chains for 600 tune and 600 draw iterations (2_400 + 2_400 draws total) took 122 seconds.
-There were 3 divergences after tuning. Increase `target_accept` or reparameterize.
+Sampling 4 chains for 600 tune and 600 draw iterations (2_400 + 2_400 draws total) took 172 seconds.
+There were 8 divergences after tuning. Increase `target_accept` or reparameterize.
 The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
@@ -602,7 +610,7 @@ The rhat statistic is larger than 1.01 for some parameters. This indicates probl
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Saved ddm fit to /Users/gdehol/.bauer_tutorial_cache/garcia_8subj_ddm.nc
+Saved ddm fit to /Users/gdehol/.bauer_tutorial_cache/garcia_n8_rtmin200_ddm.nc
 </pre></div></div>
 </div>
 <p>(We use <code class="docutils literal notranslate"><span class="pre">draws=600,</span> <span class="pre">tune=600</span></code> to keep tutorial wall time manageable. For production fits, use the bauer defaults <code class="docutils literal notranslate"><span class="pre">draws=1000,</span> <span class="pre">tune=1000</span></code> — see lesson 4.)</p>
@@ -634,16 +642,16 @@ Saved ddm fit to /Users/gdehol/.bauer_tutorial_cache/garcia_8subj_ddm.nc
 <div class="output_area docutils container">
 <div class="highlight"><pre>
                    mcse_mean  mcse_sd  ess_bulk  ess_tail  r_hat
-a_mu                   0.002    0.002    1428.0     984.0    1.0
-t0_mu                  0.000    0.000    1280.0    1232.0    1.0
-n1_evidence_sd_mu      0.001    0.001    1715.0    1571.0    1.0
-n2_evidence_sd_mu      0.002    0.002     781.0    1029.0    1.0
-prior_mu_mu            0.007    0.007    1639.0    1187.0    1.0
-prior_sd_mu            0.006    0.008     907.0    1223.0    1.0
+a_mu                   0.002    0.002    1542.0    1017.0   1.01
+t0_mu                  0.000    0.000    1611.0    1329.0   1.01
+n1_evidence_sd_mu      0.001    0.001    1458.0    1275.0   1.00
+n2_evidence_sd_mu      0.001    0.001     894.0     983.0   1.00
+prior_mu_mu            0.007    0.007    1448.0    1365.0   1.00
+prior_sd_mu            0.007    0.007     629.0     748.0   1.01
 
-Divergences: 3
-Max r̂:       1.000
-Min ESS bulk: 781
+Divergences: 8
+Max r̂:       1.010
+Min ESS bulk: 629
 </pre></div></div>
 </div>
 <p><strong>Rules of thumb</strong> (from the bauer convention, see CLAUDE.md):</p>
@@ -702,7 +710,7 @@ Min ESS bulk: 781
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-PPC shape: (98100, 2), columns: [&#39;simulated_rt&#39;, &#39;simulated_choice&#39;]
+PPC shape: (94080, 2), columns: [&#39;simulated_rt&#39;, &#39;simulated_choice&#39;]
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
@@ -865,21 +873,13 @@ al. 2012).</p>
 </pre></div>
 </div>
 </div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Initializing NUTS using adapt_full...
-Multiprocess sampling (4 chains in 4 jobs)
-NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset, n2_evidence_sd_mu_untransformed, n2_evidence_sd_sd, n2_evidence_sd_offset, prior_mu_mu, prior_mu_sd, prior_mu_offset, prior_sd_mu_untransformed, prior_sd_sd, prior_sd_offset, w_0_mu_untransformed, w_0_sd, w_0_offset, w_d_mu_untransformed, w_d_sd, w_d_offset, w_s_mu, w_s_sd, w_s_offset, a_mu_untransformed, a_sd, a_offset, t0_mu_untransformed, t0_sd, t0_offset]
-</pre></div></div>
-</div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "e1acf721a34d4081bbaa37f3131f2625", "version_major": 2, "version_minor": 0}</script></div>
+<div class="highlight"><pre>
+Loading cached rdm fit from /Users/gdehol/.bauer_tutorial_cache/garcia_n8_rtmin200_rdm.nc
+</pre></div></div>
 </div>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
@@ -904,17 +904,17 @@ NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset
 <div class="output_area docutils container">
 <div class="highlight"><pre>
                    mcse_mean  mcse_sd  ess_bulk  ess_tail  r_hat
-a_mu                   0.002    0.002    2348.0    1911.0   1.00
-t0_mu                  0.002    0.002    1563.0     875.0   1.00
-w_0_mu                 0.014    0.027     488.0     248.0   1.01
-w_d_mu                 0.004    0.003    1801.0    1832.0   1.00
-w_s_mu                 0.001    0.001    1385.0    1009.0   1.00
-n1_evidence_sd_mu      0.002    0.001    1466.0    1766.0   1.00
-n2_evidence_sd_mu      0.002    0.001    1547.0    1481.0   1.00
-prior_mu_mu            0.008    0.008    2369.0    1822.0   1.00
-prior_sd_mu            0.006    0.005    1314.0    1468.0   1.00
+a_mu                   0.004    0.003    1000.0    1700.0   1.00
+t0_mu                  0.000    0.001    1696.0    1216.0   1.00
+w_0_mu                 0.022    0.027     294.0     403.0   1.01
+w_d_mu                 0.005    0.004    2021.0    1628.0   1.00
+w_s_mu                 0.001    0.001    1789.0    1594.0   1.00
+n1_evidence_sd_mu      0.002    0.002    1816.0    1817.0   1.00
+n2_evidence_sd_mu      0.002    0.002    2033.0    2102.0   1.00
+prior_mu_mu            0.007    0.006    1680.0    1566.0   1.00
+prior_sd_mu            0.004    0.004    1625.0    1824.0   1.00
 
-Divergences: 80
+Divergences: 1
 Max r̂:       1.010
 </pre></div></div>
 </div>
@@ -1109,7 +1109,7 @@ NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "6e69164d0e2d4943b9ea6a3db71851cb", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "3177287e220d4445a1f56773f982d3e4", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -1122,8 +1122,8 @@ NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 118 seconds.
-There were 26 divergences after tuning. Increase `target_accept` or reparameterize.
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 123 seconds.
+There were 5 divergences after tuning. Increase `target_accept` or reparameterize.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
 The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
@@ -1134,7 +1134,7 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Saved rdm_noadv fit to /Users/gdehol/.bauer_tutorial_cache/garcia_8subj_rdm_noadv.nc
+Saved rdm_noadv fit to /Users/gdehol/.bauer_tutorial_cache/garcia_n8_rtmin200_rdm_noadv.nc
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">

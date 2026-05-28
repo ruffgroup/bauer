@@ -308,289 +308,226 @@
 <li><p><strong>Affine</strong> <span class="math notranslate nohighlight">\(\nu(n) = a + bn\)</span> <span class="math notranslate nohighlight">\(\Rightarrow\)</span> noise floor + Weber scaling</p></li>
 <li><p><strong>Super-linear</strong> <span class="math notranslate nohighlight">\(\nu(n)\)</span> <span class="math notranslate nohighlight">\(\Rightarrow\)</span> worse precision at large <span class="math notranslate nohighlight">\(n\)</span> (super-Weber)</p></li>
 </ul>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span><span class="p">;</span> <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">seaborn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sns</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_garcia2022</span><span class="p">,</span> <span class="n">load_dehollander2024</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">MagnitudeComparisonModel</span><span class="p">,</span> <span class="n">FlexibleNoiseComparisonModel</span><span class="p">,</span>
-                           <span class="n">RiskModel</span><span class="p">,</span> <span class="n">FlexibleNoiseRiskModel</span><span class="p">)</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>import warnings; warnings.filterwarnings(&#39;ignore&#39;)
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import arviz as az
+from bauer.utils.data import load_garcia2022, load_dehollander2024
+from bauer.models import (MagnitudeComparisonModel, FlexibleNoiseComparisonModel,
+                           RiskModel, FlexibleNoiseRiskModel)
 
-<span class="c1"># ── AffineNoise: a simple alternative between MCM and FlexNoise ──────────────</span>
-<span class="c1"># The key idea: FlexibleNoiseComparisonModel uses B-spline basis functions to</span>
-<span class="c1"># parameterise ν(n).  If the deviation from Weber&#39;s law is just a constant noise</span>
-<span class="c1"># floor (ν(n) = a + b·n instead of ν(n) = b·n), we can capture that with a</span>
-<span class="c1"># two-element basis [1, n̂] instead of 5 B-spline bases.</span>
-<span class="c1">#</span>
-<span class="c1"># Implementation: subclass FlexibleNoiseComparisonModel, override make_dm()</span>
-<span class="c1"># to return an affine design matrix, and fix polynomial_order=2.</span>
+# ── AffineNoise: a simple alternative between MCM and FlexNoise ──────────────
+# The key idea: FlexibleNoiseComparisonModel uses B-spline basis functions to
+# parameterise ν(n).  If the deviation from Weber&#39;s law is just a constant noise
+# floor (ν(n) = a + b·n instead of ν(n) = b·n), we can capture that with a
+# two-element basis [1, n̂] instead of 5 B-spline bases.
+#
+# Implementation: subclass FlexibleNoiseComparisonModel, override make_dm()
+# to return an affine design matrix, and fix spline_order=2.
 
-<span class="k">class</span><span class="w"> </span><span class="nc">AffineNoiseComparisonModel</span><span class="p">(</span><span class="n">FlexibleNoiseComparisonModel</span><span class="p">):</span>
-    <span class="c1"># Magnitude-comparison model with affine noise: v(n) = softplus(b0 + b1*n_hat)</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                 <span class="n">fit_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">):</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="n">fit_separate_evidence_sd</span><span class="p">,</span>
-                         <span class="n">fit_prior</span><span class="o">=</span><span class="n">fit_prior</span><span class="p">,</span> <span class="n">polynomial_order</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-                         <span class="n">memory_model</span><span class="o">=</span><span class="n">memory_model</span><span class="p">)</span>
+class AffineNoiseComparisonModel(FlexibleNoiseComparisonModel):
+    # Magnitude-comparison model with affine noise: v(n) = softplus(b0 + b1*n_hat)
+    def __init__(self, paradigm, fit_separate_evidence_sd=True,
+                 fit_prior=False, memory_model=&#39;independent&#39;):
+        super().__init__(paradigm, fit_separate_evidence_sd=fit_separate_evidence_sd,
+                         fit_prior=fit_prior, spline_order=2,
+                         memory_model=memory_model)
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">make_dm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">):</span>
-        <span class="c1"># Override: [1, n_hat] basis instead of B-splines</span>
-        <span class="n">min_n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
-        <span class="n">max_n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
-        <span class="n">x_norm</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="o">-</span> <span class="n">min_n</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">max_n</span> <span class="o">-</span> <span class="n">min_n</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">x_norm</span><span class="p">),</span> <span class="n">x_norm</span><span class="p">])</span>
+    def make_dm(self, x, variable=&#39;n1_evidence_sd&#39;):
+        # Override: [1, n_hat] basis instead of B-splines
+        min_n = self.paradigm[[&#39;n1&#39;, &#39;n2&#39;]].min().min()
+        max_n = self.paradigm[[&#39;n1&#39;, &#39;n2&#39;]].max().max()
+        x_norm = (np.asarray(x, dtype=float) - min_n) / (max_n - min_n)
+        return np.column_stack([np.ones_like(x_norm), x_norm])
 
 
-<span class="k">class</span><span class="w"> </span><span class="nc">AffineNoiseRiskModel</span><span class="p">(</span><span class="n">FlexibleNoiseRiskModel</span><span class="p">):</span>
-    <span class="c1"># Risky-choice model with affine noise: v(n) = softplus(b0 + b1*n_hat)</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
-                 <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">memory_model</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">):</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="n">prior_estimate</span><span class="p">,</span>
-                         <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="n">fit_separate_evidence_sd</span><span class="p">,</span>
-                         <span class="n">polynomial_order</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">memory_model</span><span class="o">=</span><span class="n">memory_model</span><span class="p">)</span>
+class AffineNoiseRiskModel(FlexibleNoiseRiskModel):
+    # Risky-choice model with affine noise: v(n) = softplus(b0 + b1*n_hat)
+    def __init__(self, paradigm, prior_estimate=&#39;full&#39;,
+                 fit_separate_evidence_sd=True, memory_model=&#39;independent&#39;):
+        super().__init__(paradigm, prior_estimate=prior_estimate,
+                         fit_separate_evidence_sd=fit_separate_evidence_sd,
+                         spline_order=2, memory_model=memory_model)
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">make_dm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">):</span>
-        <span class="c1"># Override: [1, n_hat] basis instead of B-splines</span>
-        <span class="n">min_n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
-        <span class="n">max_n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">paradigm</span><span class="p">[[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
-        <span class="n">x_norm</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="o">-</span> <span class="n">min_n</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">max_n</span> <span class="o">-</span> <span class="n">min_n</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">x_norm</span><span class="p">),</span> <span class="n">x_norm</span><span class="p">])</span>
+    def make_dm(self, x, variable=&#39;n1_evidence_sd&#39;):
+        # Override: [1, n_hat] basis instead of B-splines
+        min_n = self.paradigm[[&#39;n1&#39;, &#39;n2&#39;]].min().min()
+        max_n = self.paradigm[[&#39;n1&#39;, &#39;n2&#39;]].max().max()
+        x_norm = (np.asarray(x, dtype=float) - min_n) / (max_n - min_n)
+        return np.column_stack([np.ones_like(x_norm), x_norm])
 
-<span class="c1"># Garcia et al. (2022) — dot-array magnitude comparison</span>
-<span class="n">df_mag</span> <span class="o">=</span> <span class="n">load_garcia2022</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s1">&#39;magnitude&#39;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Garcia magnitude  |  subjects: </span><span class="si">{</span><span class="n">df_mag</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span><span class="si">}</span><span class="s2">,  &quot;</span>
-      <span class="sa">f</span><span class="s2">&quot;trials: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df_mag</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+# Garcia et al. (2022) — dot-array magnitude comparison
+df_mag = load_garcia2022(task=&#39;magnitude&#39;)
+print(f&quot;Garcia magnitude  |  subjects: {df_mag.index.get_level_values(&#39;subject&#39;).nunique()},  &quot;
+      f&quot;trials: {len(df_mag)}&quot;)
 
-<span class="c1"># de Hollander et al. (2024, bioRxiv) — Arabic-numeral gambles</span>
-<span class="n">df_sym</span> <span class="o">=</span> <span class="n">load_dehollander2024</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s1">&#39;symbolic&#39;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Arabic numerals   |  subjects: </span><span class="si">{</span><span class="n">df_sym</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span><span class="si">}</span><span class="s2">,  &quot;</span>
-      <span class="sa">f</span><span class="s2">&quot;trials: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df_sym</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+# de Hollander et al. (2024, bioRxiv) — Arabic-numeral gambles
+df_sym = load_dehollander2024(task=&#39;symbolic&#39;)
+print(f&quot;Arabic numerals   |  subjects: {df_sym.index.get_level_values(&#39;subject&#39;).nunique()},  &quot;
+      f&quot;trials: {len(df_sym)}&quot;)
 </pre></div>
 </div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-Garcia magnitude  |  subjects: 64,  trials: 13824
-Arabic numerals   |  subjects: 58,  trials: 14722
-</pre></div></div>
 </div>
 </section>
 <section id="Illustrating-flexible-noise-curves">
 <h2>Illustrating flexible noise curves<a class="headerlink" href="#Illustrating-flexible-noise-curves" title="Link to this heading">¶</a></h2>
 <p>The left panel shows the three canonical noise-vs-magnitude shapes. The right panel shows the <strong>key signature of Weber’s law</strong>: when noise is linear (<span class="math notranslate nohighlight">\(\nu \propto n\)</span>), psychometric curves plotted against the <em>relative</em> difference <span class="math notranslate nohighlight">\((n_2 - n_1)/n_1\)</span> collapse onto a single curve regardless of the reference magnitude <span class="math notranslate nohighlight">\(n_1\)</span> — scale invariance. Flat or super-linear noise breaks this collapse.</p>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.stats</span><span class="w"> </span><span class="kn">import</span> <span class="n">norm</span> <span class="k">as</span> <span class="n">scipy_norm</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>from scipy.stats import norm as scipy_norm
 
-<span class="n">n_vals</span>   <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">45</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
-<span class="n">nu0</span>      <span class="o">=</span> <span class="mf">0.30</span>          <span class="c1"># noise level at mean magnitude</span>
-<span class="n">rel_diffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mi">300</span><span class="p">)</span>   <span class="c1"># (n2 - n1) / n1</span>
+n_vals   = np.linspace(5, 45, 200)
+nu0      = 0.30          # noise level at mean magnitude
+rel_diffs = np.linspace(-0.5, 0.5, 300)   # (n2 - n1) / n1
 
-<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mf">4.5</span><span class="p">))</span>
+fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
 
-<span class="c1"># Left: noise curves in natural space</span>
-<span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">noise_curves</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="p">(</span><span class="s1">&#39;Linear  ν(n) = ν₀·n  [Weber / scale-invariant]&#39;</span><span class="p">,</span>
-     <span class="n">nu0</span> <span class="o">*</span> <span class="n">n_vals</span> <span class="o">/</span> <span class="n">n_vals</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span>        <span class="s1">&#39;#2166ac&#39;</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">),</span>
-    <span class="p">(</span><span class="s1">&#39;Flat  ν(n) = const  [constant absolute noise]&#39;</span><span class="p">,</span>
-     <span class="n">np</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">n_vals</span><span class="p">,</span> <span class="n">nu0</span><span class="p">),</span>           <span class="s1">&#39;#d73027&#39;</span><span class="p">,</span> <span class="s1">&#39;--&#39;</span><span class="p">),</span>
-    <span class="p">(</span><span class="s1">&#39;Super-linear  [worse precision at large n]&#39;</span><span class="p">,</span>
-     <span class="n">nu0</span> <span class="o">*</span> <span class="p">(</span><span class="n">n_vals</span> <span class="o">/</span> <span class="n">n_vals</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span><span class="o">**</span><span class="mf">1.8</span><span class="p">,</span> <span class="s1">&#39;#1a9850&#39;</span><span class="p">,</span> <span class="s1">&#39;:&#39;</span><span class="p">),</span>
-<span class="p">]</span>
-<span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">nu_n</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">ls</span> <span class="ow">in</span> <span class="n">noise_curves</span><span class="p">:</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">n_vals</span><span class="p">,</span> <span class="n">nu_n</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="n">ls</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Magnitude  n&#39;</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Natural-space noise  ν(n)&#39;</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Noise-vs-magnitude curve shapes&#39;</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mf">8.5</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+# Left: noise curves in natural space
+ax = axes[0]
+noise_curves = [
+    (&#39;Linear  ν(n) = ν₀·n  [Weber / scale-invariant]&#39;,
+     nu0 * n_vals / n_vals.mean(),        &#39;#2166ac&#39;, &#39;-&#39;),
+    (&#39;Flat  ν(n) = const  [constant absolute noise]&#39;,
+     np.full_like(n_vals, nu0),           &#39;#d73027&#39;, &#39;--&#39;),
+    (&#39;Super-linear  [worse precision at large n]&#39;,
+     nu0 * (n_vals / n_vals.mean())**1.8, &#39;#1a9850&#39;, &#39;:&#39;),
+]
+for label, nu_n, c, ls in noise_curves:
+    ax.plot(n_vals, nu_n, lw=2.5, color=c, ls=ls, label=label)
+ax.set_xlabel(&#39;Magnitude  n&#39;)
+ax.set_ylabel(&#39;Natural-space noise  ν(n)&#39;)
+ax.set_title(&#39;Noise-vs-magnitude curve shapes&#39;)
+ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
-<span class="c1"># Right: scale-invariance test — plot P(chose n2) vs (n2-n1)/n1</span>
-<span class="c1"># With linear noise ν = ν₀×n_ref: P = Φ(rel_diff × n1 / (√2 × ν₀ × n1))</span>
-<span class="c1">#                                    = Φ(rel_diff / (√2 × ν₀))  — same for all n1!</span>
-<span class="c1"># With flat noise ν = const: P = Φ(rel_diff × n1 / (√2 × ν_const))  — varies with n1</span>
-<span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-<span class="k">for</span> <span class="n">n_ref</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">ls</span> <span class="ow">in</span> <span class="p">[(</span><span class="mi">8</span><span class="p">,</span> <span class="s1">&#39;#4393c3&#39;</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">),</span> <span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="s1">&#39;#1a9850&#39;</span><span class="p">,</span> <span class="s1">&#39;--&#39;</span><span class="p">),</span> <span class="p">(</span><span class="mi">36</span><span class="p">,</span> <span class="s1">&#39;#d73027&#39;</span><span class="p">,</span> <span class="s1">&#39;:&#39;</span><span class="p">)]:</span>
-    <span class="n">nu_lin</span>  <span class="o">=</span> <span class="n">nu0</span> <span class="o">*</span> <span class="n">n_ref</span> <span class="o">/</span> <span class="n">n_vals</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>   <span class="c1"># linear noise at n_ref</span>
-    <span class="n">nu_flat</span> <span class="o">=</span> <span class="n">nu0</span>                            <span class="c1"># flat noise (constant)</span>
-    <span class="n">p_lin</span>  <span class="o">=</span> <span class="n">scipy_norm</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">rel_diffs</span> <span class="o">*</span> <span class="n">n_ref</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">nu_lin</span><span class="p">))</span>   <span class="c1"># collapses!</span>
-    <span class="n">p_flat</span> <span class="o">=</span> <span class="n">scipy_norm</span><span class="o">.</span><span class="n">cdf</span><span class="p">(</span><span class="n">rel_diffs</span> <span class="o">*</span> <span class="n">n_ref</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">nu_flat</span><span class="p">))</span>  <span class="c1"># shifts by n_ref</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">rel_diffs</span><span class="p">,</span> <span class="n">p_lin</span><span class="p">,</span>  <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="n">ls</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;Linear ν (n₁=</span><span class="si">{</span><span class="n">n_ref</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">rel_diffs</span><span class="p">,</span> <span class="n">p_flat</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.2</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="n">ls</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.4</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span>  <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="mf">0.97</span><span class="p">,</span> <span class="mf">0.07</span><span class="p">,</span> <span class="s1">&#39;Faint: flat ν (curves shift with n₁)&#39;</span><span class="p">,</span>
-        <span class="n">transform</span><span class="o">=</span><span class="n">ax</span><span class="o">.</span><span class="n">transAxes</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s1">&#39;right&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Relative difference  (n₂ − n₁) / n₁&#39;</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;P(chose n₂)&#39;</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Weber’s law = scale invariance: linear ν curves collapse&#39;</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mf">8.5</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+# Right: scale-invariance test — plot P(chose n2) vs (n2-n1)/n1
+# With linear noise ν = ν₀×n_ref: P = Φ(rel_diff × n1 / (√2 × ν₀ × n1))
+#                                    = Φ(rel_diff / (√2 × ν₀))  — same for all n1!
+# With flat noise ν = const: P = Φ(rel_diff × n1 / (√2 × ν_const))  — varies with n1
+ax = axes[1]
+for n_ref, c, ls in [(8, &#39;#4393c3&#39;, &#39;-&#39;), (20, &#39;#1a9850&#39;, &#39;--&#39;), (36, &#39;#d73027&#39;, &#39;:&#39;)]:
+    nu_lin  = nu0 * n_ref / n_vals.mean()   # linear noise at n_ref
+    nu_flat = nu0                            # flat noise (constant)
+    p_lin  = scipy_norm.cdf(rel_diffs * n_ref / (np.sqrt(2) * nu_lin))   # collapses!
+    p_flat = scipy_norm.cdf(rel_diffs * n_ref / (np.sqrt(2) * nu_flat))  # shifts by n_ref
+    ax.plot(rel_diffs, p_lin,  color=c, lw=2.5, ls=ls, label=f&#39;Linear ν (n₁={n_ref})&#39;)
+    ax.plot(rel_diffs, p_flat, color=c, lw=1.2, ls=ls, alpha=.4)
+ax.axhline(.5, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
+ax.axvline(0,  ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
+ax.text(0.97, 0.07, &#39;Faint: flat ν (curves shift with n₁)&#39;,
+        transform=ax.transAxes, ha=&#39;right&#39;, fontsize=8, color=&#39;gray&#39;)
+ax.set_xlabel(&#39;Relative difference  (n₂ − n₁) / n₁&#39;)
+ax.set_ylabel(&#39;P(chose n₂)&#39;)
+ax.set_title(&#39;Weber’s law = scale invariance: linear ν curves collapse&#39;)
+ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
-<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Flexible noise: shape determines whether Weber’s law holds&#39;</span><span class="p">,</span>
-             <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+plt.suptitle(&#39;Flexible noise: shape determines whether Weber’s law holds&#39;,
+             fontsize=12, y=1.02)
+plt.tight_layout()
 </pre></div>
-</div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="../_images/tutorial_lesson4_3_0.png" src="../_images/tutorial_lesson4_3_0.png" />
 </div>
 </div>
 </section>
 <section id="Part-A:-Dot-array-magnitude-comparison-(Garcia-et-al.-2022)">
 <h2>Part A: Dot-array magnitude comparison (Garcia et al. 2022)<a class="headerlink" href="#Part-A:-Dot-array-magnitude-comparison-(Garcia-et-al.-2022)" title="Link to this heading">¶</a></h2>
 <p>Dot arrays are a classic <strong>perceptual</strong> numerosity stimulus where Weber’s law is well-established. Fitting the Flexible Noise model here serves as a sanity check: the recovered <span class="math notranslate nohighlight">\(\nu(n)\)</span> should be approximately <strong>linear</strong>. The MCM baseline assumes log-space noise, which translates to <span class="math notranslate nohighlight">\(\sigma_\text{MCM}(n) = \nu_\text{log} \times n\)</span> (a line through the origin) — the same Weber’s-law prediction.</p>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># MagnitudeComparisonModel (MCM) — fixed log-space noise (Weber&#39;s-law null)</span>
-<span class="c1"># idata_kwargs passes extra arguments to pymc.sample_posterior_predictive;</span>
-<span class="c1"># log_likelihood=True stores trial-level log-likelihoods needed for ELPD comparison.</span>
-<span class="n">model_mcm</span> <span class="o">=</span> <span class="n">MagnitudeComparisonModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df_mag</span><span class="p">,</span> <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">model_mcm</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">df_mag</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">idata_mcm</span> <span class="o">=</span> <span class="n">model_mcm</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                              <span class="n">idata_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;log_likelihood&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># MagnitudeComparisonModel (MCM) — fixed log-space noise (Weber&#39;s-law null)
+# idata_kwargs passes extra arguments to pymc.sample_posterior_predictive;
+# log_likelihood=True stores trial-level log-likelihoods needed for ELPD comparison.
+model_mcm = MagnitudeComparisonModel(paradigm=df_mag, fit_separate_evidence_sd=True)
+model_mcm.build_estimation_model(data=df_mag, hierarchical=True)
+idata_mcm = model_mcm.sample(draws=200, tune=200, chains=4, progressbar=False,
+                              idata_kwargs={&#39;log_likelihood&#39;: True})
 </pre></div>
 </div>
 </div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (4 chains in 4 jobs)
-NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset, n2_evidence_sd_mu_untransformed, n2_evidence_sd_sd, n2_evidence_sd_offset]
-Sampling 4 chains for 200 tune and 200 draw iterations (800 + 800 draws total) took 36 seconds.
-The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
-The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
-</pre></div></div>
-</div>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># FlexibleNoiseComparisonModel — free noise curve fitted to dot arrays</span>
-<span class="n">model_flex_mag</span> <span class="o">=</span> <span class="n">FlexibleNoiseComparisonModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df_mag</span><span class="p">,</span>
-                                               <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                                               <span class="n">polynomial_order</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-<span class="n">model_flex_mag</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df_mag</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">idata_flex_mag</span> <span class="o">=</span> <span class="n">model_flex_mag</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                                        <span class="n">idata_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;log_likelihood&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># FlexibleNoiseComparisonModel — free noise curve fitted to dot arrays
+model_flex_mag = FlexibleNoiseComparisonModel(paradigm=df_mag,
+                                               fit_separate_evidence_sd=True,
+                                               spline_order=5)
+model_flex_mag.build_estimation_model(paradigm=df_mag, hierarchical=True)
+idata_flex_mag = model_flex_mag.sample(draws=200, tune=200, chains=4, progressbar=False,
+                                        idata_kwargs={&#39;log_likelihood&#39;: True})
 </pre></div>
 </div>
 </div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (4 chains in 4 jobs)
-NUTS: [n1_evidence_sd_spline1_mu, n1_evidence_sd_spline1_sd, n1_evidence_sd_spline1_offset, n1_evidence_sd_spline2_mu, n1_evidence_sd_spline2_sd, n1_evidence_sd_spline2_offset, n1_evidence_sd_spline3_mu, n1_evidence_sd_spline3_sd, n1_evidence_sd_spline3_offset, n1_evidence_sd_spline4_mu, n1_evidence_sd_spline4_sd, n1_evidence_sd_spline4_offset, n1_evidence_sd_spline5_mu, n1_evidence_sd_spline5_sd, n1_evidence_sd_spline5_offset, n2_evidence_sd_spline1_mu, n2_evidence_sd_spline1_sd, n2_evidence_sd_spline1_offset, n2_evidence_sd_spline2_mu, n2_evidence_sd_spline2_sd, n2_evidence_sd_spline2_offset, n2_evidence_sd_spline3_mu, n2_evidence_sd_spline3_sd, n2_evidence_sd_spline3_offset, n2_evidence_sd_spline4_mu, n2_evidence_sd_spline4_sd, n2_evidence_sd_spline4_offset, n2_evidence_sd_spline5_mu, n2_evidence_sd_spline5_sd, n2_evidence_sd_spline5_offset]
-Sampling 4 chains for 200 tune and 200 draw iterations (800 + 800 draws total) took 156 seconds.
-The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
-The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
-</pre></div></div>
-</div>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># AffineNoiseComparisonModel — intercept + linear noise (defined above)</span>
-<span class="n">model_affine_mag</span> <span class="o">=</span> <span class="n">AffineNoiseComparisonModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df_mag</span><span class="p">,</span>
-                                               <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">model_affine_mag</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df_mag</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">idata_affine_mag</span> <span class="o">=</span> <span class="n">model_affine_mag</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                                            <span class="n">idata_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;log_likelihood&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># AffineNoiseComparisonModel — intercept + linear noise (defined above)
+model_affine_mag = AffineNoiseComparisonModel(paradigm=df_mag,
+                                               fit_separate_evidence_sd=True)
+model_affine_mag.build_estimation_model(paradigm=df_mag, hierarchical=True)
+idata_affine_mag = model_affine_mag.sample(draws=200, tune=200, chains=4, progressbar=False,
+                                            idata_kwargs={&#39;log_likelihood&#39;: True})
 </pre></div>
 </div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (4 chains in 4 jobs)
-NUTS: [n1_evidence_sd_spline1_mu, n1_evidence_sd_spline1_sd, n1_evidence_sd_spline1_offset, n1_evidence_sd_spline2_mu, n1_evidence_sd_spline2_sd, n1_evidence_sd_spline2_offset, n2_evidence_sd_spline1_mu, n2_evidence_sd_spline1_sd, n2_evidence_sd_spline1_offset, n2_evidence_sd_spline2_mu, n2_evidence_sd_spline2_sd, n2_evidence_sd_spline2_offset]
-Sampling 4 chains for 200 tune and 200 draw iterations (800 + 800 draws total) took 92 seconds.
-There was 1 divergence after tuning. Increase `target_accept` or reparameterize.
-The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
-The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
-</pre></div></div>
 </div>
 <section id="Posterior-noise-curves-—-dot-arrays">
 <h3>Posterior noise curves — dot arrays<a class="headerlink" href="#Posterior-noise-curves-—-dot-arrays" title="Link to this heading">¶</a></h3>
 <p>If Weber’s law holds, all three curves should overlap: both the FlexNoise (red) and AffineNoise (green) should track the MCM reference line <span class="math notranslate nohighlight">\(\sigma = \nu_\text{log} \times n\)</span> (dashed blue). A non-zero intercept in the AffineNoise curve would indicate baseline noise that does not scale with magnitude.</p>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sd_curves_mag</span> <span class="o">=</span> <span class="n">model_flex_mag</span><span class="o">.</span><span class="n">get_sd_curve</span><span class="p">(</span><span class="n">idata</span><span class="o">=</span><span class="n">idata_flex_mag</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span>
-                                              <span class="n">group</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">df_mag</span><span class="o">.</span><span class="n">reset_index</span><span class="p">())</span>
-<span class="n">sd_curves_aff</span> <span class="o">=</span> <span class="n">model_affine_mag</span><span class="o">.</span><span class="n">get_sd_curve</span><span class="p">(</span><span class="n">idata</span><span class="o">=</span><span class="n">idata_affine_mag</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span>
-                                                <span class="n">group</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">df_mag</span><span class="o">.</span><span class="n">reset_index</span><span class="p">())</span>
-<span class="n">nu1_mcm</span> <span class="o">=</span> <span class="n">idata_mcm</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd_mu&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
-<span class="n">nu2_mcm</span> <span class="o">=</span> <span class="n">idata_mcm</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd_mu&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>sd_curves_mag = model_flex_mag.get_sd_curve(idata=idata_flex_mag, variable=&#39;both&#39;,
+                                              group=True, data=df_mag.reset_index())
+sd_curves_aff = model_affine_mag.get_sd_curve(idata=idata_affine_mag, variable=&#39;both&#39;,
+                                                group=True, data=df_mag.reset_index())
+nu1_mcm = idata_mcm.posterior[&#39;n1_evidence_sd_mu&#39;].values.ravel()
+nu2_mcm = idata_mcm.posterior[&#39;n2_evidence_sd_mu&#39;].values.ravel()
 
-<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mf">4.5</span><span class="p">))</span>
-<span class="n">colors</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;flex&#39;</span><span class="p">:</span> <span class="s1">&#39;#d73027&#39;</span><span class="p">,</span> <span class="s1">&#39;affine&#39;</span><span class="p">:</span> <span class="s1">&#39;#1a9850&#39;</span><span class="p">,</span> <span class="s1">&#39;mcm&#39;</span><span class="p">:</span> <span class="s1">&#39;#4393c3&#39;</span><span class="p">}</span>
+fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+colors = {&#39;flex&#39;: &#39;#d73027&#39;, &#39;affine&#39;: &#39;#1a9850&#39;, &#39;mcm&#39;: &#39;#4393c3&#39;}
 
-<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="p">(</span><span class="n">var_col</span><span class="p">,</span> <span class="n">nu_mcm_samp</span><span class="p">,</span> <span class="n">title</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
-        <span class="n">axes</span><span class="p">,</span>
-        <span class="p">[(</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="n">nu1_mcm</span><span class="p">,</span> <span class="s1">&#39;First option  σ₁(n)&#39;</span><span class="p">),</span>
-         <span class="p">(</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">,</span> <span class="n">nu2_mcm</span><span class="p">,</span> <span class="s1">&#39;Second option  σ₂(n)&#39;</span><span class="p">)]):</span>
-    <span class="c1"># FlexNoise (B-spline)</span>
-    <span class="n">grp</span> <span class="o">=</span> <span class="n">sd_curves_mag</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">)[</span><span class="n">var_col</span><span class="p">]</span>
-    <span class="n">x_vals</span> <span class="o">=</span> <span class="n">grp</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">x_vals</span><span class="p">,</span> <span class="n">grp</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.025</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">grp</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.975</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
-                    <span class="n">alpha</span><span class="o">=</span><span class="mf">.18</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;flex&#39;</span><span class="p">])</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_vals</span><span class="p">,</span> <span class="n">grp</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;flex&#39;</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;FlexNoise (B-spline)&#39;</span><span class="p">)</span>
-    <span class="c1"># AffineNoise (intercept + linear)</span>
-    <span class="n">grp_a</span> <span class="o">=</span> <span class="n">sd_curves_aff</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">)[</span><span class="n">var_col</span><span class="p">]</span>
-    <span class="n">x_a</span> <span class="o">=</span> <span class="n">grp_a</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">x_a</span><span class="p">,</span> <span class="n">grp_a</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.025</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">grp_a</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.975</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
-                    <span class="n">alpha</span><span class="o">=</span><span class="mf">.18</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;affine&#39;</span><span class="p">])</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_a</span><span class="p">,</span> <span class="n">grp_a</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;affine&#39;</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;AffineNoise (a + b·n)&#39;</span><span class="p">)</span>
-    <span class="c1"># MCM reference (Weber: σ = ν₀ × n)</span>
-    <span class="n">nu0</span> <span class="o">=</span> <span class="n">nu_mcm_samp</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_vals</span><span class="p">,</span> <span class="n">nu0</span> <span class="o">*</span> <span class="n">x_vals</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;mcm&#39;</span><span class="p">],</span>
-            <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;MCM (Weber)  ν₀=</span><span class="si">{</span><span class="n">nu0</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">x_vals</span><span class="p">,</span>
-                    <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">nu_mcm_samp</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">)</span> <span class="o">*</span> <span class="n">x_vals</span><span class="p">,</span>
-                    <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">nu_mcm_samp</span><span class="p">,</span> <span class="mf">97.5</span><span class="p">)</span> <span class="o">*</span> <span class="n">x_vals</span><span class="p">,</span>
-                    <span class="n">alpha</span><span class="o">=</span><span class="mf">.10</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;mcm&#39;</span><span class="p">])</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Magnitude  n&#39;</span><span class="p">)</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Natural-space noise  σ(n)&#39;</span><span class="p">)</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">title</span><span class="p">);</span> <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mf">8.5</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+for ax, (var_col, nu_mcm_samp, title) in zip(
+        axes,
+        [(&#39;n1_evidence_sd&#39;, nu1_mcm, &#39;First option  σ₁(n)&#39;),
+         (&#39;n2_evidence_sd&#39;, nu2_mcm, &#39;Second option  σ₂(n)&#39;)]):
+    # FlexNoise (B-spline)
+    grp = sd_curves_mag.groupby(level=&#39;x&#39;)[var_col]
+    x_vals = grp.mean().index.values
+    ax.fill_between(x_vals, grp.quantile(0.025).values, grp.quantile(0.975).values,
+                    alpha=.18, color=colors[&#39;flex&#39;])
+    ax.plot(x_vals, grp.mean().values, lw=2.5, color=colors[&#39;flex&#39;], label=&#39;FlexNoise (B-spline)&#39;)
+    # AffineNoise (intercept + linear)
+    grp_a = sd_curves_aff.groupby(level=&#39;x&#39;)[var_col]
+    x_a = grp_a.mean().index.values
+    ax.fill_between(x_a, grp_a.quantile(0.025).values, grp_a.quantile(0.975).values,
+                    alpha=.18, color=colors[&#39;affine&#39;])
+    ax.plot(x_a, grp_a.mean().values, lw=2.5, color=colors[&#39;affine&#39;], label=&#39;AffineNoise (a + b·n)&#39;)
+    # MCM reference (Weber: σ = ν₀ × n)
+    nu0 = nu_mcm_samp.mean()
+    ax.plot(x_vals, nu0 * x_vals, ls=&#39;--&#39;, lw=2, color=colors[&#39;mcm&#39;],
+            label=f&#39;MCM (Weber)  ν₀={nu0:.2f}&#39;)
+    ax.fill_between(x_vals,
+                    np.percentile(nu_mcm_samp, 2.5) * x_vals,
+                    np.percentile(nu_mcm_samp, 97.5) * x_vals,
+                    alpha=.10, color=colors[&#39;mcm&#39;])
+    ax.set_xlabel(&#39;Magnitude  n&#39;)
+    ax.set_ylabel(&#39;Natural-space noise  σ(n)&#39;)
+    ax.set_title(title); ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
-<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Dot arrays: MCM vs AffineNoise vs FlexNoise (95 % posterior interval)&#39;</span><span class="p">,</span>
-             <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+plt.suptitle(&#39;Dot arrays: MCM vs AffineNoise vs FlexNoise (95 % posterior interval)&#39;,
+             fontsize=12, y=1.02)
+plt.tight_layout()
 </pre></div>
-</div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="../_images/tutorial_lesson4_9_0.png" src="../_images/tutorial_lesson4_9_0.png" />
 </div>
 </div>
 </section>
@@ -602,99 +539,65 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 <li><p><strong>Is the deviation captured by a simple intercept, or is genuine nonlinearity needed?</strong> Compare AffineNoise vs FlexNoise.</p></li>
 </ol>
 <p>If AffineNoise matches FlexNoise on ELPD while beating MCM, the deviation from Weber’s law is well-described by a noise floor — a simple, interpretable parameter.</p>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ELPD model comparison — dot arrays (3-way)</span>
-<span class="n">compare_mag</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">compare</span><span class="p">({</span><span class="s1">&#39;MCM (Weber)&#39;</span><span class="p">:</span>   <span class="n">idata_mcm</span><span class="p">,</span>
-                           <span class="s1">&#39;AffineNoise&#39;</span><span class="p">:</span>   <span class="n">idata_affine_mag</span><span class="p">,</span>
-                           <span class="s1">&#39;FlexNoise&#39;</span><span class="p">:</span>     <span class="n">idata_flex_mag</span><span class="p">})</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">compare_mag</span><span class="p">[[</span><span class="s1">&#39;elpd_loo&#39;</span><span class="p">,</span> <span class="s1">&#39;p_loo&#39;</span><span class="p">,</span> <span class="s1">&#39;elpd_diff&#39;</span><span class="p">,</span> <span class="s1">&#39;dse&#39;</span><span class="p">,</span> <span class="s1">&#39;warning&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ELPD model comparison — dot arrays (3-way)
+compare_mag = az.compare({&#39;MCM (Weber)&#39;:   idata_mcm,
+                           &#39;AffineNoise&#39;:   idata_affine_mag,
+                           &#39;FlexNoise&#39;:     idata_flex_mag})
+print(compare_mag[[&#39;elpd_loo&#39;, &#39;p_loo&#39;, &#39;elpd_diff&#39;, &#39;dse&#39;, &#39;warning&#39;]].to_string())
 </pre></div>
 </div>
 </div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-                elpd_loo       p_loo   elpd_diff        dse  warning
-FlexNoise   -3390.563812  246.417456    0.000000   0.000000     True
-MCM (Weber) -3481.573198   94.900493   91.009386  26.049270     True
-AffineNoise -3573.241605  232.238865  182.677793  22.417787     True
-</pre></div></div>
-</div>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ax</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">plot_compare</span><span class="p">(</span><span class="n">compare_mag</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mf">3.5</span><span class="p">))</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;ELPD comparison — dot-array magnitude comparison (higher = better prediction)&#39;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>ax = az.plot_compare(compare_mag, figsize=(7, 3.5))
+ax.set_title(&#39;ELPD comparison — dot-array magnitude comparison (higher = better prediction)&#39;)
+plt.tight_layout()
 </pre></div>
 </div>
 </div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="../_images/tutorial_lesson4_12_0.png" src="../_images/tutorial_lesson4_12_0.png" />
-</div>
-</div>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ── Interpret the dot-array ELPD result (3-way) ─────────────────────────────</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;ELPD ranking (dot arrays):&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">compare_mag</span><span class="p">[[</span><span class="s1">&#39;elpd_loo&#39;</span><span class="p">,</span> <span class="s1">&#39;p_loo&#39;</span><span class="p">,</span> <span class="s1">&#39;elpd_diff&#39;</span><span class="p">,</span> <span class="s1">&#39;dse&#39;</span><span class="p">,</span> <span class="s1">&#39;warning&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>
-<span class="nb">print</span><span class="p">()</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ── Interpret the dot-array ELPD result (3-way) ─────────────────────────────
+print(&quot;ELPD ranking (dot arrays):&quot;)
+print(compare_mag[[&#39;elpd_loo&#39;, &#39;p_loo&#39;, &#39;elpd_diff&#39;, &#39;dse&#39;, &#39;warning&#39;]].to_string())
+print()
 
-<span class="c1"># Pairwise interpretation</span>
-<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">compare_mag</span><span class="p">)):</span>
-    <span class="n">name</span> <span class="o">=</span> <span class="n">compare_mag</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-    <span class="n">diff</span> <span class="o">=</span> <span class="n">compare_mag</span><span class="p">[</span><span class="s1">&#39;elpd_diff&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-    <span class="n">dse</span>  <span class="o">=</span> <span class="n">compare_mag</span><span class="p">[</span><span class="s1">&#39;dse&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-    <span class="n">ratio</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">diff</span><span class="p">)</span> <span class="o">/</span> <span class="n">dse</span> <span class="k">if</span> <span class="n">dse</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;inf&#39;</span><span class="p">)</span>
-    <span class="n">winner</span> <span class="o">=</span> <span class="n">compare_mag</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-    <span class="n">verdict</span> <span class="o">=</span> <span class="s2">&quot;distinguishable&quot;</span> <span class="k">if</span> <span class="n">ratio</span> <span class="o">&gt;</span> <span class="mi">2</span> <span class="k">else</span> <span class="s2">&quot;NOT distinguishable&quot;</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">winner</span><span class="si">}</span><span class="s2"> vs </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">:  DELTA_ELPD = </span><span class="si">{</span><span class="n">diff</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">,  SE = </span><span class="si">{</span><span class="n">dse</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">,  &quot;</span>
-          <span class="sa">f</span><span class="s2">&quot;|ratio| = </span><span class="si">{</span><span class="n">ratio</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">  -&gt;  </span><span class="si">{</span><span class="n">verdict</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+# Pairwise interpretation
+for i in range(1, len(compare_mag)):
+    name = compare_mag.index[i]
+    diff = compare_mag[&#39;elpd_diff&#39;].iloc[i]
+    dse  = compare_mag[&#39;dse&#39;].iloc[i]
+    ratio = abs(diff) / dse if dse &gt; 0 else float(&#39;inf&#39;)
+    winner = compare_mag.index[0]
+    verdict = &quot;distinguishable&quot; if ratio &gt; 2 else &quot;NOT distinguishable&quot;
+    print(f&quot;  {winner} vs {name}:  DELTA_ELPD = {diff:.1f},  SE = {dse:.1f},  &quot;
+          f&quot;|ratio| = {ratio:.1f}  -&gt;  {verdict}&quot;)
 
-<span class="c1"># Key question: does AffineNoise capture the FlexNoise advantage?</span>
-<span class="k">if</span> <span class="s1">&#39;AffineNoise&#39;</span> <span class="ow">in</span> <span class="n">compare_mag</span><span class="o">.</span><span class="n">index</span> <span class="ow">and</span> <span class="s1">&#39;FlexNoise&#39;</span> <span class="ow">in</span> <span class="n">compare_mag</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
-    <span class="n">aff_rank</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">compare_mag</span><span class="o">.</span><span class="n">index</span><span class="p">)</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">&#39;AffineNoise&#39;</span><span class="p">)</span>
-    <span class="n">flex_rank</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">compare_mag</span><span class="o">.</span><span class="n">index</span><span class="p">)</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">&#39;FlexNoise&#39;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">()</span>
-    <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">aff_rank</span> <span class="o">-</span> <span class="n">flex_rank</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="n">aff_elpd</span> <span class="o">=</span> <span class="n">compare_mag</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;AffineNoise&#39;</span><span class="p">,</span> <span class="s1">&#39;elpd_loo&#39;</span><span class="p">]</span>
-        <span class="n">flex_elpd</span> <span class="o">=</span> <span class="n">compare_mag</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;FlexNoise&#39;</span><span class="p">,</span> <span class="s1">&#39;elpd_loo&#39;</span><span class="p">]</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;AffineNoise ELPD: </span><span class="si">{</span><span class="n">aff_elpd</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">,  FlexNoise ELPD: </span><span class="si">{</span><span class="n">flex_elpd</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">aff_elpd</span> <span class="o">-</span> <span class="n">flex_elpd</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">10</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-&gt; Affine noise captures most of the FlexNoise advantage.&quot;</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;   The deviation from Weber&#39;s law is well-described by a noise floor (a + b*n).&quot;</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-&gt; Affine noise does NOT fully capture the flexible curve&#39;s advantage.&quot;</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;   Genuine nonlinearity in the noise function is needed.&quot;</span><span class="p">)</span>
+# Key question: does AffineNoise capture the FlexNoise advantage?
+if &#39;AffineNoise&#39; in compare_mag.index and &#39;FlexNoise&#39; in compare_mag.index:
+    aff_rank = list(compare_mag.index).index(&#39;AffineNoise&#39;)
+    flex_rank = list(compare_mag.index).index(&#39;FlexNoise&#39;)
+    print()
+    if abs(aff_rank - flex_rank) &lt;= 1:
+        aff_elpd = compare_mag.loc[&#39;AffineNoise&#39;, &#39;elpd_loo&#39;]
+        flex_elpd = compare_mag.loc[&#39;FlexNoise&#39;, &#39;elpd_loo&#39;]
+        print(f&quot;AffineNoise ELPD: {aff_elpd:.1f},  FlexNoise ELPD: {flex_elpd:.1f}&quot;)
+        if abs(aff_elpd - flex_elpd) &lt; 10:
+            print(&quot;-&gt; Affine noise captures most of the FlexNoise advantage.&quot;)
+            print(&quot;   The deviation from Weber&#39;s law is well-described by a noise floor (a + b*n).&quot;)
+        else:
+            print(&quot;-&gt; Affine noise does NOT fully capture the flexible curve&#39;s advantage.&quot;)
+            print(&quot;   Genuine nonlinearity in the noise function is needed.&quot;)
 </pre></div>
 </div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-ELPD ranking (dot arrays):
-                elpd_loo       p_loo   elpd_diff        dse  warning
-FlexNoise   -3390.563812  246.417456    0.000000   0.000000     True
-MCM (Weber) -3481.573198   94.900493   91.009386  26.049270     True
-AffineNoise -3573.241605  232.238865  182.677793  22.417787     True
-
-  FlexNoise vs MCM (Weber):  DELTA_ELPD = 91.0,  SE = 26.0,  |ratio| = 3.5  -&gt;  distinguishable
-  FlexNoise vs AffineNoise:  DELTA_ELPD = 182.7,  SE = 22.4,  |ratio| = 8.1  -&gt;  distinguishable
-
-</pre></div></div>
 </div>
 </section>
 </section>
@@ -706,162 +609,114 @@ AffineNoise -3573.241605  232.238865  182.677793  22.417787     True
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">prep_df</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
-    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
-    <span class="n">risky_first</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mf">0.55</span>
-    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;log_ratio&#39;</span><span class="p">]</span>     <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
-        <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">])</span> <span class="o">/</span>
-        <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]))</span>
-    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;chose_risky&#39;</span><span class="p">]</span>   <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="o">~</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">])</span>
-    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n_safe&#39;</span><span class="p">]</span>        <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">],</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])</span>
-    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;risky_first&#39;</span><span class="p">]</span>   <span class="o">=</span> <span class="n">risky_first</span>
-    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;order&#39;</span><span class="p">]</span>         <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="s1">&#39;Risky first&#39;</span><span class="p">,</span> <span class="s1">&#39;Safe first&#39;</span><span class="p">)</span>
-    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;log_ratio_bin&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">cut</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;log_ratio&#39;</span><span class="p">],</span> <span class="n">bins</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
-                             <span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">mid</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">))</span>
-    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;n_safe_bin&#39;</span><span class="p">]</span>    <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">qcut</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;n_safe&#39;</span><span class="p">],</span> <span class="n">q</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
-                                   <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Low stakes&#39;</span><span class="p">,</span> <span class="s1">&#39;Mid stakes&#39;</span><span class="p">,</span> <span class="s1">&#39;High stakes&#39;</span><span class="p">])</span>
-    <span class="k">return</span> <span class="n">df</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>def prep_df(df):
+    df = df.reset_index()
+    risky_first = df[&#39;p1&#39;] == 0.55
+    df[&#39;log_ratio&#39;]     = np.log(
+        np.where(risky_first, df[&#39;n1&#39;], df[&#39;n2&#39;]) /
+        np.where(risky_first, df[&#39;n2&#39;], df[&#39;n1&#39;]))
+    df[&#39;chose_risky&#39;]   = np.where(risky_first, ~df[&#39;choice&#39;], df[&#39;choice&#39;])
+    df[&#39;n_safe&#39;]        = np.where(risky_first, df[&#39;n2&#39;], df[&#39;n1&#39;])
+    df[&#39;risky_first&#39;]   = risky_first
+    df[&#39;order&#39;]         = np.where(risky_first, &#39;Risky first&#39;, &#39;Safe first&#39;)
+    df[&#39;log_ratio_bin&#39;] = (pd.cut(df[&#39;log_ratio&#39;], bins=10)
+                             .map(lambda x: x.mid).astype(float))
+    df[&#39;n_safe_bin&#39;]    = pd.qcut(df[&#39;n_safe&#39;], q=3,
+                                   labels=[&#39;Low stakes&#39;, &#39;Mid stakes&#39;, &#39;High stakes&#39;])
+    return df
 
-<span class="n">df_sym_p</span> <span class="o">=</span> <span class="n">prep_df</span><span class="p">(</span><span class="n">df_sym</span><span class="p">)</span>
+df_sym_p = prep_df(df_sym)
 </pre></div>
 </div>
 </div>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># PMCM (fixed log-space noise) — log_likelihood stored for ELPD comparison</span>
-<span class="n">model_pmcm</span> <span class="o">=</span> <span class="n">RiskModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df_sym</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
-                        <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">model_pmcm</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">df_sym</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_p_choice</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">idata_pmcm</span> <span class="o">=</span> <span class="n">model_pmcm</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                                <span class="n">idata_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;log_likelihood&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># PMCM (fixed log-space noise) — log_likelihood stored for ELPD comparison
+model_pmcm = RiskModel(paradigm=df_sym, prior_estimate=&#39;full&#39;,
+                        fit_separate_evidence_sd=True)
+model_pmcm.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
+idata_pmcm = model_pmcm.sample(draws=200, tune=200, chains=4, progressbar=False,
+                                idata_kwargs={&#39;log_likelihood&#39;: True})
 </pre></div>
 </div>
 </div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (4 chains in 4 jobs)
-NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset, n2_evidence_sd_mu_untransformed, n2_evidence_sd_sd, n2_evidence_sd_offset, risky_prior_mu_mu, risky_prior_mu_sd, risky_prior_mu_offset, risky_prior_sd_mu_untransformed, risky_prior_sd_sd, risky_prior_sd_offset, safe_prior_mu_mu, safe_prior_mu_sd, safe_prior_mu_offset, safe_prior_sd_mu_untransformed, safe_prior_sd_sd, safe_prior_sd_offset]
-Sampling 4 chains for 200 tune and 200 draw iterations (800 + 800 draws total) took 115 seconds.
-The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
-The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
-</pre></div></div>
-</div>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># FlexibleNoiseRiskModel — free noise curve on Arabic-numeral data</span>
-<span class="n">model_flex</span> <span class="o">=</span> <span class="n">FlexibleNoiseRiskModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df_sym</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
-                                     <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">polynomial_order</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-<span class="n">model_flex</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df_sym</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_p_choice</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">idata_flex</span> <span class="o">=</span> <span class="n">model_flex</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                                <span class="n">idata_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;log_likelihood&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># FlexibleNoiseRiskModel — free noise curve on Arabic-numeral data
+model_flex = FlexibleNoiseRiskModel(paradigm=df_sym, prior_estimate=&#39;full&#39;,
+                                     fit_separate_evidence_sd=True, spline_order=5)
+model_flex.build_estimation_model(paradigm=df_sym, hierarchical=True, save_p_choice=True)
+idata_flex = model_flex.sample(draws=200, tune=200, chains=4, progressbar=False,
+                                idata_kwargs={&#39;log_likelihood&#39;: True})
 </pre></div>
 </div>
 </div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (4 chains in 4 jobs)
-NUTS: [n1_evidence_sd_spline1_mu, n1_evidence_sd_spline1_sd, n1_evidence_sd_spline1_offset, n1_evidence_sd_spline2_mu, n1_evidence_sd_spline2_sd, n1_evidence_sd_spline2_offset, n1_evidence_sd_spline3_mu, n1_evidence_sd_spline3_sd, n1_evidence_sd_spline3_offset, n1_evidence_sd_spline4_mu, n1_evidence_sd_spline4_sd, n1_evidence_sd_spline4_offset, n1_evidence_sd_spline5_mu, n1_evidence_sd_spline5_sd, n1_evidence_sd_spline5_offset, n2_evidence_sd_spline1_mu, n2_evidence_sd_spline1_sd, n2_evidence_sd_spline1_offset, n2_evidence_sd_spline2_mu, n2_evidence_sd_spline2_sd, n2_evidence_sd_spline2_offset, n2_evidence_sd_spline3_mu, n2_evidence_sd_spline3_sd, n2_evidence_sd_spline3_offset, n2_evidence_sd_spline4_mu, n2_evidence_sd_spline4_sd, n2_evidence_sd_spline4_offset, n2_evidence_sd_spline5_mu, n2_evidence_sd_spline5_sd, n2_evidence_sd_spline5_offset, risky_prior_mu_mu, risky_prior_mu_sd, risky_prior_mu_offset, risky_prior_sd_mu_untransformed, risky_prior_sd_sd, risky_prior_sd_offset, safe_prior_mu_mu, safe_prior_mu_sd, safe_prior_mu_offset, safe_prior_sd_mu_untransformed, safe_prior_sd_sd, safe_prior_sd_offset]
-Sampling 4 chains for 200 tune and 200 draw iterations (800 + 800 draws total) took 911 seconds.
-There were 305 divergences after tuning. Increase `target_accept` or reparameterize.
-The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
-The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
-</pre></div></div>
-</div>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># AffineNoiseRiskModel — intercept + linear noise for Arabic-numeral gambles</span>
-<span class="n">model_affine</span> <span class="o">=</span> <span class="n">AffineNoiseRiskModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df_sym</span><span class="p">,</span> <span class="n">prior_estimate</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">,</span>
-                                     <span class="n">fit_separate_evidence_sd</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">model_affine</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df_sym</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_p_choice</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">idata_affine</span> <span class="o">=</span> <span class="n">model_affine</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                                    <span class="n">idata_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;log_likelihood&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># AffineNoiseRiskModel — intercept + linear noise for Arabic-numeral gambles
+model_affine = AffineNoiseRiskModel(paradigm=df_sym, prior_estimate=&#39;full&#39;,
+                                     fit_separate_evidence_sd=True)
+model_affine.build_estimation_model(paradigm=df_sym, hierarchical=True, save_p_choice=True)
+idata_affine = model_affine.sample(draws=200, tune=200, chains=4, progressbar=False,
+                                    idata_kwargs={&#39;log_likelihood&#39;: True})
 </pre></div>
 </div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (4 chains in 4 jobs)
-NUTS: [n1_evidence_sd_spline1_mu, n1_evidence_sd_spline1_sd, n1_evidence_sd_spline1_offset, n1_evidence_sd_spline2_mu, n1_evidence_sd_spline2_sd, n1_evidence_sd_spline2_offset, n2_evidence_sd_spline1_mu, n2_evidence_sd_spline1_sd, n2_evidence_sd_spline1_offset, n2_evidence_sd_spline2_mu, n2_evidence_sd_spline2_sd, n2_evidence_sd_spline2_offset, risky_prior_mu_mu, risky_prior_mu_sd, risky_prior_mu_offset, risky_prior_sd_mu_untransformed, risky_prior_sd_sd, risky_prior_sd_offset, safe_prior_mu_mu, safe_prior_mu_sd, safe_prior_mu_offset, safe_prior_sd_mu_untransformed, safe_prior_sd_sd, safe_prior_sd_offset]
-Sampling 4 chains for 200 tune and 200 draw iterations (800 + 800 draws total) took 748 seconds.
-There were 300 divergences after tuning. Increase `target_accept` or reparameterize.
-The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
-The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
-</pre></div></div>
 </div>
 <section id="Posterior-noise-curves-—-Arabic-numerals">
 <h3>Posterior noise curves — Arabic numerals<a class="headerlink" href="#Posterior-noise-curves-—-Arabic-numerals" title="Link to this heading">¶</a></h3>
 <p>Three models are overlaid: the B-spline FlexNoise (red), the two-parameter AffineNoise (green), and the PMCM Weber reference (dashed blue).</p>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sd_curves</span> <span class="o">=</span> <span class="n">model_flex</span><span class="o">.</span><span class="n">get_sd_curve</span><span class="p">(</span><span class="n">idata</span><span class="o">=</span><span class="n">idata_flex</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span>
-                                     <span class="n">group</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">df_sym</span><span class="o">.</span><span class="n">reset_index</span><span class="p">())</span>
-<span class="n">sd_curves_aff_sym</span> <span class="o">=</span> <span class="n">model_affine</span><span class="o">.</span><span class="n">get_sd_curve</span><span class="p">(</span><span class="n">idata</span><span class="o">=</span><span class="n">idata_affine</span><span class="p">,</span> <span class="n">variable</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span>
-                                                <span class="n">group</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">df_sym</span><span class="o">.</span><span class="n">reset_index</span><span class="p">())</span>
-<span class="n">nu1_pmcm</span> <span class="o">=</span> <span class="n">idata_pmcm</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd_mu&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
-<span class="n">nu2_pmcm</span> <span class="o">=</span> <span class="n">idata_pmcm</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd_mu&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>sd_curves = model_flex.get_sd_curve(idata=idata_flex, variable=&#39;both&#39;,
+                                     group=True, data=df_sym.reset_index())
+sd_curves_aff_sym = model_affine.get_sd_curve(idata=idata_affine, variable=&#39;both&#39;,
+                                                group=True, data=df_sym.reset_index())
+nu1_pmcm = idata_pmcm.posterior[&#39;n1_evidence_sd_mu&#39;].values.ravel()
+nu2_pmcm = idata_pmcm.posterior[&#39;n2_evidence_sd_mu&#39;].values.ravel()
 
-<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mf">4.5</span><span class="p">))</span>
-<span class="n">colors</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;flex&#39;</span><span class="p">:</span> <span class="s1">&#39;#d73027&#39;</span><span class="p">,</span> <span class="s1">&#39;affine&#39;</span><span class="p">:</span> <span class="s1">&#39;#1a9850&#39;</span><span class="p">,</span> <span class="s1">&#39;pmcm&#39;</span><span class="p">:</span> <span class="s1">&#39;#4393c3&#39;</span><span class="p">}</span>
+fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+colors = {&#39;flex&#39;: &#39;#d73027&#39;, &#39;affine&#39;: &#39;#1a9850&#39;, &#39;pmcm&#39;: &#39;#4393c3&#39;}
 
-<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="p">(</span><span class="n">var_col</span><span class="p">,</span> <span class="n">nu_pmcm_samp</span><span class="p">,</span> <span class="n">title</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
-        <span class="n">axes</span><span class="p">,</span>
-        <span class="p">[(</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">,</span> <span class="n">nu1_pmcm</span><span class="p">,</span> <span class="s1">&#39;First option  σ₁(n)&#39;</span><span class="p">),</span>
-         <span class="p">(</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">,</span> <span class="n">nu2_pmcm</span><span class="p">,</span> <span class="s1">&#39;Second option  σ₂(n)&#39;</span><span class="p">)]):</span>
-    <span class="c1"># FlexNoise</span>
-    <span class="n">grp</span> <span class="o">=</span> <span class="n">sd_curves</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">)[</span><span class="n">var_col</span><span class="p">]</span>
-    <span class="n">x_vals</span> <span class="o">=</span> <span class="n">grp</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">x_vals</span><span class="p">,</span> <span class="n">grp</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.025</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">grp</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.975</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
-                    <span class="n">alpha</span><span class="o">=</span><span class="mf">.18</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;flex&#39;</span><span class="p">])</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_vals</span><span class="p">,</span> <span class="n">grp</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;flex&#39;</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;FlexNoise (B-spline)&#39;</span><span class="p">)</span>
-    <span class="c1"># AffineNoise</span>
-    <span class="n">grp_a</span> <span class="o">=</span> <span class="n">sd_curves_aff_sym</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">)[</span><span class="n">var_col</span><span class="p">]</span>
-    <span class="n">x_a</span> <span class="o">=</span> <span class="n">grp_a</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">x_a</span><span class="p">,</span> <span class="n">grp_a</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.025</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">grp_a</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.975</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
-                    <span class="n">alpha</span><span class="o">=</span><span class="mf">.18</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;affine&#39;</span><span class="p">])</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_a</span><span class="p">,</span> <span class="n">grp_a</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;affine&#39;</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;AffineNoise (a + b·n)&#39;</span><span class="p">)</span>
-    <span class="c1"># PMCM reference</span>
-    <span class="n">nu0</span> <span class="o">=</span> <span class="n">nu_pmcm_samp</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_vals</span><span class="p">,</span> <span class="n">nu0</span> <span class="o">*</span> <span class="n">x_vals</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;pmcm&#39;</span><span class="p">],</span>
-            <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;PMCM (Weber)  ν₀=</span><span class="si">{</span><span class="n">nu0</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">x_vals</span><span class="p">,</span>
-                    <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">nu_pmcm_samp</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">)</span> <span class="o">*</span> <span class="n">x_vals</span><span class="p">,</span>
-                    <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">nu_pmcm_samp</span><span class="p">,</span> <span class="mf">97.5</span><span class="p">)</span> <span class="o">*</span> <span class="n">x_vals</span><span class="p">,</span>
-                    <span class="n">alpha</span><span class="o">=</span><span class="mf">.10</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="s1">&#39;pmcm&#39;</span><span class="p">])</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Payoff magnitude  n&#39;</span><span class="p">)</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Natural-space noise  σ(n)&#39;</span><span class="p">)</span>
-    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">title</span><span class="p">);</span> <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mf">8.5</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+for ax, (var_col, nu_pmcm_samp, title) in zip(
+        axes,
+        [(&#39;n1_evidence_sd&#39;, nu1_pmcm, &#39;First option  σ₁(n)&#39;),
+         (&#39;n2_evidence_sd&#39;, nu2_pmcm, &#39;Second option  σ₂(n)&#39;)]):
+    # FlexNoise
+    grp = sd_curves.groupby(level=&#39;x&#39;)[var_col]
+    x_vals = grp.mean().index.values
+    ax.fill_between(x_vals, grp.quantile(0.025).values, grp.quantile(0.975).values,
+                    alpha=.18, color=colors[&#39;flex&#39;])
+    ax.plot(x_vals, grp.mean().values, lw=2.5, color=colors[&#39;flex&#39;], label=&#39;FlexNoise (B-spline)&#39;)
+    # AffineNoise
+    grp_a = sd_curves_aff_sym.groupby(level=&#39;x&#39;)[var_col]
+    x_a = grp_a.mean().index.values
+    ax.fill_between(x_a, grp_a.quantile(0.025).values, grp_a.quantile(0.975).values,
+                    alpha=.18, color=colors[&#39;affine&#39;])
+    ax.plot(x_a, grp_a.mean().values, lw=2.5, color=colors[&#39;affine&#39;], label=&#39;AffineNoise (a + b·n)&#39;)
+    # PMCM reference
+    nu0 = nu_pmcm_samp.mean()
+    ax.plot(x_vals, nu0 * x_vals, ls=&#39;--&#39;, lw=2, color=colors[&#39;pmcm&#39;],
+            label=f&#39;PMCM (Weber)  ν₀={nu0:.2f}&#39;)
+    ax.fill_between(x_vals,
+                    np.percentile(nu_pmcm_samp, 2.5) * x_vals,
+                    np.percentile(nu_pmcm_samp, 97.5) * x_vals,
+                    alpha=.10, color=colors[&#39;pmcm&#39;])
+    ax.set_xlabel(&#39;Payoff magnitude  n&#39;)
+    ax.set_ylabel(&#39;Natural-space noise  σ(n)&#39;)
+    ax.set_title(title); ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
-<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Arabic numerals: PMCM vs AffineNoise vs FlexNoise (95 % posterior interval)&#39;</span><span class="p">,</span>
-             <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+plt.suptitle(&#39;Arabic numerals: PMCM vs AffineNoise vs FlexNoise (95 % posterior interval)&#39;,
+             fontsize=12, y=1.02)
+plt.tight_layout()
 </pre></div>
-</div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="../_images/tutorial_lesson4_20_0.png" src="../_images/tutorial_lesson4_20_0.png" />
 </div>
 </div>
 </section>
@@ -869,237 +724,140 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 <section id="Posterior-predictive-comparison-(Arabic-numerals)">
 <h2>Posterior predictive comparison (Arabic numerals)<a class="headerlink" href="#Posterior-predictive-comparison-(Arabic-numerals)" title="Link to this heading">¶</a></h2>
 <p>We overlay both models’ predictions against the observed presentation-order × stake-size pattern — the same diagnostic used in lesson 3.</p>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">summarize_ppc_group</span>
-<span class="n">stake_pal</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">([</span><span class="s1">&#39;Low stakes&#39;</span><span class="p">,</span> <span class="s1">&#39;Mid stakes&#39;</span><span class="p">,</span> <span class="s1">&#39;High stakes&#39;</span><span class="p">],</span> <span class="n">sns</span><span class="o">.</span><span class="n">color_palette</span><span class="p">(</span><span class="s1">&#39;YlOrRd&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">)))</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>from bauer.utils import summarize_ppc_group
+stake_pal = dict(zip([&#39;Low stakes&#39;, &#39;Mid stakes&#39;, &#39;High stakes&#39;], sns.color_palette(&#39;YlOrRd&#39;, 3)))
 
-<span class="k">def</span><span class="w"> </span><span class="nf">add_model_ppc</span><span class="p">(</span><span class="n">df_orig</span><span class="p">,</span> <span class="n">df_prepped</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">idata</span><span class="p">,</span> <span class="n">model_name</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Two-step PPC via summarize_ppc_group.&quot;&quot;&quot;</span>
-    <span class="n">ppc_df</span>  <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">ppc</span><span class="p">(</span><span class="n">df_orig</span><span class="p">,</span> <span class="n">idata</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;ll_bernoulli&#39;</span><span class="p">])</span>
-    <span class="n">ppc_ll</span>  <span class="o">=</span> <span class="n">ppc_df</span><span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="s1">&#39;ll_bernoulli&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span><span class="p">)</span>
-    <span class="n">sample_cols</span> <span class="o">=</span> <span class="n">ppc_ll</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+def add_model_ppc(df_orig, df_prepped, model, idata, model_name):
+    &quot;&quot;&quot;Two-step PPC via summarize_ppc_group.&quot;&quot;&quot;
+    ppc_df  = model.ppc(df_orig, idata, var_names=[&#39;ll_bernoulli&#39;])
+    ppc_ll  = ppc_df.xs(&#39;ll_bernoulli&#39;, level=&#39;variable&#39;)
+    sample_cols = ppc_ll.columns.tolist()
 
-    <span class="n">ppc_flat</span> <span class="o">=</span> <span class="n">ppc_ll</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
-    <span class="n">risky_first</span> <span class="o">=</span> <span class="p">(</span><span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mf">0.55</span><span class="p">)</span>
-    <span class="n">ppc_flat</span><span class="p">[</span><span class="n">sample_cols</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-        <span class="n">risky_first</span><span class="o">.</span><span class="n">values</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span>
-        <span class="mi">1</span> <span class="o">-</span> <span class="n">ppc_flat</span><span class="p">[</span><span class="n">sample_cols</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
-        <span class="n">ppc_flat</span><span class="p">[</span><span class="n">sample_cols</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
-    <span class="p">)</span>
-    <span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;order&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="s1">&#39;Risky first&#39;</span><span class="p">,</span> <span class="s1">&#39;Safe first&#39;</span><span class="p">)</span>
-    <span class="n">log_ratio</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
-        <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">],</span> <span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">])</span> <span class="o">/</span>
-        <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">],</span> <span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]))</span>
-    <span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;log_ratio_bin&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">cut</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">log_ratio</span><span class="p">),</span> <span class="n">bins</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
-                                   <span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">mid</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
-    <span class="n">n_safe</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">risky_first</span><span class="p">,</span> <span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;n2&#39;</span><span class="p">],</span> <span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">])</span>
-    <span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;n_safe_bin&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">qcut</span><span class="p">(</span><span class="n">n_safe</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
-                                      <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Low stakes&#39;</span><span class="p">,</span> <span class="s1">&#39;Mid stakes&#39;</span><span class="p">,</span> <span class="s1">&#39;High stakes&#39;</span><span class="p">])</span>
+    ppc_flat = ppc_ll.reset_index()
+    risky_first = (ppc_flat[&#39;p1&#39;] == 0.55)
+    ppc_flat[sample_cols] = np.where(
+        risky_first.values[:, None],
+        1 - ppc_flat[sample_cols].values,
+        ppc_flat[sample_cols].values
+    )
+    ppc_flat[&#39;order&#39;] = np.where(risky_first, &#39;Risky first&#39;, &#39;Safe first&#39;)
+    log_ratio = np.log(
+        np.where(risky_first, ppc_flat[&#39;n1&#39;], ppc_flat[&#39;n2&#39;]) /
+        np.where(risky_first, ppc_flat[&#39;n2&#39;], ppc_flat[&#39;n1&#39;]))
+    ppc_flat[&#39;log_ratio_bin&#39;] = (pd.cut(pd.Series(log_ratio), bins=10)
+                                   .map(lambda x: x.mid).astype(float).values)
+    n_safe = np.where(risky_first, ppc_flat[&#39;n2&#39;], ppc_flat[&#39;n1&#39;])
+    ppc_flat[&#39;n_safe_bin&#39;] = pd.qcut(n_safe, q=3,
+                                      labels=[&#39;Low stakes&#39;, &#39;Mid stakes&#39;, &#39;High stakes&#39;])
 
-    <span class="n">result</span> <span class="o">=</span> <span class="n">summarize_ppc_group</span><span class="p">(</span><span class="n">ppc_flat</span><span class="p">,</span>
-                                  <span class="n">condition_cols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;order&#39;</span><span class="p">,</span> <span class="s1">&#39;n_safe_bin&#39;</span><span class="p">,</span> <span class="s1">&#39;log_ratio_bin&#39;</span><span class="p">])</span>
-    <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;p_predicted&#39;</span><span class="p">:</span> <span class="s1">&#39;p_mean&#39;</span><span class="p">,</span>
-                                   <span class="s1">&#39;hdi025&#39;</span><span class="p">:</span> <span class="s1">&#39;p_lo&#39;</span><span class="p">,</span> <span class="s1">&#39;hdi975&#39;</span><span class="p">:</span> <span class="s1">&#39;p_hi&#39;</span><span class="p">})</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
-
-
-<span class="k">def</span><span class="w"> </span><span class="nf">plot_ppc_row</span><span class="p">(</span><span class="n">df_pred</span><span class="p">,</span> <span class="n">df_obs</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">axes_row</span><span class="p">):</span>
-    <span class="n">hue_order</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Low stakes&#39;</span><span class="p">,</span> <span class="s1">&#39;Mid stakes&#39;</span><span class="p">,</span> <span class="s1">&#39;High stakes&#39;</span><span class="p">]</span>
-    <span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="n">order_val</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axes_row</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;Risky first&#39;</span><span class="p">,</span> <span class="s1">&#39;Safe first&#39;</span><span class="p">]):</span>
-        <span class="n">pred</span> <span class="o">=</span> <span class="n">df_pred</span><span class="p">[</span><span class="n">df_pred</span><span class="p">[</span><span class="s1">&#39;order&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">order_val</span><span class="p">]</span>
-        <span class="n">obs</span>  <span class="o">=</span> <span class="n">df_obs</span><span class="p">[</span><span class="n">df_obs</span><span class="p">[</span><span class="s1">&#39;order&#39;</span><span class="p">]</span>   <span class="o">==</span> <span class="n">order_val</span><span class="p">]</span>
-        <span class="k">for</span> <span class="n">sbin</span> <span class="ow">in</span> <span class="n">hue_order</span><span class="p">:</span>
-            <span class="n">p</span> <span class="o">=</span> <span class="n">pred</span><span class="p">[</span><span class="n">pred</span><span class="p">[</span><span class="s1">&#39;n_safe_bin&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">sbin</span><span class="p">]</span>
-            <span class="n">o</span> <span class="o">=</span> <span class="n">obs</span><span class="p">[</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;n_safe_bin&#39;</span><span class="p">]</span>   <span class="o">==</span> <span class="n">sbin</span><span class="p">]</span>
-            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">o</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="k">continue</span>
-            <span class="n">c</span> <span class="o">=</span> <span class="n">stake_pal</span><span class="p">[</span><span class="n">sbin</span><span class="p">]</span>
-            <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s1">&#39;log_ratio_bin&#39;</span><span class="p">],</span> <span class="n">p</span><span class="p">[</span><span class="s1">&#39;p_lo&#39;</span><span class="p">],</span> <span class="n">p</span><span class="p">[</span><span class="s1">&#39;p_hi&#39;</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.2</span><span class="p">)</span>
-            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s1">&#39;log_ratio_bin&#39;</span><span class="p">],</span> <span class="n">p</span><span class="p">[</span><span class="s1">&#39;p_mean&#39;</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">sbin</span><span class="p">)</span>
-            <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">o</span><span class="p">[</span><span class="s1">&#39;log_ratio_bin&#39;</span><span class="p">],</span> <span class="n">o</span><span class="p">[</span><span class="s1">&#39;chose_risky&#39;</span><span class="p">],</span>
-                       <span class="n">color</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.85</span><span class="p">)</span>
-        <span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mf">.5</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mf">.55</span><span class="p">),</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;#333333&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">)</span>
-        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="o">-</span><span class="mf">.05</span><span class="p">,</span> <span class="mf">1.05</span><span class="p">)</span>
-        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s1"> — </span><span class="si">{</span><span class="n">order_val</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">9</span><span class="p">)</span>
-        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;log(risky / safe)&#39;</span><span class="p">);</span> <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;P(chose risky)&#39;</span><span class="p">)</span>
-        <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s1">&#39;Safe stake&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="s1">&#39;upper left&#39;</span><span class="p">)</span>
-        <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+    result = summarize_ppc_group(ppc_flat,
+                                  condition_cols=[&#39;order&#39;, &#39;n_safe_bin&#39;, &#39;log_ratio_bin&#39;])
+    return result.rename(columns={&#39;p_predicted&#39;: &#39;p_mean&#39;,
+                                   &#39;hdi025&#39;: &#39;p_lo&#39;, &#39;hdi975&#39;: &#39;p_hi&#39;}).reset_index()
 
 
-<span class="n">obs_sym_l4</span> <span class="o">=</span> <span class="p">(</span><span class="n">df_sym_p</span>
-              <span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="s1">&#39;order&#39;</span><span class="p">,</span> <span class="s1">&#39;n_safe_bin&#39;</span><span class="p">,</span> <span class="s1">&#39;log_ratio_bin&#39;</span><span class="p">])[</span><span class="s1">&#39;chose_risky&#39;</span><span class="p">]</span>
-              <span class="o">.</span><span class="n">mean</span><span class="p">()</span>
-              <span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">&#39;order&#39;</span><span class="p">,</span> <span class="s1">&#39;n_safe_bin&#39;</span><span class="p">,</span> <span class="s1">&#39;log_ratio_bin&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
-              <span class="o">.</span><span class="n">reset_index</span><span class="p">())</span>
+def plot_ppc_row(df_pred, df_obs, model_name, axes_row):
+    hue_order = [&#39;Low stakes&#39;, &#39;Mid stakes&#39;, &#39;High stakes&#39;]
+    for ax, order_val in zip(axes_row, [&#39;Risky first&#39;, &#39;Safe first&#39;]):
+        pred = df_pred[df_pred[&#39;order&#39;] == order_val]
+        obs  = df_obs[df_obs[&#39;order&#39;]   == order_val]
+        for sbin in hue_order:
+            p = pred[pred[&#39;n_safe_bin&#39;] == sbin]
+            o = obs[obs[&#39;n_safe_bin&#39;]   == sbin]
+            if len(o) == 0:
+                continue
+            c = stake_pal[sbin]
+            ax.fill_between(p[&#39;log_ratio_bin&#39;], p[&#39;p_lo&#39;], p[&#39;p_hi&#39;], color=c, alpha=.2)
+            ax.plot(p[&#39;log_ratio_bin&#39;], p[&#39;p_mean&#39;], color=c, lw=2, label=sbin)
+            ax.scatter(o[&#39;log_ratio_bin&#39;], o[&#39;chose_risky&#39;],
+                       color=c, s=25, zorder=5, alpha=.85)
+        ax.axhline(.5, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
+        ax.axvline(np.log(1/.55), ls=&#39;--&#39;, c=&#39;#333333&#39;, lw=1.5)
+        ax.set_ylim(-.05, 1.05)
+        ax.set_title(f&#39;{model_name} — {order_val}&#39;, fontsize=9)
+        ax.set_xlabel(&#39;log(risky / safe)&#39;); ax.set_ylabel(&#39;P(chose risky)&#39;)
+        ax.legend(title=&#39;Safe stake&#39;, fontsize=7, loc=&#39;upper left&#39;)
+        sns.despine(ax=ax)
 
-<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">9</span><span class="p">),</span> <span class="n">sharey</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">for</span> <span class="p">(</span><span class="n">mdl</span><span class="p">,</span> <span class="n">idat</span><span class="p">,</span> <span class="n">name</span><span class="p">),</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
-        <span class="p">[(</span><span class="n">model_pmcm</span><span class="p">,</span> <span class="n">idata_pmcm</span><span class="p">,</span> <span class="s1">&#39;PMCM (fixed noise)&#39;</span><span class="p">),</span>
-         <span class="p">(</span><span class="n">model_flex</span><span class="p">,</span> <span class="n">idata_flex</span><span class="p">,</span> <span class="s1">&#39;Flexible Noise&#39;</span><span class="p">)],</span>
-        <span class="n">axes</span><span class="p">):</span>
-    <span class="n">df_pred</span> <span class="o">=</span> <span class="n">add_model_ppc</span><span class="p">(</span><span class="n">df_sym</span><span class="p">,</span> <span class="n">df_sym_p</span><span class="p">,</span> <span class="n">mdl</span><span class="p">,</span> <span class="n">idat</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
-    <span class="n">plot_ppc_row</span><span class="p">(</span><span class="n">df_pred</span><span class="p">,</span> <span class="n">obs_sym_l4</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">row</span><span class="p">)</span>
 
-<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Posterior predictive comparison: PMCM vs Flexible Noise (Arabic numerals)&#39;</span><span class="p">,</span>
-             <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.01</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+obs_sym_l4 = (df_sym_p
+              .groupby([&#39;subject&#39;, &#39;order&#39;, &#39;n_safe_bin&#39;, &#39;log_ratio_bin&#39;])[&#39;chose_risky&#39;]
+              .mean()
+              .groupby([&#39;order&#39;, &#39;n_safe_bin&#39;, &#39;log_ratio_bin&#39;]).mean()
+              .reset_index())
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 9), sharey=True)
+for (mdl, idat, name), row in zip(
+        [(model_pmcm, idata_pmcm, &#39;PMCM (fixed noise)&#39;),
+         (model_flex, idata_flex, &#39;Flexible Noise&#39;)],
+        axes):
+    df_pred = add_model_ppc(df_sym, df_sym_p, mdl, idat, name)
+    plot_ppc_row(df_pred, obs_sym_l4, name, row)
+
+plt.suptitle(&#39;Posterior predictive comparison: PMCM vs Flexible Noise (Arabic numerals)&#39;,
+             fontsize=12, y=1.01)
+plt.tight_layout()
 </pre></div>
-</div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Sampling: [ll_bernoulli]
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "ca13a77661734e6397d37a5d32472099", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
-</pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Sampling: [ll_bernoulli]
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "863d3ead8fdf4b50a66e127ede01a253", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
-</pre></div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="../_images/tutorial_lesson4_22_8.png" src="../_images/tutorial_lesson4_22_8.png" />
 </div>
 </div>
 <section id="Model-comparison:-PMCM-vs-AffineNoise-vs-FlexNoise-(Arabic-numerals)">
 <h3>Model comparison: PMCM vs AffineNoise vs FlexNoise (Arabic numerals)<a class="headerlink" href="#Model-comparison:-PMCM-vs-AffineNoise-vs-FlexNoise-(Arabic-numerals)" title="Link to this heading">¶</a></h3>
 <p>The same three-way ELPD comparison for the risk models.</p>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ELPD comparison — Arabic numerals risky choice (3-way)</span>
-<span class="n">compare_sym</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">compare</span><span class="p">({</span><span class="s1">&#39;PMCM (Weber)&#39;</span><span class="p">:</span>   <span class="n">idata_pmcm</span><span class="p">,</span>
-                           <span class="s1">&#39;AffineNoise&#39;</span><span class="p">:</span>    <span class="n">idata_affine</span><span class="p">,</span>
-                           <span class="s1">&#39;FlexNoise&#39;</span><span class="p">:</span>      <span class="n">idata_flex</span><span class="p">})</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">compare_sym</span><span class="p">[[</span><span class="s1">&#39;elpd_loo&#39;</span><span class="p">,</span> <span class="s1">&#39;p_loo&#39;</span><span class="p">,</span> <span class="s1">&#39;elpd_diff&#39;</span><span class="p">,</span> <span class="s1">&#39;dse&#39;</span><span class="p">,</span> <span class="s1">&#39;warning&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ELPD comparison — Arabic numerals risky choice (3-way)
+compare_sym = az.compare({&#39;PMCM (Weber)&#39;:   idata_pmcm,
+                           &#39;AffineNoise&#39;:    idata_affine,
+                           &#39;FlexNoise&#39;:      idata_flex})
+print(compare_sym[[&#39;elpd_loo&#39;, &#39;p_loo&#39;, &#39;elpd_diff&#39;, &#39;dse&#39;, &#39;warning&#39;]].to_string())
 </pre></div>
 </div>
 </div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-                 elpd_loo       p_loo  elpd_diff        dse  warning
-FlexNoise    -5255.137017  358.592403   0.000000   0.000000     True
-PMCM (Weber) -5265.285102  248.825810  10.148085  21.323564     True
-AffineNoise  -5289.984210  305.939075  34.847193  16.043618     True
-</pre></div></div>
-</div>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ax</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">plot_compare</span><span class="p">(</span><span class="n">compare_sym</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mf">3.5</span><span class="p">))</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;ELPD comparison — Arabic-numeral risky choice (higher = better prediction)&#39;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>ax = az.plot_compare(compare_sym, figsize=(7, 3.5))
+ax.set_title(&#39;ELPD comparison — Arabic-numeral risky choice (higher = better prediction)&#39;)
+plt.tight_layout()
 </pre></div>
 </div>
 </div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="../_images/tutorial_lesson4_25_0.png" src="../_images/tutorial_lesson4_25_0.png" />
-</div>
-</div>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ── Interpret the Arabic-numeral ELPD result (3-way) ─────────────────────────</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;ELPD ranking (Arabic numerals):&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">compare_sym</span><span class="p">[[</span><span class="s1">&#39;elpd_loo&#39;</span><span class="p">,</span> <span class="s1">&#39;p_loo&#39;</span><span class="p">,</span> <span class="s1">&#39;elpd_diff&#39;</span><span class="p">,</span> <span class="s1">&#39;dse&#39;</span><span class="p">,</span> <span class="s1">&#39;warning&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>
-<span class="nb">print</span><span class="p">()</span>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ── Interpret the Arabic-numeral ELPD result (3-way) ─────────────────────────
+print(&quot;ELPD ranking (Arabic numerals):&quot;)
+print(compare_sym[[&#39;elpd_loo&#39;, &#39;p_loo&#39;, &#39;elpd_diff&#39;, &#39;dse&#39;, &#39;warning&#39;]].to_string())
+print()
 
-<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">compare_sym</span><span class="p">)):</span>
-    <span class="n">name</span> <span class="o">=</span> <span class="n">compare_sym</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-    <span class="n">diff</span> <span class="o">=</span> <span class="n">compare_sym</span><span class="p">[</span><span class="s1">&#39;elpd_diff&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-    <span class="n">dse</span>  <span class="o">=</span> <span class="n">compare_sym</span><span class="p">[</span><span class="s1">&#39;dse&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-    <span class="n">ratio</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">diff</span><span class="p">)</span> <span class="o">/</span> <span class="n">dse</span> <span class="k">if</span> <span class="n">dse</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;inf&#39;</span><span class="p">)</span>
-    <span class="n">winner</span> <span class="o">=</span> <span class="n">compare_sym</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-    <span class="n">verdict</span> <span class="o">=</span> <span class="s2">&quot;distinguishable&quot;</span> <span class="k">if</span> <span class="n">ratio</span> <span class="o">&gt;</span> <span class="mi">2</span> <span class="k">else</span> <span class="s2">&quot;NOT distinguishable&quot;</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">winner</span><span class="si">}</span><span class="s2"> vs </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">:  DELTA_ELPD = </span><span class="si">{</span><span class="n">diff</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">,  SE = </span><span class="si">{</span><span class="n">dse</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">,  &quot;</span>
-          <span class="sa">f</span><span class="s2">&quot;|ratio| = </span><span class="si">{</span><span class="n">ratio</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">  -&gt;  </span><span class="si">{</span><span class="n">verdict</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+for i in range(1, len(compare_sym)):
+    name = compare_sym.index[i]
+    diff = compare_sym[&#39;elpd_diff&#39;].iloc[i]
+    dse  = compare_sym[&#39;dse&#39;].iloc[i]
+    ratio = abs(diff) / dse if dse &gt; 0 else float(&#39;inf&#39;)
+    winner = compare_sym.index[0]
+    verdict = &quot;distinguishable&quot; if ratio &gt; 2 else &quot;NOT distinguishable&quot;
+    print(f&quot;  {winner} vs {name}:  DELTA_ELPD = {diff:.1f},  SE = {dse:.1f},  &quot;
+          f&quot;|ratio| = {ratio:.1f}  -&gt;  {verdict}&quot;)
 
-<span class="k">if</span> <span class="s1">&#39;AffineNoise&#39;</span> <span class="ow">in</span> <span class="n">compare_sym</span><span class="o">.</span><span class="n">index</span> <span class="ow">and</span> <span class="s1">&#39;FlexNoise&#39;</span> <span class="ow">in</span> <span class="n">compare_sym</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
-    <span class="n">aff_elpd</span> <span class="o">=</span> <span class="n">compare_sym</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;AffineNoise&#39;</span><span class="p">,</span> <span class="s1">&#39;elpd_loo&#39;</span><span class="p">]</span>
-    <span class="n">flex_elpd</span> <span class="o">=</span> <span class="n">compare_sym</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;FlexNoise&#39;</span><span class="p">,</span> <span class="s1">&#39;elpd_loo&#39;</span><span class="p">]</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">AffineNoise ELPD: </span><span class="si">{</span><span class="n">aff_elpd</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">,  FlexNoise ELPD: </span><span class="si">{</span><span class="n">flex_elpd</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">aff_elpd</span> <span class="o">-</span> <span class="n">flex_elpd</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">10</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-&gt; Affine noise captures most of the FlexNoise advantage (if any).&quot;</span><span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-&gt; Genuine nonlinearity in the noise function may be needed.&quot;</span><span class="p">)</span>
+if &#39;AffineNoise&#39; in compare_sym.index and &#39;FlexNoise&#39; in compare_sym.index:
+    aff_elpd = compare_sym.loc[&#39;AffineNoise&#39;, &#39;elpd_loo&#39;]
+    flex_elpd = compare_sym.loc[&#39;FlexNoise&#39;, &#39;elpd_loo&#39;]
+    print(f&quot;\nAffineNoise ELPD: {aff_elpd:.1f},  FlexNoise ELPD: {flex_elpd:.1f}&quot;)
+    if abs(aff_elpd - flex_elpd) &lt; 10:
+        print(&quot;-&gt; Affine noise captures most of the FlexNoise advantage (if any).&quot;)
+    else:
+        print(&quot;-&gt; Genuine nonlinearity in the noise function may be needed.&quot;)
 </pre></div>
 </div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-ELPD ranking (Arabic numerals):
-                 elpd_loo       p_loo  elpd_diff        dse  warning
-FlexNoise    -5255.137017  358.592403   0.000000   0.000000     True
-PMCM (Weber) -5265.285102  248.825810  10.148085  21.323564     True
-AffineNoise  -5289.984210  305.939075  34.847193  16.043618     True
-
-  FlexNoise vs PMCM (Weber):  DELTA_ELPD = 10.1,  SE = 21.3,  |ratio| = 0.5  -&gt;  NOT distinguishable
-  FlexNoise vs AffineNoise:  DELTA_ELPD = 34.8,  SE = 16.0,  |ratio| = 2.2  -&gt;  distinguishable
-
-AffineNoise ELPD: -5290.0,  FlexNoise ELPD: -5255.1
--&gt; Genuine nonlinearity in the noise function may be needed.
-</pre></div></div>
 </div>
 </section>
 </section>
