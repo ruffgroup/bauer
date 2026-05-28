@@ -4019,20 +4019,33 @@ df_full = load_garcia2022(task='magnitude')
 subs = df_full.index.get_level_values('subject').unique()[:8]
 df = df_full.loc[df_full.index.get_level_values('subject').isin(subs)].copy()
 
+# ── Preprocess: drop physiologically implausible fast trials ──────────────
+# Same RT filter as lesson 8 — see that lesson for the full pedagogical
+# motivation. Without it, the per-subject _t0_cap (= 0.95 * min rt) sits
+# below the t0 prior centre for most subjects, squeezing t0 against the cap
+# and funneling t0_sd through the HalfCauchy heavy tail. Concretely, for
+# this RDM fit, dropping it cuts divergences from ~80 to ~1.
+RT_MIN = 0.20
+n_before = len(df)
+df = df[df['rt'] >= RT_MIN].copy()
 n_subj = df.index.get_level_values('subject').nunique()
 print(f"Subjects: {n_subj}")
 print(f"Trials:   {len(df)}  (~{len(df) // n_subj} per subject)")
 print(f"Columns:  {list(df.columns)}")
+print(f"\\nDropped {n_before - len(df)} / {n_before} trials with rt < {RT_MIN:.2f}s "
+      f"({100*(n_before - len(df))/n_before:.1f}%); min rt now {df['rt'].min():.3f}s.")
 
 # Cache directory for fitted idata, so re-running the notebook after a
 # downstream cell change doesn't redo the (~5-15 min) fits. Set
-# BAUER_TUTORIAL_REFIT=1 in the env to force a fresh fit.
+# BAUER_TUTORIAL_REFIT=1 in the env to force a fresh fit. Cache key
+# encodes the RT cutoff so a future change there gets a fresh cache.
 CACHE_DIR = os.path.expanduser('~/.bauer_tutorial_cache')
 os.makedirs(CACHE_DIR, exist_ok=True)
 FORCE_REFIT = bool(os.environ.get('BAUER_TUTORIAL_REFIT', ''))
+CACHE_TAG = f'garcia_n{n_subj}_rtmin{int(RT_MIN*1000)}'
 
 def fit_or_load(model, name, draws=600, tune=600, chains=4, target_accept=0.95):
-    path = os.path.join(CACHE_DIR, f'garcia_8subj_{name}.nc')
+    path = os.path.join(CACHE_DIR, f'{CACHE_TAG}_{name}.nc')
     if os.path.exists(path) and not FORCE_REFIT:
         print(f"Loading cached {name} fit from {path}")
         return az.from_netcdf(path)
