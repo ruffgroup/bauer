@@ -1,0 +1,26 @@
+# Pre-commit hooks — catch lint before it reaches CI (or even gets committed).
+#
+# One-time setup per clone:
+#     pip install pre-commit        # (already in the [dev] extra)
+#     pre-commit install
+#
+# Thereafter `git commit` runs flake8 (same config as CI, from setup.cfg) on the
+# staged bauer/ and tests/ files and blocks the commit on any violation. Run
+# manually over everything with:  pre-commit run --all-files
+repos:
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.3.0
+    hooks:
+      - id: flake8
+        # Match the CI lint step exactly: `flake8 bauer tests` (config in setup.cfg).
+        files: ^(bauer|tests)/.*\.py$
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace          # would have caught the W391/E2xx churn
+        exclude: '\.ipynb$|^docs/|^notes/'
+      - id: end-of-file-fixer
+        exclude: '\.ipynb$|^docs/|^notes/'
+      - id: check-added-large-files       # don't accidentally commit a .nc fit
+        args: ['--maxkb=2000']

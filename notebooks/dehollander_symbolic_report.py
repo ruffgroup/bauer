@@ -34,12 +34,12 @@ df['n_safe'] = np.where(df['risky_first'], df['n2'], df['n1'])
 df['log_ratio'] = np.log(np.where(df['risky_first'], df['n1'] / df['n2'], df['n2'] / df['n1']))
 
 FITS = {
-    'choice':       ('choice_full.nc',                   RiskModel,                                  dict(prior_estimate='full', fit_seperate_evidence_sd=True)),
-    'choice-flex':  ('choice_flex_full.nc',              FlexibleNoiseRiskModel,                     dict(prior_estimate='full', fit_seperate_evidence_sd=True, spline_order=5)),
-    'DDM':          ('ddm_freescale_full.nc',            DDMRiskModel,                               dict(prior_estimate='full', fit_seperate_evidence_sd=True, fit_v_scale=True)),
-    'DDM-flex':     ('ddm_flex_freescale_full.nc',       DDMFlexibleNoiseRiskModel,                  dict(prior_estimate='full', fit_seperate_evidence_sd=True, spline_order=5, fit_v_scale=True)),
-    'RDM':          ('rdm_full.nc',                      RaceDiffusionRiskModel,                     dict(prior_estimate='full', fit_seperate_evidence_sd=True, advantage=True)),
-    'RDM-flex':     ('rdm_flex_full.nc',                 RaceDiffusionFlexibleNoiseRiskModel,        dict(prior_estimate='full', fit_seperate_evidence_sd=True, spline_order=5, advantage=True)),
+    'choice':       ('choice_full.nc',                   RiskModel,                                  dict(prior_estimate='full', fit_separate_evidence_sd=True)),
+    'choice-flex':  ('choice_flex_full.nc',              FlexibleNoiseRiskModel,                     dict(prior_estimate='full', fit_separate_evidence_sd=True, spline_order=5)),
+    'DDM':          ('ddm_freescale_full.nc',            DDMRiskModel,                               dict(prior_estimate='full', fit_separate_evidence_sd=True, fit_v_scale=True)),
+    'DDM-flex':     ('ddm_flex_freescale_full.nc',       DDMFlexibleNoiseRiskModel,                  dict(prior_estimate='full', fit_separate_evidence_sd=True, spline_order=5, fit_v_scale=True)),
+    'RDM':          ('rdm_full.nc',                      RaceDiffusionRiskModel,                     dict(prior_estimate='full', fit_separate_evidence_sd=True, advantage=True)),
+    'RDM-flex':     ('rdm_flex_full.nc',                 RaceDiffusionFlexibleNoiseRiskModel,        dict(prior_estimate='full', fit_separate_evidence_sd=True, spline_order=5, advantage=True)),
 }
 
 idatas, models = {}, {}

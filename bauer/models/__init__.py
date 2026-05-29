@@ -1,4 +1,7 @@
 from .psychophysics import (
+    PsychophysicalModel, PsychophysicalLapseModel,
+    PsychophysicalRegressionModel, PsychophysicalLapseRegressionModel,
+    # Deprecated aliases — emit DeprecationWarning on instantiation
     PsychometricModel, PsychometricLapseModel,
     PsychometricRegressionModel, PsychometricLapseRegressionModel,
 )
@@ -29,6 +32,7 @@ try:
         DDMPowerLawNoiseComparisonModel,
         DDMPowerLawNoiseComparisonRegressionModel,
         DDMRiskModel,
+        DDMRiskRegressionModel,
         DDMFlexibleNoiseRiskModel,
         DDMFlexibleNoiseRiskRegressionModel,
         DDMPowerLawNoiseRiskModel,
@@ -51,6 +55,7 @@ from .race import (
     RaceDiffusionPowerLawNoiseComparisonModel,
     RaceDiffusionPowerLawNoiseComparisonRegressionModel,
     RaceDiffusionRiskModel,
+    RaceDiffusionRiskRegressionModel,
     RaceDiffusionFlexibleNoiseRiskModel,
     RaceDiffusionFlexibleNoiseRiskRegressionModel,
     RaceDiffusionPowerLawNoiseRiskModel,

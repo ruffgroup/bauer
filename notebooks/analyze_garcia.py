@@ -164,7 +164,7 @@ def main():
     df = _prepare(fit_subs)
     print(f'  {len(df)} trials, {len(fit_subs)} subjects', flush=True)
 
-    m_choice = MagnitudeComparisonModel(paradigm=df, fit_seperate_evidence_sd=True,
+    m_choice = MagnitudeComparisonModel(paradigm=df, fit_separate_evidence_sd=True,
                                          fit_prior=True)
     m_choice.build_estimation_model(data=df, hierarchical=True)
     print('  choice PPC...', flush=True)
@@ -176,7 +176,7 @@ def main():
     m_fd = None
     if op.exists(nc_ddm):
         idata_d = az.from_netcdf(nc_ddm)
-        m_ddm = DDMMagnitudeComparisonModel(paradigm=df, fit_seperate_evidence_sd=True,
+        m_ddm = DDMMagnitudeComparisonModel(paradigm=df, fit_separate_evidence_sd=True,
                                              fit_v_scale=True, fit_prior=True)
         m_ddm.build_estimation_model(data=df, hierarchical=True)
         print('  DDM PPC...', flush=True)
@@ -187,7 +187,7 @@ def main():
     if op.exists(nc_fddm):
         idata_fd = az.from_netcdf(nc_fddm)
         m_fd = DDMFlexibleNoiseComparisonModel(
-            paradigm=df, fit_seperate_evidence_sd=True, spline_order=5,
+            paradigm=df, fit_separate_evidence_sd=True, spline_order=5,
             fit_prior=True, fit_v_scale=False)
         m_fd.build_estimation_model(paradigm=df, hierarchical=True)
         print('  flex-DDM PPC...', flush=True)
@@ -211,7 +211,7 @@ def main():
     nc_fchoice = op.join(args.idata_dir, 'choice_flex.nc')
     if m_fd is not None and op.exists(nc_fchoice):
         idata_fc = az.from_netcdf(nc_fchoice)
-        m_fc = FlexibleNoiseComparisonModel(paradigm=df, fit_seperate_evidence_sd=True,
+        m_fc = FlexibleNoiseComparisonModel(paradigm=df, fit_separate_evidence_sd=True,
                                               spline_order=5, fit_prior=True)
         m_fc.build_estimation_model(paradigm=df, hierarchical=True)
         fig_sigma_overlay(op.join(args.out_dir, 'fig_sigma_overlay.png'),

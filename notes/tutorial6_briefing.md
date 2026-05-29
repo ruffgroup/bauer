@@ -68,7 +68,7 @@ For the tutorial, **use pymc backend** (default) so it works without JAX. Mentio
 
 ```python
 m = RaceDiffusionMagnitudeComparisonModel(
-    paradigm=df, fit_seperate_evidence_sd=True, fit_prior=True,
+    paradigm=df, fit_separate_evidence_sd=True, fit_prior=True,
     advantage=True,
 )
 m.build_estimation_model(data=df, hierarchical=True)

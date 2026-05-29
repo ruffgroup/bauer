@@ -7,12 +7,11 @@ Tests do NOT run MCMC — they verify that:
 - ``build_estimation_model()`` succeeds on a tiny multi-subject paradigm,
 - ``get_free_parameters()`` returns the expected keys for the main options.
 """
+import pytest
+import pandas as pd
+import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
-
-import numpy as np
-import pandas as pd
-import pytest
 
 
 @pytest.fixture
@@ -95,7 +94,7 @@ def test_legacy_models_importable_from_models_package():
 
 @pytest.mark.parametrize('domain', ['gain', 'loss'])
 def test_safe_vs_risky_model_builds(paradigm_safe_vs_risky_gain,
-                                     paradigm_safe_vs_risky_loss, domain):
+                                    paradigm_safe_vs_risky_loss, domain):
     from bauer.models import SafeVsRiskyModel
     df = (paradigm_safe_vs_risky_gain if domain == 'gain'
           else paradigm_safe_vs_risky_loss)
@@ -110,7 +109,7 @@ def test_safe_vs_risky_model_builds(paradigm_safe_vs_risky_gain,
 def test_safe_vs_risky_model_shared_prior(paradigm_safe_vs_risky_gain):
     from bauer.models import SafeVsRiskyModel
     m = SafeVsRiskyModel(paradigm_safe_vs_risky_gain, domain='gain',
-                          separate_priors=False, separate_evidence_sd=False)
+                         separate_priors=False, separate_evidence_sd=False)
     m.build_estimation_model(paradigm_safe_vs_risky_gain, hierarchical=True)
     free = set(m.get_free_parameters())
     assert {'prior_mu', 'prior_sd', 'evidence_sd'} == free
@@ -119,7 +118,7 @@ def test_safe_vs_risky_model_shared_prior(paradigm_safe_vs_risky_gain):
 def test_safe_vs_risky_model_fixed_priors(paradigm_safe_vs_risky_gain):
     from bauer.models import SafeVsRiskyModel
     m = SafeVsRiskyModel(paradigm_safe_vs_risky_gain, domain='gain',
-                          fix_prior_mus=True, fix_prior_sds=True)
+                         fix_prior_mus=True, fix_prior_sds=True)
     m.build_estimation_model(paradigm_safe_vs_risky_gain, hierarchical=True)
     free = set(m.get_free_parameters())
     # only evidence noise should be free
@@ -147,7 +146,7 @@ def test_safe_vs_risky_regression_builds(paradigm_safe_vs_risky_gain):
       'evidence_sd_n1', 'evidence_sd_n2'}),
 ])
 def test_safe_vs_risky_memory_builds(paradigm_safe_vs_risky_gain,
-                                      memory_model, combine_noise, expected):
+                                     memory_model, combine_noise, expected):
     from bauer.models import SafeVsRiskyMemoryModel
     m = SafeVsRiskyMemoryModel(
         paradigm_safe_vs_risky_gain, domain='gain',
@@ -159,9 +158,9 @@ def test_safe_vs_risky_memory_builds(paradigm_safe_vs_risky_gain,
 
 @pytest.mark.parametrize('prior_scope', ['global', 'role', 'domain', 'domain_role'])
 @pytest.mark.parametrize('evidence_scope',
-                          ['global', 'position', 'domain', 'domain_position'])
+                         ['global', 'position', 'domain', 'domain_position'])
 def test_joint_safe_vs_risky_builds(paradigm_joint_safe_vs_risky,
-                                     prior_scope, evidence_scope):
+                                    prior_scope, evidence_scope):
     from bauer.models import JointSafeVsRiskyModel
     m = JointSafeVsRiskyModel(
         paradigm_joint_safe_vs_risky,
@@ -188,6 +187,37 @@ def test_joint_safe_vs_risky_fixed_priors(paradigm_joint_safe_vs_risky):
     # only evidence noise should be free
     assert free == {'gain_evidence_sd_n1', 'gain_evidence_sd_n2',
                     'loss_evidence_sd_n1', 'loss_evidence_sd_n2'}
+
+
+def test_safe_vs_risky_memory_invalid_model_rejected(paradigm_safe_vs_risky_gain):
+    """An unknown memory_model is caught at construction (BaseModel.__init__
+    calls get_free_parameters)."""
+    from bauer.models import SafeVsRiskyMemoryModel
+    with pytest.raises(ValueError, match="Unknown memory_model"):
+        SafeVsRiskyMemoryModel(paradigm_safe_vs_risky_gain, domain='gain',
+                               memory_model='not_a_real_option')
+
+
+def test_joint_safe_vs_risky_accepts_domain_column():
+    """The joint model auto-derives `is_gain` from a `domain` column if present."""
+    from bauer.models import JointSafeVsRiskyModel
+    rng = np.random.default_rng(2)
+    rows = []
+    for i in range(20):
+        is_gain = i % 2 == 0
+        n_r = 15.0 * (1 if is_gain else -1)
+        n_s = 12.0 * (1 if is_gain else -1)
+        rows.append({'subject': 1, 'run': 1, 'trial_nr': i,
+                     'n1': n_r, 'n2': n_s,
+                     'p1': 0.55, 'p2': 1.0,
+                     'domain': 'gain' if is_gain else 'loss',
+                     'choice': bool(rng.random() > 0.5)})
+    df = pd.DataFrame(rows).set_index(['subject', 'run', 'trial_nr'])
+    m = JointSafeVsRiskyModel(df, prior_scope='global', evidence_scope='global')
+    # `is_gain` should now live on the stored frame
+    assert 'is_gain' in m.paradigm.columns
+    assert set(m.paradigm['is_gain'].unique()) == {0, 1}
+    m.build_estimation_model(m.paradigm, hierarchical=False)
 
 
 def test_joint_safe_vs_risky_missing_domain_info_raises():

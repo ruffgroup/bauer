@@ -13,7 +13,7 @@ dependencies:
   - patsy
   - pymc>=5
   - pytensor
-  - arviz
+  - "arviz<1.0"          # >=1.0 broke summarize_ppc
   - jupyter
   - nbformat
   - nbconvert
@@ -22,3 +22,6 @@ dependencies:
   - sphinx-rtd-theme
   - pip:
     - hssm
+    - numpyro            # fast NUTS backend (backend='numpyro')
+    - blackjax
+    - -e .               # install bauer itself (editable)

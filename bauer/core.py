@@ -1,3 +1,4 @@
+import functools
 import warnings
 import pandas as pd
 import pymc as pm
@@ -6,6 +7,48 @@ from .utils.bayes import cumulative_normal, get_diff_dist, get_posterior
 from .utils.math import logistic, softplus_np, logistic_np, logit_np, inverse_softplus_np
 import pytensor.tensor as pt
 from patsy import dmatrix, build_design_matrices
+
+
+# Mapping of deprecated (old) __init__ keyword names -> their current names.
+# Add a new entry here to retire another misspelled / renamed kwarg; the
+# translation + DeprecationWarning are handled automatically for every
+# BaseModel subclass via __init_subclass__ (and for BaseModel itself).
+_DEPRECATED_INIT_KWARGS = {
+    'fit_seperate_evidence_sd': 'fit_separate_evidence_sd',
+}
+
+
+def _translate_deprecated_kwargs(func):
+    """Wrap an ``__init__`` so deprecated kwarg names are translated.
+
+    Emits a :class:`DeprecationWarning` and forwards the value under the new
+    name. If both the old and new names are supplied, the old one is dropped
+    and the new one wins. The wrapper is idempotent (re-wrapping is a no-op)
+    so cooperative multiple inheritance doesn't double-wrap, and because the
+    outer ``__init__`` already renames before calling ``super().__init__``,
+    inner ``__init__``s only ever see the new name (no double-warning).
+    """
+    if getattr(func, '_bauer_alias_wrapped', False):
+        return func
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        for old, new in _DEPRECATED_INIT_KWARGS.items():
+            if old in kwargs:
+                warnings.warn(
+                    f"'{old}' is deprecated and will be removed; use '{new}'.",
+                    DeprecationWarning, stacklevel=2,
+                )
+                if new in kwargs:
+                    # Both passed: keep the new spelling, drop the old.
+                    kwargs.pop(old)
+                else:
+                    kwargs[new] = kwargs.pop(old)
+        return func(*args, **kwargs)
+
+    wrapper._bauer_alias_wrapped = True
+    return wrapper
+
 
 class BaseModel(object):
 
@@ -29,12 +72,29 @@ class BaseModel(object):
     recommended_nuts_kwargs: dict = {}
     recommended_pymc_init: str | None = None
 
+    # ``recommended_init`` enables bauer's starting-point finder by default for
+    # this model class (see ``BaseModel.get_initial_points`` and ``sample``).
+    # DDM/RDM mixins set this to 'mapjitter' because their posteriors are nasty
+    # enough that pymc's generic jitter init makes convergence a seed lottery
+    # (verified: vectorized regression-DDM converges ~1/7 seeds without it).
+    # ``None`` = use the backend's default init.
+    recommended_init: str | None = None
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # Wrap each subclass's own __init__ (if it defines one) so the
+        # deprecated kwarg translation runs before the real body. Mixins /
+        # diamond inheritance are fine: the outermost __init__ renames first,
+        # so inner __init__s see only the new name.
+        if '__init__' in cls.__dict__:
+            cls.__init__ = _translate_deprecated_kwargs(cls.__dict__['__init__'])
+
     def __init__(self, paradigm, save_trialwise_n_estimates=False):
         """
         data should contain ['n1', 'n2'] and 'choice'.
         The latter should be a boolean that indicates whether the *second*
         option was chosen.
-        
+
         """
         self.paradigm = paradigm
         self.save_trialwise_n_estimates = save_trialwise_n_estimates
@@ -59,7 +119,7 @@ class BaseModel(object):
         else:
             # Make sure all subjects in the paradigm are in the subject_mapping
             new_subject_ids = paradigm['subject'].unique()
-            assert(np.array_equal(new_subject_ids, list(subject_mapping.keys()))), "The unique subjects in the paradigm do not match the subjects in the subject_mapping."
+            assert (np.array_equal(new_subject_ids, list(subject_mapping.keys()))), "The unique subjects in the paradigm do not match the subjects in the subject_mapping."
             if 'subject' in paradigm.index.names:
                 paradigm_['subject_ix'] = [subject_mapping[subject] for subject in paradigm.index.get_level_values('subject')]
             else:
@@ -96,7 +156,7 @@ class BaseModel(object):
     def build_likelihood(self, parameters, save_p_choice=False):
         model = pm.Model.get_context()
         model_inputs = self.get_model_inputs(parameters)
-        
+
         if save_p_choice:
             p = pm.Deterministic('p', var=self._get_choice_predictions(model_inputs))
         else:
@@ -113,10 +173,11 @@ class BaseModel(object):
 
         return parameters
 
-    def build_estimation_model(self, data=None, coords=None, hierarchical=True, save_p_choice=False, flat_prior=False):
+    def build_estimation_model(self, data=None, coords=None, hierarchical=True, save_p_choice=False, flat_prior=False, paradigm=None):
 
+        # `data` and `paradigm` are accepted synonyms (no deprecation); data wins if both given.
         if data is None:
-            data = self.paradigm
+            data = paradigm if paradigm is not None else self.paradigm
 
         if not hierarchical and 'subject' in getattr(data, 'index', pd.Index([])).names:
             n_subjects = data.index.get_level_values('subject').nunique()
@@ -130,7 +191,7 @@ class BaseModel(object):
                 )
 
         if hierarchical and (coords is None):
-            assert('subject' in data.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
+            assert ('subject' in data.index.names), "Hierarchical estimation requires a multi-index with a 'subject' level."
             coords = {'subject': data.index.unique(level='subject')}
 
         with pm.Model(coords=coords) as self.estimation_model:
@@ -174,14 +235,13 @@ class BaseModel(object):
         if transform == 'identity':
             pm.Normal(name, mu=mu_intercept, sigma=sigma_intercept)
         elif transform == 'softplus':
-            pm.Normal(name+'_untransformed', mu=mu_intercept, sigma=sigma_intercept)
-            pm.Deterministic(name, var=pt.softplus(model[name+'_untransformed']))
+            pm.Normal(name + '_untransformed', mu=mu_intercept, sigma=sigma_intercept)
+            pm.Deterministic(name, var=pt.softplus(model[name + '_untransformed']))
         elif transform == 'logistic':
-            pm.Normal(name+'_untransformed', mu=mu_intercept, sigma=sigma_intercept)
-            pm.Deterministic(name, var=logistic(model[name+'_untransformed']))
+            pm.Normal(name + '_untransformed', mu=mu_intercept, sigma=sigma_intercept)
+            pm.Deterministic(name, var=logistic(model[name + '_untransformed']))
         else:
             raise NotImplementedError
-
 
     def set_paradigm(self, paradigm=None):
         for key, value in paradigm.items():
@@ -192,7 +252,7 @@ class BaseModel(object):
 
     def build_prediction_model(self, paradigm, parameters,):
 
-        assert(isinstance(parameters, dict) or isinstance(parameters, pd.DataFrame)), "Parameters should be a dictionary or a DataFrame."
+        assert (isinstance(parameters, dict) or isinstance(parameters, pd.DataFrame)), "Parameters should be a dictionary or a DataFrame."
 
         if paradigm is None:
             paradigm = self.data
@@ -202,13 +262,12 @@ class BaseModel(object):
 
             # Make sure that the unique levels in 'subject' (either index or column) of the paradigm align with the subjects in the parameters
             if 'subject' in paradigm.index.names:
-                assert(np.array_equal(paradigm.index.unique(level='subject'), parameter_subjects)), "The unique subjects in the paradigm do not match the subjects in the parameters."
+                assert (np.array_equal(paradigm.index.unique(level='subject'), parameter_subjects)), "The unique subjects in the paradigm do not match the subjects in the parameters."
             elif 'subject' in paradigm.columns:
-                assert(np.array_equal(paradigm.subject.unique(), parameter_subjects)), "The unique subjects in the paradigm do not match the subjects in the parameters."
+                assert (np.array_equal(paradigm.subject.unique(), parameter_subjects)), "The unique subjects in the paradigm do not match the subjects in the parameters."
 
             parameters = parameters.to_dict(orient='list')
 
-                                              
         with pm.Model() as self.prediction_model:
             paradigm = self._get_paradigm(paradigm=paradigm)
             self.set_paradigm(paradigm)
@@ -219,7 +278,7 @@ class BaseModel(object):
 
             parameters = self.get_parameter_values()
             model_inputs = self.get_model_inputs(parameters)
-        
+
             p = pm.Deterministic('p', var=self._get_choice_predictions(model_inputs))
             pm.Bernoulli('ll_bernoulli', p=p)
 
@@ -245,7 +304,7 @@ class BaseModel(object):
         if not paradigm.index.name:
             paradigm.index.name = 'trial'
 
-        data = pd.DataFrame(data.T, index=paradigm.index, columns=pd.Index(np.arange(n_samples)+1, name='sample'))
+        data = pd.DataFrame(data.T, index=paradigm.index, columns=pd.Index(np.arange(n_samples) + 1, name='sample'))
         data = data.stack().to_frame('simulated_choice').astype(bool)
         data = data.join(paradigm)
 
@@ -256,7 +315,7 @@ class BaseModel(object):
         return data
 
     def sample(self, draws=1000, tune=1000, target_accept=0.8, chains=4,
-               backend='pymc', **kwargs):
+               backend='pymc', find_init=None, **kwargs):
         """Sample from the posterior using the requested NUTS backend.
 
         Parameters
@@ -288,9 +347,27 @@ class BaseModel(object):
         explicitly. DDMMixin / RaceMixin do this for full mass-matrix
         adaptation.
         """
+        # Starting-point finder. ``find_init`` (or the class default
+        # ``recommended_init``) builds dispersed per-chain initial values
+        # around a data-informed plausible centre (see get_initial_points),
+        # instead of relying on the backend's generic jitter init. This is
+        # what stops hard DDM/regression posteriors from being a seed
+        # lottery. Skipped if the user supplied their own ``initvals``.
+        if find_init is None:
+            find_init = self.recommended_init
+        if find_init and 'initvals' not in kwargs:
+            seed = kwargs.get('random_seed', None)
+            kwargs['initvals'] = self.get_initial_points(
+                chains=chains, use_map=(find_init != 'priorjitter'),
+                seed=seed if isinstance(seed, int) else None)
+
         if backend == 'pymc':
-            kwargs.setdefault('init', getattr(self, 'recommended_pymc_init', None)
-                                       or 'auto')
+            # When we supply our own dispersed initvals, avoid a jitter-adding
+            # init method (we already jittered); else keep the recommendation.
+            default_init = getattr(self, 'recommended_pymc_init', None) or 'auto'
+            if 'initvals' in kwargs and isinstance(default_init, str):
+                default_init = default_init.replace('jitter+', '')
+            kwargs.setdefault('init', default_init)
             with self.estimation_model:
                 self.idata = pm.sample(
                     draws, tune=tune, chains=chains,
@@ -308,6 +385,8 @@ class BaseModel(object):
             user = kwargs.pop('nuts_kwargs', None) or {}
             nuts_kwargs = {**rec, **user}
             kwargs.setdefault('chain_method', 'vectorized')
+            if 'initvals' in kwargs:
+                kwargs.setdefault('jitter', False)  # initvals already dispersed
             with self.estimation_model:
                 self.idata = sampler(
                     draws=draws, tune=tune, chains=chains,
@@ -319,6 +398,63 @@ class BaseModel(object):
             raise ValueError(f"backend must be 'pymc'/'numpyro'/'blackjax', got {backend!r}")
         return self.idata
 
+    def get_initial_points(self, chains=4, jitter_frac=0.1, use_map=True,
+                           n_prior=500, seed=None):
+        """Dispersed per-chain starting points for the sampler.
+
+        Returns a list of ``chains`` initval dicts (keyed by the model's
+        free-RV value-variable names). Each is a *plausible centre* plus
+        per-parameter Gaussian jitter whose SD is ``jitter_frac`` times that
+        parameter's prior SD. Chains are dispersed around the centre — never
+        all placed *at* it — so the mode (which is not in the typical set) is
+        not the start, and between-chain r̂ stays meaningful.
+
+        centre
+            ``find_MAP`` (the data-informed posterior mode / plausible value)
+            when ``use_map``; otherwise the model's prior-central
+            ``initial_point()``. Falls back to ``initial_point()`` if MAP fails.
+        jitter scale
+            Each free parameter is a plain unconstrained Normal in bauer's
+            models (softplus/logistic links are applied downstream as
+            Deterministics), so prior draws live in the same space as the
+            initvals and their SD is a natural, safe jitter scale.
+
+        Mirrors the init strategy HSSM uses (curated centre + small jitter) —
+        which bauer otherwise omits, leaving convergence of hard posteriors a
+        seed lottery.
+        """
+        rng = np.random.default_rng(seed)
+        with self.estimation_model:
+            ip = self.estimation_model.initial_point()
+            centre = {k: np.asarray(v, dtype='float64') for k, v in ip.items()}
+            if use_map:
+                try:
+                    mp = pm.find_MAP(progressbar=False)
+                    for k in centre:
+                        if k in mp:
+                            centre[k] = np.asarray(mp[k], dtype='float64')
+                except Exception as e:  # pragma: no cover - robustness
+                    warnings.warn(f"find_MAP failed ({e}); using prior-central "
+                                  "centre for initial points.")
+            try:
+                pr = pm.sample_prior_predictive(
+                    draws=n_prior, var_names=list(centre), random_seed=seed)
+                psd = {k: np.asarray(pr.prior[k]).std(axis=(0, 1))
+                       for k in centre if k in pr.prior}
+            except Exception:  # pragma: no cover - robustness
+                psd = {}
+
+        points = []
+        for _ in range(chains):
+            pt = {}
+            for k in centre:
+                scale = np.broadcast_to(np.asarray(psd.get(k, 1.0)), centre[k].shape)
+                scale = np.where(scale > 0, scale, 1.0)
+                jit = rng.normal(0.0, jitter_frac * scale, size=centre[k].shape)
+                pt[k] = (centre[k] + jit).astype(ip[k].dtype)
+            points.append(pt)
+        return points
+
     def fit_map(self, filter_pars=True, progressbar=True, **kwargs):
         with self.estimation_model:
             pars = pm.find_MAP(progressbar=progressbar, **kwargs)
@@ -329,7 +465,7 @@ class BaseModel(object):
         if 'subject' in self.estimation_model.coords:
             pars = pd.DataFrame(pars, index=pd.Index(self.estimation_model.coords['subject'], name='subject'))
             pars.columns.name = 'parameter'
-        
+
         return pars
 
     def fit_map_individual(self, data=None, flat_prior=True, **kwargs):
@@ -381,7 +517,7 @@ class BaseModel(object):
         return pd.DataFrame(rows).set_index('subject')
 
     def ppc(self, paradigm, idata, n_posterior_samples=200,
-             out_of_sample=False, random_seed=None, progressbar=True):
+            out_of_sample=False, random_seed=None, progressbar=True):
         """Posterior-predictive choices for ``paradigm``.
 
         Returns
@@ -404,7 +540,7 @@ class BaseModel(object):
                 coords, hierarchical, subject_id_to_ix = None, False, None
             with pm.Model(coords=coords) as self.out_of_sample_model:
                 paradigm_ = self._get_paradigm(paradigm=paradigm,
-                                                subject_mapping=subject_id_to_ix)
+                                               subject_mapping=subject_id_to_ix)
                 self.set_paradigm(paradigm_)
                 self.build_priors(hierarchical=hierarchical)
                 parameters = self.get_parameter_values()
@@ -441,9 +577,8 @@ class BaseModel(object):
 
     def get_trialwise_variable(self, key):
 
-
         model = pm.Model.get_context()
-        
+
         n_trials = pt.cast(model['_data_n'], int)
 
         if key == 'n1_evidence_mu':
@@ -458,8 +593,8 @@ class BaseModel(object):
             return pt.tile(model[f'{key}'], n_trials)
 
     def build_hierarchical_nodes(self, name, mu_intercept=None, sigma_intercept=None,
-                                  cauchy_sigma_intercept=None, transform='identity',
-                                  min_value=0.0, **kwargs):
+                                 cauchy_sigma_intercept=None, transform='identity',
+                                 min_value=0.0, **kwargs):
         """Build a hierarchical (group_mu, group_sd, per-subject offset) node.
 
         ``transform`` ∈ {'identity', 'softplus', 'logistic'}. When ``transform`` is
@@ -484,29 +619,28 @@ class BaseModel(object):
 
         if transform == 'identity':
             group_mu = pm.Normal(f"{name}_mu",
-                                            mu=mu_intercept,
-                                            sigma=sigma_intercept)
+                                 mu=mu_intercept,
+                                 sigma=sigma_intercept)
         elif transform == 'softplus':
             group_mu = pm.Normal(f"{name}_mu_untransformed",
-                                            mu=mu_intercept,
-                                            sigma=sigma_intercept)
+                                 mu=mu_intercept,
+                                 sigma=sigma_intercept)
 
             pm.Deterministic(name=f'{name}_mu', var=_softplus_with_floor(group_mu))
         elif transform == 'logistic':
             group_mu = pm.Normal(f"{name}_mu_untransformed",
-                                            mu=mu_intercept,
-                                            sigma=sigma_intercept)
+                                 mu=mu_intercept,
+                                 sigma=sigma_intercept)
 
             pm.Deterministic(name=f'{name}_mu', var=logistic(group_mu))
         else:
             raise NotImplementedError
 
-
         group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma_intercept)
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject',))
 
         if transform == 'identity':
-             return pm.Deterministic(f'{name}', group_mu + group_sd * subject_offset, dims=('subject',))
+            return pm.Deterministic(f'{name}', group_mu + group_sd * subject_offset, dims=('subject',))
         else:
             subjectwise_untrans = pm.Deterministic(f'{name}_untransformed', group_mu + group_sd * subject_offset, dims=('subject',))
 
@@ -532,10 +666,10 @@ class BaseModel(object):
         idata = self._get_idata(idata)
         parameters = self._get_parameters(parameters)
 
-        mu_pars = pd.concat([idata.posterior[par+'_mu'].to_dataframe() for par in self.free_parameters], axis=1, keys=parameters, names=['parameter']).droplevel(1, axis=1)
+        mu_pars = pd.concat([idata.posterior[par + '_mu'].to_dataframe() for par in self.free_parameters], axis=1, keys=parameters, names=['parameter']).droplevel(1, axis=1)
 
         if include_sd:
-            sd_pars = pd.concat([idata.posterior[par+'_sd'].to_dataframe() for par in self.free_parameters], axis=1, keys=self.free_parameters, names=['parameter']).droplevel(1, axis=1)
+            sd_pars = pd.concat([idata.posterior[par + '_sd'].to_dataframe() for par in self.free_parameters], axis=1, keys=self.free_parameters, names=['parameter']).droplevel(1, axis=1)
             pars = pd.concat((mu_pars, sd_pars), keys=['mu', 'sd'], names=['type'], axis=1)
 
         else:
@@ -575,7 +709,7 @@ class BaseModel(object):
                 samples_pars[key] = logistic_np(samples_pars[key])
 
         if n_subjects:
-            sample_pars =  pd.DataFrame(samples_pars, index=pd.Index(np.arange(1, n_subjects+1), name='subject'))
+            sample_pars = pd.DataFrame(samples_pars, index=pd.Index(np.arange(1, n_subjects + 1), name='subject'))
             sample_pars.columns.name = 'parameter'
             return sample_pars
         else:
@@ -601,12 +735,11 @@ class BaseModel(object):
         elif transform == 'logistic':
             return logit_np(data)
 
-
     def get_example_paradigm(self, n_subjects=None):
         if n_subjects is None:
             return self._get_example_paradigm()
         else:
-            return pd.concat([self._get_example_paradigm() for _ in range(n_subjects)], keys=np.arange(1, n_subjects+1), names=['subject'])
+            return pd.concat([self._get_example_paradigm() for _ in range(n_subjects)], keys=np.arange(1, n_subjects + 1), names=['subject'])
 
     def get_model_inputs(self, parameters):
 
@@ -616,18 +749,24 @@ class BaseModel(object):
 
         for key in self.base_parameters:
             model_inputs[key] = parameters[key]
-        
+
         for key in self.paradigm_keys:
             model_inputs[key] = model[key]
 
         return model_inputs
+
+
+# BaseModel can't translate its own __init__ via __init_subclass__ (that hook
+# only fires for subclasses), so wrap it explicitly here.
+BaseModel.__init__ = _translate_deprecated_kwargs(BaseModel.__init__)
+
 
 class LapseModel(BaseModel):
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
 
-        pars['p_lapse'] = {'mu_intercept':logit_np(0.02), 'transform':'logistic'}
+        pars['p_lapse'] = {'mu_intercept': logit_np(0.02), 'transform': 'logistic'}
         return pars
 
     def _get_choice_predictions(self, model_inputs):
@@ -651,19 +790,11 @@ class RegressionModel(BaseModel):
             self.regressors = regressors
 
         self.design_matrices = {}
-        
+
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
-        # Forward subject_mapping only when the next class in the MRO accepts
-        # it (DDMMixin does; plain MagnitudeComparisonModel doesn't). Without
-        # this fallback, multiple-inheritance combinations like
-        # DDMMagnitudeComparisonRegressionModel raise TypeError on build.
-        try:
-            paradigm_ = super()._get_paradigm(paradigm, subject_mapping=None)
-        except TypeError:
-            paradigm_ = super()._get_paradigm(paradigm)
+        paradigm_ = super()._get_paradigm(paradigm, subject_mapping=subject_mapping)
 
         free_parameters = self.get_free_parameters()
-
 
         for key in free_parameters:
             dm = self.build_design_matrix(paradigm, key)
@@ -675,11 +806,11 @@ class RegressionModel(BaseModel):
     def build_design_matrix(self, data, parameter):
         if parameter not in self.regressors:
             self.regressors[parameter] = '1'
-        
+
         return dmatrix(self.regressors[parameter], data)
 
     def rebuild_design_matrix(self, paradigm, parameter):
-        assert(hasattr(self, 'design_matrices')), 'Model needs to have design matrices as an attribute (model.design_matrices...) based on original data for rebuilding design matrices (HINT: use `.build_estimation_model()`)'
+        assert (hasattr(self, 'design_matrices')), 'Model needs to have design matrices as an attribute (model.design_matrices...) based on original data for rebuilding design matrices (HINT: use `.build_estimation_model()`)'
 
         design_info = self.design_matrices[parameter].design_info
 
@@ -729,12 +860,18 @@ class RegressionModel(BaseModel):
 
         return trialwise_pars
 
-
-    def build_prior(self, name, mu_intercept=None, sigma_intercept=None, sigma_regressors=1.,  transform='identity'):
-
+    def build_prior(self, name, mu_intercept=None, sigma_intercept=None,
+                    sigma_regressors=1., transform='identity',
+                    flat_prior=False, **_unused):
+        # ``flat_prior`` is accepted (and currently ignored) so the
+        # non-hierarchical dispatch (``build_priors(hierarchical=False)``)
+        # works for regression models too; the legacy hierarchical path
+        # already supports it.
+        if sigma_intercept is None:
+            sigma_intercept = 1.0
         model = pm.Model.get_context()
         model.add_coord(f'{name}_regressors', self.design_matrices[name].design_info.column_names)
-        
+
         mu = np.zeros(self.design_matrices[name].shape[1])
         sigma = np.ones(self.design_matrices[name].shape[1]) * sigma_regressors
 
@@ -743,29 +880,39 @@ class RegressionModel(BaseModel):
             if name in ['n1_evidence_mu', 'n2_evidence_mu']:
                 warnings.warn(f'{name} has an Intercept-regressors. This is most likely NOT a good idea.')
 
-            if transform == 'identity':
-                mu[0] = mu_intercept
-                sigma[0] = sigma_intercept
-            elif transform == 'logistic':
-                mu[0] = mu_intercept
-                sigma[0] = sigma_intercept
-            # Possibly use inverse of softplus
+            # The regression happens on the *untransformed* scale (the
+            # transform — softplus / logistic / identity — is applied later
+            # in get_trialwise_variable after the design-matrix product), so
+            # the Intercept prior is always Normal(mu_intercept,
+            # sigma_intercept) regardless of which transform the parameter
+            # uses. Previously the softplus branch was missing, silently
+            # defaulting softplus parameters to Normal(0, sigma_regressors)
+            # — which wrecked NUTS mixing on every regression DDM fit.
+            mu[0] = mu_intercept
+            sigma[0] = sigma_intercept
 
         pm.Normal(name, mu=mu, sigma=sigma, dims=(f'{name}_regressors',))
 
-
-    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=1.,
-                                  cauchy_sigma_intercept=0.25, sigma_regressors=1.,
-                                  cauchy_sigma_regressors=0.25, transform='identity',
-                                  min_value=0.0, **kwargs):
+    def build_hierarchical_nodes(self, name, mu_intercept=0.0, sigma_intercept=None,
+                                 cauchy_sigma_intercept=None, sigma_regressors=1.,
+                                 cauchy_sigma_regressors=0.25, transform='identity',
+                                 min_value=0.0, **kwargs):
         # `min_value` and the transform are applied in get_trialwise_variable
         # (which sees the design-matrix product); accepted here so that
         # parameters carrying these kwargs (e.g. DDM `a`, `t0`) don't crash the
         # regression-model dispatch.
+        # sigma_intercept / cauchy_sigma_intercept default to None (resolved
+        # to 0.5 / 0.25 below) to match BaseModel.build_hierarchical_nodes,
+        # so that intercept-only regression models have the same Intercept
+        # prior as the equivalent basic model.
+        if sigma_intercept is None:
+            sigma_intercept = 0.5
+        if cauchy_sigma_intercept is None:
+            cauchy_sigma_intercept = 0.25
 
         model = pm.Model.get_context()
         model.add_coord(f'{name}_regressors', self.design_matrices[name].design_info.column_names)
-        
+
         mu = np.zeros(self.design_matrices[name].shape[1])
         sigma = np.ones(self.design_matrices[name].shape[1]) * sigma_regressors
         cauchy_sigma = np.ones(self.design_matrices[name].shape[1]) * cauchy_sigma_regressors
@@ -776,20 +923,19 @@ class RegressionModel(BaseModel):
             if name in ['n1_evidence_mu', 'n2_evidence_mu']:
                 warnings.warn(f'{name} has an Intercept-regressors. This is most likely NOT a good idea.')
 
-            if transform == 'identity':
-                mu[0] = mu_intercept
-                sigma[0] = sigma_intercept
-            elif transform == 'logistic':
-                mu[0] = mu_intercept
-                sigma[0] = sigma_intercept
-            # Possibly use inverse of softplus
+            # See note in build_prior: the regression operates on the
+            # *untransformed* scale, so the Intercept prior is the same
+            # Normal(mu_intercept, sigma_intercept) for all three
+            # transforms. The previously-missing softplus branch was the
+            # source of the regression-DDM convergence pathology.
+            mu[0] = mu_intercept
+            sigma[0] = sigma_intercept
 
-        group_mu = pm.Normal(f"{name}_mu", 
-                                        mu=mu, 
-                                        sigma=sigma,
-                                        dims=(f'{name}_regressors',))
+        group_mu = pm.Normal(f"{name}_mu",
+                             mu=mu,
+                             sigma=sigma,
+                             dims=(f'{name}_regressors',))
 
-        
         group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma, dims=(f'{name}_regressors',))
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject', f'{name}_regressors'))
 
@@ -808,11 +954,11 @@ class RegressionModel(BaseModel):
             parameters = self.design_matrices.keys()
             for parameter, dm in self.design_matrices.items():
                 if hierarchical:
-                    df.append(pd.DataFrame(map_parameters[parameter], 
-                                            index=pd.Index(subjects, name='subject'), columns=pd.Index(dm.design_info.column_names, name='dm_key')))
+                    df.append(pd.DataFrame(map_parameters[parameter],
+                                           index=pd.Index(subjects, name='subject'), columns=pd.Index(dm.design_info.column_names, name='dm_key')))
                 else:
-                    df.append(pd.Series(map_parameters[parameter], 
-                                            index=pd.Index(dm.design_info.column_names, name='dm_key')))
+                    df.append(pd.Series(map_parameters[parameter],
+                                        index=pd.Index(dm.design_info.column_names, name='dm_key')))
 
             df = pd.concat(df, keys=parameters, axis=1)
 
@@ -825,9 +971,8 @@ class RegressionModel(BaseModel):
 
         with self.estimation_model:
             pars = pm.find_MAP(**kwargs)
-        
-        return convert_map(pars)
 
+        return convert_map(pars)
 
     def build_prediction_model(self, paradigm, parameters,):
 
@@ -837,14 +982,14 @@ class RegressionModel(BaseModel):
             hierarchical = False
         else:
             raise ValueError("Parameters should be a dictionary or a DataFrame.")
-        
+
         with pm.Model() as self.prediction_model:
             paradigm = self._get_paradigm(paradigm=paradigm)
             self.set_paradigm(paradigm)
-            
+
             if hierarchical:
                 n_subjects = np.unique(self.prediction_model['subject_ix'].eval()).shape[0]
-                assert(len(parameters) == n_subjects), f'Number of subjects in data ({n_subjects}) does not match number of subjects in parameters ({len(parameters)})'
+                assert (len(parameters) == n_subjects), f'Number of subjects in data ({n_subjects}) does not match number of subjects in parameters ({len(parameters)})'
 
             for key in self.free_parameters.keys():
                 dm_keys = self.design_matrices[key].design_info.column_names
@@ -857,7 +1002,7 @@ class RegressionModel(BaseModel):
 
             parameters = self.get_parameter_values()
             model_inputs = self.get_model_inputs(parameters)
-        
+
             p = pm.Deterministic('p', var=self._get_choice_predictions(model_inputs))
             pm.Bernoulli('ll_bernoulli', p=p)
 
@@ -882,7 +1027,7 @@ class RegressionModel(BaseModel):
                     samples_pars[key] = np.random.normal(0, 1, n_subjects)
 
         if n_subjects:
-            return pd.DataFrame(samples_pars, index=pd.Index(np.arange(1, n_subjects+1), name='subject'))
+            return pd.DataFrame(samples_pars, index=pd.Index(np.arange(1, n_subjects + 1), name='subject'))
         else:
             return samples_pars
 
@@ -891,12 +1036,16 @@ class RegressionModel(BaseModel):
         parameter_values = []
         free_parameters = self.get_free_parameters()
 
-        assert(hasattr(self, 'paradigm')), 'Model needs to have original paradigm as an attribute (model.paradigm...) for calcuating conditionwise parameters'
+        assert (hasattr(self, 'paradigm')), 'Model needs to have original paradigm as an attribute (model.paradigm...) for calcuating conditionwise parameters'
 
         for parameter in free_parameters.keys():
             dm = self.rebuild_design_matrix(conditions, parameter)
 
-            if group:
+            # Hierarchical regression fits store the group-mean coefficients as
+            # `{parameter}_mu`; per-subject (non-hierarchical) fits only have
+            # `{parameter}`. Prefer the group-mean when asked for the group and
+            # it exists, otherwise fall back to the per-subject coefficients.
+            if group and f'{parameter}_mu' in idata.posterior:
                 trace = idata.posterior[f'{parameter}_mu'].to_dataframe().unstack(-1)
             else:
                 trace = idata.posterior[f'{parameter}'].to_dataframe().unstack(-1)

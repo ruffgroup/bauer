@@ -18,13 +18,12 @@ Pass ``--all-subjects-no-tms`` to use all 73 subjects across all sessions.
 the TMS condition as a covariate on the noise/aversion parameters. Currently
 only implemented for ``choice`` (DDM/RDM regression versions to come).
 """
+from bauer.utils.data import load_dehollander_tms_risk
 import argparse
 import os
 import os.path as op
 import warnings
 warnings.filterwarnings('ignore')
-
-from bauer.utils.data import load_dehollander_tms_risk
 
 
 def _progress(trace, draw):  # noqa: ARG001
@@ -44,11 +43,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('model', choices=['choice', 'ddm', 'rdm'])
     ap.add_argument('--regression', action='store_true',
-                     help='Use the RegressionModel variant with stimulation_condition '
-                          'as a covariate. Choice + non-flex available; '
-                          'flex variants of DDM/RDM regression now supported.')
+                    help='Use the RegressionModel variant with stimulation_condition '
+                    'as a covariate. Choice + non-flex available; '
+                    'flex variants of DDM/RDM regression now supported.')
     ap.add_argument('--flex', action='store_true',
-                     help='Use flexible-noise (B-spline) variant')
+                    help='Use flexible-noise (B-spline) variant')
     ap.add_argument('--spline-order', type=int, default=5)
     ap.add_argument(
         '--reg-on', default='n1_evidence_sd,n2_evidence_sd',
@@ -58,13 +57,13 @@ def main():
              'safe_prior_mu,safe_prior_sd") for the most permissive spec.'
     )
     ap.add_argument('--prior-estimate', default='full',
-                     choices=['objective', 'shared', 'full', 'klw'])
+                    choices=['objective', 'shared', 'full', 'klw'])
     ap.add_argument('--v-scale', choices=['free', 'fixed'], default='free')
     ap.add_argument('--n-subjects', default='all',
-                     help='Number of subjects: integer or "all"')
+                    help='Number of subjects: integer or "all"')
     ap.add_argument('--all-subjects-no-tms', action='store_true',
-                     help='Use all 73 subjects across all sessions '
-                          '(default: 35 TMS subjects, sessions 2/3)')
+                    help='Use all 73 subjects across all sessions '
+                    '(default: 35 TMS subjects, sessions 2/3)')
     ap.add_argument('--out-dir', default='results/dehollander_tms')
     ap.add_argument('--draws', type=int, default=1000)
     ap.add_argument('--tune', type=int, default=1000)
@@ -73,7 +72,7 @@ def main():
     ap.add_argument('--target-accept', type=float, default=0.95)
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--backend', choices=['pymc', 'numpyro', 'blackjax'],
-                     default='pymc')
+                    default='pymc')
     ap.add_argument('--no-ppc', action='store_true')
     args = ap.parse_args()
 
@@ -93,7 +92,7 @@ def main():
     df_use = df.reset_index().set_index('subject') if args.regression else df
 
     common = dict(paradigm=df_use, prior_estimate=args.prior_estimate,
-                  fit_seperate_evidence_sd=True)
+                  fit_separate_evidence_sd=True)
     if args.flex:
         common['spline_order'] = args.spline_order
 
@@ -162,18 +161,27 @@ def main():
     reg_tag = '_reg' if args.regression else ''
     scale_tag = f'_{args.v_scale}scale' if args.model in ('ddm', 'rdm') else ''
     out_path = op.join(args.out_dir, f'{n_subj}subj',
-                        f'{args.model}{flex_tag}{reg_tag}{scale_tag}_{args.prior_estimate}.nc')
+                       f'{args.model}{flex_tag}{reg_tag}{scale_tag}_{args.prior_estimate}.nc')
     _safe_to_netcdf(idata, out_path)
     print(f'idata -> {out_path}', flush=True)
 
     if not args.no_ppc:
         print('Computing PPC...', flush=True)
+        # Regression fits need stimulation_condition as a COLUMN (patsy rebuilds
+        # the design matrix during prediction). But the PPC join also needs a
+        # UNIQUE index — df_use's set_index('subject') is non-unique (many trials
+        # per subject) and breaks the join. So keep df's unique trial-level
+        # multi-index and just promote the condition to a column.
+        ppc_df = df
+        if args.regression:
+            ppc_df = df.copy()
+            ppc_df['stimulation_condition'] = df.index.get_level_values('stimulation_condition')
         if args.model == 'choice':
-            ppc = m.ppc(df, idata, progressbar=False)
+            ppc = m.ppc(ppc_df, idata, progressbar=False)
         else:
-            ppc = m.ppc(df, idata, n_posterior_samples=200,
-                         inner_samples=1, random_seed=args.seed,
-                         progressbar=False)
+            ppc = m.ppc(ppc_df, idata, n_posterior_samples=200,
+                        inner_samples=1, random_seed=args.seed,
+                        progressbar=False)
         ppc_path = out_path.replace('.nc', '_ppc.pickle')
         ppc.to_pickle(ppc_path)
         print(f'ppc -> {ppc_path}', flush=True)

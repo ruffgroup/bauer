@@ -78,8 +78,8 @@ def load_garcia2022(task='magnitude', remove_non_responses=True, min_rt=0.15,
 # ---------------------------------------------------------------------------
 
 def load_dehollander2024_risk(sessions=None, remove_non_responses=True,
-                               min_rt=0.15, max_rt=None):
-    """De Hollander et al. (2024 Nature Communications) dotcloud risky-choice
+                              min_rt=0.15, max_rt=None):
+    """De Hollander et al. (2024, bioRxiv preprint) dotcloud risky-choice
     task — N=30 subjects across 3T and 7T sessions, ~256 trials/subject.
 
     ``choice = True`` means option 2 chosen (bauer's risk convention).
@@ -99,7 +99,7 @@ def load_dehollander2024_risk(sessions=None, remove_non_responses=True,
 # ---------------------------------------------------------------------------
 
 def load_dehollander2024_symbolic(remove_non_responses=True, min_rt=0.15,
-                                   max_rt=None):
+                                  max_rt=None):
     """De Hollander 2024 *symbolic* (Arabic-numeral) risky-choice task —
     N=58 subjects, ~256 trials each. Unlike the dotcloud task, n1/n2 are
     continuous (range ~5–100), making this a stronger test of stimulus-
@@ -138,8 +138,8 @@ def load_bedi2026(remove_non_responses=True):
 
 
 def load_dehollander_tms_risk(stimulation_conditions=None, sessions=None,
-                                tms_only=True, remove_non_responses=True,
-                                min_rt=0.15, max_rt=None):
+                              tms_only=True, remove_non_responses=True,
+                              min_rt=0.15, max_rt=None):
     """De Hollander TMS-risk experiment — 73 subjects total but only 35 of
     them completed the TMS sessions (sessions 2 and 3); the remaining 38
     only did the baseline session.
@@ -170,4 +170,4 @@ def load_dehollander_tms_risk(stimulation_conditions=None, sessions=None,
         df = df[df['session'].isin(sessions)]
     df = _clean_rt_choice(df, remove_non_responses, min_rt, max_rt)
     return df.set_index(['subject', 'session', 'stimulation_condition',
-                          'run', 'trial_nr']).sort_index()
+                         'run', 'trial_nr']).sort_index()

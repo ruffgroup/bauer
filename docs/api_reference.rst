@@ -16,20 +16,20 @@ Core
    :members:
    :show-inheritance:
 
-Psychometric models
--------------------
+Psychophysical models
+---------------------
 
-.. autoclass:: bauer.models.PsychometricModel
+.. autoclass:: bauer.models.PsychophysicalModel
    :members:
    :show-inheritance:
 
-.. autoclass:: bauer.models.PsychometricLapseModel
+.. autoclass:: bauer.models.PsychophysicalLapseModel
    :show-inheritance:
 
-.. autoclass:: bauer.models.PsychometricRegressionModel
+.. autoclass:: bauer.models.PsychophysicalRegressionModel
    :show-inheritance:
 
-.. autoclass:: bauer.models.PsychometricLapseRegressionModel
+.. autoclass:: bauer.models.PsychophysicalLapseRegressionModel
    :show-inheritance:
 
 Magnitude comparison models

@@ -118,6 +118,11 @@ notebooks/results/
 *.parquet
 *.netcdf
 
+# Agent worktrees / local agent state
+.claude/
+# Reference PDFs (large binaries; keep local only)
+notes/papers/
+
 # Rendered figures
 notebooks/figures/
 

@@ -450,7 +450,7 @@ But we can also test Weber's law *without* assuming log encoding, by fitting a m
 that works in **natural space** — that is, the space of raw stimulus magnitudes $n$,
 not $\log n$.
 
-`PsychometricRegressionModel` is a simple psychometric-function model that takes two
+`PsychophysicalRegressionModel` is a simple psychometric-function model that takes two
 stimuli $x_1, x_2$ and fits the probability of choosing $x_2$ as:
 
 $$P(\text{chose}\; x_2) = \Phi\!\left(\frac{x_2 - x_1}{\nu}\right)$$
@@ -465,7 +465,7 @@ when measured from outside, in the raw stimulus space.
 """),
 
 code("""\
-from bauer.models import PsychometricRegressionModel
+from bauer.models import PsychophysicalRegressionModel
 
 # x1 = n1, x2 = n2 in natural space (raw magnitudes, not log-transformed)
 data_lin = data.copy()
@@ -473,7 +473,7 @@ data_lin['x1'] = data_lin['n1'].astype(float)
 data_lin['x2'] = data_lin['n2'].astype(float)
 
 # C(n1): categorical coding — separate nu per n1 level, no linearity assumption
-model_lin_reg = PsychometricRegressionModel(
+model_lin_reg = PsychophysicalRegressionModel(
     paradigm=data_lin,
     regressors={'nu': 'C(n1)'},
 )
@@ -828,7 +828,7 @@ import seaborn as sns
 import arviz as az
 from scipy.stats import norm as scipy_norm, spearmanr
 from bauer.utils.data import load_garcia2022
-from bauer.models import PsychometricModel
+from bauer.models import PsychophysicalModel
 
 data_risk = load_garcia2022(task='risk')
 print(f"Subjects: {data_risk.index.get_level_values('subject').nunique()},  "
@@ -872,7 +872,7 @@ plt.tight_layout()
 
 md(r"""## The psychometric function for risky choice
 
-bauer's `PsychometricModel` fits:
+bauer's `PsychophysicalModel` fits:
 
 $$P(\text{chose risky}) = \Phi\!\left(\frac{\log(n_\text{risky}/n_\text{safe}) - \delta^*}{\sqrt{2}\,\nu}\right)$$
 
@@ -942,7 +942,7 @@ plt.tight_layout()
 md(r"""## Fitting psychometric functions — separately per format
 
 Because symbolic and non-symbolic formats produce different noise levels, we fit
-`PsychometricModel` **separately** for each format.  This gives us per-subject estimates
+`PsychophysicalModel` **separately** for each format.  This gives us per-subject estimates
 of $\nu$ (noise) and $\delta^*$ (indifference point) within each format, which we can
 then correlate with each other and with magnitude-task precision.
 """),
@@ -966,14 +966,14 @@ print(f"Non-symbolic:  {len(data_nonsym)} trials, "
 
 code("""\
 # Fit psychometric models — one per format
-from bauer.models import PsychometricModel
+from bauer.models import PsychophysicalModel
 
-model_sym = PsychometricModel(paradigm=data_sym)
+model_sym = PsychophysicalModel(paradigm=data_sym)
 model_sym.build_estimation_model(data=data_sym, hierarchical=True)
 idata_sym = model_sym.sample(draws=500, tune=500, chains=4, progressbar=False)
 print("Symbolic fit done")
 
-model_nonsym = PsychometricModel(paradigm=data_nonsym)
+model_nonsym = PsychophysicalModel(paradigm=data_nonsym)
 model_nonsym.build_estimation_model(data=data_nonsym, hierarchical=True)
 idata_nonsym = model_nonsym.sample(draws=500, tune=500, chains=4, progressbar=False)
 print("Non-symbolic fit done")
@@ -1220,7 +1220,7 @@ model_reg = RiskRegressionModel(
     paradigm=data_reg,
     regressors={'evidence_sd': 'C(format)'},
     prior_estimate='klw',
-    fit_seperate_evidence_sd=False,
+    fit_separate_evidence_sd=False,
 )
 model_reg.build_estimation_model(data=data_reg, hierarchical=True)
 idata_reg = model_reg.sample(draws=500, tune=500, chains=4, progressbar=False)
@@ -1297,7 +1297,7 @@ md(r"""# Lesson 3: Stake effects and presentation order — de Hollander et al. 
 
 ## Background
 
-De Hollander et al. (2024, *Nature Human Behaviour*) tested whether perceptual noise
+De Hollander et al. (2024, *bioRxiv* preprint) tested whether perceptual noise
 during the encoding of numerical magnitudes explains risk aversion and its interaction
 with presentation order.  The key design feature: the **order** in which the safe and
 risky options are presented is randomised across trials, allowing the model to disentangle
@@ -1317,8 +1317,8 @@ Standard models (EU, KLW with a shared noise) **cannot** capture this asymmetry.
 | Model | Class | Key parameters |
 |-------|-------|----------------|
 | Expected Utility (EU) | `ExpectedUtilityRiskModel` | `alpha`, `sigma` |
-| KLW | `RiskModel(prior_estimate='klw', fit_seperate_evidence_sd=False)` | `evidence_sd`, `prior_sd` (shared) |
-| PMCM | `RiskModel(prior_estimate='full', fit_seperate_evidence_sd=True)` | `n1_evidence_sd`, `n2_evidence_sd`, `risky/safe_prior_mu/sd` |
+| KLW | `RiskModel(prior_estimate='klw', fit_separate_evidence_sd=False)` | `evidence_sd`, `prior_sd` (shared) |
+| Perceptual and Memory-based Choice Model (PMCM) | `RiskModel(prior_estimate='full', fit_separate_evidence_sd=True)` | `n1_evidence_sd`, `n2_evidence_sd`, `risky/safe_prior_mu/sd` |
 
 We fit all three on both the **dot-cloud** (fMRI sessions 3T+7T) and the **symbolic**
 (Arabic numerals) datasets, then compare posterior predictives against the interaction
@@ -1483,7 +1483,7 @@ idata_eu = model_eu.sample(draws=100, tune=100, chains=2, progressbar=False,
 code("""\
 # ── 2. KLW (shared noise, shared prior) ─────────────────────────────────────
 model_klw = RiskModel(paradigm=df_dot, prior_estimate='klw',
-                      fit_seperate_evidence_sd=False)
+                      fit_separate_evidence_sd=False)
 model_klw.build_estimation_model(data=df_dot, hierarchical=True, save_p_choice=True)
 idata_klw = model_klw.sample(draws=100, tune=100, chains=2, progressbar=False,
                               idata_kwargs={'log_likelihood': True})
@@ -1492,7 +1492,7 @@ idata_klw = model_klw.sample(draws=100, tune=100, chains=2, progressbar=False,
 code("""\
 # ── 3. PMCM (separate noise + separate priors) ────────────────────
 model_full = RiskModel(paradigm=df_dot, prior_estimate='full',
-                       fit_seperate_evidence_sd=True)
+                       fit_separate_evidence_sd=True)
 model_full.build_estimation_model(data=df_dot, hierarchical=True, save_p_choice=True)
 idata_full = model_full.sample(draws=100, tune=100, chains=2, progressbar=False,
                                 idata_kwargs={'log_likelihood': True})
@@ -1633,7 +1633,7 @@ idata_eu_sym = model_eu_sym.sample(draws=100, tune=100, chains=2, progressbar=Fa
 code("""\
 # ── 2. KLW ───────────────────────────────────────────────────────────────────
 model_klw_sym = RiskModel(paradigm=df_sym, prior_estimate='klw',
-                           fit_seperate_evidence_sd=False)
+                           fit_separate_evidence_sd=False)
 model_klw_sym.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
 idata_klw_sym = model_klw_sym.sample(draws=100, tune=100, chains=2, progressbar=False,
                                           idata_kwargs={'log_likelihood': True})
@@ -1642,7 +1642,7 @@ idata_klw_sym = model_klw_sym.sample(draws=100, tune=100, chains=2, progressbar=
 code("""\
 # ── 3. PMCM ────────────────────────────────────────────────────────
 model_full_sym = RiskModel(paradigm=df_sym, prior_estimate='full',
-                            fit_seperate_evidence_sd=True)
+                            fit_separate_evidence_sd=True)
 model_full_sym.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
 idata_full_sym = model_full_sym.sample(draws=100, tune=100, chains=2, progressbar=False,
                                             idata_kwargs={'log_likelihood': True})
@@ -2063,9 +2063,9 @@ from bauer.models import (MagnitudeComparisonModel, FlexibleNoiseComparisonModel
 
 class AffineNoiseComparisonModel(FlexibleNoiseComparisonModel):
     # Magnitude-comparison model with affine noise: v(n) = softplus(b0 + b1*n_hat)
-    def __init__(self, paradigm, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm, fit_separate_evidence_sd=True,
                  fit_prior=False, memory_model='independent'):
-        super().__init__(paradigm, fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+        super().__init__(paradigm, fit_separate_evidence_sd=fit_separate_evidence_sd,
                          fit_prior=fit_prior, spline_order=2,
                          memory_model=memory_model)
 
@@ -2080,9 +2080,9 @@ class AffineNoiseComparisonModel(FlexibleNoiseComparisonModel):
 class AffineNoiseRiskModel(FlexibleNoiseRiskModel):
     # Risky-choice model with affine noise: v(n) = softplus(b0 + b1*n_hat)
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True, memory_model='independent'):
+                 fit_separate_evidence_sd=True, memory_model='independent'):
         super().__init__(paradigm, prior_estimate=prior_estimate,
-                         fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+                         fit_separate_evidence_sd=fit_separate_evidence_sd,
                          spline_order=2, memory_model=memory_model)
 
     def make_dm(self, x, variable='n1_evidence_sd'):
@@ -2178,7 +2178,7 @@ code("""\
 # MagnitudeComparisonModel (MCM) — fixed log-space noise (Weber's-law null)
 # idata_kwargs passes extra arguments to pymc.sample_posterior_predictive;
 # log_likelihood=True stores trial-level log-likelihoods needed for ELPD comparison.
-model_mcm = MagnitudeComparisonModel(paradigm=df_mag, fit_seperate_evidence_sd=True)
+model_mcm = MagnitudeComparisonModel(paradigm=df_mag, fit_separate_evidence_sd=True)
 model_mcm.build_estimation_model(data=df_mag, hierarchical=True)
 idata_mcm = model_mcm.sample(draws=200, tune=200, chains=4, progressbar=False,
                               idata_kwargs={'log_likelihood': True})
@@ -2187,7 +2187,7 @@ idata_mcm = model_mcm.sample(draws=200, tune=200, chains=4, progressbar=False,
 code("""\
 # FlexibleNoiseComparisonModel — free noise curve fitted to dot arrays
 model_flex_mag = FlexibleNoiseComparisonModel(paradigm=df_mag,
-                                               fit_seperate_evidence_sd=True,
+                                               fit_separate_evidence_sd=True,
                                                spline_order=5)
 model_flex_mag.build_estimation_model(paradigm=df_mag, hierarchical=True)
 idata_flex_mag = model_flex_mag.sample(draws=200, tune=200, chains=4, progressbar=False,
@@ -2197,7 +2197,7 @@ idata_flex_mag = model_flex_mag.sample(draws=200, tune=200, chains=4, progressba
 code("""\
 # AffineNoiseComparisonModel — intercept + linear noise (defined above)
 model_affine_mag = AffineNoiseComparisonModel(paradigm=df_mag,
-                                               fit_seperate_evidence_sd=True)
+                                               fit_separate_evidence_sd=True)
 model_affine_mag.build_estimation_model(paradigm=df_mag, hierarchical=True)
 idata_affine_mag = model_affine_mag.sample(draws=200, tune=200, chains=4, progressbar=False,
                                             idata_kwargs={'log_likelihood': True})
@@ -2351,7 +2351,7 @@ df_sym_p = prep_df(df_sym)
 code("""\
 # PMCM (fixed log-space noise) — log_likelihood stored for ELPD comparison
 model_pmcm = RiskModel(paradigm=df_sym, prior_estimate='full',
-                        fit_seperate_evidence_sd=True)
+                        fit_separate_evidence_sd=True)
 model_pmcm.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
 idata_pmcm = model_pmcm.sample(draws=200, tune=200, chains=4, progressbar=False,
                                 idata_kwargs={'log_likelihood': True})
@@ -2360,7 +2360,7 @@ idata_pmcm = model_pmcm.sample(draws=200, tune=200, chains=4, progressbar=False,
 code("""\
 # FlexibleNoiseRiskModel — free noise curve on Arabic-numeral data
 model_flex = FlexibleNoiseRiskModel(paradigm=df_sym, prior_estimate='full',
-                                     fit_seperate_evidence_sd=True, spline_order=5)
+                                     fit_separate_evidence_sd=True, spline_order=5)
 model_flex.build_estimation_model(paradigm=df_sym, hierarchical=True, save_p_choice=True)
 idata_flex = model_flex.sample(draws=200, tune=200, chains=4, progressbar=False,
                                 idata_kwargs={'log_likelihood': True})
@@ -2369,7 +2369,7 @@ idata_flex = model_flex.sample(draws=200, tune=200, chains=4, progressbar=False,
 code("""\
 # AffineNoiseRiskModel — intercept + linear noise for Arabic-numeral gambles
 model_affine = AffineNoiseRiskModel(paradigm=df_sym, prior_estimate='full',
-                                     fit_seperate_evidence_sd=True)
+                                     fit_separate_evidence_sd=True)
 model_affine.build_estimation_model(paradigm=df_sym, hierarchical=True, save_p_choice=True)
 idata_affine = model_affine.sample(draws=200, tune=200, chains=4, progressbar=False,
                                     idata_kwargs={'log_likelihood': True})
@@ -2667,7 +2667,7 @@ half_b_full = df_mag.iloc[half_b_rows]
 print(f"Half A: {len(half_a_full)} trials,  Half B: {len(half_b_full)} trials")
 """),
 
-md(r"""## Split-half analysis: 10 random splits $\times$ 5 trial counts
+md(r"""## Split-half analysis: 3 random splits $\times$ 3 trial counts
 
 For each trial count (25, 50, 108) we:
 1. Randomly split each subject's data into two halves
@@ -2675,7 +2675,7 @@ For each trial count (25, 50, 108) we:
 3. Fit MLE and hierarchical Bayes on each half
 4. Correlate the parameter estimates across halves
 
-We repeat this 10 times with different random splits to get a stable estimate of
+We repeat this 3 times with different random splits to get a stable estimate of
 reliability.  Three correlation metrics are shown: Spearman $\rho$, Pearson $r$,
 and $R^2$.
 """),
@@ -2700,11 +2700,11 @@ def split_data(df_mag, seed):
     return df_mag.iloc[a_rows], df_mag.iloc[b_rows]
 
 def fit_mle(data):
-    model = MagnitudeComparisonModel(paradigm=data, fit_seperate_evidence_sd=True)
+    model = MagnitudeComparisonModel(paradigm=data, fit_separate_evidence_sd=True)
     return model.fit_map_individual(data=data, flat_prior=True)
 
 def fit_hierarchical(data, draws=500, tune=500, chains=2):
-    model = MagnitudeComparisonModel(paradigm=data, fit_seperate_evidence_sd=True)
+    model = MagnitudeComparisonModel(paradigm=data, fit_separate_evidence_sd=True)
     model.build_estimation_model(data=data, hierarchical=True)
     idata = model.sample(draws=draws, tune=tune, chains=chains, progressbar=False)
     n_subj = len(data.index.unique(level='subject'))
@@ -2980,11 +2980,11 @@ md(r"""## Before we fit: drop physiologically implausible fast trials
 
 **Critical preprocessing step for any DDM/RDM fit — including yours.**
 
-DDM/RDM likelihoods require the non-decision time $t_0$ to be **below
-$\min(\text{RT})$ for every subject**. When the sampler wanders into a
+DDM/RDM likelihoods require the non-decision time $t_0$ to be below
+$\min(\text{RT})$ for *every* subject. When the sampler wanders into a
 region where $t_0 > \text{rt}$ for some trial, the WFPT log-likelihood
 floors at `LOGP_LB = -66.1` (HSSM's design, inherited by bauer) — and
-**the gradient w.r.t. $t_0$ in that region is exactly zero**. NUTS sees
+the gradient with respect to $t_0$ in that region is *exactly zero*. NUTS sees
 a flat landscape, loses all pull back into the valid region, and the
 chain can permanently stick in a wrong posterior mode. We diagnosed this
 the hard way on a first attempt at fitting Garcia (chains landed in 4
@@ -3150,6 +3150,33 @@ m_ddm = DDMMagnitudeComparisonModel(
     fit_prior=True,
 )
 idata_ddm = fit_or_load(m_ddm, 'ddm')
+"""),
+
+md(r"""## Why this hierarchical DDM converges: the starting-point finder
+
+Hierarchical DDM (and especially regression-DDM) posteriors are long, curved
+ridges. *Where the chains start* largely decides whether they find the bulk of
+the mass or get stuck in a bad corner at maximum tree depth. With a naive,
+generic initialization this is effectively a **seed lottery** — the same model
+and settings can give $\hat r \approx 1.0$ on one random seed and
+$\hat r > 3$ on the next.
+
+bauer handles this for you. On DDM/race models, `model.sample` is **on by
+default** backed by a *starting-point finder* (`get_initial_points`,
+`recommended_init='mapjitter'`): it places each chain at a **data-informed
+plausible value** (the posterior mode from `find_MAP`) and then **disperses the
+chains by a fraction of each parameter's prior SD** — so chains sit around the
+typical set (never all exactly at the mode), and $\hat r$ stays meaningful.
+This is the same idea HSSM uses (curated initial values + small jitter).
+
+In a controlled experiment it took a regression DDM from ~12 % to **100 %**
+seed-convergence, and made fits ~3.7× faster (converged chains avoid the
+max-tree-depth stalls). You don't have to do anything — it's the default. To
+disable it, pass `m.sample(..., find_init=False)`; to supply your own, pass
+`initvals=`. It works for every parameter (DDM, front-end, B-spline noise
+coefficients) with no per-parameter tuning. **For a large hierarchical fit
+(e.g. a full TMS or multi-condition dataset), this is the single most important
+reason your fit converges — leave it on.**
 """),
 
 md(r"""## Diagnostics — did both models sample cleanly?
@@ -3645,40 +3672,222 @@ print(f"ISI range long:  {df.loc[df['isi_cat']=='long','isi'].min():.1f}–"
       f"{df.loc[df['isi_cat']=='long','isi'].max():.1f}s")
 """),
 
-md(r"""And the recipe — we *show* this rather than running it inside the
-tutorial (another full DDM fit would add another ~45 min on GPU). On your
-own data, this is a complete drop-in:
+md(r"""**Fit the regression DDM.** This adds one regressor on
+`n1_evidence_sd` — the encoding noise on the first stimulus, the
+parameter most likely to grow if working-memory representations decay
+during the longer ISI delays. We don't regress on `a` (response caution
+shouldn't depend on the ISI scheduled by the experiment) — pre-registering
+which parameter the covariate is allowed to move keeps this honest.
+"""),
 
-```python
+code("""\
 from bauer.models import DDMMagnitudeComparisonRegressionModel
 
 m_isi = DDMMagnitudeComparisonRegressionModel(
     paradigm=df,
     fit_separate_evidence_sd=True, fit_prior=True,
-    regressors={'n1_evidence_sd': 'isi_cat'},   # only the first-stim noise
+    regressors={'n1_evidence_sd': 'isi_cat'},
 )
-m_isi.build_estimation_model(data=df, hierarchical=True)
-idata_isi = m_isi.sample(backend='numpyro', target_accept=0.95)
+idata_isi = fit_or_load(m_isi, 'ddm_isi')
+"""),
 
-# The relevant contrast is the 'long' coefficient (with 'short' as the
-# reference level — same convention as patsy / statsmodels).
-az.summary(idata_isi, var_names=['n1_evidence_sd_mu_isi_cat[T.long]'])
-# HDI excludes 0 → significant memory decay across this ISI range.
-# HDI includes 0 → no measurable decay (the expected null, given the
-# essentially-flat mean RT / accuracy across ISIs we saw earlier).
-```
+code("""\
+# bauer's regression model stores coefficients as a *coord* on the
+# parameter posterior (here 'n1_evidence_sd_regressors'), not as separate
+# variables. The 'isi_cat[T.long]' level is the contrast vs the 'short'
+# reference level (same convention as patsy / statsmodels).
+print(az.summary(idata_isi, var_names=['n1_evidence_sd_mu'],
+                  hdi_prob=0.94).to_string())
 
-Two practical notes for your own data:
+# Plain-English readout of the long-vs-short contrast on the
+# untransformed (pre-softplus) scale.
+post = idata_isi.posterior['n1_evidence_sd_mu'].sel(
+    n1_evidence_sd_regressors='isi_cat[T.long]').values.ravel()
+hdi_lo, hdi_hi = np.percentile(post, [3, 97])
+print(f"\\n94% HDI on long-vs-short ISI effect on n1_evidence_sd_mu: "
+      f"[{hdi_lo:+.3f}, {hdi_hi:+.3f}]")
+if hdi_lo > 0:
+    print("→ Long ISIs INCREASE n1 encoding noise (memory decay detected).")
+elif hdi_hi < 0:
+    print("→ Long ISIs DECREASE n1 encoding noise (unexpected — investigate).")
+else:
+    print("→ HDI includes 0: no detectable ISI effect on n1 noise across "
+          "6-9 s delays (the expected null, given the flat empirical "
+          "RT / accuracy seen earlier).")
+"""),
 
-1. **Pick the right parameter to regress.** Here ISI plausibly affects only
-   $\nu_1$ (memory for the first stimulus across the delay) — there's no
-   prior reason ISI would change response caution. Adding `'a': 'isi_cat'`
-   would be data-mining; pre-register which parameter the covariate should
-   move and only regress that one.
-2. **Continuous covariates work too** — replace `'isi_cat'` with
-   `'isi'` (the raw seconds column) to get a linear ISI slope on $\nu_1$.
-   For non-linear effects, patsy formulas like `'bs(isi, df=3)'` give a
+md(r"""### From contrast coefficient → on-scale noise per condition
+
+The summary above is on the un-softplus scale (so contrasts are
+additive). For interpretation it's easier to read the actual
+$\nu_1$ in each ISI condition. bauer's
+`model.get_conditionwise_parameters(idata, conditions, group=True)`
+does that for you — it rebuilds the design matrix at the conditions
+you pass, multiplies in the posterior coefficients, and **applies the
+transform** (softplus here, so the result is in the natural noise
+units used by the cognitive model).
+"""),
+
+code("""\
+# Group-level n1_evidence_sd per ISI condition, with the softplus
+# transform applied — i.e. the actual noise the cognitive model uses.
+isi_conditions = pd.DataFrame({'isi_cat': ['short', 'long']})
+cond_pars = m_isi.get_conditionwise_parameters(idata_isi, isi_conditions,
+                                                group=True)
+# cond_pars rows are (parameter, posterior_index); columns are conditions
+nu1 = cond_pars.loc['n1_evidence_sd']          # shape (n_post, 2)
+nu1.columns = ['short', 'long']
+diff = nu1['long'] - nu1['short']
+summary = pd.DataFrame({
+    'mean':   nu1.mean(),
+    'median': nu1.median(),
+    'hdi_3%': np.percentile(nu1, 3, axis=0),
+    'hdi_97%': np.percentile(nu1, 97, axis=0),
+})
+print('Group-level n1_evidence_sd per ISI condition (natural scale):')
+print(summary.round(3).to_string())
+print()
+print(f"long − short difference: mean = {diff.mean():+.4f}, "
+      f"94% HDI = [{np.percentile(diff, 3):+.4f}, "
+      f"{np.percentile(diff, 97):+.4f}]")
+"""),
+
+code("""\
+# Figure: per-condition posteriors of n1_evidence_sd, plus the difference.
+fig, (ax_pdf, ax_diff) = plt.subplots(1, 2, figsize=(10.5, 4.0))
+
+palette = {'short': '#377eb8', 'long': '#e41a1c'}
+for cond in ['short', 'long']:
+    sns.kdeplot(nu1[cond], ax=ax_pdf, fill=True, alpha=0.25,
+                 color=palette[cond], label=f'{cond} ISI', clip=(0, None))
+    ax_pdf.axvline(nu1[cond].median(), color=palette[cond], lw=1.2, ls='--')
+ax_pdf.set_xlabel(r'Group-level $\\nu_1$ (n1 encoding SD)')
+ax_pdf.set_ylabel('Posterior density')
+ax_pdf.set_title('Per-condition posterior')
+ax_pdf.legend()
+sns.despine(ax=ax_pdf)
+
+sns.kdeplot(diff, ax=ax_diff, fill=True, color='#666666', alpha=0.4,
+             clip=(diff.min(), diff.max()))
+ax_diff.axvline(0, color='black', ls=':', lw=1.2)
+hdi_lo, hdi_hi = np.percentile(diff, [3, 97])
+ax_diff.axvspan(hdi_lo, hdi_hi, color='gray', alpha=0.15,
+                 label=f'94% HDI [{hdi_lo:+.3f}, {hdi_hi:+.3f}]')
+ax_diff.set_xlabel(r'$\\nu_1$(long) − $\\nu_1$(short)')
+ax_diff.set_title('Long − short contrast posterior')
+ax_diff.legend(loc='upper left', fontsize=9)
+sns.despine(ax=ax_diff)
+plt.tight_layout()
+"""),
+
+md(r"""### Visualising the coefficient posterior
+
+The `az.summary` table above is the formal test; a forest plot makes the
+same contrast legible at a glance. Both group-level coefficients on $n_1$'s
+encoding noise are shown on the model's internal (pre-softplus) scale: the
+`Intercept` is the short-ISI baseline, and `isi_cat[T.long]` is the
+long-vs-short contrast whose 94% HDI relative to 0 *is* the test.
+"""),
+
+code("""\
+az.plot_forest(idata_isi, var_names=['n1_evidence_sd_mu'],
+               combined=True, hdi_prob=0.94, figsize=(7, 2.4))
+plt.axvline(0, color='black', ls=':', lw=1)
+plt.title('Group-level regression coefficients on $n_1$ encoding noise')
+plt.tight_layout()
+"""),
+
+md(r"""### Does the fit still track the data *within each condition*?
+
+A regression fit is only trustworthy if it reproduces behaviour at every
+level of the regressor — not just on average. Below we run a posterior
+predictive check and split both the data and the predictions by ISI
+condition. Two things to look for: (i) the bands cover the data points in
+**both** conditions (the fit is adequate on choice *and* RT), and (ii) the
+short and long curves nearly coincide — the visual counterpart of the
+near-null contrast we just measured.
+"""),
+
+code("""\
+# PPC on the original paradigm; DDM PPCs carry simulated_choice + simulated_rt.
+ppc_isi = m_isi.ppc(df, idata_isi, n_posterior_samples=60, progressbar=False)
+d_isi = add_bins(df)               # keeps isi_cat; adds diff_bin, correct, stake
+
+# Attach difficulty + ISI condition to every PPC draw (same join as the
+# size-effect PPC earlier — d_isi is indexed by the trial keys).
+p = (ppc_isi.join(d_isi[['diff_bin', 'isi_cat', 'n1', 'n2']], how='left')
+            .reset_index())
+p['sim_correct'] = p['simulated_choice'].astype(bool) == (p['n2'] > p['n1'])
+
+# Per-draw condition means → spread across draws gives the posterior PI band.
+acc_pp = (p.groupby(['ppc_sample', 'isi_cat', 'diff_bin'], observed=True)
+            ['sim_correct'].mean().reset_index())
+rt_pp  = (p[p['sim_correct']]
+            .groupby(['ppc_sample', 'isi_cat', 'diff_bin'], observed=True)
+            ['simulated_rt'].mean().reset_index())
+# Observed condition means (correct trials for RT, matching the PPC).
+acc_obs = (d_isi.groupby(['isi_cat', 'diff_bin'], observed=True)
+                 ['correct'].mean().reset_index())
+rt_obs  = (d_isi.query('correct')
+                .groupby(['isi_cat', 'diff_bin'], observed=True)
+                ['rt'].mean().reset_index())
+
+isi_pal = {'short': '#377eb8', 'long': '#e41a1c'}
+fig, (ax_c, ax_rt) = plt.subplots(1, 2, figsize=(11, 4.2))
+
+# Left: choice (accuracy) PPC.
+sns.lineplot(data=acc_pp, x='diff_bin', y='sim_correct',
+             hue='isi_cat', hue_order=['short', 'long'], palette=isi_pal,
+             errorbar=('pi', 90), err_style='band', err_kws={'alpha': 0.18},
+             lw=2, ax=ax_c)
+sns.scatterplot(data=acc_obs, x='diff_bin', y='correct',
+                hue='isi_cat', hue_order=['short', 'long'], palette=isi_pal,
+                s=90, edgecolor='black', zorder=5, legend=False, ax=ax_c)
+ax_c.set_xlabel('Difficulty'); ax_c.set_ylabel('P(correct)')
+ax_c.set_title('Choice PPC by ISI')
+ax_c.legend(title='ISI', loc='lower right')
+
+# Right: RT (difficulty) PPC, correct trials.
+sns.lineplot(data=rt_pp, x='diff_bin', y='simulated_rt',
+             hue='isi_cat', hue_order=['short', 'long'], palette=isi_pal,
+             errorbar=('pi', 90), err_style='band', err_kws={'alpha': 0.18},
+             lw=2, ax=ax_rt, legend=False)
+sns.scatterplot(data=rt_obs, x='diff_bin', y='rt',
+                hue='isi_cat', hue_order=['short', 'long'], palette=isi_pal,
+                s=90, edgecolor='black', zorder=5, legend=False, ax=ax_rt)
+ax_rt.set_xlabel('Difficulty'); ax_rt.set_ylabel('Mean RT (s, correct)')
+ax_rt.set_title('RT PPC by ISI')
+
+for ax in (ax_c, ax_rt):
+    sns.despine(ax=ax)
+fig.suptitle('Regression DDM PPC — points = data, bands = 90% posterior PI',
+             y=1.02)
+plt.tight_layout()
+"""),
+
+md(r"""Three practical notes for your own data:
+
+1. **Pick the right parameter to regress.** ISI here plausibly affects
+   only $\nu_1$ (memory for the first stimulus across the delay) — there's
+   no prior reason ISI would change response caution. Adding `'a':
+   'isi_cat'` would be data-mining; pre-register which parameter the
+   covariate should move and only regress that one.
+2. **Continuous covariates work too** — replace `'isi_cat'` with `'isi'`
+   (the raw seconds column) to get a linear ISI slope on $\nu_1$. For
+   non-linear effects, patsy formulas like `'bs(isi, df=3)'` give a
    B-spline; bauer auto-expands the design matrix.
+3. **Priors are conventions + judgment, not derivations.** bauer's `a`/`t0`
+   priors mirror HDDM (Wiecki, Sofer & Frank 2013): wide group-mean +
+   tight group-SD. The front-end (`n*_evidence_sd`, `prior_*`) priors are
+   bauer-specific judgment calls and were tuned partly to make this
+   tutorial converge. For a real publication, run a **prior-sensitivity
+   check** — refit at 2–3 prior strengths and confirm the contrast HDI
+   barely moves.
+
+The regression DDM fit takes about as long as the basic DDM (one extra
+parameter, vmap dimensions unchanged) — budget another ~45 min on a GPU
+L4, or pre-fit on the cluster with `fit_for_lesson8.py` (which now also
+produces this `ddm_isi` cache).
 """),
 
 md(r"""## When is RT modelling worth it?
@@ -3810,20 +4019,33 @@ df_full = load_garcia2022(task='magnitude')
 subs = df_full.index.get_level_values('subject').unique()[:8]
 df = df_full.loc[df_full.index.get_level_values('subject').isin(subs)].copy()
 
+# ── Preprocess: drop physiologically implausible fast trials ──────────────
+# Same RT filter as lesson 8 — see that lesson for the full pedagogical
+# motivation. Without it, the per-subject _t0_cap (= 0.95 * min rt) sits
+# below the t0 prior centre for most subjects, squeezing t0 against the cap
+# and funneling t0_sd through the HalfCauchy heavy tail. Concretely, for
+# this RDM fit, dropping it cuts divergences from ~80 to ~1.
+RT_MIN = 0.20
+n_before = len(df)
+df = df[df['rt'] >= RT_MIN].copy()
 n_subj = df.index.get_level_values('subject').nunique()
 print(f"Subjects: {n_subj}")
 print(f"Trials:   {len(df)}  (~{len(df) // n_subj} per subject)")
 print(f"Columns:  {list(df.columns)}")
+print(f"\\nDropped {n_before - len(df)} / {n_before} trials with rt < {RT_MIN:.2f}s "
+      f"({100*(n_before - len(df))/n_before:.1f}%); min rt now {df['rt'].min():.3f}s.")
 
 # Cache directory for fitted idata, so re-running the notebook after a
 # downstream cell change doesn't redo the (~5-15 min) fits. Set
-# BAUER_TUTORIAL_REFIT=1 in the env to force a fresh fit.
+# BAUER_TUTORIAL_REFIT=1 in the env to force a fresh fit. Cache key
+# encodes the RT cutoff so a future change there gets a fresh cache.
 CACHE_DIR = os.path.expanduser('~/.bauer_tutorial_cache')
 os.makedirs(CACHE_DIR, exist_ok=True)
 FORCE_REFIT = bool(os.environ.get('BAUER_TUTORIAL_REFIT', ''))
+CACHE_TAG = f'garcia_n{n_subj}_rtmin{int(RT_MIN*1000)}'
 
 def fit_or_load(model, name, draws=600, tune=600, chains=4, target_accept=0.95):
-    path = os.path.join(CACHE_DIR, f'garcia_8subj_{name}.nc')
+    path = os.path.join(CACHE_DIR, f'{CACHE_TAG}_{name}.nc')
     if os.path.exists(path) and not FORCE_REFIT:
         print(f"Loading cached {name} fit from {path}")
         return az.from_netcdf(path)
@@ -3952,7 +4174,7 @@ code("""\
 
 m_ddm = DDMMagnitudeComparisonModel(
     paradigm=df,
-    fit_seperate_evidence_sd=True,   # allow ν_1 ≠ ν_2 (sequential task)
+    fit_separate_evidence_sd=True,   # allow ν_1 ≠ ν_2 (sequential task)
     fit_prior=True,                  # estimate Bayesian-observer prior μ_p, σ_p
 )
 idata_ddm = fit_or_load(m_ddm, 'ddm')
@@ -4195,7 +4417,7 @@ code("""\
 # notes/race_diffusion_math.md §5 for the identifiability geometry.
 m_rdm = RaceDiffusionMagnitudeComparisonModel(
     paradigm=df,
-    fit_seperate_evidence_sd=True,
+    fit_separate_evidence_sd=True,
     fit_prior=True,
     advantage=True,
 )
@@ -4376,7 +4598,7 @@ conclusions from the posterior.
 code("""\
 m_rdm_noadv = RaceDiffusionMagnitudeComparisonModel(
     paradigm=df,
-    fit_seperate_evidence_sd=True,
+    fit_separate_evidence_sd=True,
     fit_prior=True,
     advantage=False,   # the ablation
 )

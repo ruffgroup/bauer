@@ -30,7 +30,8 @@ from .magnitude import (
     PowerLawNoiseComparisonModel, PowerLawNoiseComparisonRegressionModel,
 )
 from .risky_choice import (
-    RiskModel, FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
+    RiskModel, RiskRegressionModel,
+    FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
     PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
 )
 from ..utils.bayes import get_posterior, posterior_mean_sd
@@ -130,6 +131,7 @@ class DDMMixin:
     # BaseModel for the rationale; both backends get auto-routed defaults.
     recommended_nuts_kwargs = {'dense_mass': True}     # numpyro / blackjax
     recommended_pymc_init = 'jitter+adapt_full'        # pymc
+    recommended_init = 'mapjitter'                     # MAP centre + prior-scaled jitter
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
@@ -174,12 +176,7 @@ class DDMMixin:
         return pars
 
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
-        # MagnitudeComparisonModel._get_paradigm doesn't accept subject_mapping;
-        # try with the kwarg, fall back to positional for older overrides.
-        try:
-            p = super()._get_paradigm(paradigm, subject_mapping=subject_mapping)
-        except TypeError:
-            p = super()._get_paradigm(paradigm)
+        p = super()._get_paradigm(paradigm, subject_mapping=subject_mapping)
         # rt is required for fitting but optional for prediction/simulation.
         if 'rt' in paradigm.columns:
             rt = np.asarray(paradigm['rt'].values, dtype=float)
@@ -457,11 +454,27 @@ class DDMMixin:
                 subjects = post.coords['subject'].values
                 par_dict = {name: post[name].isel(chain=ci, draw=di).values
                             for name in param_names}
-                pars_df = pd.DataFrame(par_dict, index=pd.Index(subjects, name='subject'))
-                sim = self.simulate(paradigm, pars_df, n_samples=inner_samples,
-                                    random_seed=int(rng.integers(0, 2**31 - 1)))
+                # If any parameter is 2D (per-subject × per-regressor — i.e. a
+                # regression model), pass the dict-of-arrays through directly.
+                # build_prediction_model + pm.Data already accept multi-dim
+                # values; only the legacy DataFrame wrapping path collapses to
+                # 1D-per-subject and would break here.
+                any_regression = any(np.asarray(v).ndim > 1
+                                     for v in par_dict.values())
+                if any_regression:
+                    sim = self.simulate(paradigm, par_dict, n_samples=inner_samples,
+                                        random_seed=int(rng.integers(0, 2**31 - 1)))
+                else:
+                    pars_df = pd.DataFrame(par_dict,
+                                           index=pd.Index(subjects, name='subject'))
+                    sim = self.simulate(paradigm, pars_df, n_samples=inner_samples,
+                                        random_seed=int(rng.integers(0, 2**31 - 1)))
             else:
-                par_dict = {name: float(post[name].isel(chain=ci, draw=di).values)
+                # Non-hierarchical: per-parameter values are scalar in the
+                # plain-likelihood case but 1D (n_regressors,) for regression
+                # models. ``np.asarray(...)`` accepts both; we pass the raw
+                # array through and let build_prediction_model handle the dim.
+                par_dict = {name: np.asarray(post[name].isel(chain=ci, draw=di).values)
                             for name in param_names}
                 sim = self.simulate(paradigm, par_dict, n_samples=inner_samples,
                                     random_seed=int(rng.integers(0, 2**31 - 1)))
@@ -519,9 +532,9 @@ def _drift_from_snr(model_inputs, v_scale=None, flat_observer_prior=False):
         # posterior-mean signal feeding the accumulator actually is, given a
         # fixed true V.
         sigma1 = posterior_mean_sd(model_inputs['n1_prior_sd'],
-                                     model_inputs['n1_evidence_sd'])
+                                   model_inputs['n1_evidence_sd'])
         sigma2 = posterior_mean_sd(model_inputs['n2_prior_sd'],
-                                     model_inputs['n2_evidence_sd'])
+                                   model_inputs['n2_evidence_sd'])
     threshold = model_inputs.get('threshold', 0.0)
     diff_mu = (post_n2_mu - post_n1_mu) + threshold
     diff_sd = pt.sqrt(sigma1 ** 2 + sigma2 ** 2)
@@ -588,7 +601,7 @@ class DDMMagnitudeComparisonRegressionModel(DDMMixin, MagnitudeComparisonRegress
     """
 
     def __init__(self, paradigm, regressors, fit_prior=False,
-                 fit_seperate_evidence_sd=True, memory_model='independent',
+                 fit_separate_evidence_sd=None, memory_model='independent',
                  save_trialwise_estimates=False,
                  fit_v_scale=False, fix_z=True):
         self.fit_v_scale = fit_v_scale
@@ -596,7 +609,7 @@ class DDMMagnitudeComparisonRegressionModel(DDMMixin, MagnitudeComparisonRegress
         MagnitudeComparisonRegressionModel.__init__(
             self, paradigm, regressors,
             fit_prior=fit_prior,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             memory_model=memory_model,
             save_trialwise_estimates=save_trialwise_estimates,
         )
@@ -622,11 +635,11 @@ class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
     ----------
     fit_v_scale : bool
         See :class:`DDMMagnitudeComparisonModel`. Default ``False``.
-    spline_order, fit_seperate_evidence_sd, fit_prior, memory_model :
+    spline_order, fit_separate_evidence_sd, fit_prior, memory_model :
         Forwarded to :class:`FlexibleNoiseComparisonModel`.
     """
 
-    def __init__(self, paradigm, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm, fit_separate_evidence_sd=True,
                  fit_prior=False, spline_order=5,
                  memory_model='independent', fit_v_scale=False,
                  fix_z=True, flat_observer_prior=False):
@@ -634,7 +647,7 @@ class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
         self.fix_z = fix_z
         FlexibleNoiseComparisonModel.__init__(
             self, paradigm,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             fit_prior=fit_prior,
             spline_order=spline_order,
             memory_model=memory_model,
@@ -669,14 +682,58 @@ class DDMRiskModel(DDMMixin, RiskModel):
     """
 
     def __init__(self, paradigm=None, prior_estimate='objective',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, memory_model='independent',
                  fit_v_scale=False, fix_z=True):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
         super().__init__(
             paradigm=paradigm, prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            memory_model=memory_model,
+        )
+
+    def _get_drift(self, model_inputs, parameters):
+        v_scale = parameters['v_scale'] if self.fit_v_scale else None
+        return _drift_from_snr(model_inputs, v_scale=v_scale,
+                               flat_observer_prior=getattr(self, 'flat_observer_prior', False))
+
+
+class DDMRiskRegressionModel(DDMMixin, RiskRegressionModel):
+    """DDM variant of :class:`RiskRegressionModel`.
+
+    Patsy-formula regression on the cognitive front-end (``n1_evidence_sd``,
+    ``n2_evidence_sd``, prior parameters depending on ``prior_estimate``) and
+    on the accumulator params (``a``, ``t0``, ``v_scale`` if ``fit_v_scale``).
+    Use this for two-group / condition-comparison designs where the noise
+    function shape itself is *not* the focus — e.g. testing whether
+    boundary, drift scale, or encoding noise differs between gain and loss
+    blocks of a risky-choice task::
+
+        regressors = {
+            'n1_evidence_sd': 'C(domain)',
+            'n2_evidence_sd': 'C(domain)',
+            'a':              'C(domain)',
+        }
+
+    For richer noise-curve-shape comparisons use
+    :class:`DDMFlexibleNoiseRiskRegressionModel` (B-spline noise).
+
+    Paradigm columns required: ``n1``, ``n2``, ``p1``, ``p2``, ``choice``
+    (bool), ``rt`` (seconds).
+    """
+
+    def __init__(self, paradigm, regressors, prior_estimate='objective',
+                 fit_separate_evidence_sd=True,
+                 save_trialwise_n_estimates=False, memory_model='independent',
+                 fit_v_scale=False, fix_z=True):
+        self.fit_v_scale = fit_v_scale
+        self.fix_z = fix_z
+        RiskRegressionModel.__init__(
+            self, paradigm, regressors,
+            prior_estimate=prior_estimate,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
         )
@@ -700,7 +757,7 @@ class DDMFlexibleNoiseRiskModel(DDMMixin, FlexibleNoiseRiskModel):
     """
 
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, spline_order=5,
                  representational_noise='payoff',
                  memory_model='independent',
@@ -710,7 +767,7 @@ class DDMFlexibleNoiseRiskModel(DDMMixin, FlexibleNoiseRiskModel):
         FlexibleNoiseRiskModel.__init__(
             self, paradigm,
             prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             spline_order=spline_order,
             representational_noise=representational_noise,
@@ -741,7 +798,7 @@ class DDMFlexibleNoiseRiskRegressionModel(DDMMixin, FlexibleNoiseRiskRegressionM
     """
 
     def __init__(self, paradigm, regressors, prior_estimate='full',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, spline_order=5,
                  representational_noise='payoff',
                  memory_model='independent',
@@ -751,7 +808,7 @@ class DDMFlexibleNoiseRiskRegressionModel(DDMMixin, FlexibleNoiseRiskRegressionM
         FlexibleNoiseRiskRegressionModel.__init__(
             self, paradigm, regressors,
             prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             spline_order=spline_order,
             representational_noise=representational_noise,
@@ -778,14 +835,14 @@ class DDMPowerLawNoiseComparisonModel(DDMMixin, PowerLawNoiseComparisonModel):
     Weber's law (log scale).
     """
 
-    def __init__(self, paradigm, fit_seperate_evidence_sd=True,
+    def __init__(self, paradigm, fit_separate_evidence_sd=True,
                  fit_prior=False, memory_model='independent',
                  fit_v_scale=False, fix_z=True, flat_observer_prior=False):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
         PowerLawNoiseComparisonModel.__init__(
             self, paradigm,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             fit_prior=fit_prior, memory_model=memory_model,
             flat_observer_prior=flat_observer_prior,
         )
@@ -805,14 +862,14 @@ class DDMPowerLawNoiseComparisonRegressionModel(DDMMixin, PowerLawNoiseCompariso
     """
 
     def __init__(self, paradigm, regressors,
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  fit_prior=False, memory_model='independent',
                  fit_v_scale=False, fix_z=True):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
         PowerLawNoiseComparisonRegressionModel.__init__(
             self, paradigm, regressors,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             fit_prior=fit_prior, memory_model=memory_model,
         )
 
@@ -827,7 +884,7 @@ class DDMPowerLawNoiseRiskModel(DDMMixin, PowerLawNoiseRiskModel):
     log-EU difference (same as :class:`DDMRiskModel`)."""
 
     def __init__(self, paradigm, prior_estimate='full',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False,
                  memory_model='independent',
                  fit_v_scale=False, fix_z=True):
@@ -836,7 +893,7 @@ class DDMPowerLawNoiseRiskModel(DDMMixin, PowerLawNoiseRiskModel):
         PowerLawNoiseRiskModel.__init__(
             self, paradigm,
             prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
         )
@@ -857,7 +914,7 @@ class DDMPowerLawNoiseRiskRegressionModel(DDMMixin, PowerLawNoiseRiskRegressionM
     """
 
     def __init__(self, paradigm, regressors, prior_estimate='full',
-                 fit_seperate_evidence_sd=True,
+                 fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False,
                  memory_model='independent',
                  fit_v_scale=False, fix_z=True):
@@ -866,7 +923,7 @@ class DDMPowerLawNoiseRiskRegressionModel(DDMMixin, PowerLawNoiseRiskRegressionM
         PowerLawNoiseRiskRegressionModel.__init__(
             self, paradigm, regressors,
             prior_estimate=prior_estimate,
-            fit_seperate_evidence_sd=fit_seperate_evidence_sd,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
             save_trialwise_n_estimates=save_trialwise_n_estimates,
             memory_model=memory_model,
         )

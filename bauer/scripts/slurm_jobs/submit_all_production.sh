@@ -40,11 +40,12 @@ submit_l4 garcia_ddm_flex        02:00:00 bauer.scripts.fit_garcia ddm --flex   
 submit_l4 garcia_rdm             01:00:00 bauer.scripts.fit_garcia rdm                 --n-subjects all --backend numpyro --out-dir "$GARCIA"
 submit_l4 garcia_rdm_flex        01:30:00 bauer.scripts.fit_garcia rdm --flex          --n-subjects all --backend numpyro --out-dir "$GARCIA"
 
-# Garcia spline-order sweep on RDM-flex: {3, 7, 9, 11, 13}; spline_order=5 already
-# covered above. Outputs go into garcia/64subj_spline_sweep/ for clarity.
+# Garcia spline-order sweep on RDM-flex: {4, 7, 9, 11, 13}; spline_order=5 already
+# covered above. (B-splines need df >= 4 for cubic degree, so so3 is invalid.)
+# Higher orders have more parameters and sample slower → 03:00:00 walltime.
 GARCIA_SWEEP="$ROOT/garcia_spline_sweep"
-for SO in 3 7 9 11 13; do
-  submit_l4 "garcia_rdm_flex_so${SO}" 01:30:00 \
+for SO in 4 7 9 11 13; do
+  submit_l4 "garcia_rdm_flex_so${SO}" 03:00:00 \
     bauer.scripts.fit_garcia rdm --flex --spline-order $SO \
     --n-subjects all --backend numpyro --out-dir "$GARCIA_SWEEP/so${SO}"
 done

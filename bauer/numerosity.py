@@ -17,11 +17,9 @@ Data is loaded via bauer.utils.data.load_neuralpriors().
 """
 
 import numpy as np
-from numpy import trapezoid as np_trapz
 import pandas as pd
 import pymc as pm
 import pytensor.tensor as pt
-import pytensor.tensor.math as ptm
 from .estimation import EstimationBaseModel
 
 
@@ -44,7 +42,7 @@ def bernstein_basis(t, degree):
     k = np.arange(n + 1)
     coeffs = comb(n, k)
     basis = coeffs[np.newaxis, :] * (t[:, np.newaxis] ** k[np.newaxis, :]) * \
-            ((1 - t[:, np.newaxis]) ** (n - k)[np.newaxis, :])
+        ((1 - t[:, np.newaxis]) ** (n - k)[np.newaxis, :])
     return basis
 
 
@@ -148,9 +146,9 @@ class LogEncodingEstimationModel(EstimationBaseModel):
         self.unique_stimuli = np.sort(paradigm['n'].unique().astype(float))
 
     def build_estimation_model(self, data=None, coords=None, hierarchical=True,
-                               save_p_choice=False, flat_prior=False):
+                               save_p_choice=False, flat_prior=False, paradigm=None):
         if data is None:
-            data = self.paradigm
+            data = paradigm if paradigm is not None else self.paradigm
         self._setup_grids(data)
         super().build_estimation_model(data, coords, hierarchical, save_p_choice, flat_prior)
 
@@ -201,11 +199,11 @@ class LogEncodingEstimationModel(EstimationBaseModel):
 
         # Step 1: Encoding (SHARED across conditions)
         p_r = pt.exp(-0.5 * ((rep_grid[None, None, :] - unique_mu[None, :, None]) / nu[:, None, None]) ** 2) \
-              / (nu[:, None, None] * pt.sqrt(2 * np.pi))  # (S, K, R)
+            / (nu[:, None, None] * pt.sqrt(2 * np.pi))  # (S, K, R)
 
         # Step 2: Decoding (CONDITION-SPECIFIC prior)
         likelihood = pt.exp(-0.5 * ((rep_grid[None, None, :] - mu_on_grid[None, :, None]) / nu[:, None, None]) ** 2) \
-                     / (nu[:, None, None] * pt.sqrt(2 * np.pi))  # (S, N, R)
+            / (nu[:, None, None] * pt.sqrt(2 * np.pi))  # (S, N, R)
 
         posterior = likelihood[:, None, :, :] * priors[None, :, :, None]  # (S, C, N, R)
         posterior = posterior / (pt.sum(posterior, axis=2, keepdims=True) * d_stim + 1e-30)
@@ -392,9 +390,9 @@ class FlexibleEncodingEstimationModel(LogEncodingEstimationModel):
         return super().get_trialwise_variable(key)
 
     def build_estimation_model(self, data=None, coords=None, hierarchical=True,
-                               save_p_choice=False, flat_prior=False):
+                               save_p_choice=False, flat_prior=False, paradigm=None):
         if data is None:
-            data = self.paradigm
+            data = paradigm if paradigm is not None else self.paradigm
         self._setup_grids(data)
 
         if coords is None and hierarchical:
@@ -421,7 +419,7 @@ class FlexibleEncodingEstimationModel(LogEncodingEstimationModel):
         rep_grid = pt.as_tensor_variable(self.rep_grid)
         priors = pt.as_tensor_variable(self.priors)
         basis_grid = pt.as_tensor_variable(self.bernstein_basis_matrix)   # (N, n_poly)
-        basis_unique = pt.as_tensor_variable(self.bernstein_basis_unique) # (K, n_poly)
+        basis_unique = pt.as_tensor_variable(self.bernstein_basis_unique)  # (K, n_poly)
 
         d_stim = self.d_stim
         d_rep = self.d_rep
@@ -447,12 +445,12 @@ class FlexibleEncodingEstimationModel(LogEncodingEstimationModel):
             # Encoding: p(r | n_i, c) = N(r; mu_c(n_i), nu^2)
             # unique_mu: (C, K), rep_grid: (R) -> (S, C, K, R)
             p_r = pt.exp(-0.5 * ((rep_grid[None, None, None, :] - unique_mu[None, :, :, None]) / nu[:, None, None, None]) ** 2) \
-                  / (nu[:, None, None, None] * pt.sqrt(2 * np.pi))
+                / (nu[:, None, None, None] * pt.sqrt(2 * np.pi))
 
             # Decoding likelihood: p(r | n, c) using condition-specific encoding
             # mu_on_grid: (C, N), rep_grid: (R) -> (S, C, N, R)
             likelihood = pt.exp(-0.5 * ((rep_grid[None, None, None, :] - mu_on_grid[None, :, :, None]) / nu[:, None, None, None]) ** 2) \
-                         / (nu[:, None, None, None] * pt.sqrt(2 * np.pi))
+                / (nu[:, None, None, None] * pt.sqrt(2 * np.pi))
 
             # Posterior: p(n | r, c) ∝ likelihood(c) * prior(c)
             posterior = likelihood * priors[None, :, :, None]  # (S, C, N, R)
@@ -479,10 +477,10 @@ class FlexibleEncodingEstimationModel(LogEncodingEstimationModel):
             unique_mu = pt.dot(basis_unique, coefficients)     # (K,)
 
             p_r = pt.exp(-0.5 * ((rep_grid[None, None, :] - unique_mu[None, :, None]) / nu[:, None, None]) ** 2) \
-                  / (nu[:, None, None] * pt.sqrt(2 * np.pi))
+                / (nu[:, None, None] * pt.sqrt(2 * np.pi))
 
             likelihood = pt.exp(-0.5 * ((rep_grid[None, None, :] - mu_on_grid[None, :, None]) / nu[:, None, None]) ** 2) \
-                         / (nu[:, None, None] * pt.sqrt(2 * np.pi))
+                / (nu[:, None, None] * pt.sqrt(2 * np.pi))
 
             posterior = likelihood[:, None, :, :] * priors[None, :, :, None]
             posterior = posterior / (pt.sum(posterior, axis=2, keepdims=True) * d_stim + 1e-30)
@@ -590,12 +588,12 @@ class EfficientEncodingEstimationModel(LogEncodingEstimationModel):
         # Step 1: Encoding — CONDITION-SPECIFIC
         # p(r | n_i, c) = N(r; F_c(n_i), nu^2)
         p_r = pt.exp(-0.5 * ((rep_grid[None, None, None, :] - enc_unique[None, :, :, None]) / nu[:, None, None, None]) ** 2) \
-              / (nu[:, None, None, None] * pt.sqrt(2 * np.pi))  # (S, C, K, R)
+            / (nu[:, None, None, None] * pt.sqrt(2 * np.pi))  # (S, C, K, R)
 
         # Step 2: Bayesian decoding — condition-specific encoding + prior
         # p(r | n, c) = N(r; F_c(n), nu^2)
         likelihood = pt.exp(-0.5 * ((rep_grid[None, None, None, :] - enc_cdfs[None, :, :, None]) / nu[:, None, None, None]) ** 2) \
-                     / (nu[:, None, None, None] * pt.sqrt(2 * np.pi))  # (S, C, N, R)
+            / (nu[:, None, None, None] * pt.sqrt(2 * np.pi))  # (S, C, N, R)
 
         posterior = likelihood * priors[None, :, :, None]
         posterior = posterior / (pt.sum(posterior, axis=2, keepdims=True) * d_stim + 1e-30)
