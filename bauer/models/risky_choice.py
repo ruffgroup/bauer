@@ -648,13 +648,18 @@ class RiskModel(BaseModel):
         if self.prior_estimate == 'shared':
             if self.paradigm is not None:
                 prior_mu = np.mean(np.log(np.stack((self.paradigm['n1'], self.paradigm['n2']))))
-                prior_sd = np.mean(np.log(np.stack((self.paradigm['n1'], self.paradigm['n2']))))
+                prior_sd = np.std(np.log(np.stack((self.paradigm['n1'], self.paradigm['n2']))))
             else:
                 prior_mu = np.log(25)
                 prior_sd = 2
 
             free_parameters['prior_mu'] = {'mu_intercept': prior_mu, 'transform': 'identity'}
-            free_parameters['prior_sd'] = {'mu_intercept': prior_sd, 'transform': 'identity'}
+            # prior_sd is a standard deviation: it must stay positive. Use the
+            # softplus transform (like 'full'/'klw'); 'identity' here let NUTS
+            # push it <= 0 -> degenerate Gaussian observer -> divergences. The
+            # intercept is the empirical std of log(n), inverse-softplus'd onto
+            # the untransformed scale.
+            free_parameters['prior_sd'] = {'mu_intercept': inverse_softplus_np(prior_sd), 'transform': 'softplus'}
 
         elif self.prior_estimate == 'full':
             if self.paradigm is not None:

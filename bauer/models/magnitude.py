@@ -939,14 +939,10 @@ class PowerLawEncodingComparisonModel(BaseModel):
 
         free_parameters['alpha'] = {'mu_intercept': 0.5, 'sigma_intercept': 0.5, 'transform': 'softplus'}
 
+        # sigma_intercept=0.5 keeps the regression-model Intercept prior from
+        # defaulting to 1.0, which otherwise leaks into distortions in alpha.
         if self.fit_separate_evidence_sd:
-            free_parameters['n1_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
-            free_parameters['n2_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
-        else:
-            free_parameters['evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus'}
-            free_parameters['log_sd_ratio'] = {'mu_intercept': 0., 'transform': 'identity'}
-        elif self.fit_seperate_evidence_sd:
-            free_parameters['n1_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus','sigma_intercept': 0.5} # changed otherwise regression model defaults to sigma_intercept = 1 here... which leads to distortions in alpha.... maybe change this in 
+            free_parameters['n1_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus', 'sigma_intercept': 0.5}
             free_parameters['n2_evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus', 'sigma_intercept': 0.5}
         else:
             free_parameters['evidence_sd'] = {'mu_intercept': -1., 'transform': 'softplus', 'sigma_intercept': 0.5}
