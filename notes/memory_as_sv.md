@@ -132,7 +132,26 @@ sv nearly doubles the error-slowness relative to corrects — the Ratcliff
 slow-error signature, as designed.
 
 ### 3. Parameter recovery (the key test)
-*(filled in by validate_sv.py runs — see RECOVERY RESULTS below)*
+
+Simulated 12 subjects (6 control / 6 patient), 400 trials each, via
+`model.simulate` (faithful ssm-simulators `ddm_sdv` draws) with the group
+difference injected into **only one** noise component. Refit with the
+`memory_as_sv` regression model (`{perceptual,memory}_noise_sd ~ C(group)`),
+1200 tune / 1200 draws, 2 chains, numpyro. Reading off the
+`C(group)[T.patient]` group-level slope:
+
+| True difference | Perceptual contrast | Memory contrast | max r̂ |
+|---|---|---|---|
+| **memory-only**     | −0.03 [−0.13, +0.08] (null) | **+0.83 [+0.61, +1.05]** | 1.01 |
+| **perceptual-only** | **+0.81 [+0.66, +0.96]**    | +0.04 [−0.21, +0.30] (null) | 1.01 |
+
+**Clean double dissociation.** The injected group effect lands in the correct
+parameter with a CI excluding 0, while the *other* parameter's contrast is null
+(CI spans 0). Perceptual and memory noise are now **separately recoverable** —
+exactly the identifiability the old symmetric-SNR drift could not provide.
+
+Reproduce: `python validate_sv.py {slow,memory,perceptual}` in
+`~/git/dyscalculic_ddm`.
 
 ## Limitations / honest status
 
