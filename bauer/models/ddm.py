@@ -43,6 +43,11 @@ except ImportError:
     logp_ddm = None
 
 try:
+    from hssm.likelihoods import logp_ddm_sdv
+except ImportError:
+    logp_ddm_sdv = None
+
+try:
     from ssms.basic_simulators import simulator as _ssms_simulator
 except ImportError:
     _ssms_simulator = None
@@ -126,6 +131,11 @@ class DDMMixin:
 
     fit_v_scale = False
     fix_z = True
+    # When True (and memory_model='shared_perceptual_noise'), the held-n1
+    # memory noise is mapped to across-trial drift variability `sv` instead of
+    # entering the drift SNR symmetrically. See _drift_and_sv_from_snr and
+    # notes/memory_as_sv.md. Defaults OFF for back-compat.
+    memory_as_sv = False
 
     # Strongly-correlated DDM posteriors need full mass adaptation. See
     # BaseModel for the rationale; both backends get auto-routed defaults.
@@ -232,6 +242,26 @@ class DDMMixin:
             )
         model_inputs = self.get_model_inputs(parameters)
 
+        if self.memory_as_sv:
+            if logp_ddm_sdv is None:
+                raise ImportError(
+                    "memory_as_sv=True requires hssm.likelihoods.logp_ddm_sdv. "
+                    "Update hssm (>=0.3)."
+                )
+            v, sv = self._get_drift_and_sv(model_inputs, parameters)
+            if save_p_choice:
+                pm.Deterministic('drift', v)
+                pm.Deterministic('sv', sv)
+            a = parameters['a']
+            z = pt.constant(0.5) if self.fix_z else parameters['z']
+            t0 = parameters['t0']
+            observed = model['_rt_choice_data'].get_value()
+            pm.CustomDist(
+                'll', v, a, z, t0, sv,
+                logp=lambda value, v_, a_, z_, t_, sv_: logp_ddm_sdv(value, v_, a_, z_, t_, sv_),
+                observed=observed)
+            return
+
         v = self._get_drift(model_inputs, parameters)
         if save_p_choice:
             pm.Deterministic('drift', v)
@@ -271,8 +301,13 @@ class DDMMixin:
                 pm.Data(key, value)
             params = self.get_parameter_values()
             model_inputs = self.get_model_inputs(params)
-            v = self._get_drift(model_inputs, params)
+            if self.memory_as_sv:
+                v, sv = self._get_drift_and_sv(model_inputs, params)
+            else:
+                v = self._get_drift(model_inputs, params)
+                sv = pt.zeros_like(v)
             pm.Deterministic('drift', v)
+            pm.Deterministic('sv_t', pt.broadcast_to(sv, v.shape))
             # Also expose (a, z, t0) tiled to per-trial shape for simulate.
             pm.Deterministic('a_t', params['a'])
             z_per_trial = pt.full_like(v, 0.5) if self.fix_z else params['z']
@@ -293,13 +328,17 @@ class DDMMixin:
                 pm.Data(key, value)
             params = self.get_parameter_values()
             model_inputs = self.get_model_inputs(params)
-            v = self._get_drift(model_inputs, params)
             a, t0 = params['a'], params['t0']
             z = pt.constant(0.5) if self.fix_z else params['z']
             mc = pm.Model.get_context()
             signed = pt.switch(mc['choice'], 1.0, -1.0)
             data = pt.stack([mc['rt'], signed], axis=1)
-            per_trial = logp_ddm(data, v, a, z, t0)
+            if self.memory_as_sv:
+                v, sv = self._get_drift_and_sv(model_inputs, params)
+                per_trial = logp_ddm_sdv(data, v, a, z, t0, sv)
+            else:
+                v = self._get_drift(model_inputs, params)
+                per_trial = logp_ddm(data, v, a, z, t0)
             pm.Deterministic('per_trial_ll', per_trial)
 
     def compute_log_likelihood(self, idata, paradigm=None, var_name='ll_ddm'):
@@ -376,12 +415,21 @@ class DDMMixin:
             a = self.prediction_model['a_t'].eval()
             z = self.prediction_model['z_t'].eval()
             t0 = self.prediction_model['t0_t'].eval()
-        # Per-trial theta = [v, a, z, t]
-        theta = np.column_stack([v, a, z, t0])
-        out = _ssms_simulator.simulator(
-            theta=theta, model='ddm', n_samples=n_samples,
-            random_state=random_seed,
-        )
+            sv = self.prediction_model['sv_t'].eval()
+        if self.memory_as_sv:
+            # ddm_sdv simulator: per-trial theta = [v, a, z, t, sv]
+            theta = np.column_stack([v, a, z, t0, sv])
+            out = _ssms_simulator.simulator(
+                theta=theta, model='ddm_sdv', n_samples=n_samples,
+                random_state=random_seed,
+            )
+        else:
+            # Per-trial theta = [v, a, z, t]
+            theta = np.column_stack([v, a, z, t0])
+            out = _ssms_simulator.simulator(
+                theta=theta, model='ddm', n_samples=n_samples,
+                random_state=random_seed,
+            )
         # ssms output shape: (n_trials, 1) when n_samples=1; otherwise
         # (n_samples, n_trials, 1). Squeeze and reshape to (n_trials, n_samples).
         rts = np.asarray(out['rts']).squeeze(-1)
@@ -496,6 +544,25 @@ class DDMMixin:
             "DDM subclasses must implement _get_drift(model_inputs, parameters)."
         )
 
+    def _get_drift_and_sv(self, model_inputs, parameters):
+        """Return (drift, sv) for the memory→sv variant. Default uses the
+        shared :func:`_drift_and_sv_from_snr` helper, valid for any front-end
+        that exposes the standard ``n{1,2}_{prior,evidence}_{mu,sd}`` keys and
+        was built with ``memory_model='shared_perceptual_noise'``."""
+        if getattr(self, 'memory_model', None) != 'shared_perceptual_noise':
+            raise ValueError(
+                "memory_as_sv=True requires memory_model='shared_perceptual_noise' "
+                "(the perceptual/memory noise decomposition). Got "
+                f"memory_model={getattr(self, 'memory_model', None)!r}."
+            )
+        if getattr(self, 'flat_observer_prior', False):
+            raise ValueError(
+                "memory_as_sv=True is incompatible with flat_observer_prior=True: "
+                "the sv derivation needs the posterior-mean shrinkage gains."
+            )
+        v_scale = parameters['v_scale'] if self.fit_v_scale else None
+        return _drift_and_sv_from_snr(model_inputs, v_scale=v_scale)
+
 
 def _drift_from_snr(model_inputs, v_scale=None, flat_observer_prior=False):
     """Drift = ((post_n2_mu - post_n1_mu) + threshold) / sqrt(sd1^2 + sd2^2).
@@ -544,6 +611,108 @@ def _drift_from_snr(model_inputs, v_scale=None, flat_observer_prior=False):
     return v
 
 
+def _drift_and_sv_from_snr(model_inputs, v_scale=None):
+    r"""Drift mean + across-trial drift variability for the memory→sv variant.
+
+    Only valid for the ``shared_perceptual_noise`` front-end, where the two
+    encoding noises play *different temporal roles*:
+
+      * **Perceptual noise** ``σ_perc`` acts on the still-visible n2. The
+        accumulator can draw fresh samples → reducible by accumulation →
+        **within-trial** diffusion noise (it enters ``sd_DV``, costing RT but
+        not asymptotic accuracy).
+      * **Memory noise** ``σ_mem`` acts on the held n1, a single frozen
+        degraded trace that cannot be re-sampled → **irreducible** → it makes
+        the per-trial drift *rate* jiggle from trial to trial → classic
+        Ratcliff across-trial drift variability ``sv`` (→ slow errors).
+
+    Recovering the components.  Under ``shared_perceptual_noise``,
+    ``get_model_inputs`` sets ``n2_evidence_sd = σ_perc`` and
+    ``n1_evidence_sd = σ_perc + σ_mem`` (noise adds in SD space). So::
+
+        σ_perc = n2_evidence_sd
+        σ_mem  = n1_evidence_sd - n2_evidence_sd   (>= 0 by construction)
+
+    Generative model.  Let the prior be V ~ N(μ_p, σ_p²). The observer's
+    posterior-mean estimate of accumulator k is the linear shrinkage
+    ``μ̂_k = w_k·x_k + (1-w_k)·μ_p`` with ``w_k = σ_p²/(σ_p²+σ_e,k²)``.
+    For accumulator k, ``SD[μ̂_k | true V] = w_k·σ_e,k`` (see
+    :func:`bauer.utils.bayes.posterior_mean_sd`).
+
+    Split n1's posterior-mean noise into its two physical sources. The two
+    noise streams that compose ``σ_e,1 = σ_perc + σ_mem`` propagate through the
+    *same* shrinkage gain ``w₁``, so the SD they each contribute to ``μ̂₁`` is::
+
+        within-trial part of n1 :  w₁·σ_perc   (perceptual → reducible)
+        frozen     part of n1   :  w₁·σ_mem    (memory     → frozen offset)
+
+    (Strictly the gain mixes the two streams in variance space; using a single
+    ``w₁`` computed from the *combined* ``σ_e,1`` is the exact linear-Gaussian
+    posterior-mean gain, and we just attribute its output variance to the two
+    inputs in proportion to their SD. This is the documented modelling choice;
+    see notes/memory_as_sv.md.)
+
+    Numerator (the per-trial decision variable signal) is
+    ``ΔV = μ̂₂ - μ̂₁ + threshold``. Its **within-trial** SD (the diffusion
+    noise the accumulator integrates against) gets only the reducible parts::
+
+        sd_DV = sqrt( (w₂·σ_perc)² + (w₁·σ_perc)² )
+
+    i.e. the perceptual noise on BOTH stimuli is within-trial reducible. The
+    drift is then the SNR against *this* (perceptual-only) noise::
+
+        v = v_scale · ΔV / sd_DV
+
+    The frozen memory error shifts ΔV by a trial-constant amount with
+    ``SD[shift] = w₁·σ_mem``. A constant shift of the numerator scales the
+    drift by ``1/sd_DV``, so across trials the drift rate ``v`` is itself
+    Gaussian with standard deviation::
+
+        sv = v_scale · (w₁·σ_mem) / sd_DV
+
+    which is exactly HSSM/Ratcliff's ``sv`` parameter. Memory now buys slow
+    errors and is identifiable separately from perceptual (which only buys RT).
+
+    Returns
+    -------
+    (v, sv) : tuple of pytensor tensors
+        Per-trial drift mean and per-trial across-trial drift SD.
+    """
+    # Components of the combined encoding noise.
+    sigma_perc = model_inputs['n2_evidence_sd']
+    sigma_mem = model_inputs['n1_evidence_sd'] - model_inputs['n2_evidence_sd']
+    # Clamp tiny negative values from float round-off (σ_mem >= 0 by construction).
+    sigma_mem = pt.clip(sigma_mem, 0.0, np.inf)
+
+    # Posterior-mean shrinkage gains per accumulator.
+    var_p1 = model_inputs['n1_prior_sd'] ** 2
+    var_p2 = model_inputs['n2_prior_sd'] ** 2
+    w1 = var_p1 / (var_p1 + model_inputs['n1_evidence_sd'] ** 2)
+    w2 = var_p2 / (var_p2 + model_inputs['n2_evidence_sd'] ** 2)
+
+    post_n1_mu, _ = get_posterior(
+        model_inputs['n1_prior_mu'], model_inputs['n1_prior_sd'],
+        model_inputs['n1_evidence_mu'], model_inputs['n1_evidence_sd'],
+    )
+    post_n2_mu, _ = get_posterior(
+        model_inputs['n2_prior_mu'], model_inputs['n2_prior_sd'],
+        model_inputs['n2_evidence_mu'], model_inputs['n2_evidence_sd'],
+    )
+    threshold = model_inputs.get('threshold', 0.0)
+    diff_mu = (post_n2_mu - post_n1_mu) + threshold
+
+    # Within-trial (reducible, perceptual-only) diffusion noise.
+    sd_dv = pt.sqrt((w2 * sigma_perc) ** 2 + (w1 * sigma_perc) ** 2)
+
+    v = diff_mu / sd_dv
+    # Frozen memory error → across-trial drift variability.
+    sv = (w1 * sigma_mem) / sd_dv
+    if v_scale is not None:
+        v = v_scale * v
+        sv = v_scale * sv
+    return v, sv
+
+
 class DDMMagnitudeComparisonModel(DDMMixin, MagnitudeComparisonModel):
     """DDM variant of MagnitudeComparisonModel.
 
@@ -566,11 +735,13 @@ class DDMMagnitudeComparisonModel(DDMMixin, MagnitudeComparisonModel):
         fixing one removes a degeneracy that bloats posterior intervals.
     """
 
-    def __init__(self, paradigm=None, fit_v_scale=False, fix_z=True, **kwargs):
+    def __init__(self, paradigm=None, fit_v_scale=False, fix_z=True,
+                 memory_as_sv=False, **kwargs):
         # Forward all cognitive-front-end kwargs (fit_prior, memory_model,
         # flat_observer_prior, etc.) to MagnitudeComparisonModel via super().
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
+        self.memory_as_sv = memory_as_sv
         super().__init__(paradigm=paradigm, **kwargs)
 
     def _get_drift(self, model_inputs, parameters):
@@ -603,9 +774,10 @@ class DDMMagnitudeComparisonRegressionModel(DDMMixin, MagnitudeComparisonRegress
     def __init__(self, paradigm, regressors, fit_prior=False,
                  fit_separate_evidence_sd=None, memory_model='independent',
                  save_trialwise_estimates=False,
-                 fit_v_scale=False, fix_z=True):
+                 fit_v_scale=False, fix_z=True, memory_as_sv=False):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
+        self.memory_as_sv = memory_as_sv
         MagnitudeComparisonRegressionModel.__init__(
             self, paradigm, regressors,
             fit_prior=fit_prior,

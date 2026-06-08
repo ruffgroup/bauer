@@ -109,6 +109,40 @@ def test_ddm_magnitude_models_build(paradigm_magnitude, cls_name, extras):
     assert 't0' in m.free_parameters
 
 
+def test_ddm_memory_as_sv_builds(paradigm_magnitude):
+    """memory_as_sv=True maps held-n1 memory noise to across-trial drift
+    variability `sv`, normalizing drift by perceptual noise only. Requires the
+    shared_perceptual_noise front-end and the hssm sdv WFPT."""
+    pytest.importorskip('hssm')
+    from bauer.models import DDMMagnitudeComparisonModel
+    m = DDMMagnitudeComparisonModel(
+        paradigm=paradigm_magnitude, fit_separate_evidence_sd=True,
+        memory_model='shared_perceptual_noise', memory_as_sv=True)
+    m.build_estimation_model(data=paradigm_magnitude, hierarchical=True,
+                             save_p_choice=True)
+    assert m.memory_as_sv is True
+    assert {'perceptual_noise_sd', 'memory_noise_sd', 'a', 't0'}.issubset(
+        m.free_parameters)
+    # drift + sv deterministics exist and evaluate finite, with sv >= 0.
+    with m.estimation_model:
+        drift = m.estimation_model['drift'].eval()
+        sv = m.estimation_model['sv'].eval()
+    assert np.all(np.isfinite(drift))
+    assert np.all(np.isfinite(sv))
+    assert np.all(sv >= 0)
+
+
+def test_ddm_memory_as_sv_requires_shared_perceptual(paradigm_magnitude):
+    """memory_as_sv with the wrong (independent) memory_model errors clearly."""
+    pytest.importorskip('hssm')
+    from bauer.models import DDMMagnitudeComparisonModel
+    m = DDMMagnitudeComparisonModel(
+        paradigm=paradigm_magnitude, fit_separate_evidence_sd=True,
+        memory_model='independent', memory_as_sv=True)
+    with pytest.raises(ValueError, match='shared_perceptual_noise'):
+        m.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
+
+
 @pytest.mark.parametrize('cls_name,extras', [
     ('DDMRiskModel', {'fit_v_scale': True}),
 ])
