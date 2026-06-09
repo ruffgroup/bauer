@@ -588,18 +588,22 @@ class DDMLapseMixin(RTLapseMixin):
         return np.zeros(n)
 
     def simulate(self, paradigm, parameters, n_samples=1, random_seed=None):
-        """Simulate (rt, choice) WITH the HSSM-style outlier contaminant.
+        """Simulate (rt, choice); optionally generate the outlier contaminant.
 
-        Draws the decision process via :meth:`DDMMixin.simulate`, then on a
-        fraction ``p_outlier`` of trials replaces the draw with a contaminant:
-        ``rt ~ Uniform(0, lapse_upper)`` and a 50/50 choice. Without this,
-        simulate/ppc would generate pure-WFPT data (no outliers) and so would be
-        inconsistent with the likelihood — PPCs would spuriously show the model
-        underpredicting the RT tail, and recovery-from-simulation would never
-        contain (or test) the contaminant process.
+        Draws the decision process via :meth:`DDMMixin.simulate`. By default
+        (``simulate_contaminant=False``) it returns those clean draws — matching
+        HSSM, which treats ``p_outlier`` as a likelihood-only robustness device.
+        With ``simulate_contaminant=True`` a fraction ``p_outlier`` of trials is
+        replaced by a contaminant (``rt ~ Uniform(0, lapse_upper)``, 50/50
+        choice), giving a generatively-consistent PPC (otherwise a clean-WFPT PPC
+        overlaid on real data shows a spurious RT-tail misfit).
         """
         out_df = super().simulate(paradigm, parameters, n_samples=n_samples,
                                   random_seed=random_seed)
+        if not getattr(self, 'simulate_contaminant', False):
+            # Match HSSM: p_outlier is likelihood-only; simulate the clean
+            # decision process. Set simulate_contaminant=True to generate them.
+            return out_df
         rng = np.random.default_rng(random_seed)
         prow = self._p_outlier_per_row(out_df, parameters)
         is_lapse = rng.random(len(out_df)) < prow
