@@ -19,6 +19,8 @@ HSSM convention (used here):
     rt  reaction time, in seconds — must be > 0
 """
 
+import warnings
+
 import numpy as np
 import pandas as pd
 import pymc as pm
@@ -563,6 +565,54 @@ class DDMLapseMixin(RTLapseMixin):
             data = pt.stack([mc['rt'], signed], axis=1)
             per_trial = self._mix_with_lapse(logp_ddm(data, v, a, z, t0), p_outlier)
             pm.Deterministic('per_trial_ll', per_trial)
+
+    def _p_outlier_per_row(self, out_df, parameters):
+        """Per-row contaminant rate for simulate(): fixed scalar, or per-subject
+        when p_outlier is estimated. Falls back to 0 (no contaminant) if the
+        per-subject value can't be resolved."""
+        n = len(out_df)
+        if isinstance(self.p_outlier, (int, float)):
+            return np.full(n, float(self.p_outlier))
+        try:
+            if isinstance(parameters, pd.DataFrame) and 'p_outlier' in parameters:
+                subj = out_df.index.get_level_values('subject')
+                return subj.map(parameters['p_outlier']).to_numpy(dtype=float)
+            if isinstance(parameters, dict) and 'p_outlier' in parameters:
+                val = np.asarray(parameters['p_outlier'], dtype=float)
+                if val.size == 1:
+                    return np.full(n, float(val))
+        except Exception:
+            pass
+        warnings.warn("DDMLapseMixin.simulate: could not resolve per-subject "
+                      "p_outlier; simulating with no contaminant.")
+        return np.zeros(n)
+
+    def simulate(self, paradigm, parameters, n_samples=1, random_seed=None):
+        """Simulate (rt, choice) WITH the HSSM-style outlier contaminant.
+
+        Draws the decision process via :meth:`DDMMixin.simulate`, then on a
+        fraction ``p_outlier`` of trials replaces the draw with a contaminant:
+        ``rt ~ Uniform(0, lapse_upper)`` and a 50/50 choice. Without this,
+        simulate/ppc would generate pure-WFPT data (no outliers) and so would be
+        inconsistent with the likelihood — PPCs would spuriously show the model
+        underpredicting the RT tail, and recovery-from-simulation would never
+        contain (or test) the contaminant process.
+        """
+        out_df = super().simulate(paradigm, parameters, n_samples=n_samples,
+                                  random_seed=random_seed)
+        rng = np.random.default_rng(random_seed)
+        prow = self._p_outlier_per_row(out_df, parameters)
+        is_lapse = rng.random(len(out_df)) < prow
+        if is_lapse.any():
+            k = int(is_lapse.sum())
+            out_df = out_df.copy()
+            rt = out_df['simulated_rt'].to_numpy().copy()
+            ch = out_df['simulated_choice'].to_numpy().copy()
+            rt[is_lapse] = rng.uniform(0.0, self.lapse_upper, k)
+            ch[is_lapse] = rng.random(k) < 0.5
+            out_df['simulated_rt'] = rt
+            out_df['simulated_choice'] = ch
+        return out_df
 
 
 def _drift_from_snr(model_inputs, v_scale=None, flat_observer_prior=False):
