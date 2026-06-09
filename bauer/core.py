@@ -1150,7 +1150,16 @@ class RTLapseMixin(object):
     # the concrete classes, which set these attributes before super().__init__.
     lapse_upper = 20.0
     lapse_choice_5050 = True
-    # Group-prior selector for the per-subject outlier rate.
+    # ``p_outlier`` mirrors HSSM's API:
+    #   - a FLOAT (default 0.05, HSSM's default) -> the contaminant rate is
+    #     FIXED at that value; it is NOT a sampled parameter, so it cannot
+    #     funnel/diverge. This is the recommended/default mode.
+    #   - 'hierarchical' -> per-subject estimated rate (bauer extension; weakly
+    #     identified in the WFPT/Wald mixture, prone to divergences -- opt-in).
+    # Estimating a single (non-hierarchical) rate is not yet supported; HSSM's
+    # own default is the fixed value anyway.
+    p_outlier = 0.05
+    # Group prior for the per-subject rate (only used when p_outlier='hierarchical').
     lapse_group = 'beta'
     lapse_mu_mean = 0.05
     lapse_mu_kappa = 8.0
@@ -1158,6 +1167,9 @@ class RTLapseMixin(object):
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
+        if isinstance(self.p_outlier, (int, float)):
+            # Fixed contaminant rate (HSSM default): not a free parameter.
+            return pars
         spec = _lapse_param_spec(self.lapse_group,
                                  self.lapse_mu_mean,
                                  self.lapse_mu_kappa,
@@ -1170,7 +1182,10 @@ class RTLapseMixin(object):
 
     def get_model_inputs(self, parameters):
         model_inputs = super().get_model_inputs(parameters)
-        model_inputs['p_outlier'] = parameters['p_outlier']
+        if isinstance(self.p_outlier, (int, float)):
+            model_inputs['p_outlier'] = pt.constant(float(self.p_outlier))
+        else:
+            model_inputs['p_outlier'] = parameters['p_outlier']
         return model_inputs
 
     def _lapse_logp_const(self):

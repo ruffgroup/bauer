@@ -81,7 +81,7 @@ def load_data(path, n_subjects, rt_floor=0.20):
     return df
 
 
-def build_model(df, step, memory_model, beta_mu_mean):
+def build_model(df, step, memory_model, beta_mu_mean, p_outlier=0.05):
     """Construct the model for the requested ladder step.
 
     Regressors mirror the original blow-up config: perceptual & memory noise +
@@ -102,10 +102,12 @@ def build_model(df, step, memory_model, beta_mu_mean):
 
     if step == 'lapse':
         m = DDMMagnitudeComparisonLapseRegressionModel(**common)
-        # lapse_group / lapse_mu_mean are class attributes, not __init__ kwargs.
-        # Set them, then re-derive free_parameters (computed in __init__).
-        m.lapse_group = 'beta'
-        m.lapse_mu_mean = beta_mu_mean
+        # p_outlier: float -> FIXED (HSSM default); 'hierarchical' -> per-subject.
+        m.p_outlier = p_outlier
+        if not isinstance(p_outlier, (int, float)):
+            m.lapse_group = 'beta'
+            m.lapse_mu_mean = beta_mu_mean
+        # free_parameters are computed in __init__; re-derive after overrides.
         m.free_parameters = m.get_free_parameters()
         return m
     return DDMMagnitudeComparisonRegressionModel(**common)
@@ -142,6 +144,8 @@ def main():
                         "-> shared_perceptual_noise; indep -> independent.")
     p.add_argument('--beta-mu-mean', type=float, default=0.02,
                    help='Lapse Beta group-mean prior (regularize DOWN). ~0.02-0.03.')
+    p.add_argument('--p-outlier', default='0.05',
+                   help="DDM contaminant rate: a float (FIXED, HSSM default 0.05) or 'hierarchical'.")
     p.add_argument('--draws', type=int, default=1000)
     p.add_argument('--tune', type=int, default=2000)
     p.add_argument('--chains', type=int, default=4)
@@ -170,7 +174,11 @@ def main():
           f"| ta={args.target_accept} | n_subj="
           f"{df.index.get_level_values('subject').nunique()} ===")
 
-    model = build_model(df, args.step, memory_model, args.beta_mu_mean)
+    try:
+        p_outlier = float(args.p_outlier)
+    except ValueError:
+        p_outlier = args.p_outlier
+    model = build_model(df, args.step, memory_model, args.beta_mu_mean, p_outlier)
     model.group_sd_dist = args.group_sd_dist
     model.build_estimation_model(data=df, hierarchical=True)
 
