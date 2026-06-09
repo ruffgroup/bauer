@@ -425,7 +425,7 @@ class RaceLapseMixin(RTLapseMixin):
             pm.Deterministic('per_trial_ll', self._mix_with_lapse(ll, p_outlier))
 
 
-class RaceDiffusionMagnitudeComparisonModel(RaceMixin, MagnitudeComparisonModel):
+class RaceDiffusionMagnitudeComparisonModel(RaceLapseMixin, RaceMixin, MagnitudeComparisonModel):
     """Generalized Bayesian race-diffusion model for magnitude comparison.
 
     Paradigm columns required: ``n1``, ``n2``, ``choice`` (bool), ``rt`` (seconds).
@@ -521,7 +521,7 @@ def _drifts_from_post_and_prior(model_inputs, parameters, advantage=True,
     return v1, v2, sigma1, sigma2
 
 
-class RaceDiffusionFlexibleNoiseComparisonModel(RaceMixin, FlexibleNoiseComparisonModel):
+class RaceDiffusionFlexibleNoiseComparisonModel(RaceLapseMixin, RaceMixin, FlexibleNoiseComparisonModel):
     """Race-diffusion variant with B-spline stimulus-dependent encoding noise.
 
     Paradigm columns required: ``n1``, ``n2``, ``choice`` (bool), ``rt`` (seconds).
@@ -549,7 +549,7 @@ class RaceDiffusionFlexibleNoiseComparisonModel(RaceMixin, FlexibleNoiseComparis
                                            fit_w_s=getattr(self, 'fit_w_s', True))
 
 
-class RaceDiffusionRiskModel(RaceMixin, RiskModel):
+class RaceDiffusionRiskModel(RaceLapseMixin, RaceMixin, RiskModel):
     """Race-diffusion variant for risky choice (race on log(EU_k)).
 
     Paradigm columns required: ``n1``, ``n2``, ``p1``, ``p2``, ``choice`` (bool),
@@ -575,7 +575,7 @@ class RaceDiffusionRiskModel(RaceMixin, RiskModel):
                                            fit_w_s=getattr(self, 'fit_w_s', True))
 
 
-class RaceDiffusionRiskRegressionModel(RaceMixin, RiskRegressionModel):
+class RaceDiffusionRiskRegressionModel(RaceLapseMixin, RaceMixin, RiskRegressionModel):
     """Race-diffusion variant of :class:`RiskRegressionModel`.
 
     Patsy-formula regression on the cognitive front-end
@@ -611,7 +611,7 @@ class RaceDiffusionRiskRegressionModel(RaceMixin, RiskRegressionModel):
                                            fit_w_s=getattr(self, 'fit_w_s', True))
 
 
-class RaceDiffusionFlexibleNoiseRiskModel(RaceMixin, FlexibleNoiseRiskModel):
+class RaceDiffusionFlexibleNoiseRiskModel(RaceLapseMixin, RaceMixin, FlexibleNoiseRiskModel):
     """Race-diffusion variant of :class:`FlexibleNoiseRiskModel` for risky
     choice with stimulus-dependent (B-spline) encoding noise.
 
@@ -694,7 +694,7 @@ class RaceDiffusionFlexibleNoiseRiskRegressionModel(
 # Race-Diffusion × PowerLawNoise variants
 # ============================================================
 
-class RaceDiffusionPowerLawNoiseComparisonModel(RaceMixin, PowerLawNoiseComparisonModel):
+class RaceDiffusionPowerLawNoiseComparisonModel(RaceLapseMixin, RaceMixin, PowerLawNoiseComparisonModel):
     """Race-diffusion variant of :class:`PowerLawNoiseComparisonModel`.
 
     Race accumulators with σ_k(n) = exp(log_sd_k) · n^noise_exponent. The
@@ -749,7 +749,7 @@ class RaceDiffusionPowerLawNoiseComparisonRegressionModel(
                                            fit_w_s=getattr(self, 'fit_w_s', True))
 
 
-class RaceDiffusionPowerLawNoiseRiskModel(RaceMixin, PowerLawNoiseRiskModel):
+class RaceDiffusionPowerLawNoiseRiskModel(RaceLapseMixin, RaceMixin, PowerLawNoiseRiskModel):
     """Race-diffusion + power-law-noise risky choice."""
 
     def __init__(self, paradigm, prior_estimate='full',
@@ -797,73 +797,3 @@ class RaceDiffusionPowerLawNoiseRiskRegressionModel(
                                            flat_observer_prior=getattr(self, 'flat_observer_prior', False),
                                            fit_w_s=getattr(self, 'fit_w_s', True))
 
-
-# ============================================================
-# Race-Diffusion × lapse / outlier-contaminant variants
-# ============================================================
-#
-# These add the same RT-aware ``p_outlier`` mixture as the DDM lapse variants.
-# The uniform-RT contaminant is independent of the Wald-race dynamics, so it
-# composes just as cleanly here. ``RaceLapseMixin`` is to the LEFT so its
-# likelihood overrides win over RaceMixin's.
-
-class RaceDiffusionMagnitudeComparisonLapseModel(
-        RaceLapseMixin, RaceDiffusionMagnitudeComparisonModel):
-    """:class:`RaceDiffusionMagnitudeComparisonModel` + RT-aware lapse mixture."""
-
-    def __init__(self, paradigm=None, fit_prior=True,
-                 fit_separate_evidence_sd=True, memory_model='independent',
-                 save_trialwise_n_estimates=False, advantage=True,
-                 lapse_upper=20.0, lapse_choice_5050=True,
-                 lapse_group='logit_normal'):
-        self.lapse_upper = lapse_upper
-        self.lapse_choice_5050 = lapse_choice_5050
-        self.lapse_group = lapse_group
-        super().__init__(
-            paradigm=paradigm, fit_prior=fit_prior,
-            fit_separate_evidence_sd=fit_separate_evidence_sd,
-            memory_model=memory_model,
-            save_trialwise_n_estimates=save_trialwise_n_estimates,
-            advantage=advantage,
-        )
-
-
-class RaceDiffusionRiskLapseModel(RaceLapseMixin, RaceDiffusionRiskModel):
-    """:class:`RaceDiffusionRiskModel` + RT-aware lapse mixture."""
-
-    def __init__(self, paradigm=None, prior_estimate='objective',
-                 fit_separate_evidence_sd=True,
-                 save_trialwise_n_estimates=False, memory_model='independent',
-                 advantage=True,
-                 lapse_upper=20.0, lapse_choice_5050=True,
-                 lapse_group='logit_normal'):
-        self.lapse_upper = lapse_upper
-        self.lapse_choice_5050 = lapse_choice_5050
-        self.lapse_group = lapse_group
-        super().__init__(
-            paradigm=paradigm, prior_estimate=prior_estimate,
-            fit_separate_evidence_sd=fit_separate_evidence_sd,
-            save_trialwise_n_estimates=save_trialwise_n_estimates,
-            memory_model=memory_model, advantage=advantage,
-        )
-
-
-class RaceDiffusionRiskLapseRegressionModel(
-        RaceLapseMixin, RaceDiffusionRiskRegressionModel):
-    """:class:`RaceDiffusionRiskRegressionModel` + RT-aware lapse mixture."""
-
-    def __init__(self, paradigm, regressors, prior_estimate='objective',
-                 fit_separate_evidence_sd=True,
-                 save_trialwise_n_estimates=False, memory_model='independent',
-                 advantage=True,
-                 lapse_upper=20.0, lapse_choice_5050=True,
-                 lapse_group='logit_normal'):
-        self.lapse_upper = lapse_upper
-        self.lapse_choice_5050 = lapse_choice_5050
-        self.lapse_group = lapse_group
-        super().__init__(
-            paradigm, regressors, prior_estimate=prior_estimate,
-            fit_separate_evidence_sd=fit_separate_evidence_sd,
-            save_trialwise_n_estimates=save_trialwise_n_estimates,
-            memory_model=memory_model, advantage=advantage,
-        )

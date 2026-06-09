@@ -60,10 +60,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 import pandas as pd
 import arviz as az
 
-from bauer.models import (
-    DDMMagnitudeComparisonRegressionModel,
-    DDMMagnitudeComparisonLapseRegressionModel,
-)
+from bauer.models import DDMMagnitudeComparisonRegressionModel
 
 
 def load_data(path, n_subjects, rt_floor=0.20):
@@ -100,17 +97,16 @@ def build_model(df, step, memory_model, beta_mu_mean, p_outlier=0.05):
         memory_model=memory_model, fit_v_scale=False, fix_z=True,
     )
 
-    if step == 'lapse':
-        m = DDMMagnitudeComparisonLapseRegressionModel(**common)
-        # p_outlier: float -> FIXED (HSSM default); 'hierarchical' -> per-subject.
-        m.p_outlier = p_outlier
-        if not isinstance(p_outlier, (int, float)):
-            m.lapse_group = 'beta'
-            m.lapse_mu_mean = beta_mu_mean
-        # free_parameters are computed in __init__; re-derive after overrides.
-        m.free_parameters = m.get_free_parameters()
-        return m
-    return DDMMagnitudeComparisonRegressionModel(**common)
+    # The contaminant is now baked into the base DDM (p_outlier=0.05 default).
+    # p_outlier is the control: a float fixes the rate (0.0 = pure WFPT, no
+    # contaminant); 'hierarchical' opts into the per-subject extension.
+    m = DDMMagnitudeComparisonRegressionModel(**common)
+    m.p_outlier = p_outlier
+    if not isinstance(p_outlier, (int, float)):
+        m.lapse_group = 'beta'
+        m.lapse_mu_mean = beta_mu_mean
+    m.free_parameters = m.get_free_parameters()
+    return m
 
 
 def diagnostics(idata, var_names):

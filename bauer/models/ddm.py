@@ -665,7 +665,7 @@ def _drift_from_snr(model_inputs, v_scale=None, flat_observer_prior=False):
     return v
 
 
-class DDMMagnitudeComparisonModel(DDMMixin, MagnitudeComparisonModel):
+class DDMMagnitudeComparisonModel(DDMLapseMixin, DDMMixin, MagnitudeComparisonModel):
     """DDM variant of MagnitudeComparisonModel.
 
     Drift is the subjective signal-to-noise of the perceived log-magnitude
@@ -700,7 +700,7 @@ class DDMMagnitudeComparisonModel(DDMMixin, MagnitudeComparisonModel):
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMMagnitudeComparisonRegressionModel(DDMMixin, MagnitudeComparisonRegressionModel):
+class DDMMagnitudeComparisonRegressionModel(DDMLapseMixin, DDMMixin, MagnitudeComparisonRegressionModel):
     """DDM variant of :class:`MagnitudeComparisonRegressionModel`.
 
     Patsy-formula regression on the cognitive front-end (``n1_evidence_sd``,
@@ -741,7 +741,7 @@ class DDMMagnitudeComparisonRegressionModel(DDMMixin, MagnitudeComparisonRegress
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
+class DDMFlexibleNoiseComparisonModel(DDMLapseMixin, DDMMixin, FlexibleNoiseComparisonModel):
     """DDM variant of FlexibleNoiseComparisonModel.
 
     Drift uses the same SNR-of-perceived-difference formula as
@@ -781,7 +781,7 @@ class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMRiskModel(DDMMixin, RiskModel):
+class DDMRiskModel(DDMLapseMixin, DDMMixin, RiskModel):
     """DDM variant of :class:`RiskModel` for risky-choice tasks.
 
     Drift is the SNR of the perceived log-EU difference:
@@ -821,7 +821,7 @@ class DDMRiskModel(DDMMixin, RiskModel):
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMRiskRegressionModel(DDMMixin, RiskRegressionModel):
+class DDMRiskRegressionModel(DDMLapseMixin, DDMMixin, RiskRegressionModel):
     """DDM variant of :class:`RiskRegressionModel`.
 
     Patsy-formula regression on the cognitive front-end (``n1_evidence_sd``,
@@ -865,7 +865,7 @@ class DDMRiskRegressionModel(DDMMixin, RiskRegressionModel):
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMFlexibleNoiseRiskModel(DDMMixin, FlexibleNoiseRiskModel):
+class DDMFlexibleNoiseRiskModel(DDMLapseMixin, DDMMixin, FlexibleNoiseRiskModel):
     """DDM variant of :class:`FlexibleNoiseRiskModel` for risky choice with
     stimulus-dependent (B-spline) encoding noise.
 
@@ -901,7 +901,7 @@ class DDMFlexibleNoiseRiskModel(DDMMixin, FlexibleNoiseRiskModel):
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMFlexibleNoiseRiskRegressionModel(DDMMixin, FlexibleNoiseRiskRegressionModel):
+class DDMFlexibleNoiseRiskRegressionModel(DDMLapseMixin, DDMMixin, FlexibleNoiseRiskRegressionModel):
     """DDM variant of :class:`FlexibleNoiseRiskRegressionModel`.
 
     Patsy-formula regression on noise spline coefficients (auto-expanded if
@@ -946,7 +946,7 @@ class DDMFlexibleNoiseRiskRegressionModel(DDMMixin, FlexibleNoiseRiskRegressionM
 # DDM × PowerLawNoise variants
 # ============================================================
 
-class DDMPowerLawNoiseComparisonModel(DDMMixin, PowerLawNoiseComparisonModel):
+class DDMPowerLawNoiseComparisonModel(DDMLapseMixin, DDMMixin, PowerLawNoiseComparisonModel):
     """DDM variant of :class:`PowerLawNoiseComparisonModel`.
 
     Drift uses the same SNR-of-perceived-difference formula as
@@ -974,7 +974,7 @@ class DDMPowerLawNoiseComparisonModel(DDMMixin, PowerLawNoiseComparisonModel):
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMPowerLawNoiseComparisonRegressionModel(DDMMixin, PowerLawNoiseComparisonRegressionModel):
+class DDMPowerLawNoiseComparisonRegressionModel(DDMLapseMixin, DDMMixin, PowerLawNoiseComparisonRegressionModel):
     """DDM + power-law noise + patsy-formula regression on parameters.
 
     Use to let ``noise_exponent`` vary across conditions (e.g. across
@@ -1000,7 +1000,7 @@ class DDMPowerLawNoiseComparisonRegressionModel(DDMMixin, PowerLawNoiseCompariso
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMPowerLawNoiseRiskModel(DDMMixin, PowerLawNoiseRiskModel):
+class DDMPowerLawNoiseRiskModel(DDMLapseMixin, DDMMixin, PowerLawNoiseRiskModel):
     """DDM + power-law noise for risky choice. Drift = SNR of perceived
     log-EU difference (same as :class:`DDMRiskModel`)."""
 
@@ -1025,7 +1025,7 @@ class DDMPowerLawNoiseRiskModel(DDMMixin, PowerLawNoiseRiskModel):
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMPowerLawNoiseRiskRegressionModel(DDMMixin, PowerLawNoiseRiskRegressionModel):
+class DDMPowerLawNoiseRiskRegressionModel(DDMLapseMixin, DDMMixin, PowerLawNoiseRiskRegressionModel):
     """DDM + power-law-noise risky choice + patsy-formula regression.
 
     Same multi-inheritance pattern as the flex versions. Targetable
@@ -1055,97 +1055,3 @@ class DDMPowerLawNoiseRiskRegressionModel(DDMMixin, PowerLawNoiseRiskRegressionM
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-# ============================================================
-# DDM × lapse / outlier-contaminant variants
-# ============================================================
-#
-# These add an RT-aware ``p_outlier`` mixture (HSSM convention) on top of the
-# corresponding DDM model. ``DDMLapseMixin`` is composed to the LEFT so its
-# ``build_likelihood`` / ``build_loglik_model`` overrides win over DDMMixin's.
-# Each forwards ``lapse_upper`` / ``lapse_choice_5050`` to RTLapseMixin and all
-# remaining kwargs to its non-lapse parent.
-
-class DDMMagnitudeComparisonLapseModel(DDMLapseMixin, DDMMagnitudeComparisonModel):
-    """:class:`DDMMagnitudeComparisonModel` with an RT-aware lapse mixture.
-
-    Adds a free ``p_outlier`` parameter; on a fraction of trials the observed
-    ``(rt, choice)`` is a flat-RT contaminant rather than a diffusion draw. See
-    :class:`bauer.core.RTLapseMixin` for the contaminant-density documentation.
-    """
-
-    def __init__(self, paradigm=None, fit_v_scale=False, fix_z=True,
-                 lapse_upper=20.0, lapse_choice_5050=True,
-                 lapse_group='logit_normal', **kwargs):
-        self.lapse_upper = lapse_upper
-        self.lapse_choice_5050 = lapse_choice_5050
-        self.lapse_group = lapse_group
-        super().__init__(paradigm=paradigm, fit_v_scale=fit_v_scale,
-                         fix_z=fix_z, **kwargs)
-
-
-class DDMMagnitudeComparisonLapseRegressionModel(
-        DDMLapseMixin, DDMMagnitudeComparisonRegressionModel):
-    """:class:`DDMMagnitudeComparisonRegressionModel` + RT-aware lapse mixture."""
-
-    def __init__(self, paradigm, regressors, fit_prior=False,
-                 fit_separate_evidence_sd=None, memory_model='independent',
-                 save_trialwise_estimates=False,
-                 fit_v_scale=False, fix_z=True,
-                 lapse_upper=20.0, lapse_choice_5050=True,
-                 lapse_group='logit_normal'):
-        self.lapse_upper = lapse_upper
-        self.lapse_choice_5050 = lapse_choice_5050
-        self.lapse_group = lapse_group
-        super().__init__(
-            paradigm, regressors, fit_prior=fit_prior,
-            fit_separate_evidence_sd=fit_separate_evidence_sd,
-            memory_model=memory_model,
-            save_trialwise_estimates=save_trialwise_estimates,
-            fit_v_scale=fit_v_scale, fix_z=fix_z,
-        )
-
-
-class DDMRiskLapseModel(DDMLapseMixin, DDMRiskModel):
-    """:class:`DDMRiskModel` with an RT-aware lapse mixture.
-
-    Adds a free ``p_outlier`` parameter; on a fraction of trials the observed
-    ``(rt, choice)`` is a flat-RT contaminant rather than a diffusion draw.
-    """
-
-    def __init__(self, paradigm=None, prior_estimate='objective',
-                 fit_separate_evidence_sd=True,
-                 save_trialwise_n_estimates=False, memory_model='independent',
-                 fit_v_scale=False, fix_z=True,
-                 lapse_upper=20.0, lapse_choice_5050=True,
-                 lapse_group='logit_normal'):
-        self.lapse_upper = lapse_upper
-        self.lapse_choice_5050 = lapse_choice_5050
-        self.lapse_group = lapse_group
-        super().__init__(
-            paradigm=paradigm, prior_estimate=prior_estimate,
-            fit_separate_evidence_sd=fit_separate_evidence_sd,
-            save_trialwise_n_estimates=save_trialwise_n_estimates,
-            memory_model=memory_model,
-            fit_v_scale=fit_v_scale, fix_z=fix_z,
-        )
-
-
-class DDMRiskLapseRegressionModel(DDMLapseMixin, DDMRiskRegressionModel):
-    """:class:`DDMRiskRegressionModel` + RT-aware lapse mixture."""
-
-    def __init__(self, paradigm, regressors, prior_estimate='objective',
-                 fit_separate_evidence_sd=True,
-                 save_trialwise_n_estimates=False, memory_model='independent',
-                 fit_v_scale=False, fix_z=True,
-                 lapse_upper=20.0, lapse_choice_5050=True,
-                 lapse_group='logit_normal'):
-        self.lapse_upper = lapse_upper
-        self.lapse_choice_5050 = lapse_choice_5050
-        self.lapse_group = lapse_group
-        super().__init__(
-            paradigm, regressors, prior_estimate=prior_estimate,
-            fit_separate_evidence_sd=fit_separate_evidence_sd,
-            save_trialwise_n_estimates=save_trialwise_n_estimates,
-            memory_model=memory_model,
-            fit_v_scale=fit_v_scale, fix_z=fix_z,
-        )
