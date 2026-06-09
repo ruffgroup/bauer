@@ -342,6 +342,15 @@ class BaseModel(object):
             divergences persist.
         draws, tune : int
             Posterior and warmup draws per chain.
+        find_init : {None, 'mapjitter', 'priorjitter', 'pathfinder'}
+            Starting-point strategy. ``None`` uses the class default
+            (``recommended_init``; ``'mapjitter'`` for DDM/Race). ``'mapjitter'``
+            = MAP centre + prior-scaled jitter; ``'priorjitter'`` = prior-central
+            centre + jitter; ``'pathfinder'`` = seed each chain from a multipath
+            Pathfinder draw (variational; lands in the typical set — best for
+            nasty high-dimensional DDM geometries, needs ``pymc_extras``, falls
+            back to ``'mapjitter'`` if unavailable). Ignored if ``initvals`` is
+            passed in ``**kwargs``.
         **kwargs
             Forwarded to the underlying sampler. Notably:
             - pymc backend: ``init=`` (e.g. 'jitter+adapt_full' for dense
@@ -363,13 +372,24 @@ class BaseModel(object):
         # instead of relying on the backend's generic jitter init. This is
         # what stops hard DDM/regression posteriors from being a seed
         # lottery. Skipped if the user supplied their own ``initvals``.
+        #
+        # ``find_init='pathfinder'`` runs multipath Pathfinder (variational;
+        # lands in the typical set rather than at the MAP mode) and seeds each
+        # chain from a distinct Pathfinder draw — the right lever for nasty
+        # high-dimensional DDM geometries where MAP is the wrong target. See
+        # get_initial_points / _pathfinder_initial_points.
         if find_init is None:
             find_init = self.recommended_init
         if find_init and 'initvals' not in kwargs:
             seed = kwargs.get('random_seed', None)
-            kwargs['initvals'] = self.get_initial_points(
-                chains=chains, use_map=(find_init != 'priorjitter'),
-                seed=seed if isinstance(seed, int) else None)
+            seed = seed if isinstance(seed, int) else None
+            if find_init == 'pathfinder':
+                kwargs['initvals'] = self._pathfinder_initial_points(
+                    chains=chains, seed=seed)
+            else:
+                kwargs['initvals'] = self.get_initial_points(
+                    chains=chains, use_map=(find_init != 'priorjitter'),
+                    seed=seed)
 
         if backend == 'pymc':
             # When we supply our own dispersed initvals, avoid a jitter-adding
@@ -463,6 +483,138 @@ class BaseModel(object):
                 jit = rng.normal(0.0, jitter_frac * scale, size=centre[k].shape)
                 pt[k] = (centre[k] + jit).astype(ip[k].dtype)
             points.append(pt)
+        return points
+
+    def _pathfinder_initial_points(self, chains=4, seed=None,
+                                   num_paths=8, **pathfinder_kwargs):
+        """Pathfinder-based dispersed per-chain starting points.
+
+        Runs **multipath Pathfinder** (a variational method that lands in the
+        posterior's *typical set*, not at the MAP mode) on the built
+        ``estimation_model`` via :func:`pymc_extras.inference.fit`, then turns
+        ``chains`` of its draws into per-chain ``initvals`` dicts on the model's
+        **value-variable (unconstrained) scale** — the exact format
+        :meth:`get_initial_points` returns (keyed by ``model.initial_point()``
+        names, e.g. ``a_mu_untransformed``, ``s_log__``, ``p_logodds__``), so it
+        is a drop-in replacement as a sampler ``initvals``.
+
+        This is the right init lever for hard, high-dimensional DDM/RDM
+        posteriors: MAP (the ``'mapjitter'`` centre) is in the wrong place in
+        high dimensions (the mode is not in the typical set), whereas
+        Pathfinder draws already sit where the chains should warm up.
+
+        Robustness
+        ----------
+        If ``pymc_extras`` is missing, or Pathfinder errors / returns too few
+        usable draws, this falls back to :meth:`get_initial_points`
+        (MAP + jitter) with a :class:`UserWarning` — so a fit never crashes for
+        want of the optional dependency.
+
+        Parameters
+        ----------
+        chains : int
+            Number of per-chain initval dicts to return.
+        seed : int or None
+            Seed forwarded to Pathfinder for reproducibility.
+        num_paths : int
+            Number of Pathfinder paths (multipath). Default 8.
+        **pathfinder_kwargs
+            Extra keyword arguments forwarded to
+            ``pymc_extras.inference.fit(method='pathfinder', ...)``.
+        """
+        def _fallback(reason):
+            warnings.warn(
+                f"Pathfinder init unavailable ({reason}); "
+                "falling back to mapjitter initial points.")
+            return self.get_initial_points(chains=chains, use_map=True,
+                                           seed=seed)
+
+        try:
+            from pymc_extras.inference import fit as pmx_fit
+        except Exception as e:  # pragma: no cover - optional dependency
+            return _fallback(f"could not import pymc_extras ({e})")
+
+        # Draw at least as many Pathfinder samples as we need chains, with a
+        # comfortable margin so we can pick well-separated draws.
+        num_draws = pathfinder_kwargs.pop('num_draws',
+                                          max(1000, 50 * chains))
+        try:
+            with self.estimation_model:
+                pf_idata = pmx_fit(
+                    method='pathfinder', num_paths=num_paths,
+                    num_draws=num_draws, random_seed=seed,
+                    **pathfinder_kwargs)
+        except Exception as e:  # pragma: no cover - robustness
+            return _fallback(f"pathfinder failed ({e})")
+
+        try:
+            return self._pathfinder_idata_to_initvals(pf_idata, chains, seed)
+        except Exception as e:  # pragma: no cover - robustness
+            return _fallback(f"could not convert pathfinder draws ({e})")
+
+    def _pathfinder_idata_to_initvals(self, pf_idata, chains, seed):
+        """Convert a Pathfinder ``InferenceData`` into ``chains`` value-variable
+        (unconstrained-scale) initval dicts, matching ``initial_point()`` keys.
+
+        Pathfinder returns draws on the **constrained / natural** scale, keyed
+        by free-RV name. The sampler wants ``initvals`` on the **value-variable
+        (unconstrained) scale** keyed by value-var name (what
+        ``model.initial_point()`` uses). For each free RV we apply its
+        transform's ``forward`` (e.g. log / logodds) to map the constrained
+        draw to the unconstrained value the sampler expects; untransformed RVs
+        pass through unchanged.
+        """
+        import pytensor
+
+        rng = np.random.default_rng(seed)
+        post = pf_idata.posterior
+        # Flatten (chain, draw) into a single sample axis and pick `chains`
+        # distinct draws to disperse the NUTS chains across the typical set.
+        n_pf = int(post.sizes['chain'] * post.sizes['draw'])
+        stacked = post.stack(_sample=('chain', 'draw'))
+        n_take = min(chains, n_pf)
+        sel = rng.choice(n_pf, size=n_take, replace=(n_pf < chains))
+
+        model = self.estimation_model
+        ip = model.initial_point()  # value-var-name -> array (template)
+
+        # Map each free RV to (value-var name, forward-transform or None),
+        # precompiling a forward function per transformed RV for speed.
+        rv_specs = []
+        for rv, value_var in model.rvs_to_values.items():
+            if rv.name not in post:
+                # Deterministics / RVs Pathfinder didn't return — skip; the
+                # sampler will initialise these from the model default.
+                continue
+            transform = model.rvs_to_transforms.get(rv, None)
+            if transform is None:
+                fwd_fn = None
+            else:
+                inp = pt.tensor(name='_c', dtype='float64',
+                                shape=(None,) * rv.ndim)
+                fwd_expr = transform.forward(inp, *rv.owner.inputs)
+                fwd_fn = pytensor.function(
+                    [inp], fwd_expr, on_unused_input='ignore')
+            rv_specs.append((rv.name, value_var.name, fwd_fn))
+
+        points = []
+        for s in sel:
+            pt_dict = {}
+            for rv_name, val_name, fwd_fn in rv_specs:
+                constrained = np.asarray(
+                    stacked[rv_name].isel(_sample=int(s)).values,
+                    dtype='float64')
+                if fwd_fn is None:
+                    unconstrained = constrained
+                else:
+                    unconstrained = np.asarray(fwd_fn(constrained))
+                pt_dict[val_name] = unconstrained.astype(
+                    ip[val_name].dtype).reshape(ip[val_name].shape)
+            points.append(pt_dict)
+
+        # If Pathfinder produced fewer draws than chains (degenerate), recycle.
+        while len(points) < chains:
+            points.append({k: v.copy() for k, v in points[-1].items()})
         return points
 
     def fit_map(self, filter_pars=True, progressbar=True, **kwargs):
