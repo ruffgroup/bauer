@@ -814,9 +814,11 @@ class RaceDiffusionMagnitudeComparisonLapseModel(
     def __init__(self, paradigm=None, fit_prior=True,
                  fit_separate_evidence_sd=True, memory_model='independent',
                  save_trialwise_n_estimates=False, advantage=True,
-                 lapse_upper=20.0, lapse_choice_5050=True):
+                 lapse_upper=20.0, lapse_choice_5050=True,
+                 lapse_group='logit_normal'):
         self.lapse_upper = lapse_upper
         self.lapse_choice_5050 = lapse_choice_5050
+        self.lapse_group = lapse_group
         super().__init__(
             paradigm=paradigm, fit_prior=fit_prior,
             fit_separate_evidence_sd=fit_separate_evidence_sd,
@@ -833,9 +835,11 @@ class RaceDiffusionRiskLapseModel(RaceLapseMixin, RaceDiffusionRiskModel):
                  fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, memory_model='independent',
                  advantage=True,
-                 lapse_upper=20.0, lapse_choice_5050=True):
+                 lapse_upper=20.0, lapse_choice_5050=True,
+                 lapse_group='logit_normal'):
         self.lapse_upper = lapse_upper
         self.lapse_choice_5050 = lapse_choice_5050
+        self.lapse_group = lapse_group
         super().__init__(
             paradigm=paradigm, prior_estimate=prior_estimate,
             fit_separate_evidence_sd=fit_separate_evidence_sd,
@@ -852,9 +856,11 @@ class RaceDiffusionRiskLapseRegressionModel(
                  fit_separate_evidence_sd=True,
                  save_trialwise_n_estimates=False, memory_model='independent',
                  advantage=True,
-                 lapse_upper=20.0, lapse_choice_5050=True):
+                 lapse_upper=20.0, lapse_choice_5050=True,
+                 lapse_group='logit_normal'):
         self.lapse_upper = lapse_upper
         self.lapse_choice_5050 = lapse_choice_5050
+        self.lapse_group = lapse_group
         super().__init__(
             paradigm, regressors, prior_estimate=prior_estimate,
             fit_separate_evidence_sd=fit_separate_evidence_sd,

@@ -210,7 +210,8 @@ class BaseModel(object):
             for key, info in self.free_parameters.items():
                 self.build_prior(key, flat_prior=flat_prior, **info)
 
-    def build_prior(self, name, mu_intercept=None, sigma_intercept=None, transform='identity', flat_prior=False):
+    def build_prior(self, name, mu_intercept=None, sigma_intercept=None, transform='identity',
+                    flat_prior=False, beta_mu_mean=0.05, beta_mu_kappa=8.0, **kwargs):
 
         model = pm.Model.get_context()
 
@@ -221,10 +222,19 @@ class BaseModel(object):
                 pm.Flat(name)
             elif transform == 'softplus':
                 pm.HalfFlat(name)
-            elif transform == 'logistic':
+            elif transform in ('logistic', 'beta'):
                 pm.Uniform(name, lower=0, upper=1)
             else:
                 raise NotImplementedError
+            return
+
+        if transform == 'beta':
+            # Single-subject Beta prior with the same small-mean / heavy-tail
+            # shape used by the hierarchical 'beta' group prior (see
+            # build_hierarchical_nodes). Concentration = beta_mu_kappa.
+            a0 = beta_mu_mean * beta_mu_kappa
+            b0 = (1.0 - beta_mu_mean) * beta_mu_kappa
+            pm.Beta(name, alpha=a0, beta=b0)
             return
 
         if mu_intercept is None:
@@ -594,14 +604,57 @@ class BaseModel(object):
 
     def build_hierarchical_nodes(self, name, mu_intercept=None, sigma_intercept=None,
                                  cauchy_sigma_intercept=None, transform='identity',
-                                 min_value=0.0, **kwargs):
+                                 min_value=0.0, beta_mu_mean=0.05, beta_mu_kappa=8.0,
+                                 beta_kappa_sd=3.0, **kwargs):
         """Build a hierarchical (group_mu, group_sd, per-subject offset) node.
 
-        ``transform`` ∈ {'identity', 'softplus', 'logistic'}. When ``transform`` is
-        'softplus' and ``min_value > 0``, the transformed parameter has a hard
-        lower bound: ``param = min_value + softplus(x)``. Used to keep e.g. the
-        DDM/RDM threshold ``a`` away from the a→0 collapse mode.
+        ``transform`` ∈ {'identity', 'softplus', 'logistic', 'beta'}. When
+        ``transform`` is 'softplus' and ``min_value > 0``, the transformed
+        parameter has a hard lower bound: ``param = min_value + softplus(x)``.
+        Used to keep e.g. the DDM/RDM threshold ``a`` away from the a→0 collapse
+        mode.
+
+        Hierarchical-Beta group prior (``transform='beta'``)
+        ----------------------------------------------------
+        A per-subject rate in ``(0, 1)`` whose population density is
+        concentrated near 0 with a heavy upper tail — the "1/x"-like shape — for
+        parameters such as a lapse / outlier rate, where most subjects are ≈ 0
+        but a minority genuinely lapse a lot. This replaces the logit-Normal
+        parameterization (``transform='logistic'``), which **funnels** when the
+        true rate ≈ 0: the per-subject logit → −∞, the group SD inflates without
+        bound, and NUTS diverges.
+
+        The model is::
+
+            mu     ~ Beta(beta_mu_mean·beta_mu_kappa, (1-beta_mu_mean)·beta_mu_kappa)
+            kappa  = 2 + exp(log_kappa),   log_kappa ~ Normal(0, beta_kappa_sd)
+            p[s]   ~ Beta(alpha, beta),    alpha = mu·kappa, beta = (1-mu)·kappa
+
+        ``mu`` is the group-mean rate (prior mean ``beta_mu_mean``, default
+        0.05); ``kappa`` is the population concentration. The per-subject density
+        is ``∝ p^(alpha-1)(1-p)^(beta-1)``: when ``alpha = mu·kappa < 1`` (small
+        ``mu``) this is an integrable spike at 0 (the "1/x" shape) with a fat
+        upper tail, exactly matching "most subjects ≈ 0, a few disengaged". The
+        ``kappa = 2 + exp(...)`` floor keeps ``beta = (1-mu)·kappa > 1`` so the
+        density is bounded near 1 (no spurious upper-edge spike) while still
+        allowing ``alpha < 1``. ``p[s]`` is sampled directly as a ``pm.Beta``,
+        whose default log-odds transform gives NUTS a clean unconstrained
+        geometry without the logit funnel (the per-subject scale is set by the
+        *data-informed* Beta, not a shared inflating SD). Group nodes
+        ``{name}_mu`` and ``{name}_kappa`` are exposed for reporting (so
+        ``get_groupwise_parameter_estimates`` keeps working via ``{name}_mu``).
         """
+
+        if transform == 'beta':
+            a0 = beta_mu_mean * beta_mu_kappa
+            b0 = (1.0 - beta_mu_mean) * beta_mu_kappa
+            group_mu = pm.Beta(f'{name}_mu', alpha=a0, beta=b0)
+            log_kappa = pm.Normal(f'{name}_log_kappa', mu=0.0, sigma=beta_kappa_sd)
+            group_kappa = pm.Deterministic(f'{name}_kappa',
+                                           2.0 + pt.exp(log_kappa))
+            alpha = group_mu * group_kappa
+            beta = (1.0 - group_mu) * group_kappa
+            return pm.Beta(name, alpha=alpha, beta=beta, dims=('subject',))
 
         if mu_intercept is None:
             mu_intercept = 0.0
@@ -669,7 +722,13 @@ class BaseModel(object):
         mu_pars = pd.concat([idata.posterior[par + '_mu'].to_dataframe() for par in self.free_parameters], axis=1, keys=parameters, names=['parameter']).droplevel(1, axis=1)
 
         if include_sd:
-            sd_pars = pd.concat([idata.posterior[par + '_sd'].to_dataframe() for par in self.free_parameters], axis=1, keys=self.free_parameters, names=['parameter']).droplevel(1, axis=1)
+            # 'beta' group priors expose a concentration ({par}_kappa) instead
+            # of a Normal scale ({par}_sd); fall back to it so reporting works.
+            def _spread(par):
+                if par + '_sd' in idata.posterior:
+                    return idata.posterior[par + '_sd'].to_dataframe()
+                return idata.posterior[par + '_kappa'].to_dataframe()
+            sd_pars = pd.concat([_spread(par) for par in self.free_parameters], axis=1, keys=self.free_parameters, names=['parameter']).droplevel(1, axis=1)
             pars = pd.concat((mu_pars, sd_pars), keys=['mu', 'sd'], names=['type'], axis=1)
 
         else:
@@ -702,6 +761,14 @@ class BaseModel(object):
             if 'transform' not in pars.keys():
                 pars['transform'] = 'identity'
 
+            if pars['transform'] == 'beta':
+                mean = pars.get('beta_mu_mean', 0.05)
+                kappa = pars.get('beta_mu_kappa', 8.0)
+                samples_pars[key] = np.random.beta(mean * kappa,
+                                                   (1.0 - mean) * kappa,
+                                                   n_subjects)
+                continue
+
             samples_pars[key] = np.random.normal(pars['mu_intercept'], pars['sigma_intercept'], n_subjects)
             if pars['transform'] == 'softplus':
                 samples_pars[key] = softplus_np(samples_pars[key])
@@ -718,7 +785,8 @@ class BaseModel(object):
     def forward_transform(self, data, parameter):
         transform = self.free_parameters[parameter]['transform']
 
-        if transform == 'identity':
+        if transform in ('identity', 'beta'):
+            # 'beta' rates already live in (0, 1) — natural == sampling scale.
             return data
         elif transform == 'softplus':
             return softplus_np(data)
@@ -728,7 +796,7 @@ class BaseModel(object):
     def backward_transform(self, data, parameter):
         transform = self.free_parameters[parameter]['transform']
 
-        if transform == 'identity':
+        if transform in ('identity', 'beta'):
             return data
         elif transform == 'softplus':
             return inverse_softplus_np(data)
@@ -761,12 +829,49 @@ class BaseModel(object):
 BaseModel.__init__ = _translate_deprecated_kwargs(BaseModel.__init__)
 
 
+def _lapse_param_spec(group, mu_mean, mu_kappa, kappa_sd):
+    """Free-parameter spec dict for a lapse / outlier rate in (0, 1).
+
+    ``group='logit_normal'`` (default) reproduces the historical logit-Normal
+    hierarchical prior (centred at ``mu_mean``). ``group='beta'`` selects the
+    hierarchical-Beta "1/x"-like group prior (see
+    :meth:`BaseModel.build_hierarchical_nodes`), which is concentrated near 0
+    with a heavy upper tail and removes the logit funnel that arises when the
+    true rate ≈ 0.
+    """
+    if group == 'beta':
+        return {'transform': 'beta',
+                'beta_mu_mean': mu_mean,
+                'beta_mu_kappa': mu_kappa,
+                'beta_kappa_sd': kappa_sd}
+    elif group == 'logit_normal':
+        return {'mu_intercept': logit_np(mu_mean), 'transform': 'logistic'}
+    raise ValueError(
+        f"lapse_group must be 'logit_normal' or 'beta', got {group!r}.")
+
+
 class LapseModel(BaseModel):
+    """Static-choice model with a per-subject random-lapse rate ``p_lapse``.
+
+    ``lapse_group`` selects the group prior on the per-subject lapse rate:
+    ``'logit_normal'`` (default, backward-compatible) or ``'beta'`` (the
+    heavy-tailed "1/x"-like hierarchical Beta; see
+    :meth:`BaseModel.build_hierarchical_nodes`). The Beta option is preferable
+    when most subjects lapse ≈ 0 (it avoids the logit funnel).
+    """
+
+    lapse_group = 'logit_normal'
+    lapse_mu_mean = 0.02
+    lapse_mu_kappa = 8.0
+    lapse_kappa_sd = 3.0
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
 
-        pars['p_lapse'] = {'mu_intercept': logit_np(0.02), 'transform': 'logistic'}
+        pars['p_lapse'] = _lapse_param_spec(self.lapse_group,
+                                            self.lapse_mu_mean,
+                                            self.lapse_mu_kappa,
+                                            self.lapse_kappa_sd)
         return pars
 
     def _get_choice_predictions(self, model_inputs):
@@ -830,23 +935,44 @@ class RTLapseMixin(object):
         responses (joint density 0.5/upper). If False, match HSSM's RT-only
         margin (1/upper).
 
-    The free parameter is named ``p_outlier`` (HSSM's name); ``p_lapse`` is
-    accepted as a backwards-compatible alias for symmetry with
-    :class:`LapseModel`. Its prior is centred small (logistic transform,
-    intercept = logit(0.05)) to match HSSM's ``p_outlier=0.05`` default.
+    The free parameter is named ``p_outlier`` (HSSM's name).
+
+    Group prior on ``p_outlier``
+    ----------------------------
+    ``lapse_group`` selects how the *per-subject* outlier rate is regularized
+    across subjects:
+
+    - ``'logit_normal'`` (default, backward-compatible): hierarchical
+      logit-Normal, centred at ``logit(0.05)``. This **funnels** when subjects'
+      true lapse ≈ 0 — the per-subject logit → −∞, the group SD inflates, and
+      NUTS diverges.
+    - ``'beta'``: hierarchical Beta "1/x"-like group prior (group mean μ +
+      concentration κ; density ``∝ p^(μκ-1)`` — a spike at 0 with a heavy upper
+      tail). See :meth:`BaseModel.build_hierarchical_nodes`. Recommended on
+      clean data, where it removes the funnel because the per-subject rate lives
+      in (0, 1) directly rather than on an unbounded logit.
     """
 
     # HSSM-matching defaults; overridable per-instance via __init__ kwargs of
     # the concrete classes, which set these attributes before super().__init__.
     lapse_upper = 20.0
     lapse_choice_5050 = True
+    # Group-prior selector for the per-subject outlier rate.
+    lapse_group = 'logit_normal'
+    lapse_mu_mean = 0.05
+    lapse_mu_kappa = 8.0
+    lapse_kappa_sd = 3.0
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
-        # logit(0.05) ≈ -2.944 ; small, identifiable, matches HSSM default.
-        pars['p_outlier'] = {'mu_intercept': logit_np(0.05),
-                             'sigma_intercept': 0.5,
-                             'transform': 'logistic'}
+        spec = _lapse_param_spec(self.lapse_group,
+                                 self.lapse_mu_mean,
+                                 self.lapse_mu_kappa,
+                                 self.lapse_kappa_sd)
+        if self.lapse_group == 'logit_normal':
+            # Preserve the historical sigma_intercept=0.5 on the logit prior.
+            spec['sigma_intercept'] = 0.5
+        pars['p_outlier'] = spec
         return pars
 
     def get_model_inputs(self, parameters):

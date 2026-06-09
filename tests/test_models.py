@@ -190,6 +190,57 @@ def test_ddm_rdm_lapse_models_build(paradigm_magnitude, paradigm_risk,
     assert 'll' in m.estimation_model.named_vars
 
 
+@pytest.mark.parametrize('cls_name,kind', [
+    ('DDMMagnitudeComparisonLapseModel', 'magnitude'),
+    ('RaceDiffusionMagnitudeComparisonLapseModel', 'magnitude'),
+])
+def test_lapse_beta_group_prior_builds(paradigm_magnitude, cls_name, kind):
+    """The ``lapse_group='beta'`` option replaces the logit-Normal group prior
+    on ``p_outlier`` with a hierarchical Beta (group_mu + concentration kappa),
+    which removes the logit funnel on clean data."""
+    if cls_name.startswith('DDM'):
+        pytest.importorskip('hssm')
+    import bauer.models as M
+    Cls = getattr(M, cls_name)
+    m = Cls(paradigm=paradigm_magnitude, fit_separate_evidence_sd=True,
+            fit_prior=True, lapse_group='beta')
+    assert m.free_parameters['p_outlier']['transform'] == 'beta'
+    m.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
+    nv = m.estimation_model.named_vars
+    # Hierarchical-Beta exposes group mean + concentration, not a logit SD.
+    assert 'p_outlier_mu' in nv
+    assert 'p_outlier_kappa' in nv
+    assert 'p_outlier_untransformed' not in nv
+    assert 'll' in nv
+
+
+def test_lapse_model_beta_group_prior_static():
+    """The static-choice LapseModel also accepts the Beta '1/x' group prior."""
+    import numpy as np
+    import pandas as pd
+    from bauer.core import LapseModel
+    from bauer.models.magnitude import MagnitudeComparisonModel
+
+    class MagLapse(LapseModel, MagnitudeComparisonModel):
+        lapse_group = 'beta'
+
+    rng = np.random.default_rng(0)
+    rows = []
+    for s in range(1, 4):
+        for t in range(30):
+            n1, n2 = rng.uniform(5, 25), rng.uniform(5, 25)
+            rows.append((s, t, n1, n2, n2 > n1))
+    df = pd.DataFrame(rows, columns=['subject', 'trial', 'n1', 'n2', 'choice'])
+    df = df.set_index(['subject', 'trial'])
+
+    m = MagLapse(paradigm=df)
+    assert m.free_parameters['p_lapse']['transform'] == 'beta'
+    m.build_estimation_model(data=df, hierarchical=True)
+    nv = m.estimation_model.named_vars
+    assert 'p_lapse_mu' in nv and 'p_lapse_kappa' in nv
+    assert 'p_lapse_untransformed' not in nv
+
+
 def test_flat_observer_prior_magnitude(paradigm_magnitude):
     """Magnitude/Flex/PowerLaw + DDMFlex with flat_observer_prior=True should
     build without populating n*_prior_* keys, and should reject fit_prior=True."""
