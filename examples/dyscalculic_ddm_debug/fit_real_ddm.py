@@ -101,8 +101,13 @@ def build_model(df, step, memory_model, beta_mu_mean):
     )
 
     if step == 'lapse':
-        return DDMMagnitudeComparisonLapseRegressionModel(
-            lapse_group='beta', lapse_mu_mean=beta_mu_mean, **common)
+        m = DDMMagnitudeComparisonLapseRegressionModel(**common)
+        # lapse_group / lapse_mu_mean are class attributes, not __init__ kwargs.
+        # Set them, then re-derive free_parameters (computed in __init__).
+        m.lapse_group = 'beta'
+        m.lapse_mu_mean = beta_mu_mean
+        m.free_parameters = m.get_free_parameters()
+        return m
     return DDMMagnitudeComparisonRegressionModel(**common)
 
 
