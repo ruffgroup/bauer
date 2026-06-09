@@ -563,12 +563,27 @@ class BaseModel(object):
         # comfortable margin so we can pick well-separated draws.
         num_draws = pathfinder_kwargs.pop('num_draws',
                                           max(1000, 50 * chains))
+
+        # Seed Pathfinder's OWN optimization from a plausible, data-informed
+        # point (the MAP) so its paths start in the valid region. Without this,
+        # on nasty DDM/RDM geometries Pathfinder can wander into the WFPT's
+        # flat/-inf zone and hand NUTS a frozen, all-divergent starting point
+        # (observed: independent-noise DDM -> 4000/4000 divergences, within-
+        # chain SD 0). If MAP fails, fall back to Pathfinder's default init.
+        seed_initvals = pathfinder_kwargs.pop('initvals', None)
+        if seed_initvals is None:
+            try:
+                with self.estimation_model:
+                    seed_initvals = pm.find_MAP(progressbar=False)
+            except Exception:  # pragma: no cover - robustness
+                seed_initvals = None
+
         try:
             with self.estimation_model:
                 pf_idata = pmx_fit(
                     method='pathfinder', num_paths=num_paths,
                     num_draws=num_draws, random_seed=seed,
-                    **pathfinder_kwargs)
+                    initvals=seed_initvals, **pathfinder_kwargs)
         except Exception as e:  # pragma: no cover - robustness
             return _fallback(f"pathfinder failed ({e})")
 
