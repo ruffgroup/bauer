@@ -854,13 +854,13 @@ class LapseModel(BaseModel):
     """Static-choice model with a per-subject random-lapse rate ``p_lapse``.
 
     ``lapse_group`` selects the group prior on the per-subject lapse rate:
-    ``'logit_normal'`` (default, backward-compatible) or ``'beta'`` (the
+    ``'logit_normal'`` (legacy opt-in; Beta is now the default) or ``'beta'`` (the
     heavy-tailed "1/x"-like hierarchical Beta; see
     :meth:`BaseModel.build_hierarchical_nodes`). The Beta option is preferable
     when most subjects lapse ≈ 0 (it avoids the logit funnel).
     """
 
-    lapse_group = 'logit_normal'
+    lapse_group = 'beta'
     lapse_mu_mean = 0.02
     lapse_mu_kappa = 8.0
     lapse_kappa_sd = 3.0
@@ -942,7 +942,7 @@ class RTLapseMixin(object):
     ``lapse_group`` selects how the *per-subject* outlier rate is regularized
     across subjects:
 
-    - ``'logit_normal'`` (default, backward-compatible): hierarchical
+    - ``'logit_normal'`` (legacy opt-in; Beta is now the default): hierarchical
       logit-Normal, centred at ``logit(0.05)``. This **funnels** when subjects'
       true lapse ≈ 0 — the per-subject logit → −∞, the group SD inflates, and
       NUTS diverges.
@@ -958,7 +958,7 @@ class RTLapseMixin(object):
     lapse_upper = 20.0
     lapse_choice_5050 = True
     # Group-prior selector for the per-subject outlier rate.
-    lapse_group = 'logit_normal'
+    lapse_group = 'beta'
     lapse_mu_mean = 0.05
     lapse_mu_kappa = 8.0
     lapse_kappa_sd = 3.0
