@@ -49,8 +49,13 @@ Usage (on a GPU compute node)::
 """
 import argparse
 import json
+import os
 import sys
 import time
+
+# Import THIS checkout's bauer (the feature/ddm-lapse submodule), not whatever
+# is pip-installed in the env (e.g. ~/git/bauer), which lacks the lapse classes.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 import pandas as pd
 import arviz as az
