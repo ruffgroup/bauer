@@ -590,14 +590,12 @@ class DDMLapseMixin(RTLapseMixin):
     def simulate(self, paradigm, parameters, n_samples=1, random_seed=None):
         """Simulate (rt, choice); optionally generate the outlier contaminant.
 
-        Draws the decision process via :meth:`DDMMixin.simulate`. By default
-        (``simulate_contaminant=False``) it returns those clean draws, on the
-        interpretation that ``p_outlier`` is a likelihood *robustness* device,
-        not a generative process. With ``simulate_contaminant=True`` a fraction
-        ``p_outlier`` of trials is replaced by a contaminant
-        (``rt ~ Uniform(0, lapse_upper)``, 50/50 choice) — this matches HSSM's
-        posterior predictive (its ``rng_fn`` applies the lapse) and avoids the
-        (expected) RT-tail misfit when overlaying a clean PPC on real data.
+        Draws the decision process via :meth:`DDMMixin.simulate`, then by default
+        (``simulate_contaminant=True``, matching HSSM's posterior predictive)
+        replaces a fraction ``p_outlier`` of trials with a contaminant
+        (``rt ~ Uniform(0, lapse_upper)``, 50/50 choice). Set
+        ``simulate_contaminant=False`` for the clean decision process only (the
+        "p_outlier as likelihood-robustness, not generative" reading).
         """
         out_df = super().simulate(paradigm, parameters, n_samples=n_samples,
                                   random_seed=random_seed)

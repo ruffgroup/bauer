@@ -1159,19 +1159,16 @@ class RTLapseMixin(object):
     # Estimating a single (non-hierarchical) rate is not yet supported; HSSM's
     # own default is the fixed value anyway.
     p_outlier = 0.05
-    # Whether simulate()/ppc() GENERATE contaminant trials.
-    # NOTE on HSSM: HSSM's posterior predictive *does* generate them — its
-    # RandomVariable.rng_fn applies the lapse (`_apply_lapse_model`) after the
-    # clean ssms draw; only its standalone `simulate_data` helper is clean.
-    # We nonetheless default to False on the (defensible, arguably cleaner)
-    # interpretation that p_outlier is a *likelihood robustness* device — a way
-    # to down-weight untrusted trials — NOT a generative process. So the
-    # predictor reflects the clean decision model; a PPC that "misses" the RT
-    # tail is then honestly telling you the decision model doesn't explain those
-    # trials. Set True to (a) match HSSM's posterior predictive exactly and
-    # (b) avoid that (expected) tail "misfit" when overlaying a PPC on real data
-    # (a fraction p_outlier become Uniform(0, lapse_upper) x 50/50 contaminants).
-    simulate_contaminant = False
+    # Whether simulate()/ppc() GENERATE contaminant trials. Default True to
+    # MATCH HSSM (the Frank-lab reference): HSSM's posterior predictive applies
+    # the lapse in its RandomVariable.rng_fn (`_apply_lapse_model`) after the
+    # clean ssms draw, so a fraction p_outlier of predicted trials are
+    # Uniform(0, lapse_upper) x 50/50-choice contaminants. (HSSM's standalone
+    # `simulate_data` helper is the clean exception.) Set False for the
+    # alternative "robustness-only" reading -- p_outlier as a likelihood
+    # down-weighting device, not a generative process -- where the predictor
+    # shows the clean decision model (and a PPC honestly "misses" the RT tail).
+    simulate_contaminant = True
     # Group prior for the per-subject rate (only used when p_outlier='hierarchical').
     lapse_group = 'beta'
     lapse_mu_mean = 0.05
