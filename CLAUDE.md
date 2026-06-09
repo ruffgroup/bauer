@@ -88,9 +88,15 @@ outputs (not re-executed in CI) — re-run them locally first. Full docs workflo
 
 ### Inheritance
 
-`BaseModel` (in `core.py`) is abstract. Two mixins extend it:
-- **`LapseModel`** — adds `p_lapse` for random-choice trials.
-- **`RegressionModel`** — adds patsy-formula regression on free parameters; for flex models, formulas targeting `n1_evidence_sd` etc. are auto-expanded across spline coefficients.
+`BaseModel` (in `core.py`) is abstract. Mixins extend it:
+- **`LapseModel`** — static-choice random-lapse (`p = p·(1−λ) + 0.5·λ`); the `p_lapse` group prior is `lapse_group` (`'beta'` default — a near-0 "1/x" Beta; `'logit_normal'` legacy). Opt-in per model family (`RiskLapseModel`, …).
+- **`RTLapseMixin`** — RT-aware `p_outlier` contaminant (HSSM-style mixture, uniform-RT lapse) for DDM/RDM. **Folded into every DDM/RDM base class by default (`p_outlier=0.05`)** — there is no separate `DDM*Lapse*` class. `p_outlier=0` recovers pure WFPT; `'hierarchical'` is an unstable opt-in (avoid).
+- **`RegressionModel`** — patsy-formula regression on free parameters; for flex models, formulas targeting `n1_evidence_sd` etc. are auto-expanded across spline coefficients.
+- Group-SD prior is configurable: `group_sd_dist` (`'halfcauchy'` default; `'halfnormal'` tames the funnel). Init: `find_init` (`'mapjitter'` default; `'pathfinder'` opt-in, needs `pymc_extras`).
+
+> **Sampling won't converge (divergences / r̂>1.01 / seed-lottery)?** The
+> canonical guide is now **`notes/sampling_robustness.md`** (lapses, the
+> logit/HalfCauchy funnels, init, target_accept, tiered recipe).
 
 Models are built by multiple inheritance, e.g.
 
@@ -200,19 +206,19 @@ bash bauer/scripts/slurm_jobs/submit_all_production.sh
 - `target_accept=0.95` — 0.99 was overkill on cluster; 0.95 is well-behaved here.
 - `tune=1000, draws=1000, chains=4` — solid for these sample sizes. **Bump warmup to 1500-2000 if any fit shows `r̂ > 1.01` or `min ESS < 100/chain` post-hoc.**
 
-> **Fitting a DDM/RDM on real data?** Start with **`notes/fitting_ddm_models.md`**
-> (prescriptive recipe + the "starting points" explanation); the empirical
-> experiment behind the defaults is `notes/experiments/ddm_sampler_experiments.md`.
-> Short version: filter `rt < 0.20 s`, `fit_separate_evidence_sd=True`, numpyro
-> on a GPU L4, `tune=2000 target_accept=0.99`, `chain_method='vectorized'`.
-> The thing that makes hard/regression posteriors converge is **bauer's
-> starting-point finder** (`recommended_init='mapjitter'`, on by default for
-> DDM/Race: MAP centre + prior-scaled jitter). Without it, convergence is a seed
-> lottery (a regression DDM converged ~12% of seeds; with the finder, 100%).
-> The finder is also **~3.7× faster** (174 s vs 647 s — converged chains avoid
-> max-tree-depth stalls), and on a single GPU `vectorized` beats `parallel`
-> (sequential chains). So finder+vectorized = most reliable AND fastest;
-> `chain_method` is not the lever. Always check r̂/ESS.
+> **Fitting a DDM/RDM on real data?** See **`notes/sampling_robustness.md`**
+> (canonical) and `notes/fitting_ddm_models.md`. Short version: filter
+> `rt < 0.20 s`, `fit_separate_evidence_sd=True`, numpyro on a GPU L4,
+> `tune=2000`, `chain_method='vectorized'`, `mapjitter` init. **The single
+> biggest lever is the `p_outlier` contaminant — now on by default in every
+> DDM/RDM model.** It absorbs slow-tail/near-boundary RTs that otherwise bump
+> the likelihood; it's what makes the full-scale DDM converge (66-subj DDM:
+> r̂ 1.53 without it → **1.00, ESS 4264** with it). With the contaminant in,
+> plain `mapjitter` suffices — **Pathfinder (`find_init='pathfinder'`) is not
+> needed** and stays a break-glass tool (expensive). `target_accept=0.99` is a
+> band-aid for bad geometry; once the contaminant has cleaned it up, ~0.9 is
+> ~2.3× faster (a few divergences return — use 0.95–0.99 for the final fit).
+> Always check r̂/ESS.
 
 ### Output filenames
 

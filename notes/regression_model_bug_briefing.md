@@ -1,5 +1,7 @@
 # Briefing: `RegressionModel` softplus-prior bug (fixed 2026-05-23)
 
+> **Historical record** (bug is fixed). For current convergence guidance see [`sampling_robustness.md`](sampling_robustness.md).
+
 A handoff document for any agent / future-Gilles picking up bauer.
 Read this before touching `bauer/core.py:RegressionModel` or any
 `*RegressionModel` subclass.

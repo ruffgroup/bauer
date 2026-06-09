@@ -1,5 +1,7 @@
 # Hierarchical DDM convergence — what we learned
 
+> **Historical.** Superseded by [`sampling_robustness.md`](sampling_robustness.md) (the `p_outlier` contaminant — now a default — is what actually cracks full-scale DDM convergence). Kept for the empirical record.
+
 Notes from getting bauer's `DDMMagnitudeComparisonModel` (and its
 regression variant) to converge cleanly on Barreto-Garcia 2022
 (n=64 subjects, ~210 trials/subject after cleaning). Distilled in

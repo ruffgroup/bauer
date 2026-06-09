@@ -1,5 +1,7 @@
 # Fitting DDM models in bauer
 
+> **Canonical convergence guide: [`sampling_robustness.md`](sampling_robustness.md).** Key update since this was written: the `p_outlier` contaminant is now baked into every DDM/RDM model by default (`p_outlier=0.05`) and is the biggest convergence lever; with it, `mapjitter` suffices and Pathfinder is break-glass only. The recipe below still holds for the non-contaminant mechanics.
+
 A short, prescriptive recipe for fitting drift-diffusion (and race) models.
 Runnable examples: `bauer/scripts/fit_for_lesson8.py` (magnitude comparison
 with a regressor) and `examples/for_alina/fit_ddm.py` (risky choice, gain/loss
