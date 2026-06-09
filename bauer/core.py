@@ -1159,12 +1159,18 @@ class RTLapseMixin(object):
     # Estimating a single (non-hierarchical) rate is not yet supported; HSSM's
     # own default is the fixed value anyway.
     p_outlier = 0.05
-    # Whether simulate()/ppc() GENERATE contaminant trials. HSSM treats
-    # p_outlier as a likelihood-only robustness device and simulates the clean
-    # decision process, so the default here matches HSSM (False). Set True for a
-    # generatively-consistent PPC (a fraction p_outlier of simulated trials are
-    # Uniform(0, lapse_upper) x 50/50-choice contaminants) -- which avoids the
-    # spurious RT-tail "misfit" you get overlaying a clean-WFPT PPC on real data.
+    # Whether simulate()/ppc() GENERATE contaminant trials.
+    # NOTE on HSSM: HSSM's posterior predictive *does* generate them — its
+    # RandomVariable.rng_fn applies the lapse (`_apply_lapse_model`) after the
+    # clean ssms draw; only its standalone `simulate_data` helper is clean.
+    # We nonetheless default to False on the (defensible, arguably cleaner)
+    # interpretation that p_outlier is a *likelihood robustness* device — a way
+    # to down-weight untrusted trials — NOT a generative process. So the
+    # predictor reflects the clean decision model; a PPC that "misses" the RT
+    # tail is then honestly telling you the decision model doesn't explain those
+    # trials. Set True to (a) match HSSM's posterior predictive exactly and
+    # (b) avoid that (expected) tail "misfit" when overlaying a PPC on real data
+    # (a fraction p_outlier become Uniform(0, lapse_upper) x 50/50 contaminants).
     simulate_contaminant = False
     # Group prior for the per-subject rate (only used when p_outlier='hierarchical').
     lapse_group = 'beta'
