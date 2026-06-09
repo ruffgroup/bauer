@@ -43,6 +43,7 @@ from .risky_choice import (
     FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
     PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
 )
+from ..core import RTLapseMixin
 from ..utils.bayes import get_posterior, posterior_mean_sd
 from ..utils.math import inverse_softplus_np
 
@@ -360,6 +361,68 @@ class RaceMixin:
     def compute_log_likelihood(self, idata, paradigm=None, var_name='ll_race'):
         from .ddm import _attach_log_likelihood
         return _attach_log_likelihood(self, idata, paradigm=paradigm, var_name=var_name)
+
+
+class RaceLapseMixin(RTLapseMixin):
+    """RT-aware lapse / outlier mixture for :class:`RaceMixin` likelihoods.
+
+    Identical contaminant convention to :class:`bauer.models.ddm.DDMLapseMixin`
+    — the Wald-race per-trial log-density is mixed with a flat-RT (× 50/50
+    choice) contaminant via the HSSM formula (see :class:`bauer.core.RTLapseMixin`).
+    The uniform contaminant is over the observed ``(rt, choice)`` and is
+    independent of the accumulator dynamics, so the mixture is just as clean for
+    the analytical Wald race as for the DDM. Compose to the LEFT of
+    :class:`RaceMixin`::
+
+        class RaceDiffusionRiskLapseModel(RaceLapseMixin, RaceDiffusionRiskModel): ...
+    """
+
+    def build_likelihood(self, parameters, save_p_choice=False):
+        model = pm.Model.get_context()
+        if '_rt_choice_data' not in model.named_vars:
+            raise ValueError("Race models require 'rt' and 'choice' columns in the paradigm.")
+        model_inputs = self.get_model_inputs(parameters)
+
+        v1, v2, sigma1, sigma2 = self._get_drifts(model_inputs, parameters)
+        if save_p_choice:
+            pm.Deterministic('drift_1', v1)
+            pm.Deterministic('drift_2', v2)
+            pm.Deterministic('sigma_1', sigma1)
+            pm.Deterministic('sigma_2', sigma2)
+
+        a = parameters['a']
+        t0 = pt.minimum(parameters['t0'], model['_t0_cap'])
+        if save_p_choice:
+            pm.Deterministic('t0_eff', t0)
+        p_outlier = model_inputs['p_outlier']
+        observed = model['_rt_choice_data'].get_value()
+
+        def _logp(value, v1_, v2_, s1_, s2_, a_, t_, p_):
+            ll = logp_race_diffusion_2(value, v1_, v2_, s1_, s2_, a_, t_)
+            return self._mix_with_lapse(ll, p_)
+
+        pm.CustomDist('ll', v1, v2, sigma1, sigma2, a, t0, p_outlier,
+                      logp=_logp, observed=observed)
+
+    def build_loglik_model(self, paradigm, parameters):
+        if isinstance(parameters, pd.DataFrame):
+            parameters = parameters.to_dict(orient='list')
+        with pm.Model() as self.loglik_model:
+            paradigm_ = self._get_paradigm(paradigm=paradigm)
+            self.set_paradigm(paradigm_)
+            for key, value in parameters.items():
+                pm.Data(key, value)
+            params = self.get_parameter_values()
+            model_inputs = self.get_model_inputs(params)
+            v1, v2, sigma1, sigma2 = self._get_drifts(model_inputs, params)
+            mc = pm.Model.get_context()
+            a = params['a']
+            t0 = pt.minimum(params['t0'], mc['_t0_cap'])
+            p_outlier = model_inputs['p_outlier']
+            signed = pt.switch(mc['choice'], 1.0, -1.0)
+            data = pt.stack([mc['rt'], signed], axis=1)
+            ll = logp_race_diffusion_2(data, v1, v2, sigma1, sigma2, a, t0)
+            pm.Deterministic('per_trial_ll', self._mix_with_lapse(ll, p_outlier))
 
 
 class RaceDiffusionMagnitudeComparisonModel(RaceMixin, MagnitudeComparisonModel):
@@ -733,3 +796,68 @@ class RaceDiffusionPowerLawNoiseRiskRegressionModel(
                                            advantage=self.advantage,
                                            flat_observer_prior=getattr(self, 'flat_observer_prior', False),
                                            fit_w_s=getattr(self, 'fit_w_s', True))
+
+
+# ============================================================
+# Race-Diffusion × lapse / outlier-contaminant variants
+# ============================================================
+#
+# These add the same RT-aware ``p_outlier`` mixture as the DDM lapse variants.
+# The uniform-RT contaminant is independent of the Wald-race dynamics, so it
+# composes just as cleanly here. ``RaceLapseMixin`` is to the LEFT so its
+# likelihood overrides win over RaceMixin's.
+
+class RaceDiffusionMagnitudeComparisonLapseModel(
+        RaceLapseMixin, RaceDiffusionMagnitudeComparisonModel):
+    """:class:`RaceDiffusionMagnitudeComparisonModel` + RT-aware lapse mixture."""
+
+    def __init__(self, paradigm=None, fit_prior=True,
+                 fit_separate_evidence_sd=True, memory_model='independent',
+                 save_trialwise_n_estimates=False, advantage=True,
+                 lapse_upper=20.0, lapse_choice_5050=True):
+        self.lapse_upper = lapse_upper
+        self.lapse_choice_5050 = lapse_choice_5050
+        super().__init__(
+            paradigm=paradigm, fit_prior=fit_prior,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
+            memory_model=memory_model,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            advantage=advantage,
+        )
+
+
+class RaceDiffusionRiskLapseModel(RaceLapseMixin, RaceDiffusionRiskModel):
+    """:class:`RaceDiffusionRiskModel` + RT-aware lapse mixture."""
+
+    def __init__(self, paradigm=None, prior_estimate='objective',
+                 fit_separate_evidence_sd=True,
+                 save_trialwise_n_estimates=False, memory_model='independent',
+                 advantage=True,
+                 lapse_upper=20.0, lapse_choice_5050=True):
+        self.lapse_upper = lapse_upper
+        self.lapse_choice_5050 = lapse_choice_5050
+        super().__init__(
+            paradigm=paradigm, prior_estimate=prior_estimate,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            memory_model=memory_model, advantage=advantage,
+        )
+
+
+class RaceDiffusionRiskLapseRegressionModel(
+        RaceLapseMixin, RaceDiffusionRiskRegressionModel):
+    """:class:`RaceDiffusionRiskRegressionModel` + RT-aware lapse mixture."""
+
+    def __init__(self, paradigm, regressors, prior_estimate='objective',
+                 fit_separate_evidence_sd=True,
+                 save_trialwise_n_estimates=False, memory_model='independent',
+                 advantage=True,
+                 lapse_upper=20.0, lapse_choice_5050=True):
+        self.lapse_upper = lapse_upper
+        self.lapse_choice_5050 = lapse_choice_5050
+        super().__init__(
+            paradigm, regressors, prior_estimate=prior_estimate,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            memory_model=memory_model, advantage=advantage,
+        )

@@ -34,6 +34,7 @@ from .risky_choice import (
     FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
     PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
 )
+from ..core import RTLapseMixin
 from ..utils.bayes import get_posterior, posterior_mean_sd
 from ..utils.math import inverse_softplus_np
 
@@ -497,6 +498,73 @@ class DDMMixin:
         )
 
 
+class DDMLapseMixin(RTLapseMixin):
+    """RT-aware lapse / outlier mixture for :class:`DDMMixin` likelihoods.
+
+    Adds a free ``p_outlier`` parameter and replaces the bare WFPT
+    log-likelihood with the HSSM-style contaminant mixture (see
+    :class:`bauer.core.RTLapseMixin` for the math and contaminant-density
+    documentation). On a fraction ``p_outlier`` of trials the observed
+    ``(rt, choice)`` is treated as a draw from a flat density over RT rather
+    than from the diffusion process.
+
+    Compose to the LEFT of :class:`DDMMixin` so this mixin's overrides of
+    ``build_likelihood`` / ``build_loglik_model`` win, e.g.::
+
+        class DDMRiskLapseModel(DDMLapseMixin, DDMRiskModel): ...
+    """
+
+    def build_likelihood(self, parameters, save_p_choice=False):
+        if logp_ddm is None:
+            raise ImportError(
+                "DDM models require hssm. Install with: pip install bauer[ddm]"
+            )
+        model = pm.Model.get_context()
+        if '_rt_choice_data' not in model.named_vars:
+            raise ValueError(
+                "DDM models require 'rt' and 'choice' columns in the paradigm."
+            )
+        model_inputs = self.get_model_inputs(parameters)
+
+        v = self._get_drift(model_inputs, parameters)
+        if save_p_choice:
+            pm.Deterministic('drift', v)
+
+        a = parameters['a']
+        z = pt.constant(0.5) if self.fix_z else parameters['z']
+        t0 = parameters['t0']
+        p_outlier = model_inputs['p_outlier']
+
+        observed = model['_rt_choice_data'].get_value()
+
+        def _logp(value, v_, a_, z_, t_, p_):
+            ll = logp_ddm(value, v_, a_, z_, t_)
+            return self._mix_with_lapse(ll, p_)
+
+        pm.CustomDist('ll', v, a, z, t0, p_outlier,
+                      logp=_logp, observed=observed)
+
+    def build_loglik_model(self, paradigm, parameters):
+        if isinstance(parameters, pd.DataFrame):
+            parameters = parameters.to_dict(orient='list')
+        with pm.Model() as self.loglik_model:
+            paradigm_ = self._get_paradigm(paradigm=paradigm)
+            self.set_paradigm(paradigm_)
+            for key, value in parameters.items():
+                pm.Data(key, value)
+            params = self.get_parameter_values()
+            model_inputs = self.get_model_inputs(params)
+            v = self._get_drift(model_inputs, params)
+            a, t0 = params['a'], params['t0']
+            z = pt.constant(0.5) if self.fix_z else params['z']
+            p_outlier = model_inputs['p_outlier']
+            mc = pm.Model.get_context()
+            signed = pt.switch(mc['choice'], 1.0, -1.0)
+            data = pt.stack([mc['rt'], signed], axis=1)
+            per_trial = self._mix_with_lapse(logp_ddm(data, v, a, z, t0), p_outlier)
+            pm.Deterministic('per_trial_ll', per_trial)
+
+
 def _drift_from_snr(model_inputs, v_scale=None, flat_observer_prior=False):
     """Drift = ((post_n2_mu - post_n1_mu) + threshold) / sqrt(sd1^2 + sd2^2).
 
@@ -932,3 +1000,91 @@ class DDMPowerLawNoiseRiskRegressionModel(DDMMixin, PowerLawNoiseRiskRegressionM
         v_scale = parameters['v_scale'] if self.fit_v_scale else None
         return _drift_from_snr(model_inputs, v_scale=v_scale,
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
+
+
+# ============================================================
+# DDM × lapse / outlier-contaminant variants
+# ============================================================
+#
+# These add an RT-aware ``p_outlier`` mixture (HSSM convention) on top of the
+# corresponding DDM model. ``DDMLapseMixin`` is composed to the LEFT so its
+# ``build_likelihood`` / ``build_loglik_model`` overrides win over DDMMixin's.
+# Each forwards ``lapse_upper`` / ``lapse_choice_5050`` to RTLapseMixin and all
+# remaining kwargs to its non-lapse parent.
+
+class DDMMagnitudeComparisonLapseModel(DDMLapseMixin, DDMMagnitudeComparisonModel):
+    """:class:`DDMMagnitudeComparisonModel` with an RT-aware lapse mixture.
+
+    Adds a free ``p_outlier`` parameter; on a fraction of trials the observed
+    ``(rt, choice)`` is a flat-RT contaminant rather than a diffusion draw. See
+    :class:`bauer.core.RTLapseMixin` for the contaminant-density documentation.
+    """
+
+    def __init__(self, paradigm=None, fit_v_scale=False, fix_z=True,
+                 lapse_upper=20.0, lapse_choice_5050=True, **kwargs):
+        self.lapse_upper = lapse_upper
+        self.lapse_choice_5050 = lapse_choice_5050
+        super().__init__(paradigm=paradigm, fit_v_scale=fit_v_scale,
+                         fix_z=fix_z, **kwargs)
+
+
+class DDMMagnitudeComparisonLapseRegressionModel(
+        DDMLapseMixin, DDMMagnitudeComparisonRegressionModel):
+    """:class:`DDMMagnitudeComparisonRegressionModel` + RT-aware lapse mixture."""
+
+    def __init__(self, paradigm, regressors, fit_prior=False,
+                 fit_separate_evidence_sd=None, memory_model='independent',
+                 save_trialwise_estimates=False,
+                 fit_v_scale=False, fix_z=True,
+                 lapse_upper=20.0, lapse_choice_5050=True):
+        self.lapse_upper = lapse_upper
+        self.lapse_choice_5050 = lapse_choice_5050
+        super().__init__(
+            paradigm, regressors, fit_prior=fit_prior,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
+            memory_model=memory_model,
+            save_trialwise_estimates=save_trialwise_estimates,
+            fit_v_scale=fit_v_scale, fix_z=fix_z,
+        )
+
+
+class DDMRiskLapseModel(DDMLapseMixin, DDMRiskModel):
+    """:class:`DDMRiskModel` with an RT-aware lapse mixture.
+
+    Adds a free ``p_outlier`` parameter; on a fraction of trials the observed
+    ``(rt, choice)`` is a flat-RT contaminant rather than a diffusion draw.
+    """
+
+    def __init__(self, paradigm=None, prior_estimate='objective',
+                 fit_separate_evidence_sd=True,
+                 save_trialwise_n_estimates=False, memory_model='independent',
+                 fit_v_scale=False, fix_z=True,
+                 lapse_upper=20.0, lapse_choice_5050=True):
+        self.lapse_upper = lapse_upper
+        self.lapse_choice_5050 = lapse_choice_5050
+        super().__init__(
+            paradigm=paradigm, prior_estimate=prior_estimate,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            memory_model=memory_model,
+            fit_v_scale=fit_v_scale, fix_z=fix_z,
+        )
+
+
+class DDMRiskLapseRegressionModel(DDMLapseMixin, DDMRiskRegressionModel):
+    """:class:`DDMRiskRegressionModel` + RT-aware lapse mixture."""
+
+    def __init__(self, paradigm, regressors, prior_estimate='objective',
+                 fit_separate_evidence_sd=True,
+                 save_trialwise_n_estimates=False, memory_model='independent',
+                 fit_v_scale=False, fix_z=True,
+                 lapse_upper=20.0, lapse_choice_5050=True):
+        self.lapse_upper = lapse_upper
+        self.lapse_choice_5050 = lapse_choice_5050
+        super().__init__(
+            paradigm, regressors, prior_estimate=prior_estimate,
+            fit_separate_evidence_sd=fit_separate_evidence_sd,
+            save_trialwise_n_estimates=save_trialwise_n_estimates,
+            memory_model=memory_model,
+            fit_v_scale=fit_v_scale, fix_z=fix_z,
+        )

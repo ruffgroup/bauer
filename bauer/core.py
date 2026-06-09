@@ -780,6 +780,103 @@ class LapseModel(BaseModel):
         return model_inputs
 
 
+class RTLapseMixin(object):
+    """RT-aware lapse / outlier-contaminant mixture for sequential-sampling
+    (DDM / RDM) likelihoods, mirroring HSSM's ``p_outlier`` mechanism.
+
+    The static-choice :class:`LapseModel` lapses *choices* only
+    (``p = p·(1-λ) + 0.5·λ``); that is correct for the cumulative-normal
+    Bernoulli likelihood but **wrong** for a likelihood defined jointly over
+    ``(rt, choice)``. A response-time model needs an RT-aware contaminant: on a
+    fraction ``p_outlier`` of trials the observation is assumed to come from a
+    process unrelated to the decision (fast guesses, lapses of attention,
+    delayed/anticipatory responses), modelled by a flat density over RT.
+
+    Following HSSM (``hssm.distribution_utils.dist``), the per-trial
+    log-likelihood becomes the numerically-stable mixture::
+
+        logp = log( (1 - p_outlier) * exp(ll_model)
+                    + p_outlier * exp(lapse_logp) + 1e-29 )
+
+    where ``ll_model`` is the WFPT (DDM) / Wald-race (RDM) log-density and
+    ``lapse_logp`` is the contaminant log-density.
+
+    Contaminant density
+    -------------------
+    HSSM's default lapse distribution is ``Uniform(0, lapse_upper)`` over RT
+    (``lapse_upper`` = 20 s), and the contaminant choice is 50/50. The joint
+    (rt, choice) contaminant density is therefore::
+
+        f_lapse(rt, choice) = 0.5 / lapse_upper      for 0 <= rt <= lapse_upper
+                            = 0                       otherwise
+
+    so ``lapse_logp = log(0.5) - log(lapse_upper)`` — a constant, independent of
+    the trial (every observed RT in a fitted dataset is well within the bound).
+    This 0.5/upper joint form (RT *and* choice uniform) is the conceptually
+    complete contaminant; HSSM's code path happens to score only the RT margin
+    (``-log(lapse_upper)``), but since the term is an additive constant inside
+    the mixture this changes only the absolute scale of the contaminant weight,
+    not the inference about decision parameters. The factor is documented here
+    for reproducibility. Set ``lapse_choice_5050=False`` to drop the ``log(0.5)``
+    and exactly match HSSM's RT-only convention.
+
+    Parameters
+    ----------
+    lapse_upper : float
+        Upper bound (seconds) of the uniform contaminant RT density. Default
+        20.0 (HSSM default). Must exceed the largest observed RT.
+    lapse_choice_5050 : bool
+        If True (default), the contaminant assigns 50/50 over the two
+        responses (joint density 0.5/upper). If False, match HSSM's RT-only
+        margin (1/upper).
+
+    The free parameter is named ``p_outlier`` (HSSM's name); ``p_lapse`` is
+    accepted as a backwards-compatible alias for symmetry with
+    :class:`LapseModel`. Its prior is centred small (logistic transform,
+    intercept = logit(0.05)) to match HSSM's ``p_outlier=0.05`` default.
+    """
+
+    # HSSM-matching defaults; overridable per-instance via __init__ kwargs of
+    # the concrete classes, which set these attributes before super().__init__.
+    lapse_upper = 20.0
+    lapse_choice_5050 = True
+
+    def get_free_parameters(self):
+        pars = super().get_free_parameters()
+        # logit(0.05) ≈ -2.944 ; small, identifiable, matches HSSM default.
+        pars['p_outlier'] = {'mu_intercept': logit_np(0.05),
+                             'sigma_intercept': 0.5,
+                             'transform': 'logistic'}
+        return pars
+
+    def get_model_inputs(self, parameters):
+        model_inputs = super().get_model_inputs(parameters)
+        model_inputs['p_outlier'] = parameters['p_outlier']
+        return model_inputs
+
+    def _lapse_logp_const(self):
+        """Constant log-density of the uniform RT (× 50/50 choice) contaminant."""
+        const = -np.log(self.lapse_upper)
+        if self.lapse_choice_5050:
+            const += np.log(0.5)
+        return float(const)
+
+    def _mix_with_lapse(self, ll_model, p_outlier):
+        """HSSM-style numerically-stable lapse mixture of per-trial log-densities.
+
+        ``ll_model`` is the (per-trial) WFPT / Wald-race log-likelihood; the
+        contaminant is a flat density with constant log-value
+        :meth:`_lapse_logp_const`. Returns the mixed per-trial log-likelihood.
+        """
+        lapse_logp = pt.constant(self._lapse_logp_const())
+        # log( (1-p)·exp(ll) + p·exp(lapse) + 1e-29 ), via logaddexp for stability.
+        log_keep = pt.log1p(-p_outlier) + ll_model
+        log_lapse = pt.log(p_outlier) + lapse_logp
+        mixed = pt.logaddexp(log_keep, log_lapse)
+        # Match HSSM's +1e-29 guard against log(0) when both terms underflow.
+        return pt.logaddexp(mixed, pt.constant(np.log(1e-29)))
+
+
 class RegressionModel(BaseModel):
 
     def __init__(self, regressors=None):

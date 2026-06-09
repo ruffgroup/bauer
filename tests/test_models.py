@@ -154,6 +154,42 @@ def test_rdm_models_build(paradigm_magnitude, paradigm_risk, cls_name):
     assert 't0' in m.free_parameters
 
 
+@pytest.mark.parametrize('cls_name,kind', [
+    ('DDMMagnitudeComparisonLapseModel', 'magnitude'),
+    ('DDMRiskLapseModel', 'risk'),
+    ('RaceDiffusionMagnitudeComparisonLapseModel', 'magnitude'),
+    ('RaceDiffusionRiskLapseModel', 'risk'),
+])
+def test_ddm_rdm_lapse_models_build(paradigm_magnitude, paradigm_risk,
+                                    cls_name, kind):
+    """DDM/RDM lapse variants add a free ``p_outlier`` and build the RT-aware
+    contaminant-mixture likelihood without errors."""
+    if cls_name.startswith('DDM'):
+        pytest.importorskip('hssm')
+    import numpy as np
+    import bauer.models as M
+    Cls = getattr(M, cls_name)
+    if kind == 'risk':
+        m = Cls(paradigm=paradigm_risk, prior_estimate='objective',
+                fit_separate_evidence_sd=True)
+        data = paradigm_risk
+    else:
+        kwargs = {'fit_separate_evidence_sd': True, 'fit_prior': True}
+        m = Cls(paradigm=paradigm_magnitude, **kwargs)
+        data = paradigm_magnitude
+    try:
+        m.build_estimation_model(data=data, hierarchical=True)
+    except TypeError:
+        m.build_estimation_model(paradigm=data, hierarchical=True)
+    assert 'p_outlier' in m.free_parameters
+    assert m.free_parameters['p_outlier']['transform'] == 'logistic'
+    assert 'a' in m.free_parameters and 't0' in m.free_parameters
+    # Contaminant log-density = log(0.5) - log(20) ≈ -3.689 (HSSM convention).
+    assert np.isclose(m._lapse_logp_const(), np.log(0.5) - np.log(20.0))
+    # ll node uses the lapse-mixture CustomDist.
+    assert 'll' in m.estimation_model.named_vars
+
+
 def test_flat_observer_prior_magnitude(paradigm_magnitude):
     """Magnitude/Flex/PowerLaw + DDMFlex with flat_observer_prior=True should
     build without populating n*_prior_* keys, and should reject fit_prior=True."""
