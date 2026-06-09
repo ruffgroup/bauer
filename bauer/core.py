@@ -50,9 +50,34 @@ def _translate_deprecated_kwargs(func):
     return wrapper
 
 
+def _group_sd_rv(name, scale, dist='halfcauchy', dims=None):
+    """Group-level SD prior for a hierarchical node.
+
+    ``'halfcauchy'`` (default, ``HalfCauchy(beta=scale)``) is bauer's historical
+    choice but has an infinite-variance heavy tail: a poorly-identified group SD
+    can wander to huge values, producing a funnel and divergences (seen e.g. on
+    DDM noise components and near-0 lapse rates). ``'halfnormal'``
+    (``HalfNormal(sigma=scale)``) has a light tail that tames the SD and removes
+    that pathology, at the cost of mild over-shrinkage if true between-subject
+    heterogeneity is large.
+    """
+    if dist == 'halfnormal':
+        return pm.HalfNormal(name, sigma=scale, dims=dims)
+    if dist == 'halfcauchy':
+        return pm.HalfCauchy(name, beta=scale, dims=dims)
+    raise ValueError(
+        f"group_sd_dist must be 'halfcauchy' or 'halfnormal', got {dist!r}")
+
+
 class BaseModel(object):
 
     paradigm_keys = []
+
+    # Group-level SD prior family for hierarchical nodes: 'halfcauchy'
+    # (default, historical) or 'halfnormal' (tamer tail; avoids the group-SD
+    # funnel that drives divergences when between-subject variance is weakly
+    # identified). See _group_sd_rv. Set per-instance/subclass to override.
+    group_sd_dist = 'halfcauchy'
 
     # Per-model-class hints for the NUTS sampler.
     #
@@ -841,7 +866,8 @@ class BaseModel(object):
         else:
             raise NotImplementedError
 
-        group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma_intercept)
+        group_sd = _group_sd_rv(f'{name}_sd', cauchy_sigma_intercept,
+                                getattr(self, 'group_sd_dist', 'halfcauchy'))
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject',))
 
         if transform == 'identity':
@@ -1311,7 +1337,9 @@ class RegressionModel(BaseModel):
                              sigma=sigma,
                              dims=(f'{name}_regressors',))
 
-        group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma, dims=(f'{name}_regressors',))
+        group_sd = _group_sd_rv(f'{name}_sd', cauchy_sigma,
+                                getattr(self, 'group_sd_dist', 'halfcauchy'),
+                                dims=(f'{name}_regressors',))
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject', f'{name}_regressors'))
 
         return pm.Deterministic(name, group_mu + group_sd * subject_offset, dims=('subject', f'{name}_regressors'))
