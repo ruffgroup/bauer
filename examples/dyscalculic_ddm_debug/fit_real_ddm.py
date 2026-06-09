@@ -141,6 +141,9 @@ def main():
     p.add_argument('--chain-method', default='vectorized',
                    choices=('vectorized', 'parallel'))
     p.add_argument('--random-seed', type=int, default=None)
+    p.add_argument('--group-sd-dist', default='halfcauchy',
+                   choices=('halfcauchy', 'halfnormal'),
+                   help="Group-SD prior family (halfnormal tames the funnel).")
     args = p.parse_args()
 
     # Resolve per-step defaults for init and memory model.
@@ -158,6 +161,7 @@ def main():
           f"{df.index.get_level_values('subject').nunique()} ===")
 
     model = build_model(df, args.step, memory_model, args.beta_mu_mean)
+    model.group_sd_dist = args.group_sd_dist
     model.build_estimation_model(data=df, hierarchical=True)
 
     sample_kwargs = dict(
@@ -190,6 +194,7 @@ def main():
 
     result = {
         'step': args.step, 'init': init, 'memory_model': memory_model,
+        'group_sd_dist': args.group_sd_dist,
         'target_accept': args.target_accept, 'backend': args.backend,
         'n_subjects': int(df.index.get_level_values('subject').nunique()),
         'n_trials': int(len(df)), 'beta_mu_mean': args.beta_mu_mean,
