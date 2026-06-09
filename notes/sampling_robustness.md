@@ -156,7 +156,19 @@ before the sv-DDM.
 `RiskLapseRegressionModel`, objective prior, `lapse_group='beta'` (default),
 dense_mass + mapjitter, `tune=1500–2000`, ta=0.95 → r̂ 1.01, ESS ~1000.
 
-**dyscalculic DDM — (pending full-scale validation):**
-`memory_model='shared_perceptual_noise'`, `fit_v_scale=False`, MAP-seeded
-Pathfinder, ta≈0.9 (final 0.95). 8-subject: r̂ 1.00, 0 div, ESS 2664.
-_66-subject + lapse + HalfNormal results: TBD (fits in flight)._
+**dyscalculic DDM — SETTLED (full 66-subject scale):**
+`DDMMagnitudeComparisonLapseRegressionModel`, **fixed `p_outlier=0.05`**
+(HSSM-style; NOT hierarchical), `memory_model='shared_perceptual_noise'`,
+`fit_v_scale=False`, **plain mapjitter init**, `tune=2000`, ta=0.99 (drop toward
+0.8 for speed). → **r̂ 1.00, 0 divergences, ESS 4264** at 66 subjects, ~51 min.
+
+The decisive finding: the plain DDM at 66 subjects does NOT converge
+(r̂ 1.53 HalfNormal / 2.42 HalfCauchy, ESS 5–33) — the slow-tail RTs bump the
+likelihood. Adding the **fixed contaminant** fixes it (r̂→1.00, ESS→4264); it's
+the same disease as the risk model (an unmodeled lapse), here on RT. Notes:
+- **Pathfinder is NOT needed** once the contaminant is in — mapjitter converges
+  identically (r̂ 1.00, ESS 4264 vs 3732). Keep Pathfinder as break-glass only.
+- The per-subject **hierarchical** `p_outlier` diverges (4000/4000) — use the
+  fixed scalar (HSSM default).
+- HalfNormal helped the *contaminant-free* DDM (r̂ 2.42→1.53) but is not needed
+  once the contaminant is present.
