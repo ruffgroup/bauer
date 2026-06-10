@@ -167,11 +167,13 @@ class RaceMixin:
     """
     advantage = True
     fit_w_s = True   # if False, ablate the OV/common-signal term (w_s ≡ 0)
-    # fit_w_d=False FIXES the discriminative gain w_d ≡ 1 (the race analog of
-    # pinning the DDM's v_scale=1): frees the encoding noise / boundary to set
-    # the scale and makes σ comparable across DDM/RDM (w_d↔σ are otherwise
-    # ~collinear, r≈0.8).
-    fit_w_d = True
+    # w_d is the discriminative gain -- the race analog of the DDM's v_scale.
+    # It is ~collinear with the encoding-noise scale (posterior r≈0.8): an
+    # unidentified ridge that wrecks NUTS mixing, exactly as a free v_scale does
+    # in the DDM. So as of 0.4.0 it is FIXED to 1 by default (mirroring the DDM's
+    # fit_v_scale=False). Set fit_w_d=True to estimate it -- only when your design
+    # identifies it (strong compression or an explicit accumulation-rate manipulation).
+    fit_w_d = False
 
     # See DDMMixin / BaseModel for rationale — race model has the same
     # multiplicative w_0 × tilde_μ structure (and w_d × tilde_diff when
@@ -558,7 +560,7 @@ class RaceDiffusionFlexibleNoiseComparisonModel(RaceLapseMixin, RaceMixin, Flexi
     def __init__(self, paradigm, fit_separate_evidence_sd=True,
                  fit_prior=True, spline_order=5,
                  memory_model='independent', advantage=True,
-                 flat_observer_prior=False, fit_w_s=True, fit_w_d=True):
+                 flat_observer_prior=False, fit_w_s=True, fit_w_d=False):
         self.advantage = advantage
         self.fit_w_s = fit_w_s
         self.fit_w_d = fit_w_d
@@ -730,7 +732,7 @@ class RaceDiffusionPowerLawNoiseComparisonModel(RaceLapseMixin, RaceMixin, Power
     def __init__(self, paradigm, fit_separate_evidence_sd=True,
                  fit_prior=False, memory_model='independent',
                  advantage=True, flat_observer_prior=False, fit_w_s=True,
-                 fit_w_d=True):
+                 fit_w_d=False):
         self.advantage = advantage
         self.fit_w_s = fit_w_s
         self.fit_w_d = fit_w_d

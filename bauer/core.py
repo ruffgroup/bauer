@@ -1299,7 +1299,15 @@ class RegressionModel(BaseModel):
 
     def build_design_matrix(self, data, parameter):
         if parameter not in self.regressors:
-            self.regressors[parameter] = '1'
+            # A random effect is per-subject scatter around a population mean,
+            # so a random term must live in the fixed design. If the user gave
+            # only random_regressors for this parameter, promote that design to
+            # the fixed design too -- e.g. random_regressors={p:'0 + C(group)'}
+            # alone => per-group means (fixed) + per-group SD (random).
+            if self.random_regressors and parameter in self.random_regressors:
+                self.regressors[parameter] = self.random_regressors[parameter]
+            else:
+                self.regressors[parameter] = '1'
 
         return dmatrix(self.regressors[parameter], data)
 
@@ -1324,25 +1332,42 @@ class RegressionModel(BaseModel):
                     f"column of its fixed design {fixed_names}. Random terms "
                     "must be a subset of the fixed design.")
             cols.append(fixed_names.index(nm))
-        # between-subjects guard: a random column constant within every subject
-        if 'subject' in getattr(data, 'columns', []) or (
-                hasattr(data, 'index') and 'subject' in getattr(data.index, 'names', [])):
-            subj = (data['subject'] if 'subject' in getattr(data, 'columns', [])
-                    else data.index.get_level_values('subject'))
-            arr = np.asarray(fixed_dm)
-            subj = np.asarray(subj)
-            for nm, j in zip(rand_names, cols):
-                within = pd.Series(arr[:, j]).groupby(subj).nunique()
-                if (within <= 1).all() and nm != 'Intercept':
-                    warnings.warn(
-                        f"random_regressors for {parameter!r} includes '{nm}', "
-                        "which is constant within subject (a between-subjects "
-                        "regressor). A per-subject random effect on it is "
-                        "non-identified for off-group subjects and makes the "
-                        "between-subject variance heteroscedastic. Put it only "
-                        "in fixed_regressors unless this is intended.",
-                        UserWarning, stacklevel=2)
         self._random_cols[parameter] = cols
+
+        has_subj = 'subject' in getattr(data, 'columns', []) or (
+            hasattr(data, 'index') and 'subject' in getattr(data.index, 'names', []))
+        if not has_subj:
+            return
+        subj = np.asarray(data['subject'] if 'subject' in getattr(data, 'columns', [])
+                          else data.index.get_level_values('subject'))
+        rand_arr = np.asarray(rand_dm)
+
+        # Cell-means partition (e.g. '0 + C(group)'): no Intercept, every row loads
+        # exactly one column. This is an INTENDED per-group random effect (own
+        # mean AND own between-subject SD), not the footgun, so skip the warning.
+        # (Each subject loads one group column; the offset on the other group's
+        # column is multiplied by 0 in the likelihood -- a harmless prior draw,
+        # not pruned, as it cannot bias the fit or open a funnel.)
+        is_partition = ('Intercept' not in rand_names and len(rand_names) > 1
+                        and np.allclose(rand_arr.sum(1), 1.0)
+                        and np.all(np.isin(rand_arr, [0.0, 1.0])))
+        if is_partition:
+            return
+
+        # between-subjects footgun: a random slope on a column constant within
+        # subject (e.g. legacy regressors={p:'group'}) is non-identified.
+        arr = np.asarray(fixed_dm)
+        for nm, j in zip(rand_names, cols):
+            within = pd.Series(arr[:, j]).groupby(subj).nunique()
+            if (within <= 1).all() and nm != 'Intercept':
+                warnings.warn(
+                    f"random_regressors for {parameter!r} includes '{nm}', "
+                    "which is constant within subject (a between-subjects "
+                    "regressor). A per-subject random effect on it is "
+                    "non-identified for off-group subjects and makes the "
+                    "between-subject variance heteroscedastic. Put it only "
+                    "in fixed_regressors unless this is intended.",
+                    UserWarning, stacklevel=2)
 
     def rebuild_design_matrix(self, paradigm, parameter):
         assert (hasattr(self, 'design_matrices')), 'Model needs to have design matrices as an attribute (model.design_matrices...) based on original data for rebuilding design matrices (HINT: use `.build_estimation_model()`)'
