@@ -914,10 +914,11 @@ class DDMMagnitudeComparisonRegressionModel(DDMLapseMixin, DDMMixin, MagnitudeCo
     'control'/'dyscalculia' column joined onto the trial dataframe).
     """
 
-    def __init__(self, paradigm, regressors, fit_prior=False,
+    def __init__(self, paradigm, regressors=None, fit_prior=False,
                  fit_separate_evidence_sd=None, memory_model='independent',
                  save_trialwise_estimates=False,
-                 fit_v_scale=False, fix_z=True, memory_as_sv=False):
+                 fit_v_scale=False, fix_z=True, memory_as_sv=False,
+                 fixed_regressors=None, random_regressors=None):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
         self.memory_as_sv = memory_as_sv
@@ -927,6 +928,8 @@ class DDMMagnitudeComparisonRegressionModel(DDMLapseMixin, DDMMixin, MagnitudeCo
             fit_separate_evidence_sd=fit_separate_evidence_sd,
             memory_model=memory_model,
             save_trialwise_estimates=save_trialwise_estimates,
+            fixed_regressors=fixed_regressors,
+            random_regressors=random_regressors,
         )
 
     def _get_drift(self, model_inputs, parameters):
