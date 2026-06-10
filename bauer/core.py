@@ -396,6 +396,7 @@ class BaseModel(object):
             passed in ``**kwargs``.
         **kwargs
             Forwarded to the underlying sampler. Notably:
+
             - pymc backend: ``init=`` (e.g. 'jitter+adapt_full' for dense
               mass adaptation), ``cores=``, ``random_seed=``.
             - JAX backends: ``nuts_kwargs={'dense_mass': True}``,
