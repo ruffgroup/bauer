@@ -132,6 +132,18 @@ def _sample_wald_race_2(v1, v2, sigma1, sigma2, a, t0, n_samples=1, rng=None):
     a = np.asarray(a, dtype=float).ravel()
     t0 = np.asarray(t0, dtype=float).ravel()
 
+    # Wald (inverse-Gaussian) requires a strictly positive mean (= a / v) and
+    # shape (= a^2 / sigma^2). The race likelihood already assumes v > 0; at
+    # poorly-mixed / extreme posterior draws the advantage drift can dip <= 0
+    # (or NaN), which would crash rng.wald. Floor drift and sigma to a small
+    # positive value so simulation is always defined — a near-zero-drift
+    # accumulator then simply (almost) never wins the race.
+    eps = 1e-6
+    v1 = np.maximum(np.nan_to_num(v1, nan=eps), eps)
+    v2 = np.maximum(np.nan_to_num(v2, nan=eps), eps)
+    sigma1 = np.maximum(np.nan_to_num(sigma1, nan=eps), eps)
+    sigma2 = np.maximum(np.nan_to_num(sigma2, nan=eps), eps)
+
     mu1 = a / v1
     mu2 = a / v2
     lam1 = a ** 2 / sigma1 ** 2
@@ -155,6 +167,10 @@ class RaceMixin:
     """
     advantage = True
     fit_w_s = True   # if False, ablate the OV/common-signal term (w_s ≡ 0)
+    fit_w_d = True   # if False, FIX the discriminative gain w_d ≡ 1 (the race
+                     # analog of pinning the DDM's v_scale=1). Frees the encoding
+                     # noise / boundary to set the scale and makes σ comparable
+                     # across DDM/RDM (w_d↔σ are otherwise ~collinear, r≈0.8).
 
     # See DDMMixin / BaseModel for rationale — race model has the same
     # multiplicative w_0 × tilde_μ structure (and w_d × tilde_diff when
@@ -168,8 +184,9 @@ class RaceMixin:
         pars['w_0'] = {'mu_intercept': inverse_softplus_np(2.5),
                        'sigma_intercept': 0.5, 'transform': 'softplus'}
         if self.advantage:
-            pars['w_d'] = {'mu_intercept': inverse_softplus_np(0.5),
-                           'sigma_intercept': 0.5, 'transform': 'softplus'}
+            if getattr(self, 'fit_w_d', True):
+                pars['w_d'] = {'mu_intercept': inverse_softplus_np(0.5),
+                               'sigma_intercept': 0.5, 'transform': 'softplus'}
             if self.fit_w_s:
                 pars['w_s'] = {'mu_intercept': 0.0,
                                'sigma_intercept': 0.5, 'transform': 'identity'}
@@ -310,9 +327,19 @@ class RaceMixin:
                 subjects = post.coords['subject'].values
                 par_dict = {name: post[name].isel(chain=ci, draw=di).values
                             for name in param_names}
-                pars_df = pd.DataFrame(par_dict, index=pd.Index(subjects, name='subject'))
-                sim = self.simulate(paradigm, pars_df, n_samples=inner_samples,
-                                    random_seed=int(rng.integers(0, 2**31 - 1)))
+                # Regression models carry 2D (subject x regressor) parameters;
+                # pass the dict straight through (pm.Data + the regression
+                # design matrix handle multi-dim). Only the plain
+                # (1D-per-subject) case is wrapped into a per-subject
+                # DataFrame, which would otherwise collapse 2D arrays. Mirrors
+                # the DDMMixin.ppc handling.
+                if any(np.asarray(v).ndim > 1 for v in par_dict.values()):
+                    sim = self.simulate(paradigm, par_dict, n_samples=inner_samples,
+                                        random_seed=int(rng.integers(0, 2**31 - 1)))
+                else:
+                    pars_df = pd.DataFrame(par_dict, index=pd.Index(subjects, name='subject'))
+                    sim = self.simulate(paradigm, pars_df, n_samples=inner_samples,
+                                        random_seed=int(rng.integers(0, 2**31 - 1)))
             else:
                 par_dict = {name: float(post[name].isel(chain=ci, draw=di).values)
                             for name in param_names}
@@ -443,12 +470,11 @@ class RaceDiffusionMagnitudeComparisonModel(RaceLapseMixin, RaceMixin, Magnitude
     def _get_drifts(self, model_inputs, parameters):
         return _drifts_from_post_and_prior(model_inputs, parameters,
                                            advantage=self.advantage,
-                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False),
-                                           fit_w_s=getattr(self, 'fit_w_s', True))
+                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 def _drifts_from_post_and_prior(model_inputs, parameters, advantage=True,
-                                flat_observer_prior=False, fit_w_s=True):
+                                flat_observer_prior=False):
     """Per-accumulator drifts under the generalized Bayesian race model.
 
     For risk front-ends (``p1, p2`` in model_inputs) the race operates on
@@ -498,12 +524,13 @@ def _drifts_from_post_and_prior(model_inputs, parameters, advantage=True,
     tilde_2 = post_n2_mu - mu_p2
     w0 = parameters['w_0']
     if advantage:
-        wd = parameters['w_d']
-        # When fit_w_s=False, ablate the common/OV signal: drift contains only
-        # the discriminative ΔV term, no Σ term. Useful as a control to test
-        # whether OV→behavior is fully accounted for by the common-signal
-        # mechanism, or whether σ(V) variation is also required.
-        ws = parameters['w_s'] if fit_w_s else 0.0
+        # Optional drift weights default to their identity/ablation value when
+        # not fit (get_free_parameters omits them per fit_w_d / fit_w_s): the
+        # discriminative gain w_d -> 1 (unit gain, the v_scale analog) and the
+        # common/OV signal w_s -> 0 (no Σ term). The drift just consumes
+        # whatever weights are present -- no fit_* flags threaded through here.
+        wd = parameters.get('w_d', 1.0)
+        ws = parameters.get('w_s', 0.0)
         diff = tilde_1 - tilde_2
         summ = tilde_1 + tilde_2
         v1 = w0 + wd * diff + ws * summ
@@ -530,9 +557,10 @@ class RaceDiffusionFlexibleNoiseComparisonModel(RaceLapseMixin, RaceMixin, Flexi
     def __init__(self, paradigm, fit_separate_evidence_sd=True,
                  fit_prior=True, spline_order=5,
                  memory_model='independent', advantage=True,
-                 flat_observer_prior=False, fit_w_s=True):
+                 flat_observer_prior=False, fit_w_s=True, fit_w_d=True):
         self.advantage = advantage
         self.fit_w_s = fit_w_s
+        self.fit_w_d = fit_w_d
         FlexibleNoiseComparisonModel.__init__(
             self, paradigm,
             fit_separate_evidence_sd=fit_separate_evidence_sd,
@@ -545,8 +573,7 @@ class RaceDiffusionFlexibleNoiseComparisonModel(RaceLapseMixin, RaceMixin, Flexi
     def _get_drifts(self, model_inputs, parameters):
         return _drifts_from_post_and_prior(model_inputs, parameters,
                                            advantage=self.advantage,
-                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False),
-                                           fit_w_s=getattr(self, 'fit_w_s', True))
+                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 class RaceDiffusionRiskModel(RaceLapseMixin, RaceMixin, RiskModel):
@@ -571,8 +598,7 @@ class RaceDiffusionRiskModel(RaceLapseMixin, RaceMixin, RiskModel):
     def _get_drifts(self, model_inputs, parameters):
         return _drifts_from_post_and_prior(model_inputs, parameters,
                                            advantage=self.advantage,
-                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False),
-                                           fit_w_s=getattr(self, 'fit_w_s', True))
+                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 class RaceDiffusionRiskRegressionModel(RaceLapseMixin, RaceMixin, RiskRegressionModel):
@@ -607,8 +633,7 @@ class RaceDiffusionRiskRegressionModel(RaceLapseMixin, RaceMixin, RiskRegression
     def _get_drifts(self, model_inputs, parameters):
         return _drifts_from_post_and_prior(model_inputs, parameters,
                                            advantage=self.advantage,
-                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False),
-                                           fit_w_s=getattr(self, 'fit_w_s', True))
+                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 class RaceDiffusionFlexibleNoiseRiskModel(RaceLapseMixin, RaceMixin, FlexibleNoiseRiskModel):
@@ -644,8 +669,7 @@ class RaceDiffusionFlexibleNoiseRiskModel(RaceLapseMixin, RaceMixin, FlexibleNoi
     def _get_drifts(self, model_inputs, parameters):
         return _drifts_from_post_and_prior(model_inputs, parameters,
                                            advantage=self.advantage,
-                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False),
-                                           fit_w_s=getattr(self, 'fit_w_s', True))
+                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 class RaceDiffusionFlexibleNoiseRiskRegressionModel(
@@ -686,8 +710,7 @@ class RaceDiffusionFlexibleNoiseRiskRegressionModel(
     def _get_drifts(self, model_inputs, parameters):
         return _drifts_from_post_and_prior(model_inputs, parameters,
                                            advantage=self.advantage,
-                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False),
-                                           fit_w_s=getattr(self, 'fit_w_s', True))
+                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 # ============================================================
@@ -705,9 +728,11 @@ class RaceDiffusionPowerLawNoiseComparisonModel(RaceLapseMixin, RaceMixin, Power
 
     def __init__(self, paradigm, fit_separate_evidence_sd=True,
                  fit_prior=False, memory_model='independent',
-                 advantage=True, flat_observer_prior=False, fit_w_s=True):
+                 advantage=True, flat_observer_prior=False, fit_w_s=True,
+                 fit_w_d=True):
         self.advantage = advantage
         self.fit_w_s = fit_w_s
+        self.fit_w_d = fit_w_d
         PowerLawNoiseComparisonModel.__init__(
             self, paradigm,
             fit_separate_evidence_sd=fit_separate_evidence_sd,
@@ -718,8 +743,7 @@ class RaceDiffusionPowerLawNoiseComparisonModel(RaceLapseMixin, RaceMixin, Power
     def _get_drifts(self, model_inputs, parameters):
         return _drifts_from_post_and_prior(model_inputs, parameters,
                                            advantage=self.advantage,
-                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False),
-                                           fit_w_s=getattr(self, 'fit_w_s', True))
+                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 class RaceDiffusionPowerLawNoiseComparisonRegressionModel(
@@ -745,8 +769,7 @@ class RaceDiffusionPowerLawNoiseComparisonRegressionModel(
     def _get_drifts(self, model_inputs, parameters):
         return _drifts_from_post_and_prior(model_inputs, parameters,
                                            advantage=self.advantage,
-                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False),
-                                           fit_w_s=getattr(self, 'fit_w_s', True))
+                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 class RaceDiffusionPowerLawNoiseRiskModel(RaceLapseMixin, RaceMixin, PowerLawNoiseRiskModel):
@@ -769,8 +792,7 @@ class RaceDiffusionPowerLawNoiseRiskModel(RaceLapseMixin, RaceMixin, PowerLawNoi
     def _get_drifts(self, model_inputs, parameters):
         return _drifts_from_post_and_prior(model_inputs, parameters,
                                            advantage=self.advantage,
-                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False),
-                                           fit_w_s=getattr(self, 'fit_w_s', True))
+                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
 class RaceDiffusionPowerLawNoiseRiskRegressionModel(
@@ -794,6 +816,4 @@ class RaceDiffusionPowerLawNoiseRiskRegressionModel(
     def _get_drifts(self, model_inputs, parameters):
         return _drifts_from_post_and_prior(model_inputs, parameters,
                                            advantage=self.advantage,
-                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False),
-                                           fit_w_s=getattr(self, 'fit_w_s', True))
-
+                                           flat_observer_prior=getattr(self, 'flat_observer_prior', False))
