@@ -167,10 +167,11 @@ class RaceMixin:
     """
     advantage = True
     fit_w_s = True   # if False, ablate the OV/common-signal term (w_s ≡ 0)
-    fit_w_d = True   # if False, FIX the discriminative gain w_d ≡ 1 (the race
-                     # analog of pinning the DDM's v_scale=1). Frees the encoding
-                     # noise / boundary to set the scale and makes σ comparable
-                     # across DDM/RDM (w_d↔σ are otherwise ~collinear, r≈0.8).
+    # fit_w_d=False FIXES the discriminative gain w_d ≡ 1 (the race analog of
+    # pinning the DDM's v_scale=1): frees the encoding noise / boundary to set
+    # the scale and makes σ comparable across DDM/RDM (w_d↔σ are otherwise
+    # ~collinear, r≈0.8).
+    fit_w_d = True
 
     # See DDMMixin / BaseModel for rationale — race model has the same
     # multiplicative w_0 × tilde_μ structure (and w_d × tilde_diff when

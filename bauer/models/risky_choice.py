@@ -7,8 +7,8 @@ from pymc.math import logit, invlogit
 from ..core import BaseModel, LapseModel, RegressionModel
 from ..utils.bayes import cumulative_normal, get_posterior, get_diff_dist
 from ..utils.math import inverse_softplus_np, softplus_np, inverse_softplus, logit_derivative, gaussian_pdf
-from ..utils.plotting import plot_prediction
 from .magnitude import FlexibleNoiseComparisonModel, PowerLawNoiseComparisonModel, PowerLawEncodingComparisonModel
+
 
 class RiskModelProbabilityDistortion(BaseModel):
     """Risky choice model with Bayesian distortion of magnitudes and/or probabilities.
