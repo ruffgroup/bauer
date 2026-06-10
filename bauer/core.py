@@ -50,11 +50,11 @@ def _translate_deprecated_kwargs(func):
     return wrapper
 
 
-def _group_sd_rv(name, scale, dist='halfcauchy', dims=None):
+def _group_sd_rv(name, scale, dist='halfnormal', dims=None):
     """Group-level SD prior for a hierarchical node.
 
-    ``'halfcauchy'`` (default, ``HalfCauchy(beta=scale)``) is bauer's historical
-    choice but has an infinite-variance heavy tail: a poorly-identified group SD
+    ``'halfcauchy'`` (``HalfCauchy(beta=scale)``) is bauer's historical pre-0.3.0
+    default but has an infinite-variance heavy tail: a poorly-identified group SD
     can wander to huge values, producing a funnel and divergences (seen e.g. on
     DDM noise components and near-0 lapse rates). ``'halfnormal'``
     (``HalfNormal(sigma=scale)``) has a light tail that tames the SD and removes
@@ -77,7 +77,11 @@ class BaseModel(object):
     # (default, historical) or 'halfnormal' (tamer tail; avoids the group-SD
     # funnel that drives divergences when between-subject variance is weakly
     # identified). See _group_sd_rv. Set per-instance/subclass to override.
-    group_sd_dist = 'halfcauchy'
+    # Group-level SD prior. Default 'halfnormal' (light tail) as of 0.3.0:
+    # HalfCauchy's infinite-variance tail let poorly-identified group SDs run
+    # away (funnel + divergences, e.g. the 66-subject DDM/RDM). Set to
+    # 'halfcauchy' per-instance to restore the pre-0.3.0 behaviour.
+    group_sd_dist = 'halfnormal'
 
     # Per-model-class hints for the NUTS sampler.
     #
@@ -896,7 +900,7 @@ class BaseModel(object):
             raise NotImplementedError
 
         group_sd = _group_sd_rv(f'{name}_sd', cauchy_sigma_intercept,
-                                getattr(self, 'group_sd_dist', 'halfcauchy'))
+                                getattr(self, 'group_sd_dist', 'halfnormal'))
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject',))
 
         if transform == 'identity':
@@ -1237,14 +1241,47 @@ class RTLapseMixin(object):
 
 class RegressionModel(BaseModel):
 
-    def __init__(self, regressors=None):
+    def __init__(self, regressors=None, fixed_regressors=None,
+                 random_regressors=None):
+        """Patsy-formula regression on model parameters (fixed/random split).
 
-        if regressors is None:
-            self.regressors = {}
-        else:
-            self.regressors = regressors
+        * ``fixed_regressors={param: formula}`` -- population-mean design (pure
+          fixed effects, e.g. a between-subjects ``'C(group)'`` contrast).
+        * ``random_regressors={param: formula}`` -- which terms ALSO carry a
+          per-subject random effect. Omitted -> default ``'1'`` (random
+          intercept only), the correct structure for between-subjects designs.
+          Random terms must be a subset of the fixed design's columns.
 
+        Legacy ``regressors=`` is DEPRECATED: it put a per-subject random effect
+        on *every* term (a spurious random slope on between-subjects contrasts).
+        Mapped to ``fixed_regressors = random_regressors = regressors`` (old
+        behaviour, bit-for-bit) with a DeprecationWarning.
+        """
+        if regressors is not None and (fixed_regressors is not None
+                                       or random_regressors is not None):
+            raise ValueError("Pass either the deprecated `regressors` OR "
+                             "`fixed_regressors`/`random_regressors`, not both.")
+
+        if regressors is not None:
+            warnings.warn(
+                "`regressors` is deprecated: it puts a per-subject random "
+                "effect on EVERY term (a random slope even on between-subjects "
+                "contrasts like group). Use `fixed_regressors` (population "
+                "means) + `random_regressors` (per-subject effects; default "
+                "intercept-only). Mapping regressors -> fixed_regressors = "
+                "random_regressors = regressors (preserves old behaviour).",
+                DeprecationWarning, stacklevel=2)
+            fixed_regressors = dict(regressors)
+            random_regressors = dict(regressors)
+
+        self.fixed_regressors = dict(fixed_regressors) if fixed_regressors else {}
+        self.random_regressors = (dict(random_regressors)
+                                  if random_regressors is not None else None)
+        # design matrices are built from the FIXED design; `regressors` kept as
+        # an alias so existing introspection (self.regressors[...]) still works.
+        self.regressors = self.fixed_regressors
         self.design_matrices = {}
+        self._random_cols = {}        # param -> indices of random cols in fixed design
 
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
         paradigm_ = super()._get_paradigm(paradigm, subject_mapping=subject_mapping)
@@ -1255,6 +1292,7 @@ class RegressionModel(BaseModel):
             dm = self.build_design_matrix(paradigm, key)
             self.design_matrices[key] = dm
             paradigm_[f'_dm_{key}'] = np.asarray(dm)
+            self._compute_random_cols(paradigm, key, dm)
 
         return paradigm_
 
@@ -1263,6 +1301,47 @@ class RegressionModel(BaseModel):
             self.regressors[parameter] = '1'
 
         return dmatrix(self.regressors[parameter], data)
+
+    def _random_formula(self, parameter):
+        """Random-effects formula for a parameter (default: intercept only)."""
+        if self.random_regressors is None:
+            return '1'
+        return self.random_regressors.get(parameter, '1')
+
+    def _compute_random_cols(self, data, parameter, fixed_dm):
+        """Indices of the fixed-design columns that carry a per-subject random
+        effect, per `random_regressors`. Validates subset + warns on a
+        between-subjects column given a random effect (the classic footgun)."""
+        fixed_names = list(fixed_dm.design_info.column_names)
+        rand_dm = dmatrix(self._random_formula(parameter), data)
+        rand_names = list(rand_dm.design_info.column_names)
+        cols = []
+        for nm in rand_names:
+            if nm not in fixed_names:
+                raise ValueError(
+                    f"random_regressors term '{nm}' for {parameter!r} is not a "
+                    f"column of its fixed design {fixed_names}. Random terms "
+                    "must be a subset of the fixed design.")
+            cols.append(fixed_names.index(nm))
+        # between-subjects guard: a random column constant within every subject
+        if 'subject' in getattr(data, 'columns', []) or (
+                hasattr(data, 'index') and 'subject' in getattr(data.index, 'names', [])):
+            subj = (data['subject'] if 'subject' in getattr(data, 'columns', [])
+                    else data.index.get_level_values('subject'))
+            arr = np.asarray(fixed_dm)
+            subj = np.asarray(subj)
+            for nm, j in zip(rand_names, cols):
+                within = pd.Series(arr[:, j]).groupby(subj).nunique()
+                if (within <= 1).all() and nm != 'Intercept':
+                    warnings.warn(
+                        f"random_regressors for {parameter!r} includes '{nm}', "
+                        "which is constant within subject (a between-subjects "
+                        "regressor). A per-subject random effect on it is "
+                        "non-identified for off-group subjects and makes the "
+                        "between-subject variance heteroscedastic. Put it only "
+                        "in fixed_regressors unless this is intended.",
+                        UserWarning, stacklevel=2)
+        self._random_cols[parameter] = cols
 
     def rebuild_design_matrix(self, paradigm, parameter):
         assert (hasattr(self, 'design_matrices')), 'Model needs to have design matrices as an attribute (model.design_matrices...) based on original data for rebuilding design matrices (HINT: use `.build_estimation_model()`)'
@@ -1391,12 +1470,42 @@ class RegressionModel(BaseModel):
                              sigma=sigma,
                              dims=(f'{name}_regressors',))
 
-        group_sd = _group_sd_rv(f'{name}_sd', cauchy_sigma,
-                                getattr(self, 'group_sd_dist', 'halfcauchy'),
-                                dims=(f'{name}_regressors',))
-        subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject', f'{name}_regressors'))
+        n_fixed = self.design_matrices[name].shape[1]
+        rcols = self._random_cols.get(name, list(range(n_fixed)))
 
-        return pm.Deterministic(name, group_mu + group_sd * subject_offset, dims=('subject', f'{name}_regressors'))
+        if list(rcols) == list(range(n_fixed)):
+            # Random effect on every column == legacy behaviour (deprecated
+            # `regressors`, or random_regressors mirroring the full design).
+            # Keep the exact old graph (names, dims, coords) bit-for-bit.
+            group_sd = _group_sd_rv(f'{name}_sd', cauchy_sigma,
+                                    getattr(self, 'group_sd_dist', 'halfnormal'),
+                                    dims=(f'{name}_regressors',))
+            subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1,
+                                       dims=('subject', f'{name}_regressors'))
+            return pm.Deterministic(name, group_mu + group_sd * subject_offset,
+                                    dims=('subject', f'{name}_regressors'))
+
+        # Random effect on a SUBSET of columns: build sd/offset only over the
+        # random columns (no non-identified nuisance dims) and scatter their
+        # contribution back onto the full coefficient vector, so downstream
+        # (get_trialwise_variable, ppc, subjectwise estimates) is unchanged.
+        col_names = list(self.design_matrices[name].design_info.column_names)
+        re_coord = f'{name}_re'
+        model.add_coord(re_coord, [col_names[i] for i in rcols])
+        cauchy_re = np.asarray(cauchy_sigma)[list(rcols)]
+        group_sd = _group_sd_rv(f'{name}_sd', cauchy_re,
+                                getattr(self, 'group_sd_dist', 'halfnormal'),
+                                dims=(re_coord,))
+        subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1,
+                                   dims=('subject', re_coord))
+        # one-hot scatter (n_random, n_fixed) mapping random cols -> full design
+        S = np.zeros((len(rcols), n_fixed))
+        for r, j in enumerate(rcols):
+            S[r, j] = 1.0
+        random_contrib = pt.dot(group_sd * subject_offset, S)   # (subject, n_fixed)
+        return pm.Deterministic(name, group_mu + random_contrib,
+                                dims=('subject', f'{name}_regressors'))
+
 
     def fit_map(self, filter_pars=True, **kwargs):
 

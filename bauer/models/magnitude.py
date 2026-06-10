@@ -177,10 +177,13 @@ class MagnitudeComparisonModel(BaseModel):
 class MagnitudeComparisonRegressionModel(RegressionModel, MagnitudeComparisonModel):
     """MagnitudeComparisonModel with patsy formula regression on noise/prior parameters."""
 
-    def __init__(self, paradigm, regressors, fit_prior=False,
+    def __init__(self, paradigm, regressors=None, fit_prior=False,
                  fit_separate_evidence_sd=None, memory_model='independent',
-                 save_trialwise_estimates=False):
-        RegressionModel.__init__(self, regressors)
+                 save_trialwise_estimates=False,
+                 fixed_regressors=None, random_regressors=None):
+        RegressionModel.__init__(self, regressors,
+                                 fixed_regressors=fixed_regressors,
+                                 random_regressors=random_regressors)
         MagnitudeComparisonModel.__init__(
             self, paradigm=paradigm, fit_prior=fit_prior,
             fit_separate_evidence_sd=fit_separate_evidence_sd,
