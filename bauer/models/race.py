@@ -155,6 +155,12 @@ class RaceMixin:
     """
     advantage = True
     fit_w_s = True   # if False, ablate the OV/common-signal term (w_s ≡ 0)
+    fit_w_d = True   # if False, FIX the discriminative gain w_d ≡ 1 (the race
+                     # analog of fixing the DDM's v_scale): w_d and the encoding
+                     # noise σ are otherwise ~collinear (r≈0.8), which stalls RDM
+                     # convergence (n1_evidence_sd r-hat blows up). Fixing w_d
+                     # lets σ/boundary set the scale and makes σ comparable to
+                     # the DDM. Validated in the dyscalculic project (rdm_nowd).
 
     # See DDMMixin / BaseModel for rationale — race model has the same
     # multiplicative w_0 × tilde_μ structure (and w_d × tilde_diff when
@@ -168,8 +174,9 @@ class RaceMixin:
         pars['w_0'] = {'mu_intercept': inverse_softplus_np(2.5),
                        'sigma_intercept': 0.5, 'transform': 'softplus'}
         if self.advantage:
-            pars['w_d'] = {'mu_intercept': inverse_softplus_np(0.5),
-                           'sigma_intercept': 0.5, 'transform': 'softplus'}
+            if getattr(self, 'fit_w_d', True):
+                pars['w_d'] = {'mu_intercept': inverse_softplus_np(0.5),
+                               'sigma_intercept': 0.5, 'transform': 'softplus'}
             if self.fit_w_s:
                 pars['w_s'] = {'mu_intercept': 0.0,
                                'sigma_intercept': 0.5, 'transform': 'identity'}
@@ -310,9 +317,20 @@ class RaceMixin:
                 subjects = post.coords['subject'].values
                 par_dict = {name: post[name].isel(chain=ci, draw=di).values
                             for name in param_names}
-                pars_df = pd.DataFrame(par_dict, index=pd.Index(subjects, name='subject'))
-                sim = self.simulate(paradigm, pars_df, n_samples=inner_samples,
-                                    random_seed=int(rng.integers(0, 2**31 - 1)))
+                # Regression models have 2D per-subject params (subject x
+                # regressor); pass the dict-of-arrays straight through (mirrors
+                # DDMMixin.ppc). Only the plain 1D-per-subject case wraps into a
+                # DataFrame, which would otherwise choke on the 2D arrays.
+                any_regression = any(np.asarray(v).ndim > 1
+                                     for v in par_dict.values())
+                if any_regression:
+                    sim = self.simulate(paradigm, par_dict, n_samples=inner_samples,
+                                        random_seed=int(rng.integers(0, 2**31 - 1)))
+                else:
+                    pars_df = pd.DataFrame(par_dict,
+                                           index=pd.Index(subjects, name='subject'))
+                    sim = self.simulate(paradigm, pars_df, n_samples=inner_samples,
+                                        random_seed=int(rng.integers(0, 2**31 - 1)))
             else:
                 par_dict = {name: float(post[name].isel(chain=ci, draw=di).values)
                             for name in param_names}
@@ -498,7 +516,9 @@ def _drifts_from_post_and_prior(model_inputs, parameters, advantage=True,
     tilde_2 = post_n2_mu - mu_p2
     w0 = parameters['w_0']
     if advantage:
-        wd = parameters['w_d']
+        # w_d defaults to 1.0 (unit gain, the v_scale analog) when fixed
+        # (get_free_parameters omits it under fit_w_d=False).
+        wd = parameters.get('w_d', 1.0)
         # When fit_w_s=False, ablate the common/OV signal: drift contains only
         # the discriminative ΔV term, no Σ term. Useful as a control to test
         # whether OV→behavior is fully accounted for by the common-signal
