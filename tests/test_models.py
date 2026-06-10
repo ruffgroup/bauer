@@ -189,15 +189,20 @@ def test_rdm_models_build(paradigm_magnitude, paradigm_risk, cls_name):
 
 
 @pytest.mark.parametrize('cls_name,kind', [
-    ('DDMMagnitudeComparisonLapseModel', 'magnitude'),
-    ('DDMRiskLapseModel', 'risk'),
-    ('RaceDiffusionMagnitudeComparisonLapseModel', 'magnitude'),
-    ('RaceDiffusionRiskLapseModel', 'risk'),
+    ('DDMMagnitudeComparisonModel', 'magnitude'),
+    ('DDMRiskModel', 'risk'),
+    ('RaceDiffusionMagnitudeComparisonModel', 'magnitude'),
+    ('RaceDiffusionRiskModel', 'risk'),
 ])
 def test_ddm_rdm_lapse_models_build(paradigm_magnitude, paradigm_risk,
                                     cls_name, kind):
-    """DDM/RDM lapse variants add a free ``p_outlier`` and build the RT-aware
-    contaminant-mixture likelihood without errors."""
+    """The base DDM/RDM models carry the RT-aware contaminant mixin. With a
+    *hierarchical* ``p_outlier`` they expose a free, logit-transformed outlier
+    rate and build the contaminant-mixture likelihood without errors.
+
+    0.3.0 removed the dedicated ``*Lapse*`` DDM/RDM classes: the contaminant is
+    now baked into the base classes (fixed ``p_outlier=0.05`` by default). Set
+    ``model.p_outlier='hierarchical'`` to estimate a per-subject rate."""
     if cls_name.startswith('DDM'):
         pytest.importorskip('hssm')
     import numpy as np
@@ -211,6 +216,10 @@ def test_ddm_rdm_lapse_models_build(paradigm_magnitude, paradigm_risk,
         kwargs = {'fit_separate_evidence_sd': True, 'fit_prior': True}
         m = Cls(paradigm=paradigm_magnitude, **kwargs)
         data = paradigm_magnitude
+    # Promote the fixed default p_outlier=0.05 to a free hierarchical rate.
+    m.p_outlier = 'hierarchical'
+    m.lapse_group = 'logit_normal'
+    m.free_parameters = m.get_free_parameters()
     try:
         m.build_estimation_model(data=data, hierarchical=True)
     except TypeError:
@@ -225,19 +234,26 @@ def test_ddm_rdm_lapse_models_build(paradigm_magnitude, paradigm_risk,
 
 
 @pytest.mark.parametrize('cls_name,kind', [
-    ('DDMMagnitudeComparisonLapseModel', 'magnitude'),
-    ('RaceDiffusionMagnitudeComparisonLapseModel', 'magnitude'),
+    ('DDMMagnitudeComparisonModel', 'magnitude'),
+    ('RaceDiffusionMagnitudeComparisonModel', 'magnitude'),
 ])
 def test_lapse_beta_group_prior_builds(paradigm_magnitude, cls_name, kind):
     """The ``lapse_group='beta'`` option replaces the logit-Normal group prior
     on ``p_outlier`` with a hierarchical Beta (group_mu + concentration kappa),
-    which removes the logit funnel on clean data."""
+    which removes the logit funnel on clean data.
+
+    In 0.3.0 ``lapse_group`` is a class/instance attribute (not a constructor
+    kwarg) and the contaminant only becomes a free parameter when
+    ``p_outlier='hierarchical'``."""
     if cls_name.startswith('DDM'):
         pytest.importorskip('hssm')
     import bauer.models as M
     Cls = getattr(M, cls_name)
     m = Cls(paradigm=paradigm_magnitude, fit_separate_evidence_sd=True,
-            fit_prior=True, lapse_group='beta')
+            fit_prior=True)
+    m.p_outlier = 'hierarchical'
+    m.lapse_group = 'beta'
+    m.free_parameters = m.get_free_parameters()
     assert m.free_parameters['p_outlier']['transform'] == 'beta'
     m.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
     nv = m.estimation_model.named_vars
@@ -398,3 +414,219 @@ def test_intercept_only_regression_matches_basic_priors(paradigm_magnitude):
             f'check the sigma_intercept default in '
             f'RegressionModel.build_hierarchical_nodes.'
         )
+
+
+# ===========================================================================
+# bauer 0.3.0 release coverage
+# ===========================================================================
+
+@pytest.fixture
+def paradigm_magnitude_group(paradigm_magnitude):
+    """`paradigm_magnitude` with a between-subjects ``group`` column.
+
+    Subjects 1,2 -> 'control'; subject 3 -> 'dyscalculia'. The label is
+    constant within subject (a true between-subjects contrast), so a random
+    *slope* on ``C(group)`` is non-identified — exactly the structure the
+    fixed/random split is designed to handle.
+    """
+    df = paradigm_magnitude.copy()
+    subj = df.index.get_level_values('subject')
+    df['group'] = np.where(subj == 3, 'dyscalculia', 'control')
+    return df
+
+
+def _sd_rv_distname(model, name):
+    """Name of the PyMC distribution backing the group-SD RV ``{name}_sd``.
+
+    The RV's op type is e.g. ``HalfNormalRV`` / ``HalfCauchyRV``; strip the
+    trailing ``RV`` so callers can compare against ``'HalfNormal'`` etc."""
+    rv = model.named_vars[f'{name}_sd']
+    opname = type(rv.owner.op).__name__
+    return opname[:-2] if opname.endswith('RV') else opname
+
+
+# --- 1. group_sd_dist default + override -----------------------------------
+
+def test_group_sd_dist_default_is_halfnormal(paradigm_magnitude):
+    """Default ``group_sd_dist == 'halfnormal'`` (0.3.0 changed it from
+    halfcauchy) and the built group-SD RV is a HalfNormal."""
+    from bauer.models import MagnitudeComparisonRegressionModel
+    m = MagnitudeComparisonRegressionModel(
+        paradigm=paradigm_magnitude, fit_separate_evidence_sd=True,
+        fit_prior=True, regressors={'n1_evidence_sd': '1'})
+    assert m.group_sd_dist == 'halfnormal'
+    m.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
+    assert _sd_rv_distname(m.estimation_model, 'n1_evidence_sd') == 'HalfNormal'
+
+
+def test_group_sd_dist_halfcauchy_override(paradigm_magnitude):
+    """``group_sd_dist='halfcauchy'`` (pre-0.3.0 behaviour) yields a HalfCauchy
+    group-SD RV."""
+    from bauer.models import MagnitudeComparisonRegressionModel
+    m = MagnitudeComparisonRegressionModel(
+        paradigm=paradigm_magnitude, fit_separate_evidence_sd=True,
+        fit_prior=True, regressors={'n1_evidence_sd': '1'})
+    m.group_sd_dist = 'halfcauchy'
+    m.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
+    assert _sd_rv_distname(m.estimation_model, 'n1_evidence_sd') == 'HalfCauchy'
+
+
+# --- 2. fixed_regressors / random_regressors API ---------------------------
+
+def test_regressors_kwarg_is_deprecated(paradigm_magnitude):
+    """The legacy ``regressors=`` keyword emits a DeprecationWarning."""
+    from bauer.models import MagnitudeComparisonRegressionModel
+    with pytest.warns(DeprecationWarning, match='regressors'):
+        MagnitudeComparisonRegressionModel(
+            paradigm=paradigm_magnitude, fit_separate_evidence_sd=True,
+            fit_prior=True, regressors={'n1_evidence_sd': '1'})
+
+
+def test_regressors_and_new_kwargs_mutually_exclusive(paradigm_magnitude):
+    """Passing both ``regressors`` and the new fixed/random kwargs raises."""
+    from bauer.models import MagnitudeComparisonRegressionModel
+    with pytest.raises(ValueError, match='regressors'):
+        MagnitudeComparisonRegressionModel(
+            paradigm=paradigm_magnitude, fit_separate_evidence_sd=True,
+            fit_prior=True,
+            regressors={'n1_evidence_sd': '1'},
+            fixed_regressors={'n1_evidence_sd': '1'})
+
+
+def test_legacy_regressors_is_full_random_slope(paradigm_magnitude_group):
+    """``regressors=`` maps bit-for-bit to a full random slope: the per-subject
+    ``*_offset`` spans EVERY fixed-design column (the legacy graph), i.e. it
+    includes the between-subjects group contrast."""
+    from bauer.models import MagnitudeComparisonRegressionModel
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        m = MagnitudeComparisonRegressionModel(
+            paradigm=paradigm_magnitude_group, fit_separate_evidence_sd=True,
+            fit_prior=True, regressors={'n1_evidence_sd': 'C(group)'})
+    m.build_estimation_model(data=paradigm_magnitude_group, hierarchical=True)
+    model = m.estimation_model
+    # Legacy path: offset dims == ('subject', '{name}_regressors'); the
+    # regressors coord carries both the Intercept and the group column.
+    offset_dims = model.named_vars_to_dims['n1_evidence_sd_offset']
+    assert 'n1_evidence_sd_regressors' in offset_dims
+    reg_coord = list(model.coords['n1_evidence_sd_regressors'])
+    assert any('Intercept' in c for c in reg_coord)
+    assert any('group' in c for c in reg_coord)
+    # No subset '_re' coord in the legacy full-slope path.
+    assert 'n1_evidence_sd_re' not in model.coords
+
+
+def test_fixed_random_split_drops_group_random_effect(paradigm_magnitude_group):
+    """``fixed_regressors={p:'C(group)'}`` + ``random_regressors={p:'1'}``:
+    the population-mean group contrast lives in the fixed design but carries NO
+    per-subject offset (its column is absent from the ``*_offset`` random
+    structure), while the intercept DOES."""
+    from bauer.models import MagnitudeComparisonRegressionModel
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        m = MagnitudeComparisonRegressionModel(
+            paradigm=paradigm_magnitude_group, fit_separate_evidence_sd=True,
+            fit_prior=True,
+            fixed_regressors={'n1_evidence_sd': 'C(group)'},
+            random_regressors={'n1_evidence_sd': '1'})
+    m.build_estimation_model(data=paradigm_magnitude_group, hierarchical=True)
+    model = m.estimation_model
+    # Fixed design (the group-mean coefficient vector) keeps both columns.
+    fixed_cols = list(model.coords['n1_evidence_sd_regressors'])
+    assert any('Intercept' in c for c in fixed_cols)
+    assert any('group' in c for c in fixed_cols)
+    # The random structure (subset path) spans only the Intercept; the
+    # between-subjects group column has NO per-subject offset.
+    re_cols = list(model.coords['n1_evidence_sd_re'])
+    assert any('Intercept' in c for c in re_cols)
+    assert not any('group' in c for c in re_cols)
+    # The offset RV is indexed by the subset coord, not the full design.
+    offset_dims = model.named_vars_to_dims['n1_evidence_sd_offset']
+    assert 'n1_evidence_sd_re' in offset_dims
+    assert 'n1_evidence_sd_regressors' not in offset_dims
+
+
+# --- 3. memory_as_sv composes with the contaminant -------------------------
+
+def test_memory_as_sv_composes_with_contaminant(paradigm_magnitude):
+    """``memory_as_sv=True`` (shared_perceptual_noise front-end) builds with the
+    default fixed contaminant (p_outlier=0.05): the graph exposes an ``sv`` node
+    AND the lapse-mixture ``ll`` node, and ``sv`` is finite & non-negative."""
+    pytest.importorskip('hssm')
+    from bauer.models import DDMMagnitudeComparisonModel
+    m = DDMMagnitudeComparisonModel(
+        paradigm=paradigm_magnitude, fit_separate_evidence_sd=True,
+        memory_model='shared_perceptual_noise', memory_as_sv=True)
+    # Default p_outlier is the FIXED 0.05 contaminant (not a free parameter).
+    assert m.p_outlier == 0.05
+    assert 'p_outlier' not in m.free_parameters
+    m.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
+    nv = m.estimation_model.named_vars
+    assert 'sv' in nv
+    assert 'll' in nv          # contaminant-mixture likelihood node
+    with m.estimation_model:
+        sv = nv['sv'].eval()
+    assert np.all(np.isfinite(sv))
+    assert np.all(sv >= 0)
+
+
+# --- 4. race fit_w_d / fit_w_s toggles -------------------------------------
+
+def test_race_fit_w_toggles(paradigm_magnitude):
+    """``fit_w_d=False`` removes ``w_d`` (fixes the discriminative gain to 1);
+    ``fit_w_s=False`` removes ``w_s``; defaults keep both."""
+    from bauer.models import RaceDiffusionMagnitudeComparisonModel
+
+    def free_pars(**toggles):
+        m = RaceDiffusionMagnitudeComparisonModel(
+            paradigm=paradigm_magnitude, fit_separate_evidence_sd=True,
+            fit_prior=True)
+        for k, v in toggles.items():
+            setattr(m, k, v)
+        return set(m.get_free_parameters())
+
+    both = free_pars()
+    assert 'w_d' in both and 'w_s' in both
+
+    no_wd = free_pars(fit_w_d=False)
+    assert 'w_d' not in no_wd and 'w_s' in no_wd
+
+    no_ws = free_pars(fit_w_s=False)
+    assert 'w_s' not in no_ws and 'w_d' in no_ws
+
+
+# --- 5. consistent_choice_noise --------------------------------------------
+
+def test_consistent_choice_noise_builds_and_differs(paradigm_magnitude):
+    """A static ``MagnitudeComparisonRegressionModel`` with
+    ``consistent_choice_noise=True`` builds and respects the flag, producing a
+    different choice log-likelihood than the default raw-evidence_sd
+    normalization on the same data."""
+    from bauer.models import MagnitudeComparisonRegressionModel
+
+    def build(consistent):
+        m = MagnitudeComparisonRegressionModel(
+            paradigm=paradigm_magnitude, fit_separate_evidence_sd=True,
+            fit_prior=True, regressors={'n1_evidence_sd': '1'})
+        m.consistent_choice_noise = consistent
+        m.build_estimation_model(data=paradigm_magnitude, hierarchical=True)
+        return m
+
+    m_default = build(False)
+    m_consistent = build(True)
+    assert m_consistent.consistent_choice_noise is True
+    assert m_default.consistent_choice_noise is False
+
+    # Evaluate each model's total logp at its initial point. The likelihoods
+    # differ because the choice noise is normalized differently.
+    def total_logp(m):
+        model = m.estimation_model
+        ip = model.initial_point()
+        return float(model.compile_logp()(ip))
+
+    lp_default = total_logp(m_default)
+    lp_consistent = total_logp(m_consistent)
+    assert np.isfinite(lp_default) and np.isfinite(lp_consistent)
+    assert not np.isclose(lp_default, lp_consistent), (
+        'consistent_choice_noise=True did not change the choice likelihood — '
+        'the flag is being ignored.')

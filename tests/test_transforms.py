@@ -78,6 +78,10 @@ def test_logistic_transform_roundtrip():
         'choice': [True, False, True, False],
     }).set_index(['subject', 'run', 'trial_nr'])
     m = RiskLapseModel(paradigm=df, prior_estimate='shared')
+    # As of 0.3.0 the default lapse group prior is Beta "1/x" (p_lapse -> 'beta'
+    # transform); opt into the logit-Normal prior to exercise the logistic path.
+    m.lapse_group = 'logit_normal'
+    m.free_parameters = m.get_free_parameters()
     assert m.free_parameters['p_lapse']['transform'] == 'logistic'
     p = np.array([0.02, 0.1, 0.5, 0.9])
     untrans = m.backward_transform(p, 'p_lapse')
