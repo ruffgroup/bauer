@@ -1250,5 +1250,3 @@ class DDMPowerLawNoiseRiskRegressionModel(DDMLapseMixin, DDMMixin, PowerLawNoise
         v_scale = parameters['v_scale'] if self.fit_v_scale else None
         return _drift_from_snr(model_inputs, v_scale=v_scale,
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
-
-

@@ -765,11 +765,11 @@ def _safe_vs_risky_drift(model_inputs, domain, v_scale=None):
     mu2 = pt.where(risky_first, mi["prior_mu_safe"], mi["prior_mu_risky"])
 
     sd1 = pt.where(risky_first, mi["prior_sd_risky"], mi["prior_sd_safe"])
-    
+
     sd2 = pt.where(risky_first, mi["prior_sd_safe"], mi["prior_sd_risky"])
 
     post1_mu, post1_sd = get_posterior(mu1, sd1, mi["logn1"], mi["ev_sd1"])
-    
+
     post2_mu, post2_sd = get_posterior(mu2, sd2, mi["logn2"], mi["ev_sd2"])
 
     risky_post = pt.where(risky_first, post1_mu, post2_mu)

@@ -1507,7 +1507,6 @@ class RegressionModel(BaseModel):
         return pm.Deterministic(name, group_mu + random_contrib,
                                 dims=('subject', f'{name}_regressors'))
 
-
     def fit_map(self, filter_pars=True, **kwargs):
 
         def convert_map(map_parameters):
