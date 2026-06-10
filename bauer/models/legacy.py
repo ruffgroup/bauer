@@ -13,6 +13,17 @@ import pytensor.tensor as pt
 from ..core import BaseModel, RegressionModel
 from ..utils.bayes import get_posterior, cumulative_normal
 
+# DDMMixin lives in .ddm, whose import is optional (needs the hssm/jax extras).
+# bauer.models.__init__ guards the .ddm import in a try/except, so legacy must
+# too: without this, `class DDMSafeVsRiskyModel(DDMMixin, ...)` below raises
+# NameError and makes the whole bauer.models package unimportable on any install
+# lacking the DDM extras. Fall back to `object` so legacy stays importable; the
+# DDM* legacy class is not re-exported and is only functional when ddm loads.
+try:
+    from .ddm import DDMMixin
+except Exception:
+    DDMMixin = object
+
 
 class SafeVsRiskyModel(BaseModel):
     """Bayesian observer model for risky choice between a safe and a risky option.

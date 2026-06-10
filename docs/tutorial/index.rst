@@ -11,3 +11,4 @@ Tutorials
    lesson5.ipynb
    lesson8.ipynb
    lesson9.ipynb
+   lesson10_fixed_vs_random_effects.ipynb

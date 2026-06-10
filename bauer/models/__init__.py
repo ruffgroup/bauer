@@ -26,6 +26,7 @@ from .risky_choice import (
 try:
     from .ddm import (
         DDMMixin,
+        DDMLapseMixin,
         DDMMagnitudeComparisonModel,
         DDMMagnitudeComparisonRegressionModel,
         DDMFlexibleNoiseComparisonModel,
@@ -50,6 +51,7 @@ from .legacy import (
 
 from .race import (
     RaceMixin,
+    RaceLapseMixin,
     RaceDiffusionMagnitudeComparisonModel,
     RaceDiffusionFlexibleNoiseComparisonModel,
     RaceDiffusionPowerLawNoiseComparisonModel,

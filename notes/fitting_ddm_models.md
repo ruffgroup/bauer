@@ -63,6 +63,16 @@ front-end (`prior_mu/sd`, `evidence_sd`), B-spline noise coefficients, lapse —
 with no per-parameter tuning. Pass `find_init=False` to turn it off, or your
 own `initvals` to override.
 
+**Pathfinder init (`find_init='pathfinder'`).** For especially nasty
+high-dimensional posteriors (e.g. a lapse/contaminant DDM on real data, or the
+`shared_perceptual_noise` σ_perc↔σ_mem ridge), MAP is the wrong centre — in high
+dimensions the mode is not in the typical set. `sample(find_init='pathfinder')`
+instead runs **multipath Pathfinder** (variational; `pymc_extras.inference.fit`)
+on the built model and seeds each chain from a distinct Pathfinder draw, so the
+chains warm up where the mass actually is. It's **opt-in** (the default stays
+`'mapjitter'`), needs `pymc_extras` (in `bauer_cuda`), and falls back to
+`'mapjitter'` with a warning if Pathfinder is unavailable or errors.
+
 For flexible-noise models, note the B-spline **basis is fixed at model
 construction from the paradigm** (not the fit data), so build the model with a
 paradigm that spans your stimulus range; the spline coefficients are defined
