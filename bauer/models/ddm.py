@@ -595,7 +595,18 @@ class DDMLapseMixin(RTLapseMixin):
             )
         model_inputs = self.get_model_inputs(parameters)
 
-        v = self._get_drift(model_inputs, parameters)
+        # memory_as_sv routes the frozen memory error into across-trial drift
+        # variability (sv), so the WFPT becomes the sv-aware variant. Compose
+        # that with the contaminant mixture below.
+        if self.memory_as_sv:
+            if logp_ddm_sdv is None:
+                raise ImportError(
+                    "memory_as_sv=True requires hssm.likelihoods.logp_ddm_sdv. "
+                    "Install/upgrade hssm.")
+            v, sv = self._get_drift_and_sv(model_inputs, parameters)
+            pm.Deterministic('sv', sv)
+        else:
+            v = self._get_drift(model_inputs, parameters)
         if save_p_choice:
             pm.Deterministic('drift', v)
 
@@ -606,12 +617,18 @@ class DDMLapseMixin(RTLapseMixin):
 
         observed = model['_rt_choice_data'].get_value()
 
-        def _logp(value, v_, a_, z_, t_, p_):
-            ll = logp_ddm(value, v_, a_, z_, t_)
-            return self._mix_with_lapse(ll, p_)
-
-        pm.CustomDist('ll', v, a, z, t0, p_outlier,
-                      logp=_logp, observed=observed)
+        if self.memory_as_sv:
+            def _logp(value, v_, a_, z_, t_, sv_, p_):
+                ll = logp_ddm_sdv(value, v_, a_, z_, t_, sv_)
+                return self._mix_with_lapse(ll, p_)
+            pm.CustomDist('ll', v, a, z, t0, sv, p_outlier,
+                          logp=_logp, observed=observed)
+        else:
+            def _logp(value, v_, a_, z_, t_, p_):
+                ll = logp_ddm(value, v_, a_, z_, t_)
+                return self._mix_with_lapse(ll, p_)
+            pm.CustomDist('ll', v, a, z, t0, p_outlier,
+                          logp=_logp, observed=observed)
 
     def build_loglik_model(self, paradigm, parameters):
         if isinstance(parameters, pd.DataFrame):
@@ -623,14 +640,19 @@ class DDMLapseMixin(RTLapseMixin):
                 pm.Data(key, value)
             params = self.get_parameter_values()
             model_inputs = self.get_model_inputs(params)
-            v = self._get_drift(model_inputs, params)
+            if self.memory_as_sv:
+                v, sv = self._get_drift_and_sv(model_inputs, params)
+            else:
+                v = self._get_drift(model_inputs, params)
             a, t0 = params['a'], params['t0']
             z = pt.constant(0.5) if self.fix_z else params['z']
             p_outlier = model_inputs['p_outlier']
             mc = pm.Model.get_context()
             signed = pt.switch(mc['choice'], 1.0, -1.0)
             data = pt.stack([mc['rt'], signed], axis=1)
-            per_trial = self._mix_with_lapse(logp_ddm(data, v, a, z, t0), p_outlier)
+            ll = (logp_ddm_sdv(data, v, a, z, t0, sv) if self.memory_as_sv
+                  else logp_ddm(data, v, a, z, t0))
+            per_trial = self._mix_with_lapse(ll, p_outlier)
             pm.Deterministic('per_trial_ll', per_trial)
 
     def _p_outlier_per_row(self, out_df, parameters):
