@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>bauer.utils.math - bauer 0.3.0 documentation</title>
+        <title>bauer.models.psychophysics - bauer 0.3.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -245,69 +245,99 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <h1>Source code for bauer.utils.math</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">pytensor.tensor</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pt</span>
+          <h1>Source code for bauer.models.psychophysics</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">..core</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">LapseModel</span><span class="p">,</span> <span class="n">RegressionModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..utils.bayes</span><span class="w"> </span><span class="kn">import</span> <span class="n">cumulative_normal</span><span class="p">,</span> <span class="n">get_diff_dist</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..utils.math</span><span class="w"> </span><span class="kn">import</span> <span class="n">inverse_softplus_np</span>
 
 
-<div class="viewcode-block" id="logistic">
-<a class="viewcode-back" href="../../../api_reference.html#bauer.utils.math.logistic">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">logistic</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
-    <span class="k">return</span> <span class="mf">1.</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">+</span> <span class="n">pt</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">x</span><span class="p">))</span></div>
+<div class="viewcode-block" id="PsychophysicalModel">
+<a class="viewcode-back" href="../../../api_reference.html#bauer.models.PsychophysicalModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PsychophysicalModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Psychophysical model for two-alternative forced choice with a sensitivity and bias parameter.</span>
 
+<span class="sd">    Parameters ``nu`` (discrimination sensitivity, softplus-transformed) and ``bias``</span>
+<span class="sd">    (decision criterion) describe the probability of choosing option 2 given stimuli x1 and x2.</span>
+<span class="sd">    Paradigm requires columns ``x1``, ``x2``, and ``choice``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
+    <span class="n">paradigm_keys</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;x1&#39;</span><span class="p">,</span> <span class="s1">&#39;x2&#39;</span><span class="p">]</span>
+    <span class="n">base_parameters</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;nu&#39;</span><span class="p">,</span> <span class="s1">&#39;bias&#39;</span><span class="p">]</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">inverse_softplus</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-</span> <span class="mf">1.</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">paradigm</span><span class="p">)</span>
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_free_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;nu&#39;</span><span class="p">:</span>   <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">inverse_softplus_np</span><span class="p">(</span><span class="mf">1.</span><span class="p">),</span> <span class="s1">&#39;sigma_intercept&#39;</span><span class="p">:</span> <span class="mf">10.</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;softplus&#39;</span><span class="p">},</span>
+            <span class="s1">&#39;bias&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>                       <span class="s1">&#39;sigma_intercept&#39;</span><span class="p">:</span> <span class="mf">10.</span><span class="p">,</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;identity&#39;</span><span class="p">},</span>
+        <span class="p">}</span>
 
-<div class="viewcode-block" id="softplus_np">
-<a class="viewcode-back" href="../../../api_reference.html#bauer.utils.math.softplus_np">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">softplus_np</span><span class="p">(</span><span class="n">x</span><span class="p">):</span> <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">x</span><span class="p">)))</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span></div>
-
-
-
-<div class="viewcode-block" id="inverse_softplus_np">
-<a class="viewcode-back" href="../../../api_reference.html#bauer.utils.math.inverse_softplus_np">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">inverse_softplus_np</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-</span> <span class="mf">1.</span><span class="p">)</span></div>
-
-
-
-<div class="viewcode-block" id="logistic_np">
-<a class="viewcode-back" href="../../../api_reference.html#bauer.utils.math.logistic_np">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">logistic_np</span><span class="p">(</span><span class="n">x</span><span class="p">):</span> <span class="k">return</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">x</span><span class="p">))</span></div>
-
-
-
-<div class="viewcode-block" id="logit_np">
-<a class="viewcode-back" href="../../../api_reference.html#bauer.utils.math.logit_np">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">logit_np</span><span class="p">(</span><span class="n">p</span><span class="p">):</span> <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">p</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">))</span></div>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_choice_predictions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_inputs</span><span class="p">):</span>
+        <span class="n">mu1</span><span class="p">,</span> <span class="n">mu2</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;x1&#39;</span><span class="p">],</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;x2&#39;</span><span class="p">]</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;nu&#39;</span><span class="p">]</span>
+        <span class="n">diff_mu</span><span class="p">,</span> <span class="n">diff_sd</span> <span class="o">=</span> <span class="n">get_diff_dist</span><span class="p">(</span><span class="n">mu2</span><span class="p">,</span> <span class="n">sd</span><span class="p">,</span> <span class="n">mu1</span><span class="p">,</span> <span class="n">sd</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cumulative_normal</span><span class="p">(</span><span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;bias&#39;</span><span class="p">],</span> <span class="n">diff_mu</span><span class="p">,</span> <span class="n">diff_sd</span><span class="p">)</span></div>
 
 
 
-<div class="viewcode-block" id="logit">
-<a class="viewcode-back" href="../../../api_reference.html#bauer.utils.math.logit">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">logit</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">p</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="p">))</span></div>
+<div class="viewcode-block" id="PsychophysicalLapseModel">
+<a class="viewcode-back" href="../../../api_reference.html#bauer.models.PsychophysicalLapseModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PsychophysicalLapseModel</span><span class="p">(</span><span class="n">LapseModel</span><span class="p">,</span> <span class="n">PsychophysicalModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;PsychophysicalModel extended with a lapse rate parameter.&quot;&quot;&quot;</span>
+    <span class="o">...</span></div>
 
 
 
-<div class="viewcode-block" id="logit_derivative">
-<a class="viewcode-back" href="../../../api_reference.html#bauer.utils.math.logit_derivative">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">logit_derivative</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
-    <span class="k">return</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="n">p</span> <span class="o">-</span> <span class="n">p</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span></div>
+<div class="viewcode-block" id="PsychophysicalRegressionModel">
+<a class="viewcode-back" href="../../../api_reference.html#bauer.models.PsychophysicalRegressionModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PsychophysicalRegressionModel</span><span class="p">(</span><span class="n">RegressionModel</span><span class="p">,</span> <span class="n">PsychophysicalModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;PsychophysicalModel with patsy formula regression on nu and/or bias.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">regressors</span><span class="p">,</span> <span class="n">save_trialwise_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">RegressionModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="p">)</span>
+        <span class="n">PsychophysicalModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">)</span></div>
 
 
 
-<div class="viewcode-block" id="gaussian_pdf">
-<a class="viewcode-back" href="../../../api_reference.html#bauer.utils.math.gaussian_pdf">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">gaussian_pdf</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">mean</span><span class="p">,</span> <span class="n">std</span><span class="p">):</span>
-    <span class="n">variance</span> <span class="o">=</span> <span class="n">std</span><span class="o">**</span><span class="mi">2</span>
-    <span class="n">exponent</span> <span class="o">=</span> <span class="o">-</span><span class="p">((</span><span class="n">x</span> <span class="o">-</span> <span class="n">mean</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">variance</span><span class="p">)</span>
-    <span class="n">normalization</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="n">std</span> <span class="o">*</span> <span class="n">pt</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">))</span>
-    <span class="k">return</span> <span class="n">normalization</span> <span class="o">*</span> <span class="n">pt</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">exponent</span><span class="p">)</span></div>
+<div class="viewcode-block" id="PsychophysicalLapseRegressionModel">
+<a class="viewcode-back" href="../../../api_reference.html#bauer.models.PsychophysicalLapseRegressionModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PsychophysicalLapseRegressionModel</span><span class="p">(</span><span class="n">LapseModel</span><span class="p">,</span> <span class="n">PsychophysicalRegressionModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;PsychophysicalModel with both a lapse rate and patsy formula regression.&quot;&quot;&quot;</span>
+    <span class="o">...</span></div>
 
+
+
+<span class="c1"># ─── Deprecated aliases ───────────────────────────────────────────────────────</span>
+<span class="c1"># The old &quot;Psychometric*&quot; names are kept as subclasses so existing code keeps</span>
+<span class="c1"># working; using them emits a ``DeprecationWarning``. Prefer the</span>
+<span class="c1"># ``Psychophysical*`` names in new code.</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_deprecated_alias</span><span class="p">(</span><span class="n">old_cls</span><span class="p">,</span> <span class="n">new_cls</span><span class="p">):</span>
+    <span class="k">class</span><span class="w"> </span><span class="nc">_Aliased</span><span class="p">(</span><span class="n">new_cls</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">old_cls</span><span class="si">}</span><span class="s1"> is a deprecated alias for </span><span class="si">{</span><span class="n">new_cls</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s1">; &#39;</span>
+                <span class="sa">f</span><span class="s1">&#39;use </span><span class="si">{</span><span class="n">new_cls</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s1"> instead.&#39;</span><span class="p">,</span>
+                <span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="n">_Aliased</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">=</span> <span class="n">old_cls</span>
+    <span class="n">_Aliased</span><span class="o">.</span><span class="vm">__qualname__</span> <span class="o">=</span> <span class="n">old_cls</span>
+    <span class="n">_Aliased</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="sa">f</span><span class="s1">&#39;Deprecated alias for :class:`</span><span class="si">{</span><span class="n">new_cls</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s1">`.</span><span class="se">\n\n</span><span class="s1">&#39;</span>
+        <span class="sa">f</span><span class="s1">&#39;Will be removed in a future release. Use ``</span><span class="si">{</span><span class="n">new_cls</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s1">``.&#39;</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">_Aliased</span>
+
+
+<span class="n">PsychometricModel</span> <span class="o">=</span> <span class="n">_deprecated_alias</span><span class="p">(</span><span class="s1">&#39;PsychometricModel&#39;</span><span class="p">,</span> <span class="n">PsychophysicalModel</span><span class="p">)</span>
+<span class="n">PsychometricLapseModel</span> <span class="o">=</span> <span class="n">_deprecated_alias</span><span class="p">(</span><span class="s1">&#39;PsychometricLapseModel&#39;</span><span class="p">,</span> <span class="n">PsychophysicalLapseModel</span><span class="p">)</span>
+<span class="n">PsychometricRegressionModel</span> <span class="o">=</span> <span class="n">_deprecated_alias</span><span class="p">(</span><span class="s1">&#39;PsychometricRegressionModel&#39;</span><span class="p">,</span> <span class="n">PsychophysicalRegressionModel</span><span class="p">)</span>
+<span class="n">PsychometricLapseRegressionModel</span> <span class="o">=</span> <span class="n">_deprecated_alias</span><span class="p">(</span><span class="s1">&#39;PsychometricLapseRegressionModel&#39;</span><span class="p">,</span>
+                                                     <span class="n">PsychophysicalLapseRegressionModel</span><span class="p">)</span>
 </pre></div>
         </article>
       </div>

@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>bauer.core - bauer 0.2.0 documentation</title>
+        <title>bauer.core - bauer 0.3.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -160,7 +160,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../index.html"><div class="brand">bauer 0.2.0 documentation</div></a>
+      <a href="../../index.html"><div class="brand">bauer 0.3.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -181,7 +181,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.2.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.3.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -204,12 +204,15 @@
 <li class="toctree-l2"><a class="reference internal" href="../../tutorial/lesson5.html">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../tutorial/lesson8.html">Lesson 8: DDM vs probit on the Garcia magnitude task</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../tutorial/lesson9.html">Lesson 9: Choice + Reaction Time Models — DDM and Race-Diffusion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorial/lesson10_fixed_vs_random_effects.html">Lesson 10: Fixed vs random effects (<code class="docutils literal notranslate"><span class="pre">fixed_regressors</span></code> / <code class="docutils literal notranslate"><span class="pre">random_regressors</span></code>)</a></li>
 </ul>
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Reference</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../api_reference.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../history.html">History</a></li>
 </ul>
 
 </div>
@@ -248,7 +251,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pymc</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pm</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">.utils.bayes</span><span class="w"> </span><span class="kn">import</span> <span class="n">cumulative_normal</span><span class="p">,</span> <span class="n">get_diff_dist</span><span class="p">,</span> <span class="n">get_posterior</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.utils.bayes</span><span class="w"> </span><span class="kn">import</span> <span class="n">cumulative_normal</span><span class="p">,</span> <span class="n">get_diff_dist</span><span class="p">,</span> <span class="n">get_posterior</span><span class="p">,</span> <span class="n">posterior_mean_sd</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">.utils.math</span><span class="w"> </span><span class="kn">import</span> <span class="n">logistic</span><span class="p">,</span> <span class="n">softplus_np</span><span class="p">,</span> <span class="n">logistic_np</span><span class="p">,</span> <span class="n">logit_np</span><span class="p">,</span> <span class="n">inverse_softplus_np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pytensor.tensor</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pt</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">patsy</span><span class="w"> </span><span class="kn">import</span> <span class="n">dmatrix</span><span class="p">,</span> <span class="n">build_design_matrices</span>
@@ -295,11 +298,40 @@
     <span class="k">return</span> <span class="n">wrapper</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_group_sd_rv</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">scale</span><span class="p">,</span> <span class="n">dist</span><span class="o">=</span><span class="s1">&#39;halfnormal&#39;</span><span class="p">,</span> <span class="n">dims</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Group-level SD prior for a hierarchical node.</span>
+
+<span class="sd">    ``&#39;halfcauchy&#39;`` (``HalfCauchy(beta=scale)``) is bauer&#39;s historical pre-0.3.0</span>
+<span class="sd">    default but has an infinite-variance heavy tail: a poorly-identified group SD</span>
+<span class="sd">    can wander to huge values, producing a funnel and divergences (seen e.g. on</span>
+<span class="sd">    DDM noise components and near-0 lapse rates). ``&#39;halfnormal&#39;``</span>
+<span class="sd">    (``HalfNormal(sigma=scale)``) has a light tail that tames the SD and removes</span>
+<span class="sd">    that pathology, at the cost of mild over-shrinkage if true between-subject</span>
+<span class="sd">    heterogeneity is large.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">dist</span> <span class="o">==</span> <span class="s1">&#39;halfnormal&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">pm</span><span class="o">.</span><span class="n">HalfNormal</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="n">scale</span><span class="p">,</span> <span class="n">dims</span><span class="o">=</span><span class="n">dims</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">dist</span> <span class="o">==</span> <span class="s1">&#39;halfcauchy&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">pm</span><span class="o">.</span><span class="n">HalfCauchy</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">scale</span><span class="p">,</span> <span class="n">dims</span><span class="o">=</span><span class="n">dims</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;group_sd_dist must be &#39;halfcauchy&#39; or &#39;halfnormal&#39;, got </span><span class="si">{</span><span class="n">dist</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
 <div class="viewcode-block" id="BaseModel">
 <a class="viewcode-back" href="../../api_reference.html#bauer.core.BaseModel">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">BaseModel</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
 
     <span class="n">paradigm_keys</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Group-level SD prior family for hierarchical nodes: &#39;halfcauchy&#39;</span>
+    <span class="c1"># (default, historical) or &#39;halfnormal&#39; (tamer tail; avoids the group-SD</span>
+    <span class="c1"># funnel that drives divergences when between-subject variance is weakly</span>
+    <span class="c1"># identified). See _group_sd_rv. Set per-instance/subclass to override.</span>
+    <span class="c1"># Group-level SD prior. Default &#39;halfnormal&#39; (light tail) as of 0.3.0:</span>
+    <span class="c1"># HalfCauchy&#39;s infinite-variance tail let poorly-identified group SDs run</span>
+    <span class="c1"># away (funnel + divergences, e.g. the 66-subject DDM/RDM). Set to</span>
+    <span class="c1"># &#39;halfcauchy&#39; per-instance to restore the pre-0.3.0 behaviour.</span>
+    <span class="n">group_sd_dist</span> <span class="o">=</span> <span class="s1">&#39;halfnormal&#39;</span>
 
     <span class="c1"># Per-model-class hints for the NUTS sampler.</span>
     <span class="c1">#</span>
@@ -326,6 +358,11 @@
     <span class="c1"># (verified: vectorized regression-DDM converges ~1/7 seeds without it).</span>
     <span class="c1"># ``None`` = use the backend&#39;s default init.</span>
     <span class="n">recommended_init</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1"># KLW-consistent posterior-mean-SD choice noise: the static choice</span>
+    <span class="c1"># likelihood normalizes by the SD of the noisy posterior mean (w*sigma_e),</span>
+    <span class="c1"># not the raw evidence SD. Default False keeps the historical behaviour;</span>
+    <span class="c1"># accumulators (DDM/RDM) already use posterior_mean_sd internally.</span>
+    <span class="n">consistent_choice_noise</span> <span class="o">=</span> <span class="kc">False</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__init_subclass__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init_subclass__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
@@ -392,7 +429,16 @@
                                           <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_mu&#39;</span><span class="p">],</span>
                                           <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">])</span>
 
-        <span class="n">diff_mu</span><span class="p">,</span> <span class="n">diff_sd</span> <span class="o">=</span> <span class="n">get_diff_dist</span><span class="p">(</span><span class="n">post_n2_mu</span><span class="p">,</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">],</span> <span class="n">post_n1_mu</span><span class="p">,</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">])</span>
+        <span class="c1"># KLW-consistent noise: the decision variable is the noisy posterior</span>
+        <span class="c1"># mean (mu_hat = w*r), whose across-trial SD is w*sigma_e</span>
+        <span class="c1"># (posterior_mean_sd), not the raw evidence SD. Default keeps the</span>
+        <span class="c1"># historical raw-evidence_sd normalization (back-compat).</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;consistent_choice_noise&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;flat_observer_prior&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">sd1</span> <span class="o">=</span> <span class="n">posterior_mean_sd</span><span class="p">(</span><span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_prior_sd&#39;</span><span class="p">],</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">])</span>
+            <span class="n">sd2</span> <span class="o">=</span> <span class="n">posterior_mean_sd</span><span class="p">(</span><span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_prior_sd&#39;</span><span class="p">],</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sd1</span><span class="p">,</span> <span class="n">sd2</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n1_evidence_sd&#39;</span><span class="p">],</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;n2_evidence_sd&#39;</span><span class="p">]</span>
+        <span class="n">diff_mu</span><span class="p">,</span> <span class="n">diff_sd</span> <span class="o">=</span> <span class="n">get_diff_dist</span><span class="p">(</span><span class="n">post_n2_mu</span><span class="p">,</span> <span class="n">sd2</span><span class="p">,</span> <span class="n">post_n1_mu</span><span class="p">,</span> <span class="n">sd1</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">save_trialwise_n_estimates</span><span class="p">:</span>
             <span class="n">pm</span><span class="o">.</span><span class="n">Deterministic</span><span class="p">(</span><span class="s1">&#39;n1_hat&#39;</span><span class="p">,</span> <span class="n">post_n1_mu</span><span class="p">)</span>
@@ -457,7 +503,8 @@
             <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">free_parameters</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">build_prior</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">flat_prior</span><span class="o">=</span><span class="n">flat_prior</span><span class="p">,</span> <span class="o">**</span><span class="n">info</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">build_prior</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">mu_intercept</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sigma_intercept</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="s1">&#39;identity&#39;</span><span class="p">,</span> <span class="n">flat_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_prior</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">mu_intercept</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sigma_intercept</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="s1">&#39;identity&#39;</span><span class="p">,</span>
+                    <span class="n">flat_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">beta_mu_mean</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">beta_mu_kappa</span><span class="o">=</span><span class="mf">8.0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 
         <span class="n">model</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span>
 
@@ -468,10 +515,19 @@
                 <span class="n">pm</span><span class="o">.</span><span class="n">Flat</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
             <span class="k">elif</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;softplus&#39;</span><span class="p">:</span>
                 <span class="n">pm</span><span class="o">.</span><span class="n">HalfFlat</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
-            <span class="k">elif</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;logistic&#39;</span><span class="p">:</span>
+            <span class="k">elif</span> <span class="n">transform</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;logistic&#39;</span><span class="p">,</span> <span class="s1">&#39;beta&#39;</span><span class="p">):</span>
                 <span class="n">pm</span><span class="o">.</span><span class="n">Uniform</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">lower</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;beta&#39;</span><span class="p">:</span>
+            <span class="c1"># Single-subject Beta prior with the same small-mean / heavy-tail</span>
+            <span class="c1"># shape used by the hierarchical &#39;beta&#39; group prior (see</span>
+            <span class="c1"># build_hierarchical_nodes). Concentration = beta_mu_kappa.</span>
+            <span class="n">a0</span> <span class="o">=</span> <span class="n">beta_mu_mean</span> <span class="o">*</span> <span class="n">beta_mu_kappa</span>
+            <span class="n">b0</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">beta_mu_mean</span><span class="p">)</span> <span class="o">*</span> <span class="n">beta_mu_kappa</span>
+            <span class="n">pm</span><span class="o">.</span><span class="n">Beta</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">a0</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">b0</span><span class="p">)</span>
             <span class="k">return</span>
 
         <span class="k">if</span> <span class="n">mu_intercept</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -581,8 +637,18 @@
 <span class="sd">            divergences persist.</span>
 <span class="sd">        draws, tune : int</span>
 <span class="sd">            Posterior and warmup draws per chain.</span>
+<span class="sd">        find_init : {None, &#39;mapjitter&#39;, &#39;priorjitter&#39;, &#39;pathfinder&#39;}</span>
+<span class="sd">            Starting-point strategy. ``None`` uses the class default</span>
+<span class="sd">            (``recommended_init``; ``&#39;mapjitter&#39;`` for DDM/Race). ``&#39;mapjitter&#39;``</span>
+<span class="sd">            = MAP centre + prior-scaled jitter; ``&#39;priorjitter&#39;`` = prior-central</span>
+<span class="sd">            centre + jitter; ``&#39;pathfinder&#39;`` = seed each chain from a multipath</span>
+<span class="sd">            Pathfinder draw (variational; lands in the typical set — best for</span>
+<span class="sd">            nasty high-dimensional DDM geometries, needs ``pymc_extras``, falls</span>
+<span class="sd">            back to ``&#39;mapjitter&#39;`` if unavailable). Ignored if ``initvals`` is</span>
+<span class="sd">            passed in ``**kwargs``.</span>
 <span class="sd">        **kwargs</span>
 <span class="sd">            Forwarded to the underlying sampler. Notably:</span>
+
 <span class="sd">            - pymc backend: ``init=`` (e.g. &#39;jitter+adapt_full&#39; for dense</span>
 <span class="sd">              mass adaptation), ``cores=``, ``random_seed=``.</span>
 <span class="sd">            - JAX backends: ``nuts_kwargs={&#39;dense_mass&#39;: True}``,</span>
@@ -602,13 +668,24 @@
         <span class="c1"># instead of relying on the backend&#39;s generic jitter init. This is</span>
         <span class="c1"># what stops hard DDM/regression posteriors from being a seed</span>
         <span class="c1"># lottery. Skipped if the user supplied their own ``initvals``.</span>
+        <span class="c1">#</span>
+        <span class="c1"># ``find_init=&#39;pathfinder&#39;`` runs multipath Pathfinder (variational;</span>
+        <span class="c1"># lands in the typical set rather than at the MAP mode) and seeds each</span>
+        <span class="c1"># chain from a distinct Pathfinder draw — the right lever for nasty</span>
+        <span class="c1"># high-dimensional DDM geometries where MAP is the wrong target. See</span>
+        <span class="c1"># get_initial_points / _pathfinder_initial_points.</span>
         <span class="k">if</span> <span class="n">find_init</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">find_init</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">recommended_init</span>
         <span class="k">if</span> <span class="n">find_init</span> <span class="ow">and</span> <span class="s1">&#39;initvals&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
             <span class="n">seed</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;random_seed&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-            <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;initvals&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_initial_points</span><span class="p">(</span>
-                <span class="n">chains</span><span class="o">=</span><span class="n">chains</span><span class="p">,</span> <span class="n">use_map</span><span class="o">=</span><span class="p">(</span><span class="n">find_init</span> <span class="o">!=</span> <span class="s1">&#39;priorjitter&#39;</span><span class="p">),</span>
-                <span class="n">seed</span><span class="o">=</span><span class="n">seed</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">seed</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="n">seed</span> <span class="o">=</span> <span class="n">seed</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">seed</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">find_init</span> <span class="o">==</span> <span class="s1">&#39;pathfinder&#39;</span><span class="p">:</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;initvals&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pathfinder_initial_points</span><span class="p">(</span>
+                    <span class="n">chains</span><span class="o">=</span><span class="n">chains</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;initvals&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_initial_points</span><span class="p">(</span>
+                    <span class="n">chains</span><span class="o">=</span><span class="n">chains</span><span class="p">,</span> <span class="n">use_map</span><span class="o">=</span><span class="p">(</span><span class="n">find_init</span> <span class="o">!=</span> <span class="s1">&#39;priorjitter&#39;</span><span class="p">),</span>
+                    <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s1">&#39;pymc&#39;</span><span class="p">:</span>
             <span class="c1"># When we supply our own dispersed initvals, avoid a jitter-adding</span>
@@ -707,6 +784,153 @@
             <span class="n">points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pt</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">points</span></div>
 
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_pathfinder_initial_points</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                                   <span class="n">num_paths</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="o">**</span><span class="n">pathfinder_kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Pathfinder-based dispersed per-chain starting points.</span>
+
+<span class="sd">        Runs **multipath Pathfinder** (a variational method that lands in the</span>
+<span class="sd">        posterior&#39;s *typical set*, not at the MAP mode) on the built</span>
+<span class="sd">        ``estimation_model`` via :func:`pymc_extras.inference.fit`, then turns</span>
+<span class="sd">        ``chains`` of its draws into per-chain ``initvals`` dicts on the model&#39;s</span>
+<span class="sd">        **value-variable (unconstrained) scale** — the exact format</span>
+<span class="sd">        :meth:`get_initial_points` returns (keyed by ``model.initial_point()``</span>
+<span class="sd">        names, e.g. ``a_mu_untransformed``, ``s_log__``, ``p_logodds__``), so it</span>
+<span class="sd">        is a drop-in replacement as a sampler ``initvals``.</span>
+
+<span class="sd">        This is the right init lever for hard, high-dimensional DDM/RDM</span>
+<span class="sd">        posteriors: MAP (the ``&#39;mapjitter&#39;`` centre) is in the wrong place in</span>
+<span class="sd">        high dimensions (the mode is not in the typical set), whereas</span>
+<span class="sd">        Pathfinder draws already sit where the chains should warm up.</span>
+
+<span class="sd">        Robustness</span>
+<span class="sd">        ----------</span>
+<span class="sd">        If ``pymc_extras`` is missing, or Pathfinder errors / returns too few</span>
+<span class="sd">        usable draws, this falls back to :meth:`get_initial_points`</span>
+<span class="sd">        (MAP + jitter) with a :class:`UserWarning` — so a fit never crashes for</span>
+<span class="sd">        want of the optional dependency.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        chains : int</span>
+<span class="sd">            Number of per-chain initval dicts to return.</span>
+<span class="sd">        seed : int or None</span>
+<span class="sd">            Seed forwarded to Pathfinder for reproducibility.</span>
+<span class="sd">        num_paths : int</span>
+<span class="sd">            Number of Pathfinder paths (multipath). Default 8.</span>
+<span class="sd">        **pathfinder_kwargs</span>
+<span class="sd">            Extra keyword arguments forwarded to</span>
+<span class="sd">            ``pymc_extras.inference.fit(method=&#39;pathfinder&#39;, ...)``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">_fallback</span><span class="p">(</span><span class="n">reason</span><span class="p">):</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Pathfinder init unavailable (</span><span class="si">{</span><span class="n">reason</span><span class="si">}</span><span class="s2">); &quot;</span>
+                <span class="s2">&quot;falling back to mapjitter initial points.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_initial_points</span><span class="p">(</span><span class="n">chains</span><span class="o">=</span><span class="n">chains</span><span class="p">,</span> <span class="n">use_map</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                           <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">pymc_extras.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">fit</span> <span class="k">as</span> <span class="n">pmx_fit</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># pragma: no cover - optional dependency</span>
+            <span class="k">return</span> <span class="n">_fallback</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;could not import pymc_extras (</span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Draw at least as many Pathfinder samples as we need chains, with a</span>
+        <span class="c1"># comfortable margin so we can pick well-separated draws.</span>
+        <span class="n">num_draws</span> <span class="o">=</span> <span class="n">pathfinder_kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;num_draws&#39;</span><span class="p">,</span>
+                                          <span class="nb">max</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">50</span> <span class="o">*</span> <span class="n">chains</span><span class="p">))</span>
+
+        <span class="c1"># Seed Pathfinder&#39;s OWN optimization from a plausible, data-informed</span>
+        <span class="c1"># point (the MAP) so its paths start in the valid region. Without this,</span>
+        <span class="c1"># on nasty DDM/RDM geometries Pathfinder can wander into the WFPT&#39;s</span>
+        <span class="c1"># flat/-inf zone and hand NUTS a frozen, all-divergent starting point</span>
+        <span class="c1"># (observed: independent-noise DDM -&gt; 4000/4000 divergences, within-</span>
+        <span class="c1"># chain SD 0). If MAP fails, fall back to Pathfinder&#39;s default init.</span>
+        <span class="n">seed_initvals</span> <span class="o">=</span> <span class="n">pathfinder_kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;initvals&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">seed_initvals</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimation_model</span><span class="p">:</span>
+                    <span class="n">seed_initvals</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">find_MAP</span><span class="p">(</span><span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># pragma: no cover - robustness</span>
+                <span class="n">seed_initvals</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimation_model</span><span class="p">:</span>
+                <span class="n">pf_idata</span> <span class="o">=</span> <span class="n">pmx_fit</span><span class="p">(</span>
+                    <span class="n">method</span><span class="o">=</span><span class="s1">&#39;pathfinder&#39;</span><span class="p">,</span> <span class="n">num_paths</span><span class="o">=</span><span class="n">num_paths</span><span class="p">,</span>
+                    <span class="n">num_draws</span><span class="o">=</span><span class="n">num_draws</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
+                    <span class="n">initvals</span><span class="o">=</span><span class="n">seed_initvals</span><span class="p">,</span> <span class="o">**</span><span class="n">pathfinder_kwargs</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># pragma: no cover - robustness</span>
+            <span class="k">return</span> <span class="n">_fallback</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;pathfinder failed (</span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pathfinder_idata_to_initvals</span><span class="p">(</span><span class="n">pf_idata</span><span class="p">,</span> <span class="n">chains</span><span class="p">,</span> <span class="n">seed</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># pragma: no cover - robustness</span>
+            <span class="k">return</span> <span class="n">_fallback</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;could not convert pathfinder draws (</span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_pathfinder_idata_to_initvals</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pf_idata</span><span class="p">,</span> <span class="n">chains</span><span class="p">,</span> <span class="n">seed</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert a Pathfinder ``InferenceData`` into ``chains`` value-variable</span>
+<span class="sd">        (unconstrained-scale) initval dicts, matching ``initial_point()`` keys.</span>
+
+<span class="sd">        Pathfinder returns draws on the **constrained / natural** scale, keyed</span>
+<span class="sd">        by free-RV name. The sampler wants ``initvals`` on the **value-variable</span>
+<span class="sd">        (unconstrained) scale** keyed by value-var name (what</span>
+<span class="sd">        ``model.initial_point()`` uses). For each free RV we apply its</span>
+<span class="sd">        transform&#39;s ``forward`` (e.g. log / logodds) to map the constrained</span>
+<span class="sd">        draw to the unconstrained value the sampler expects; untransformed RVs</span>
+<span class="sd">        pass through unchanged.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">pytensor</span>
+
+        <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+        <span class="n">post</span> <span class="o">=</span> <span class="n">pf_idata</span><span class="o">.</span><span class="n">posterior</span>
+        <span class="c1"># Flatten (chain, draw) into a single sample axis and pick `chains`</span>
+        <span class="c1"># distinct draws to disperse the NUTS chains across the typical set.</span>
+        <span class="n">n_pf</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">post</span><span class="o">.</span><span class="n">sizes</span><span class="p">[</span><span class="s1">&#39;chain&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="n">post</span><span class="o">.</span><span class="n">sizes</span><span class="p">[</span><span class="s1">&#39;draw&#39;</span><span class="p">])</span>
+        <span class="n">stacked</span> <span class="o">=</span> <span class="n">post</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">_sample</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;chain&#39;</span><span class="p">,</span> <span class="s1">&#39;draw&#39;</span><span class="p">))</span>
+        <span class="n">n_take</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">chains</span><span class="p">,</span> <span class="n">n_pf</span><span class="p">)</span>
+        <span class="n">sel</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">n_pf</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">n_take</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="p">(</span><span class="n">n_pf</span> <span class="o">&lt;</span> <span class="n">chains</span><span class="p">))</span>
+
+        <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimation_model</span>
+        <span class="n">ip</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">initial_point</span><span class="p">()</span>  <span class="c1"># value-var-name -&gt; array (template)</span>
+
+        <span class="c1"># Map each free RV to (value-var name, forward-transform or None),</span>
+        <span class="c1"># precompiling a forward function per transformed RV for speed.</span>
+        <span class="n">rv_specs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">rv</span><span class="p">,</span> <span class="n">value_var</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">rvs_to_values</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">rv</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">post</span><span class="p">:</span>
+                <span class="c1"># Deterministics / RVs Pathfinder didn&#39;t return — skip; the</span>
+                <span class="c1"># sampler will initialise these from the model default.</span>
+                <span class="k">continue</span>
+            <span class="n">transform</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">rvs_to_transforms</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">rv</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">transform</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">fwd_fn</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">inp</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;_c&#39;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;float64&#39;</span><span class="p">,</span>
+                                <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="kc">None</span><span class="p">,)</span> <span class="o">*</span> <span class="n">rv</span><span class="o">.</span><span class="n">ndim</span><span class="p">)</span>
+                <span class="n">fwd_expr</span> <span class="o">=</span> <span class="n">transform</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">inp</span><span class="p">,</span> <span class="o">*</span><span class="n">rv</span><span class="o">.</span><span class="n">owner</span><span class="o">.</span><span class="n">inputs</span><span class="p">)</span>
+                <span class="n">fwd_fn</span> <span class="o">=</span> <span class="n">pytensor</span><span class="o">.</span><span class="n">function</span><span class="p">(</span>
+                    <span class="p">[</span><span class="n">inp</span><span class="p">],</span> <span class="n">fwd_expr</span><span class="p">,</span> <span class="n">on_unused_input</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span>
+            <span class="n">rv_specs</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">rv</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">value_var</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">fwd_fn</span><span class="p">))</span>
+
+        <span class="n">points</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">sel</span><span class="p">:</span>
+            <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">rv_name</span><span class="p">,</span> <span class="n">val_name</span><span class="p">,</span> <span class="n">fwd_fn</span> <span class="ow">in</span> <span class="n">rv_specs</span><span class="p">:</span>
+                <span class="n">constrained</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+                    <span class="n">stacked</span><span class="p">[</span><span class="n">rv_name</span><span class="p">]</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">_sample</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">s</span><span class="p">))</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+                    <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;float64&#39;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">fwd_fn</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">unconstrained</span> <span class="o">=</span> <span class="n">constrained</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">unconstrained</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">fwd_fn</span><span class="p">(</span><span class="n">constrained</span><span class="p">))</span>
+                <span class="n">pt_dict</span><span class="p">[</span><span class="n">val_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">unconstrained</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span>
+                    <span class="n">ip</span><span class="p">[</span><span class="n">val_name</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">ip</span><span class="p">[</span><span class="n">val_name</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+            <span class="n">points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pt_dict</span><span class="p">)</span>
+
+        <span class="c1"># If Pathfinder produced fewer draws than chains (degenerate), recycle.</span>
+        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">chains</span><span class="p">:</span>
+            <span class="n">points</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">points</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">()})</span>
+        <span class="k">return</span> <span class="n">points</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fit_map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filter_pars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimation_model</span><span class="p">:</span>
@@ -855,14 +1079,57 @@
 <a class="viewcode-back" href="../../api_reference.html#bauer.core.BaseModel.build_hierarchical_nodes">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">build_hierarchical_nodes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">mu_intercept</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sigma_intercept</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
                                  <span class="n">cauchy_sigma_intercept</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="s1">&#39;identity&#39;</span><span class="p">,</span>
-                                 <span class="n">min_value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                                 <span class="n">min_value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">beta_mu_mean</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">beta_mu_kappa</span><span class="o">=</span><span class="mf">8.0</span><span class="p">,</span>
+                                 <span class="n">beta_kappa_sd</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Build a hierarchical (group_mu, group_sd, per-subject offset) node.</span>
 
-<span class="sd">        ``transform`` ∈ {&#39;identity&#39;, &#39;softplus&#39;, &#39;logistic&#39;}. When ``transform`` is</span>
-<span class="sd">        &#39;softplus&#39; and ``min_value &gt; 0``, the transformed parameter has a hard</span>
-<span class="sd">        lower bound: ``param = min_value + softplus(x)``. Used to keep e.g. the</span>
-<span class="sd">        DDM/RDM threshold ``a`` away from the a→0 collapse mode.</span>
+<span class="sd">        ``transform`` ∈ {&#39;identity&#39;, &#39;softplus&#39;, &#39;logistic&#39;, &#39;beta&#39;}. When</span>
+<span class="sd">        ``transform`` is &#39;softplus&#39; and ``min_value &gt; 0``, the transformed</span>
+<span class="sd">        parameter has a hard lower bound: ``param = min_value + softplus(x)``.</span>
+<span class="sd">        Used to keep e.g. the DDM/RDM threshold ``a`` away from the a→0 collapse</span>
+<span class="sd">        mode.</span>
+
+<span class="sd">        Hierarchical-Beta group prior (``transform=&#39;beta&#39;``)</span>
+<span class="sd">        ----------------------------------------------------</span>
+<span class="sd">        A per-subject rate in ``(0, 1)`` whose population density is</span>
+<span class="sd">        concentrated near 0 with a heavy upper tail — the &quot;1/x&quot;-like shape — for</span>
+<span class="sd">        parameters such as a lapse / outlier rate, where most subjects are ≈ 0</span>
+<span class="sd">        but a minority genuinely lapse a lot. This replaces the logit-Normal</span>
+<span class="sd">        parameterization (``transform=&#39;logistic&#39;``), which **funnels** when the</span>
+<span class="sd">        true rate ≈ 0: the per-subject logit → −∞, the group SD inflates without</span>
+<span class="sd">        bound, and NUTS diverges.</span>
+
+<span class="sd">        The model is::</span>
+
+<span class="sd">            mu     ~ Beta(beta_mu_mean·beta_mu_kappa, (1-beta_mu_mean)·beta_mu_kappa)</span>
+<span class="sd">            kappa  = 2 + exp(log_kappa),   log_kappa ~ Normal(0, beta_kappa_sd)</span>
+<span class="sd">            p[s]   ~ Beta(alpha, beta),    alpha = mu·kappa, beta = (1-mu)·kappa</span>
+
+<span class="sd">        ``mu`` is the group-mean rate (prior mean ``beta_mu_mean``, default</span>
+<span class="sd">        0.05); ``kappa`` is the population concentration. The per-subject density</span>
+<span class="sd">        is ``∝ p^(alpha-1)(1-p)^(beta-1)``: when ``alpha = mu·kappa &lt; 1`` (small</span>
+<span class="sd">        ``mu``) this is an integrable spike at 0 (the &quot;1/x&quot; shape) with a fat</span>
+<span class="sd">        upper tail, exactly matching &quot;most subjects ≈ 0, a few disengaged&quot;. The</span>
+<span class="sd">        ``kappa = 2 + exp(...)`` floor keeps ``beta = (1-mu)·kappa &gt; 1`` so the</span>
+<span class="sd">        density is bounded near 1 (no spurious upper-edge spike) while still</span>
+<span class="sd">        allowing ``alpha &lt; 1``. ``p[s]`` is sampled directly as a ``pm.Beta``,</span>
+<span class="sd">        whose default log-odds transform gives NUTS a clean unconstrained</span>
+<span class="sd">        geometry without the logit funnel (the per-subject scale is set by the</span>
+<span class="sd">        *data-informed* Beta, not a shared inflating SD). Group nodes</span>
+<span class="sd">        ``{name}_mu`` and ``{name}_kappa`` are exposed for reporting (so</span>
+<span class="sd">        ``get_groupwise_parameter_estimates`` keeps working via ``{name}_mu``).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;beta&#39;</span><span class="p">:</span>
+            <span class="n">a0</span> <span class="o">=</span> <span class="n">beta_mu_mean</span> <span class="o">*</span> <span class="n">beta_mu_kappa</span>
+            <span class="n">b0</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">beta_mu_mean</span><span class="p">)</span> <span class="o">*</span> <span class="n">beta_mu_kappa</span>
+            <span class="n">group_mu</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Beta</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_mu&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">a0</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">b0</span><span class="p">)</span>
+            <span class="n">log_kappa</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_log_kappa&#39;</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="n">beta_kappa_sd</span><span class="p">)</span>
+            <span class="n">group_kappa</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Deterministic</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_kappa&#39;</span><span class="p">,</span>
+                                           <span class="mf">2.0</span> <span class="o">+</span> <span class="n">pt</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">log_kappa</span><span class="p">))</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="n">group_mu</span> <span class="o">*</span> <span class="n">group_kappa</span>
+            <span class="n">beta</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">group_mu</span><span class="p">)</span> <span class="o">*</span> <span class="n">group_kappa</span>
+            <span class="k">return</span> <span class="n">pm</span><span class="o">.</span><span class="n">Beta</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">beta</span><span class="p">,</span> <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">,))</span>
 
         <span class="k">if</span> <span class="n">mu_intercept</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">mu_intercept</span> <span class="o">=</span> <span class="mf">0.0</span>
@@ -897,7 +1164,8 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">NotImplementedError</span>
 
-        <span class="n">group_sd</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">HalfCauchy</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_sd&#39;</span><span class="p">,</span> <span class="n">cauchy_sigma_intercept</span><span class="p">)</span>
+        <span class="n">group_sd</span> <span class="o">=</span> <span class="n">_group_sd_rv</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_sd&#39;</span><span class="p">,</span> <span class="n">cauchy_sigma_intercept</span><span class="p">,</span>
+                                <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;group_sd_dist&#39;</span><span class="p">,</span> <span class="s1">&#39;halfnormal&#39;</span><span class="p">))</span>
         <span class="n">subject_offset</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_offset&#39;</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">,))</span>
 
         <span class="k">if</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;identity&#39;</span><span class="p">:</span>
@@ -931,7 +1199,13 @@
         <span class="n">mu_pars</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="n">par</span> <span class="o">+</span> <span class="s1">&#39;_mu&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_dataframe</span><span class="p">()</span> <span class="k">for</span> <span class="n">par</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">free_parameters</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">keys</span><span class="o">=</span><span class="n">parameters</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;parameter&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">droplevel</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">include_sd</span><span class="p">:</span>
-            <span class="n">sd_pars</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="n">par</span> <span class="o">+</span> <span class="s1">&#39;_sd&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_dataframe</span><span class="p">()</span> <span class="k">for</span> <span class="n">par</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">free_parameters</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">keys</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">free_parameters</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;parameter&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">droplevel</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="c1"># &#39;beta&#39; group priors expose a concentration ({par}_kappa) instead</span>
+            <span class="c1"># of a Normal scale ({par}_sd); fall back to it so reporting works.</span>
+            <span class="k">def</span><span class="w"> </span><span class="nf">_spread</span><span class="p">(</span><span class="n">par</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">par</span> <span class="o">+</span> <span class="s1">&#39;_sd&#39;</span> <span class="ow">in</span> <span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="n">par</span> <span class="o">+</span> <span class="s1">&#39;_sd&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_dataframe</span><span class="p">()</span>
+                <span class="k">return</span> <span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="n">par</span> <span class="o">+</span> <span class="s1">&#39;_kappa&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_dataframe</span><span class="p">()</span>
+            <span class="n">sd_pars</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">_spread</span><span class="p">(</span><span class="n">par</span><span class="p">)</span> <span class="k">for</span> <span class="n">par</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">free_parameters</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">keys</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">free_parameters</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;parameter&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">droplevel</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
             <span class="n">pars</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">((</span><span class="n">mu_pars</span><span class="p">,</span> <span class="n">sd_pars</span><span class="p">),</span> <span class="n">keys</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;mu&#39;</span><span class="p">,</span> <span class="s1">&#39;sd&#39;</span><span class="p">],</span> <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
         <span class="k">else</span><span class="p">:</span>
@@ -964,6 +1238,14 @@
             <span class="k">if</span> <span class="s1">&#39;transform&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">pars</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
                 <span class="n">pars</span><span class="p">[</span><span class="s1">&#39;transform&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;identity&#39;</span>
 
+            <span class="k">if</span> <span class="n">pars</span><span class="p">[</span><span class="s1">&#39;transform&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;beta&#39;</span><span class="p">:</span>
+                <span class="n">mean</span> <span class="o">=</span> <span class="n">pars</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;beta_mu_mean&#39;</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">)</span>
+                <span class="n">kappa</span> <span class="o">=</span> <span class="n">pars</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;beta_mu_kappa&#39;</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">)</span>
+                <span class="n">samples_pars</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">beta</span><span class="p">(</span><span class="n">mean</span> <span class="o">*</span> <span class="n">kappa</span><span class="p">,</span>
+                                                   <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">mean</span><span class="p">)</span> <span class="o">*</span> <span class="n">kappa</span><span class="p">,</span>
+                                                   <span class="n">n_subjects</span><span class="p">)</span>
+                <span class="k">continue</span>
+
             <span class="n">samples_pars</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">pars</span><span class="p">[</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">],</span> <span class="n">pars</span><span class="p">[</span><span class="s1">&#39;sigma_intercept&#39;</span><span class="p">],</span> <span class="n">n_subjects</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">pars</span><span class="p">[</span><span class="s1">&#39;transform&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;softplus&#39;</span><span class="p">:</span>
                 <span class="n">samples_pars</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">softplus_np</span><span class="p">(</span><span class="n">samples_pars</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
@@ -980,7 +1262,8 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">forward_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">parameter</span><span class="p">):</span>
         <span class="n">transform</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">free_parameters</span><span class="p">[</span><span class="n">parameter</span><span class="p">][</span><span class="s1">&#39;transform&#39;</span><span class="p">]</span>
 
-        <span class="k">if</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;identity&#39;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">transform</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;identity&#39;</span><span class="p">,</span> <span class="s1">&#39;beta&#39;</span><span class="p">):</span>
+            <span class="c1"># &#39;beta&#39; rates already live in (0, 1) — natural == sampling scale.</span>
             <span class="k">return</span> <span class="n">data</span>
         <span class="k">elif</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;softplus&#39;</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">softplus_np</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
@@ -990,7 +1273,7 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">backward_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">parameter</span><span class="p">):</span>
         <span class="n">transform</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">free_parameters</span><span class="p">[</span><span class="n">parameter</span><span class="p">][</span><span class="s1">&#39;transform&#39;</span><span class="p">]</span>
 
-        <span class="k">if</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;identity&#39;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">transform</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;identity&#39;</span><span class="p">,</span> <span class="s1">&#39;beta&#39;</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">data</span>
         <span class="k">elif</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;softplus&#39;</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">inverse_softplus_np</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
@@ -1024,14 +1307,51 @@
 <span class="n">BaseModel</span><span class="o">.</span><span class="fm">__init__</span> <span class="o">=</span> <span class="n">_translate_deprecated_kwargs</span><span class="p">(</span><span class="n">BaseModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">)</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_lapse_param_spec</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="n">mu_mean</span><span class="p">,</span> <span class="n">mu_kappa</span><span class="p">,</span> <span class="n">kappa_sd</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Free-parameter spec dict for a lapse / outlier rate in (0, 1).</span>
+
+<span class="sd">    ``group=&#39;logit_normal&#39;`` (default) reproduces the historical logit-Normal</span>
+<span class="sd">    hierarchical prior (centred at ``mu_mean``). ``group=&#39;beta&#39;`` selects the</span>
+<span class="sd">    hierarchical-Beta &quot;1/x&quot;-like group prior (see</span>
+<span class="sd">    :meth:`BaseModel.build_hierarchical_nodes`), which is concentrated near 0</span>
+<span class="sd">    with a heavy upper tail and removes the logit funnel that arises when the</span>
+<span class="sd">    true rate ≈ 0.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">group</span> <span class="o">==</span> <span class="s1">&#39;beta&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;beta&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;beta_mu_mean&#39;</span><span class="p">:</span> <span class="n">mu_mean</span><span class="p">,</span>
+                <span class="s1">&#39;beta_mu_kappa&#39;</span><span class="p">:</span> <span class="n">mu_kappa</span><span class="p">,</span>
+                <span class="s1">&#39;beta_kappa_sd&#39;</span><span class="p">:</span> <span class="n">kappa_sd</span><span class="p">}</span>
+    <span class="k">elif</span> <span class="n">group</span> <span class="o">==</span> <span class="s1">&#39;logit_normal&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">logit_np</span><span class="p">(</span><span class="n">mu_mean</span><span class="p">),</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;logistic&#39;</span><span class="p">}</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;lapse_group must be &#39;logit_normal&#39; or &#39;beta&#39;, got </span><span class="si">{</span><span class="n">group</span><span class="si">!r}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+
 <div class="viewcode-block" id="LapseModel">
 <a class="viewcode-back" href="../../api_reference.html#bauer.core.LapseModel">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">LapseModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Static-choice model with a per-subject random-lapse rate ``p_lapse``.</span>
+
+<span class="sd">    ``lapse_group`` selects the group prior on the per-subject lapse rate:</span>
+<span class="sd">    ``&#39;logit_normal&#39;`` (legacy opt-in; Beta is now the default) or ``&#39;beta&#39;`` (the</span>
+<span class="sd">    heavy-tailed &quot;1/x&quot;-like hierarchical Beta; see</span>
+<span class="sd">    :meth:`BaseModel.build_hierarchical_nodes`). The Beta option is preferable</span>
+<span class="sd">    when most subjects lapse ≈ 0 (it avoids the logit funnel).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">lapse_group</span> <span class="o">=</span> <span class="s1">&#39;beta&#39;</span>
+    <span class="n">lapse_mu_mean</span> <span class="o">=</span> <span class="mf">0.02</span>
+    <span class="n">lapse_mu_kappa</span> <span class="o">=</span> <span class="mf">8.0</span>
+    <span class="n">lapse_kappa_sd</span> <span class="o">=</span> <span class="mf">3.0</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_free_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">pars</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">get_free_parameters</span><span class="p">()</span>
 
-        <span class="n">pars</span><span class="p">[</span><span class="s1">&#39;p_lapse&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;mu_intercept&#39;</span><span class="p">:</span> <span class="n">logit_np</span><span class="p">(</span><span class="mf">0.02</span><span class="p">),</span> <span class="s1">&#39;transform&#39;</span><span class="p">:</span> <span class="s1">&#39;logistic&#39;</span><span class="p">}</span>
+        <span class="n">pars</span><span class="p">[</span><span class="s1">&#39;p_lapse&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_lapse_param_spec</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lapse_group</span><span class="p">,</span>
+                                            <span class="bp">self</span><span class="o">.</span><span class="n">lapse_mu_mean</span><span class="p">,</span>
+                                            <span class="bp">self</span><span class="o">.</span><span class="n">lapse_mu_kappa</span><span class="p">,</span>
+                                            <span class="bp">self</span><span class="o">.</span><span class="n">lapse_kappa_sd</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">pars</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_choice_predictions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_inputs</span><span class="p">):</span>
@@ -1046,18 +1366,194 @@
 
 
 
+<span class="k">class</span><span class="w"> </span><span class="nc">RTLapseMixin</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;RT-aware lapse / outlier-contaminant mixture for sequential-sampling</span>
+<span class="sd">    (DDM / RDM) likelihoods, mirroring HSSM&#39;s ``p_outlier`` mechanism.</span>
+
+<span class="sd">    The static-choice :class:`LapseModel` lapses *choices* only</span>
+<span class="sd">    (``p = p·(1-λ) + 0.5·λ``); that is correct for the cumulative-normal</span>
+<span class="sd">    Bernoulli likelihood but **wrong** for a likelihood defined jointly over</span>
+<span class="sd">    ``(rt, choice)``. A response-time model needs an RT-aware contaminant: on a</span>
+<span class="sd">    fraction ``p_outlier`` of trials the observation is assumed to come from a</span>
+<span class="sd">    process unrelated to the decision (fast guesses, lapses of attention,</span>
+<span class="sd">    delayed/anticipatory responses), modelled by a flat density over RT.</span>
+
+<span class="sd">    Following HSSM (``hssm.distribution_utils.dist``), the per-trial</span>
+<span class="sd">    log-likelihood becomes the numerically-stable mixture::</span>
+
+<span class="sd">        logp = log( (1 - p_outlier) * exp(ll_model)</span>
+<span class="sd">                    + p_outlier * exp(lapse_logp) + 1e-29 )</span>
+
+<span class="sd">    where ``ll_model`` is the WFPT (DDM) / Wald-race (RDM) log-density and</span>
+<span class="sd">    ``lapse_logp`` is the contaminant log-density.</span>
+
+<span class="sd">    Contaminant density</span>
+<span class="sd">    -------------------</span>
+<span class="sd">    HSSM&#39;s default lapse distribution is ``Uniform(0, lapse_upper)`` over RT</span>
+<span class="sd">    (``lapse_upper`` = 20 s), and the contaminant choice is 50/50. The joint</span>
+<span class="sd">    (rt, choice) contaminant density is therefore::</span>
+
+<span class="sd">        f_lapse(rt, choice) = 0.5 / lapse_upper      for 0 &lt;= rt &lt;= lapse_upper</span>
+<span class="sd">                            = 0                       otherwise</span>
+
+<span class="sd">    so ``lapse_logp = log(0.5) - log(lapse_upper)`` — a constant, independent of</span>
+<span class="sd">    the trial (every observed RT in a fitted dataset is well within the bound).</span>
+<span class="sd">    This 0.5/upper joint form (RT *and* choice uniform) is the conceptually</span>
+<span class="sd">    complete contaminant; HSSM&#39;s code path happens to score only the RT margin</span>
+<span class="sd">    (``-log(lapse_upper)``), but since the term is an additive constant inside</span>
+<span class="sd">    the mixture this changes only the absolute scale of the contaminant weight,</span>
+<span class="sd">    not the inference about decision parameters. The factor is documented here</span>
+<span class="sd">    for reproducibility. Set ``lapse_choice_5050=False`` to drop the ``log(0.5)``</span>
+<span class="sd">    and exactly match HSSM&#39;s RT-only convention.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    lapse_upper : float</span>
+<span class="sd">        Upper bound (seconds) of the uniform contaminant RT density. Default</span>
+<span class="sd">        20.0 (HSSM default). Must exceed the largest observed RT.</span>
+<span class="sd">    lapse_choice_5050 : bool</span>
+<span class="sd">        If True (default), the contaminant assigns 50/50 over the two</span>
+<span class="sd">        responses (joint density 0.5/upper). If False, match HSSM&#39;s RT-only</span>
+<span class="sd">        margin (1/upper).</span>
+
+<span class="sd">    The free parameter is named ``p_outlier`` (HSSM&#39;s name).</span>
+
+<span class="sd">    Group prior on ``p_outlier``</span>
+<span class="sd">    ----------------------------</span>
+<span class="sd">    ``lapse_group`` selects how the *per-subject* outlier rate is regularized</span>
+<span class="sd">    across subjects:</span>
+
+<span class="sd">    - ``&#39;logit_normal&#39;`` (legacy opt-in; Beta is now the default): hierarchical</span>
+<span class="sd">      logit-Normal, centred at ``logit(0.05)``. This **funnels** when subjects&#39;</span>
+<span class="sd">      true lapse ≈ 0 — the per-subject logit → −∞, the group SD inflates, and</span>
+<span class="sd">      NUTS diverges.</span>
+<span class="sd">    - ``&#39;beta&#39;``: hierarchical Beta &quot;1/x&quot;-like group prior (group mean μ +</span>
+<span class="sd">      concentration κ; density ``∝ p^(μκ-1)`` — a spike at 0 with a heavy upper</span>
+<span class="sd">      tail). See :meth:`BaseModel.build_hierarchical_nodes`. Recommended on</span>
+<span class="sd">      clean data, where it removes the funnel because the per-subject rate lives</span>
+<span class="sd">      in (0, 1) directly rather than on an unbounded logit.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># HSSM-matching defaults; overridable per-instance via __init__ kwargs of</span>
+    <span class="c1"># the concrete classes, which set these attributes before super().__init__.</span>
+    <span class="n">lapse_upper</span> <span class="o">=</span> <span class="mf">20.0</span>
+    <span class="n">lapse_choice_5050</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="c1"># ``p_outlier`` mirrors HSSM&#39;s API:</span>
+    <span class="c1">#   - a FLOAT (default 0.05, HSSM&#39;s default) -&gt; the contaminant rate is</span>
+    <span class="c1">#     FIXED at that value; it is NOT a sampled parameter, so it cannot</span>
+    <span class="c1">#     funnel/diverge. This is the recommended/default mode.</span>
+    <span class="c1">#   - &#39;hierarchical&#39; -&gt; per-subject estimated rate (bauer extension; weakly</span>
+    <span class="c1">#     identified in the WFPT/Wald mixture, prone to divergences -- opt-in).</span>
+    <span class="c1"># Estimating a single (non-hierarchical) rate is not yet supported; HSSM&#39;s</span>
+    <span class="c1"># own default is the fixed value anyway.</span>
+    <span class="n">p_outlier</span> <span class="o">=</span> <span class="mf">0.05</span>
+    <span class="c1"># Whether simulate()/ppc() GENERATE contaminant trials. Default True to</span>
+    <span class="c1"># MATCH HSSM (the Frank-lab reference): HSSM&#39;s posterior predictive applies</span>
+    <span class="c1"># the lapse in its RandomVariable.rng_fn (`_apply_lapse_model`) after the</span>
+    <span class="c1"># clean ssms draw, so a fraction p_outlier of predicted trials are</span>
+    <span class="c1"># Uniform(0, lapse_upper) x 50/50-choice contaminants. (HSSM&#39;s standalone</span>
+    <span class="c1"># `simulate_data` helper is the clean exception.) Set False for the</span>
+    <span class="c1"># alternative &quot;robustness-only&quot; reading -- p_outlier as a likelihood</span>
+    <span class="c1"># down-weighting device, not a generative process -- where the predictor</span>
+    <span class="c1"># shows the clean decision model (and a PPC honestly &quot;misses&quot; the RT tail).</span>
+    <span class="n">simulate_contaminant</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="c1"># Group prior for the per-subject rate (only used when p_outlier=&#39;hierarchical&#39;).</span>
+    <span class="n">lapse_group</span> <span class="o">=</span> <span class="s1">&#39;beta&#39;</span>
+    <span class="n">lapse_mu_mean</span> <span class="o">=</span> <span class="mf">0.05</span>
+    <span class="n">lapse_mu_kappa</span> <span class="o">=</span> <span class="mf">8.0</span>
+    <span class="n">lapse_kappa_sd</span> <span class="o">=</span> <span class="mf">3.0</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_free_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">pars</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">get_free_parameters</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">p_outlier</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">)):</span>
+            <span class="c1"># Fixed contaminant rate (HSSM default): not a free parameter.</span>
+            <span class="k">return</span> <span class="n">pars</span>
+        <span class="n">spec</span> <span class="o">=</span> <span class="n">_lapse_param_spec</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lapse_group</span><span class="p">,</span>
+                                 <span class="bp">self</span><span class="o">.</span><span class="n">lapse_mu_mean</span><span class="p">,</span>
+                                 <span class="bp">self</span><span class="o">.</span><span class="n">lapse_mu_kappa</span><span class="p">,</span>
+                                 <span class="bp">self</span><span class="o">.</span><span class="n">lapse_kappa_sd</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">lapse_group</span> <span class="o">==</span> <span class="s1">&#39;logit_normal&#39;</span><span class="p">:</span>
+            <span class="c1"># Preserve the historical sigma_intercept=0.5 on the logit prior.</span>
+            <span class="n">spec</span><span class="p">[</span><span class="s1">&#39;sigma_intercept&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.5</span>
+        <span class="n">pars</span><span class="p">[</span><span class="s1">&#39;p_outlier&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">spec</span>
+        <span class="k">return</span> <span class="n">pars</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_model_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
+        <span class="n">model_inputs</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">get_model_inputs</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">p_outlier</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">)):</span>
+            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;p_outlier&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">constant</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">p_outlier</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">model_inputs</span><span class="p">[</span><span class="s1">&#39;p_outlier&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">&#39;p_outlier&#39;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">model_inputs</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_lapse_logp_const</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Constant log-density of the uniform RT (× 50/50 choice) contaminant.&quot;&quot;&quot;</span>
+        <span class="n">const</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lapse_upper</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">lapse_choice_5050</span><span class="p">:</span>
+            <span class="n">const</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">const</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_mix_with_lapse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ll_model</span><span class="p">,</span> <span class="n">p_outlier</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;HSSM-style numerically-stable lapse mixture of per-trial log-densities.</span>
+
+<span class="sd">        ``ll_model`` is the (per-trial) WFPT / Wald-race log-likelihood; the</span>
+<span class="sd">        contaminant is a flat density with constant log-value</span>
+<span class="sd">        :meth:`_lapse_logp_const`. Returns the mixed per-trial log-likelihood.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">lapse_logp</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">constant</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_lapse_logp_const</span><span class="p">())</span>
+        <span class="c1"># log( (1-p)·exp(ll) + p·exp(lapse) + 1e-29 ), via logaddexp for stability.</span>
+        <span class="n">log_keep</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="o">-</span><span class="n">p_outlier</span><span class="p">)</span> <span class="o">+</span> <span class="n">ll_model</span>
+        <span class="n">log_lapse</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">p_outlier</span><span class="p">)</span> <span class="o">+</span> <span class="n">lapse_logp</span>
+        <span class="n">mixed</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">logaddexp</span><span class="p">(</span><span class="n">log_keep</span><span class="p">,</span> <span class="n">log_lapse</span><span class="p">)</span>
+        <span class="c1"># Match HSSM&#39;s +1e-29 guard against log(0) when both terms underflow.</span>
+        <span class="k">return</span> <span class="n">pt</span><span class="o">.</span><span class="n">logaddexp</span><span class="p">(</span><span class="n">mixed</span><span class="p">,</span> <span class="n">pt</span><span class="o">.</span><span class="n">constant</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mf">1e-29</span><span class="p">)))</span>
+
+
 <div class="viewcode-block" id="RegressionModel">
 <a class="viewcode-back" href="../../api_reference.html#bauer.core.RegressionModel">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">RegressionModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fixed_regressors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">random_regressors</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Patsy-formula regression on model parameters (fixed/random split).</span>
 
-        <span class="k">if</span> <span class="n">regressors</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">regressors</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">regressors</span> <span class="o">=</span> <span class="n">regressors</span>
+<span class="sd">        * ``fixed_regressors={param: formula}`` -- population-mean design (pure</span>
+<span class="sd">          fixed effects, e.g. a between-subjects ``&#39;C(group)&#39;`` contrast).</span>
+<span class="sd">        * ``random_regressors={param: formula}`` -- which terms ALSO carry a</span>
+<span class="sd">          per-subject random effect. Omitted -&gt; default ``&#39;1&#39;`` (random</span>
+<span class="sd">          intercept only), the correct structure for between-subjects designs.</span>
+<span class="sd">          Random terms must be a subset of the fixed design&#39;s columns.</span>
 
+<span class="sd">        Legacy ``regressors=`` is DEPRECATED: it put a per-subject random effect</span>
+<span class="sd">        on *every* term (a spurious random slope on between-subjects contrasts).</span>
+<span class="sd">        Mapped to ``fixed_regressors = random_regressors = regressors`` (old</span>
+<span class="sd">        behaviour, bit-for-bit) with a DeprecationWarning.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">regressors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span><span class="n">fixed_regressors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                                       <span class="ow">or</span> <span class="n">random_regressors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Pass either the deprecated `regressors` OR &quot;</span>
+                             <span class="s2">&quot;`fixed_regressors`/`random_regressors`, not both.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">regressors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;`regressors` is deprecated: it puts a per-subject random &quot;</span>
+                <span class="s2">&quot;effect on EVERY term (a random slope even on between-subjects &quot;</span>
+                <span class="s2">&quot;contrasts like group). Use `fixed_regressors` (population &quot;</span>
+                <span class="s2">&quot;means) + `random_regressors` (per-subject effects; default &quot;</span>
+                <span class="s2">&quot;intercept-only). Mapping regressors -&gt; fixed_regressors = &quot;</span>
+                <span class="s2">&quot;random_regressors = regressors (preserves old behaviour).&quot;</span><span class="p">,</span>
+                <span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+            <span class="n">fixed_regressors</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">regressors</span><span class="p">)</span>
+            <span class="n">random_regressors</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">regressors</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">fixed_regressors</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">fixed_regressors</span><span class="p">)</span> <span class="k">if</span> <span class="n">fixed_regressors</span> <span class="k">else</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">random_regressors</span> <span class="o">=</span> <span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">random_regressors</span><span class="p">)</span>
+                                  <span class="k">if</span> <span class="n">random_regressors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="c1"># design matrices are built from the FIXED design; `regressors` kept as</span>
+        <span class="c1"># an alias so existing introspection (self.regressors[...]) still works.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">regressors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fixed_regressors</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">design_matrices</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_random_cols</span> <span class="o">=</span> <span class="p">{}</span>        <span class="c1"># param -&gt; indices of random cols in fixed design</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_paradigm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">subject_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="n">paradigm_</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_get_paradigm</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="n">subject_mapping</span><span class="o">=</span><span class="n">subject_mapping</span><span class="p">)</span>
@@ -1068,6 +1564,7 @@
             <span class="n">dm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">build_design_matrix</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">design_matrices</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">dm</span>
             <span class="n">paradigm_</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;_dm_</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dm</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_compute_random_cols</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">dm</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">paradigm_</span>
 
@@ -1076,6 +1573,47 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">regressors</span><span class="p">[</span><span class="n">parameter</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;1&#39;</span>
 
         <span class="k">return</span> <span class="n">dmatrix</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">regressors</span><span class="p">[</span><span class="n">parameter</span><span class="p">],</span> <span class="n">data</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_random_formula</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameter</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Random-effects formula for a parameter (default: intercept only).&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">random_regressors</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;1&#39;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">random_regressors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">parameter</span><span class="p">,</span> <span class="s1">&#39;1&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_random_cols</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">parameter</span><span class="p">,</span> <span class="n">fixed_dm</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Indices of the fixed-design columns that carry a per-subject random</span>
+<span class="sd">        effect, per `random_regressors`. Validates subset + warns on a</span>
+<span class="sd">        between-subjects column given a random effect (the classic footgun).&quot;&quot;&quot;</span>
+        <span class="n">fixed_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">fixed_dm</span><span class="o">.</span><span class="n">design_info</span><span class="o">.</span><span class="n">column_names</span><span class="p">)</span>
+        <span class="n">rand_dm</span> <span class="o">=</span> <span class="n">dmatrix</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_random_formula</span><span class="p">(</span><span class="n">parameter</span><span class="p">),</span> <span class="n">data</span><span class="p">)</span>
+        <span class="n">rand_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">rand_dm</span><span class="o">.</span><span class="n">design_info</span><span class="o">.</span><span class="n">column_names</span><span class="p">)</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">nm</span> <span class="ow">in</span> <span class="n">rand_names</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">nm</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fixed_names</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;random_regressors term &#39;</span><span class="si">{</span><span class="n">nm</span><span class="si">}</span><span class="s2">&#39; for </span><span class="si">{</span><span class="n">parameter</span><span class="si">!r}</span><span class="s2"> is not a &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;column of its fixed design </span><span class="si">{</span><span class="n">fixed_names</span><span class="si">}</span><span class="s2">. Random terms &quot;</span>
+                    <span class="s2">&quot;must be a subset of the fixed design.&quot;</span><span class="p">)</span>
+            <span class="n">cols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fixed_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">nm</span><span class="p">))</span>
+        <span class="c1"># between-subjects guard: a random column constant within every subject</span>
+        <span class="k">if</span> <span class="s1">&#39;subject&#39;</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s1">&#39;columns&#39;</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">(</span>
+                <span class="nb">hasattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s1">&#39;index&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="s1">&#39;subject&#39;</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="s1">&#39;names&#39;</span><span class="p">,</span> <span class="p">[])):</span>
+            <span class="n">subj</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;subject&#39;</span><span class="p">]</span> <span class="k">if</span> <span class="s1">&#39;subject&#39;</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s1">&#39;columns&#39;</span><span class="p">,</span> <span class="p">[])</span>
+                    <span class="k">else</span> <span class="n">data</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">))</span>
+            <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">fixed_dm</span><span class="p">)</span>
+            <span class="n">subj</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">subj</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">nm</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">rand_names</span><span class="p">,</span> <span class="n">cols</span><span class="p">):</span>
+                <span class="n">within</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">arr</span><span class="p">[:,</span> <span class="n">j</span><span class="p">])</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">subj</span><span class="p">)</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">within</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span> <span class="ow">and</span> <span class="n">nm</span> <span class="o">!=</span> <span class="s1">&#39;Intercept&#39;</span><span class="p">:</span>
+                    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;random_regressors for </span><span class="si">{</span><span class="n">parameter</span><span class="si">!r}</span><span class="s2"> includes &#39;</span><span class="si">{</span><span class="n">nm</span><span class="si">}</span><span class="s2">&#39;, &quot;</span>
+                        <span class="s2">&quot;which is constant within subject (a between-subjects &quot;</span>
+                        <span class="s2">&quot;regressor). A per-subject random effect on it is &quot;</span>
+                        <span class="s2">&quot;non-identified for off-group subjects and makes the &quot;</span>
+                        <span class="s2">&quot;between-subject variance heteroscedastic. Put it only &quot;</span>
+                        <span class="s2">&quot;in fixed_regressors unless this is intended.&quot;</span><span class="p">,</span>
+                        <span class="ne">UserWarning</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_random_cols</span><span class="p">[</span><span class="n">parameter</span><span class="p">]</span> <span class="o">=</span> <span class="n">cols</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">rebuild_design_matrix</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">parameter</span><span class="p">):</span>
         <span class="k">assert</span> <span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;design_matrices&#39;</span><span class="p">)),</span> <span class="s1">&#39;Model needs to have design matrices as an attribute (model.design_matrices...) based on original data for rebuilding design matrices (HINT: use `.build_estimation_model()`)&#39;</span>
@@ -1206,10 +1744,42 @@
                              <span class="n">sigma</span><span class="o">=</span><span class="n">sigma</span><span class="p">,</span>
                              <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_regressors&#39;</span><span class="p">,))</span>
 
-        <span class="n">group_sd</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">HalfCauchy</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_sd&#39;</span><span class="p">,</span> <span class="n">cauchy_sigma</span><span class="p">,</span> <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_regressors&#39;</span><span class="p">,))</span>
-        <span class="n">subject_offset</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_offset&#39;</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_regressors&#39;</span><span class="p">))</span>
+        <span class="n">n_fixed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">design_matrices</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">rcols</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_random_cols</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n_fixed</span><span class="p">)))</span>
 
-        <span class="k">return</span> <span class="n">pm</span><span class="o">.</span><span class="n">Deterministic</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">group_mu</span> <span class="o">+</span> <span class="n">group_sd</span> <span class="o">*</span> <span class="n">subject_offset</span><span class="p">,</span> <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_regressors&#39;</span><span class="p">))</span></div>
+        <span class="k">if</span> <span class="nb">list</span><span class="p">(</span><span class="n">rcols</span><span class="p">)</span> <span class="o">==</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n_fixed</span><span class="p">)):</span>
+            <span class="c1"># Random effect on every column == legacy behaviour (deprecated</span>
+            <span class="c1"># `regressors`, or random_regressors mirroring the full design).</span>
+            <span class="c1"># Keep the exact old graph (names, dims, coords) bit-for-bit.</span>
+            <span class="n">group_sd</span> <span class="o">=</span> <span class="n">_group_sd_rv</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_sd&#39;</span><span class="p">,</span> <span class="n">cauchy_sigma</span><span class="p">,</span>
+                                    <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;group_sd_dist&#39;</span><span class="p">,</span> <span class="s1">&#39;halfnormal&#39;</span><span class="p">),</span>
+                                    <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_regressors&#39;</span><span class="p">,))</span>
+            <span class="n">subject_offset</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_offset&#39;</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                                       <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_regressors&#39;</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">pm</span><span class="o">.</span><span class="n">Deterministic</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">group_mu</span> <span class="o">+</span> <span class="n">group_sd</span> <span class="o">*</span> <span class="n">subject_offset</span><span class="p">,</span>
+                                    <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_regressors&#39;</span><span class="p">))</span>
+
+        <span class="c1"># Random effect on a SUBSET of columns: build sd/offset only over the</span>
+        <span class="c1"># random columns (no non-identified nuisance dims) and scatter their</span>
+        <span class="c1"># contribution back onto the full coefficient vector, so downstream</span>
+        <span class="c1"># (get_trialwise_variable, ppc, subjectwise estimates) is unchanged.</span>
+        <span class="n">col_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">design_matrices</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">design_info</span><span class="o">.</span><span class="n">column_names</span><span class="p">)</span>
+        <span class="n">re_coord</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_re&#39;</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">add_coord</span><span class="p">(</span><span class="n">re_coord</span><span class="p">,</span> <span class="p">[</span><span class="n">col_names</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rcols</span><span class="p">])</span>
+        <span class="n">cauchy_re</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">cauchy_sigma</span><span class="p">)[</span><span class="nb">list</span><span class="p">(</span><span class="n">rcols</span><span class="p">)]</span>
+        <span class="n">group_sd</span> <span class="o">=</span> <span class="n">_group_sd_rv</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_sd&#39;</span><span class="p">,</span> <span class="n">cauchy_re</span><span class="p">,</span>
+                                <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;group_sd_dist&#39;</span><span class="p">,</span> <span class="s1">&#39;halfnormal&#39;</span><span class="p">),</span>
+                                <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="n">re_coord</span><span class="p">,))</span>
+        <span class="n">subject_offset</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_offset&#39;</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                                   <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="n">re_coord</span><span class="p">))</span>
+        <span class="c1"># one-hot scatter (n_random, n_fixed) mapping random cols -&gt; full design</span>
+        <span class="n">S</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">rcols</span><span class="p">),</span> <span class="n">n_fixed</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">r</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">rcols</span><span class="p">):</span>
+            <span class="n">S</span><span class="p">[</span><span class="n">r</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="n">random_contrib</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">group_sd</span> <span class="o">*</span> <span class="n">subject_offset</span><span class="p">,</span> <span class="n">S</span><span class="p">)</span>   <span class="c1"># (subject, n_fixed)</span>
+        <span class="k">return</span> <span class="n">pm</span><span class="o">.</span><span class="n">Deterministic</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">group_mu</span> <span class="o">+</span> <span class="n">random_contrib</span><span class="p">,</span>
+                                <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">_regressors&#39;</span><span class="p">))</span></div>
+
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fit_map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filter_pars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
@@ -1369,7 +1939,7 @@
       
     </aside>
   </div>
-</div><script src="../../_static/documentation_options.js?v=938c9ccc"></script>
+</div><script src="../../_static/documentation_options.js?v=e259d695"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>

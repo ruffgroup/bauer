@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Lesson 2: Risky Choice — Psychometric Functions and the Noise–Risk Link" href="lesson2.html"><link rel="prev" title="Tutorials" href="index.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Lesson 1: An Introduction to Psychophysical Modelling - bauer 0.2.0 documentation</title>
+        <title>Lesson 1: An Introduction to Psychophysical Modelling - bauer 0.3.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -162,7 +162,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">bauer 0.2.0 documentation</div></a>
+      <a href="../index.html"><div class="brand">bauer 0.3.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.2.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.3.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -206,12 +206,15 @@
 <li class="toctree-l2"><a class="reference internal" href="lesson5.html">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</a></li>
 <li class="toctree-l2"><a class="reference internal" href="lesson8.html">Lesson 8: DDM vs probit on the Garcia magnitude task</a></li>
 <li class="toctree-l2"><a class="reference internal" href="lesson9.html">Lesson 9: Choice + Reaction Time Models — DDM and Race-Diffusion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson10_fixed_vs_random_effects.html">Lesson 10: Fixed vs random effects (<code class="docutils literal notranslate"><span class="pre">fixed_regressors</span></code> / <code class="docutils literal notranslate"><span class="pre">random_regressors</span></code>)</a></li>
 </ul>
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Reference</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history.html">History</a></li>
 </ul>
 
 </div>
@@ -570,7 +573,7 @@
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Subjects: 64,  Trials: 13824
+Subjects: 64,  Trials: 13410
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
@@ -598,47 +601,19 @@ Subjects: 64,  Trials: 13824
       <th></th>
       <th></th>
       <th></th>
-      <th>cueonset1</th>
-      <th>cueoffset1</th>
-      <th>cueonset2</th>
-      <th>cueoffset2</th>
-      <th>stimonset1</th>
-      <th>stimoffset1</th>
-      <th>isistimonset</th>
-      <th>isistimoffset</th>
-      <th>stimonset2</th>
-      <th>stimoffset2</th>
-      <th>...</th>
-      <th>prob_value</th>
-      <th>diffval</th>
-      <th>rad</th>
-      <th>correct</th>
-      <th>leftright</th>
-      <th>pressedkey</th>
       <th>n1</th>
       <th>n2</th>
       <th>choice</th>
-      <th>log(n1/n2)</th>
+      <th>rt</th>
+      <th>accuracy</th>
+      <th>correct</th>
+      <th>isi</th>
     </tr>
     <tr>
       <th>subject</th>
       <th>format</th>
       <th>run</th>
       <th>trial_nr</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
       <th></th>
       <th></th>
       <th></th>
@@ -654,127 +629,56 @@ Subjects: 64,  Trials: 13824
       <th rowspan="5" valign="top">non-symbolic</th>
       <th rowspan="5" valign="top">1</th>
       <th>1</th>
-      <td>35070</td>
-      <td>36600</td>
-      <td>36600</td>
-      <td>37630</td>
-      <td>37630</td>
-      <td>38243</td>
-      <td>38276</td>
-      <td>46276</td>
-      <td>46276</td>
-      <td>46903</td>
-      <td>...</td>
-      <td>10</td>
-      <td>-3</td>
-      <td>190</td>
-      <td>-1</td>
-      <td>-1</td>
-      <td>49</td>
       <td>7</td>
       <td>10</td>
       <td>True</td>
-      <td>-0.356675</td>
+      <td>0.775</td>
+      <td>1</td>
+      <td>-1</td>
+      <td>8.033</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>50095</td>
-      <td>51614</td>
-      <td>51614</td>
-      <td>52628</td>
-      <td>52628</td>
-      <td>53248</td>
-      <td>53280</td>
-      <td>61780</td>
-      <td>61780</td>
-      <td>62380</td>
-      <td>...</td>
-      <td>14</td>
-      <td>-9</td>
-      <td>170</td>
-      <td>-1</td>
-      <td>1</td>
-      <td>51</td>
       <td>5</td>
       <td>14</td>
       <td>False</td>
-      <td>-1.029619</td>
+      <td>0.892</td>
+      <td>0</td>
+      <td>-1</td>
+      <td>8.532</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>65565</td>
-      <td>67087</td>
-      <td>67087</td>
-      <td>68095</td>
-      <td>68095</td>
-      <td>68719</td>
-      <td>68752</td>
-      <td>75252</td>
-      <td>75252</td>
-      <td>75852</td>
-      <td>...</td>
-      <td>14</td>
-      <td>-7</td>
-      <td>210</td>
-      <td>-1</td>
-      <td>-1</td>
-      <td>49</td>
       <td>7</td>
       <td>14</td>
       <td>True</td>
-      <td>-0.693147</td>
+      <td>0.611</td>
+      <td>1</td>
+      <td>-1</td>
+      <td>6.533</td>
     </tr>
     <tr>
       <th>4</th>
-      <td>79005</td>
-      <td>80523</td>
-      <td>80523</td>
-      <td>81527</td>
-      <td>81527</td>
-      <td>82147</td>
-      <td>82180</td>
-      <td>89180</td>
-      <td>89180</td>
-      <td>89810</td>
-      <td>...</td>
-      <td>10</td>
-      <td>-3</td>
-      <td>210</td>
-      <td>-1</td>
-      <td>-1</td>
-      <td>49</td>
       <td>7</td>
       <td>10</td>
       <td>True</td>
-      <td>-0.356675</td>
+      <td>0.660</td>
+      <td>1</td>
+      <td>-1</td>
+      <td>7.033</td>
     </tr>
     <tr>
       <th>5</th>
-      <td>92946</td>
-      <td>94467</td>
-      <td>94467</td>
-      <td>95473</td>
-      <td>95473</td>
-      <td>96096</td>
-      <td>96129</td>
-      <td>105129</td>
-      <td>105129</td>
-      <td>105754</td>
-      <td>...</td>
-      <td>10</td>
-      <td>-5</td>
-      <td>150</td>
-      <td>-1</td>
-      <td>-1</td>
-      <td>49</td>
       <td>5</td>
       <td>10</td>
       <td>True</td>
-      <td>-0.693147</td>
+      <td>0.830</td>
+      <td>1</td>
+      <td>-1</td>
+      <td>9.033</td>
     </tr>
   </tbody>
 </table>
-<p>5 rows × 38 columns</p>
 </div></div>
 </div>
 <div class="nbinput docutils container">
@@ -902,8 +806,7 @@ Subjects: 64,  Trials: 13824
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 4 jobs)
 NUTS: [nu_mu, nu_sd, nu_offset, bias_mu, bias_sd, bias_offset]
-Sampling 4 chains for 150 tune and 150 draw iterations (600 + 600 draws total) took 62 seconds.
-There was 1 divergence after tuning. Increase `target_accept` or reparameterize.
+Sampling 4 chains for 150 tune and 150 draw iterations (600 + 600 draws total) took 69 seconds.
 The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
 The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
 </pre></div></div>
@@ -1032,7 +935,8 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 4 jobs)
 NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset, n2_evidence_sd_mu_untransformed, n2_evidence_sd_sd, n2_evidence_sd_offset]
-Sampling 4 chains for 200 tune and 200 draw iterations (800 + 800 draws total) took 46 seconds.
+Sampling 4 chains for 200 tune and 200 draw iterations (800 + 800 draws total) took 35 seconds.
+There were 2 divergences after tuning. Increase `target_accept` or reparameterize.
 The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
 The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
 </pre></div></div>
@@ -1148,25 +1052,31 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 <section id="Posterior-predictive-check">
 <h2>Posterior predictive check<a class="headerlink" href="#Posterior-predictive-check" title="Link to this heading">¶</a></h2>
 <p>We draw predicted choice probabilities from the full posterior and overlay the 95 % credible interval on the observed group-average data (one panel per <span class="math notranslate nohighlight">\(n_1\)</span> value). A good fit means the shaded band covers the observed dots — and the model should also capture the different slopes across <span class="math notranslate nohighlight">\(n_1\)</span> values (the Weber’s-law signature).</p>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">summarize_ppc_group</span>
 
-<span class="c1"># Simulate binary choices from the posterior predictive</span>
-<span class="n">ppc_df</span>  <span class="o">=</span> <span class="n">model_mag</span><span class="o">.</span><span class="n">ppc</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">idata_mag</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;ll_bernoulli&#39;</span><span class="p">])</span>
-<span class="n">ppc_ll</span>  <span class="o">=</span> <span class="n">ppc_df</span><span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="s1">&#39;ll_bernoulli&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span><span class="p">)</span>   <span class="c1"># trials × posterior samples</span>
+<span class="c1"># Simulate binary choices from the posterior predictive. In bauer 0.3.0 the PPC</span>
+<span class="c1"># API is unified across every model family: model.ppc(data, idata) returns a</span>
+<span class="c1"># long-format frame indexed by (paradigm index..., ppc_sample) with a single</span>
+<span class="c1"># &#39;simulated_choice&#39; column. Unstack ppc_sample to recover the wide</span>
+<span class="c1"># (trials × posterior samples) layout that summarize_ppc_group expects, then</span>
+<span class="c1"># join the columns we need for binning.</span>
+<span class="n">ppc_df</span>  <span class="o">=</span> <span class="n">model_mag</span><span class="o">.</span><span class="n">ppc</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">idata_mag</span><span class="p">)</span>
+<span class="n">ppc_ll</span>  <span class="o">=</span> <span class="n">ppc_df</span><span class="p">[</span><span class="s1">&#39;simulated_choice&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unstack</span><span class="p">(</span><span class="s1">&#39;ppc_sample&#39;</span><span class="p">)</span>   <span class="c1"># trials × posterior samples</span>
+<span class="n">ppc_ll</span>  <span class="o">=</span> <span class="n">ppc_ll</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">data</span><span class="p">[[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;log(n2/n1)&#39;</span><span class="p">]])</span>
 
 <span class="n">ppc_flat</span> <span class="o">=</span> <span class="n">ppc_ll</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
-<span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">cut</span><span class="p">(</span><span class="o">-</span><span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;log(n1/n2)&#39;</span><span class="p">],</span> <span class="mi">12</span><span class="p">)</span>
+<span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">cut</span><span class="p">(</span><span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;log(n2/n1)&#39;</span><span class="p">],</span> <span class="mi">12</span><span class="p">)</span>
                      <span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">mid</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">))</span>
 
 <span class="n">g_ppc</span> <span class="o">=</span> <span class="n">summarize_ppc_group</span><span class="p">(</span><span class="n">ppc_flat</span><span class="p">,</span> <span class="n">condition_cols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;bin&#39;</span><span class="p">])</span>
 <span class="n">g_ppc</span> <span class="o">=</span> <span class="n">g_ppc</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;p_predicted&#39;</span><span class="p">:</span> <span class="s1">&#39;p_mean&#39;</span><span class="p">,</span> <span class="s1">&#39;hdi025&#39;</span><span class="p">:</span> <span class="s1">&#39;p_lo&#39;</span><span class="p">,</span> <span class="s1">&#39;hdi975&#39;</span><span class="p">:</span> <span class="s1">&#39;p_hi&#39;</span><span class="p">})</span>
 
 <span class="n">data_copy</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
-<span class="n">data_copy</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">cut</span><span class="p">(</span><span class="o">-</span><span class="n">data_copy</span><span class="p">[</span><span class="s1">&#39;log(n1/n2)&#39;</span><span class="p">],</span> <span class="mi">12</span><span class="p">)</span>
+<span class="n">data_copy</span><span class="p">[</span><span class="s1">&#39;bin&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">cut</span><span class="p">(</span><span class="n">data_copy</span><span class="p">[</span><span class="s1">&#39;log(n2/n1)&#39;</span><span class="p">],</span> <span class="mi">12</span><span class="p">)</span>
                       <span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">mid</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">))</span>
 <span class="n">obs</span> <span class="o">=</span> <span class="p">(</span><span class="n">data_copy</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;bin&#39;</span><span class="p">])[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
                 <span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;bin&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
@@ -1204,40 +1114,6 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
                    <span class="n">fontsize</span><span class="o">=</span><span class="mi">13</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
 <span class="n">g</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </pre></div>
-</div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Sampling: [ll_bernoulli]
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "0e57b5efdb2047b39d145c47b43957ea", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
-</pre></div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="../_images/tutorial_lesson1_26_4.png" src="../_images/tutorial_lesson1_26_4.png" />
 </div>
 </div>
 <div class="nbinput docutils container">
@@ -1389,7 +1265,7 @@ Sampling: [ll_bernoulli]
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=938c9ccc"></script>
+</div><script src="../_static/documentation_options.js?v=e259d695"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>

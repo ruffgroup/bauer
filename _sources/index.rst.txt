@@ -54,6 +54,8 @@ Quick start
    :caption: Reference
 
    api_reference
+   usage
+   history
 
 Indices and tables
 ------------------

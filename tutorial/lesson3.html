@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Lesson 4: Flexible Noise Curves — FlexibleNoiseComparisonModel and FlexibleNoiseRiskModel" href="lesson4.html"><link rel="prev" title="Lesson 2: Risky Choice — Psychometric Functions and the Noise–Risk Link" href="lesson2.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv) - bauer 0.2.0 documentation</title>
+        <title>Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv) - bauer 0.3.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -162,7 +162,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">bauer 0.2.0 documentation</div></a>
+      <a href="../index.html"><div class="brand">bauer 0.3.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.2.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.3.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -206,12 +206,15 @@
 <li class="toctree-l2"><a class="reference internal" href="lesson5.html">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</a></li>
 <li class="toctree-l2"><a class="reference internal" href="lesson8.html">Lesson 8: DDM vs probit on the Garcia magnitude task</a></li>
 <li class="toctree-l2"><a class="reference internal" href="lesson9.html">Lesson 9: Choice + Reaction Time Models — DDM and Race-Diffusion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson10_fixed_vs_random_effects.html">Lesson 10: Fixed vs random effects (<code class="docutils literal notranslate"><span class="pre">fixed_regressors</span></code> / <code class="docutils literal notranslate"><span class="pre">random_regressors</span></code>)</a></li>
 </ul>
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Reference</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history.html">History</a></li>
 </ul>
 
 </div>
@@ -284,7 +287,7 @@
 </table>
 </div>
 <p>We fit all three on both the <strong>dot-cloud</strong> (fMRI sessions 3T+7T) and the <strong>symbolic</strong> (Arabic numerals) datasets, then compare posterior predictives against the interaction pattern.</p>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
@@ -294,12 +297,16 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">seaborn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sns</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_dehollander2024</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_dehollander2024_risk</span><span class="p">,</span> <span class="n">load_dehollander2024_symbolic</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExpectedUtilityRiskModel</span><span class="p">,</span> <span class="n">RiskModel</span>
 
-<span class="c1"># Load both fMRI sessions and combine</span>
-<span class="n">df_dot</span> <span class="o">=</span> <span class="n">load_dehollander2024</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s1">&#39;dotcloud&#39;</span><span class="p">,</span> <span class="n">sessions</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;3t2&#39;</span><span class="p">,</span> <span class="s1">&#39;7t2&#39;</span><span class="p">])</span>
-<span class="n">df_sym</span> <span class="o">=</span> <span class="n">load_dehollander2024</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s1">&#39;symbolic&#39;</span><span class="p">)</span>
+<span class="c1"># Load both fMRI sessions and combine. In bauer 0.3.0 the de Hollander (2024)</span>
+<span class="c1"># loaders are split by stimulus format: load_dehollander2024_risk is the</span>
+<span class="c1"># dot-cloud risk task (sessions 3t2 + 7t2), load_dehollander2024_symbolic is the</span>
+<span class="c1"># Arabic-numeral task. (The old single load_dehollander2024(task=...) wrapper was</span>
+<span class="c1"># removed.)</span>
+<span class="n">df_dot</span> <span class="o">=</span> <span class="n">load_dehollander2024_risk</span><span class="p">(</span><span class="n">sessions</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;3t2&#39;</span><span class="p">,</span> <span class="s1">&#39;7t2&#39;</span><span class="p">])</span>
+<span class="n">df_sym</span> <span class="o">=</span> <span class="n">load_dehollander2024_symbolic</span><span class="p">()</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Dot clouds  — subjects: </span><span class="si">{</span><span class="n">df_dot</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span><span class="si">}</span><span class="s2">, &quot;</span>
       <span class="sa">f</span><span class="s2">&quot;trials: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df_dot</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -308,113 +315,6 @@
 <span class="n">df_dot</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
 </pre></div>
 </div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-Dot clouds  — subjects: 30, trials: 11445
-Symbolic    — subjects: 58, trials: 14722
-</pre></div></div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th>n1</th>
-      <th>n2</th>
-      <th>p1</th>
-      <th>p2</th>
-      <th>choice</th>
-      <th>risky_first</th>
-    </tr>
-    <tr>
-      <th>subject</th>
-      <th>session</th>
-      <th>run</th>
-      <th>trial_nr</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th rowspan="5" valign="top">02</th>
-      <th rowspan="5" valign="top">3t2</th>
-      <th rowspan="5" valign="top">1</th>
-      <th>1</th>
-      <td>5.0</td>
-      <td>5.0</td>
-      <td>0.55</td>
-      <td>1.0</td>
-      <td>True</td>
-      <td>True</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>7.0</td>
-      <td>7.0</td>
-      <td>0.55</td>
-      <td>1.0</td>
-      <td>True</td>
-      <td>True</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>37.0</td>
-      <td>20.0</td>
-      <td>0.55</td>
-      <td>1.0</td>
-      <td>True</td>
-      <td>True</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>47.0</td>
-      <td>20.0</td>
-      <td>0.55</td>
-      <td>1.0</td>
-      <td>False</td>
-      <td>True</td>
-    </tr>
-    <tr>
-      <th>5</th>
-      <td>18.0</td>
-      <td>10.0</td>
-      <td>0.55</td>
-      <td>1.0</td>
-      <td>True</td>
-      <td>True</td>
-    </tr>
-  </tbody>
-</table>
-</div></div>
 </div>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
@@ -645,17 +545,24 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
 <section id="Posterior-predictives-—-dot-cloud-data">
 <h2>Posterior predictives — dot-cloud data<a class="headerlink" href="#Posterior-predictives-—-dot-cloud-data" title="Link to this heading">¶</a></h2>
 <p>Dots = observed group average; line + shading = model mean and 95 % posterior interval.</p>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">summarize_ppc_group</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">add_model_ppc</span><span class="p">(</span><span class="n">df_orig</span><span class="p">,</span> <span class="n">df_prepped</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">idata</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">stake_labels</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Condition-level PPC via summarize_ppc_group (two-step subject averaging).&quot;&quot;&quot;</span>
-    <span class="n">ppc_df</span>  <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">ppc</span><span class="p">(</span><span class="n">df_orig</span><span class="p">,</span> <span class="n">idata</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;ll_bernoulli&#39;</span><span class="p">])</span>
-    <span class="n">ppc_ll</span>  <span class="o">=</span> <span class="n">ppc_df</span><span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="s1">&#39;ll_bernoulli&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span><span class="p">)</span>
-    <span class="n">sample_cols</span> <span class="o">=</span> <span class="n">ppc_ll</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Condition-level PPC via summarize_ppc_group (two-step subject averaging).</span>
+
+<span class="sd">    bauer 0.3.0 PPC API: model.ppc(data, idata) returns a long frame indexed by</span>
+<span class="sd">    (paradigm index..., ppc_sample) with a single &#39;simulated_choice&#39; column.</span>
+<span class="sd">    Unstack ppc_sample to get one column per posterior sample, then join the</span>
+<span class="sd">    paradigm columns (p1, n1, n2) we need to recompute order / log-ratio / stake.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ppc_df</span>  <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">ppc</span><span class="p">(</span><span class="n">df_orig</span><span class="p">,</span> <span class="n">idata</span><span class="p">)</span>
+    <span class="n">ppc_ll</span>  <span class="o">=</span> <span class="n">ppc_df</span><span class="p">[</span><span class="s1">&#39;simulated_choice&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unstack</span><span class="p">(</span><span class="s1">&#39;ppc_sample&#39;</span><span class="p">)</span>
+    <span class="n">ppc_ll</span>  <span class="o">=</span> <span class="n">ppc_ll</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">df_orig</span><span class="p">[[</span><span class="s1">&#39;p1&#39;</span><span class="p">,</span> <span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">]])</span>
+    <span class="n">sample_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">ppc_ll</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;p1&#39;</span><span class="p">,</span> <span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">)]</span>
 
     <span class="n">ppc_flat</span> <span class="o">=</span> <span class="n">ppc_ll</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
     <span class="n">risky_first</span> <span class="o">=</span> <span class="p">(</span><span class="n">ppc_flat</span><span class="p">[</span><span class="s1">&#39;p1&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mf">0.55</span><span class="p">)</span>
@@ -746,98 +653,10 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
     <span class="n">ppc_dot</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">add_model_ppc</span><span class="p">(</span><span class="n">df_dot</span><span class="p">,</span> <span class="n">df_dot_p</span><span class="p">,</span> <span class="n">mdl</span><span class="p">,</span> <span class="n">idat</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">dot_stake_labels</span><span class="p">)</span>
     <span class="n">plot_ppc_interaction</span><span class="p">(</span><span class="n">ppc_dot</span><span class="p">[</span><span class="n">name</span><span class="p">],</span> <span class="n">obs_dot</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">row</span><span class="p">,</span> <span class="n">dot_stake_labels</span><span class="p">,</span> <span class="n">dot_stake_pal</span><span class="p">)</span>
 
-<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Posterior predictive checks — dot-cloud data  (dots = observed, shading = 95 % CI)&#39;</span><span class="p">,</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">&#39;Posterior predictive checks — dot-cloud data  (dots = observed, shading = 95 % CI)&#39;</span><span class="p">,</span>
              <span class="n">fontsize</span><span class="o">=</span><span class="mi">11</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.01</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </pre></div>
-</div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Sampling: [ll_bernoulli]
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "91af9ad5191848c0a1dda140a516e6ea", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
-</pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Sampling: [ll_bernoulli]
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "7f5593c6841c4013b4d493a82ee514e4", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
-</pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Sampling: [ll_bernoulli]
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "81588c561507431a8a08fa7054612779", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
-</pre></div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="../_images/tutorial_lesson3_12_12.png" src="../_images/tutorial_lesson3_12_12.png" />
 </div>
 </div>
 <section id="Alternative-PPC-view:-columns-=-stake-size,-hue-=-order">
@@ -1250,18 +1069,21 @@ Memory-effect subjects:    [&#39;13&#39; &#39;58&#39; &#39;129&#39; &#39;52&#39;
 Attention-primacy subjects: [&#39;93&#39; &#39;87&#39; &#39;127&#39; &#39;90&#39; &#39;106&#39;]  (mean Δν = -0.113)
 </pre></div></div>
 </div>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Subject-group PPCs using model probability (p), not binary ll_bernoulli</span>
-<span class="c1"># Average P(chose risky) over 5 extreme subjects per group</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Subject-group PPCs using simulated choices averaged over posterior samples.</span>
+<span class="c1"># (bauer 0.3.0 unified PPC returns binary &#39;simulated_choice&#39;; its per-sample</span>
+<span class="c1"># mean over trials is the predicted P(chose risky), so averaging recovers the</span>
+<span class="c1"># same quantity the old continuous-`p` PPC gave.)</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">subgroup_ppc</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">idata</span><span class="p">,</span> <span class="n">df_raw</span><span class="p">,</span> <span class="n">df_prepped</span><span class="p">,</span> <span class="n">subject_ids</span><span class="p">,</span> <span class="n">group_label</span><span class="p">):</span>
-    <span class="c1"># Get model-predicted P(chose option 2) for all subjects</span>
-    <span class="n">ppc_df</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">ppc</span><span class="p">(</span><span class="n">df_raw</span><span class="p">,</span> <span class="n">idata</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;p&#39;</span><span class="p">])</span>
-    <span class="n">ppc_p</span> <span class="o">=</span> <span class="n">ppc_df</span><span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="s1">&#39;p&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span><span class="p">)</span>
-    <span class="n">sample_cols</span> <span class="o">=</span> <span class="n">ppc_p</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+    <span class="c1"># Predicted (simulated) choice for option 2 for all subjects.</span>
+    <span class="n">ppc_df</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">ppc</span><span class="p">(</span><span class="n">df_raw</span><span class="p">,</span> <span class="n">idata</span><span class="p">)</span>
+    <span class="n">ppc_p</span> <span class="o">=</span> <span class="n">ppc_df</span><span class="p">[</span><span class="s1">&#39;simulated_choice&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unstack</span><span class="p">(</span><span class="s1">&#39;ppc_sample&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">ppc_p</span> <span class="o">=</span> <span class="n">ppc_p</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">df_raw</span><span class="p">[[</span><span class="s1">&#39;p1&#39;</span><span class="p">,</span> <span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">]])</span>
+    <span class="n">sample_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">ppc_p</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;p1&#39;</span><span class="p">,</span> <span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;n2&#39;</span><span class="p">)]</span>
 
     <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">subj</span> <span class="ow">in</span> <span class="n">subject_ids</span><span class="p">:</span>
@@ -1355,175 +1177,6 @@ Attention-primacy subjects: [&#39;93&#39; &#39;87&#39; &#39;127&#39; &#39;90&#39
              <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.01</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </pre></div>
-</div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Sampling: []
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "04534702ee60481c87ce245290196aa9", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
-</pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Sampling: []
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "6e5af7ebd45746ea96f4350a83348b07", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
-</pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Sampling: []
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "de32245949e04d91b2a61714334d238d", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
-</pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Sampling: []
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "a1c59f47317d4955b0af861e7f965f2c", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
-</pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Sampling: []
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "eb990a6fe556454092cdc8471af7eab9", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
-</pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Sampling: []
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "38d182516a53495bb26f4ed2afebe758", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">
-</pre></div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="../_images/tutorial_lesson3_30_24.png" src="../_images/tutorial_lesson3_30_24.png" />
 </div>
 </div>
 </section>
@@ -1691,7 +1344,7 @@ EU   -5682.690820  149.078932  416.352690  36.002629     True
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=938c9ccc"></script>
+</div><script src="../_static/documentation_options.js?v=e259d695"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>

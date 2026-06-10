@@ -4,7 +4,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="#"><link rel="search" title="Search" href="search.html">
 
-    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 --><title>Index - bauer 0.2.0 documentation</title>
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 --><title>Index - bauer 0.3.0 documentation</title>
 <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -159,7 +159,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">bauer 0.2.0 documentation</div></a>
+      <a href="index.html"><div class="brand">bauer 0.3.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -180,7 +180,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">bauer 0.2.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.3.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -203,12 +203,15 @@
 <li class="toctree-l2"><a class="reference internal" href="tutorial/lesson5.html">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tutorial/lesson8.html">Lesson 8: DDM vs probit on the Garcia magnitude task</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tutorial/lesson9.html">Lesson 9: Choice + Reaction Time Models — DDM and Race-Diffusion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/lesson10_fixed_vs_random_effects.html">Lesson 10: Fixed vs random effects (<code class="docutils literal notranslate"><span class="pre">fixed_regressors</span></code> / <code class="docutils literal notranslate"><span class="pre">random_regressors</span></code>)</a></li>
 </ul>
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Reference</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="history.html">History</a></li>
 </ul>
 
 </div>
@@ -244,7 +247,7 @@
           
 <section class="genindex-section">
   <h1 id="index">Index</h1>
-  <div class="genindex-jumpbox"><a href="#B"><strong>B</strong></a> | <a href="#C"><strong>C</strong></a> | <a href="#F"><strong>F</strong></a> | <a href="#G"><strong>G</strong></a> | <a href="#I"><strong>I</strong></a> | <a href="#L"><strong>L</strong></a> | <a href="#P"><strong>P</strong></a> | <a href="#R"><strong>R</strong></a> | <a href="#S"><strong>S</strong></a></div>
+  <div class="genindex-jumpbox"><a href="#B"><strong>B</strong></a> | <a href="#C"><strong>C</strong></a> | <a href="#E"><strong>E</strong></a> | <a href="#F"><strong>F</strong></a> | <a href="#G"><strong>G</strong></a> | <a href="#I"><strong>I</strong></a> | <a href="#L"><strong>L</strong></a> | <a href="#M"><strong>M</strong></a> | <a href="#P"><strong>P</strong></a> | <a href="#R"><strong>R</strong></a> | <a href="#S"><strong>S</strong></a></div>
 </section>
 <section id="B" class="genindex-section">
   <h2>B</h2>
@@ -278,11 +281,35 @@
   </tr></table>
 </section>
 
+<section id="E" class="genindex-section">
+  <h2>E</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api_reference.html#bauer.models.ExpectedUtilityRiskModel">ExpectedUtilityRiskModel (class in bauer.models)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api_reference.html#bauer.models.ExpectedUtilityRiskRegressionModel">ExpectedUtilityRiskRegressionModel (class in bauer.models)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
 <section id="F" class="genindex-section">
   <h2>F</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api_reference.html#bauer.core.BaseModel.fit_map_individual">fit_map_individual() (bauer.core.BaseModel method)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.FlexibleNoiseComparisonModel">FlexibleNoiseComparisonModel (class in bauer.models)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api_reference.html#bauer.models.FlexibleNoiseComparisonRegressionModel">FlexibleNoiseComparisonRegressionModel (class in bauer.models)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.FlexibleNoiseRiskModel">FlexibleNoiseRiskModel (class in bauer.models)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.FlexibleNoiseRiskRegressionModel">FlexibleNoiseRiskRegressionModel (class in bauer.models)</a>
 </li>
     </ul></td>
   </tr></table>
@@ -328,12 +355,20 @@
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api_reference.html#bauer.core.LapseModel">LapseModel (class in bauer.core)</a>
 </li>
-        <li><a href="api_reference.html#bauer.utils.data.load_garcia2022">load_garcia2022() (in module bauer.utils.data)</a>
+        <li><a href="api_reference.html#bauer.utils.data.load_bedi2026">load_bedi2026() (in module bauer.utils.data)</a>
 </li>
-        <li><a href="api_reference.html#bauer.utils.math.logistic">logistic() (in module bauer.utils.math)</a>
+        <li><a href="api_reference.html#bauer.utils.data.load_dehollander2024_risk">load_dehollander2024_risk() (in module bauer.utils.data)</a>
+</li>
+        <li><a href="api_reference.html#bauer.utils.data.load_dehollander2024_symbolic">load_dehollander2024_symbolic() (in module bauer.utils.data)</a>
+</li>
+        <li><a href="api_reference.html#bauer.utils.data.load_dehollander_tms_risk">load_dehollander_tms_risk() (in module bauer.utils.data)</a>
+</li>
+        <li><a href="api_reference.html#bauer.utils.data.load_garcia2022">load_garcia2022() (in module bauer.utils.data)</a>
 </li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api_reference.html#bauer.utils.math.logistic">logistic() (in module bauer.utils.math)</a>
+</li>
         <li><a href="api_reference.html#bauer.utils.math.logistic_np">logistic_np() (in module bauer.utils.math)</a>
 </li>
         <li><a href="api_reference.html#bauer.utils.math.logit">logit() (in module bauer.utils.math)</a>
@@ -341,6 +376,30 @@
         <li><a href="api_reference.html#bauer.utils.math.logit_derivative">logit_derivative() (in module bauer.utils.math)</a>
 </li>
         <li><a href="api_reference.html#bauer.utils.math.logit_np">logit_np() (in module bauer.utils.math)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.LossAversionModel">LossAversionModel (class in bauer.models)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.LossAversionRegressionModel">LossAversionRegressionModel (class in bauer.models)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="M" class="genindex-section">
+  <h2>M</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api_reference.html#bauer.models.MagnitudeComparisonLapseModel">MagnitudeComparisonLapseModel (class in bauer.models)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.MagnitudeComparisonLapseRegressionModel">MagnitudeComparisonLapseRegressionModel (class in bauer.models)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api_reference.html#bauer.models.MagnitudeComparisonModel">MagnitudeComparisonModel (class in bauer.models)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.MagnitudeComparisonRegressionModel">MagnitudeComparisonRegressionModel (class in bauer.models)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.FlexibleNoiseComparisonModel.make_dm">make_dm() (bauer.models.FlexibleNoiseComparisonModel method)</a>
 </li>
     </ul></td>
   </tr></table>
@@ -354,11 +413,21 @@
 </li>
         <li><a href="api_reference.html#bauer.utils.plotting.plot_prediction">plot_prediction() (in module bauer.utils.plotting)</a>
 </li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api_reference.html#bauer.utils.plotting.plot_subjectwise_parameters">plot_subjectwise_parameters() (in module bauer.utils.plotting)</a>
 </li>
         <li><a href="api_reference.html#bauer.core.BaseModel.ppc">ppc() (bauer.core.BaseModel method)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api_reference.html#bauer.models.ProspectTheoryModel">ProspectTheoryModel (class in bauer.models)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.PsychophysicalLapseModel">PsychophysicalLapseModel (class in bauer.models)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.PsychophysicalLapseRegressionModel">PsychophysicalLapseRegressionModel (class in bauer.models)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.PsychophysicalModel">PsychophysicalModel (class in bauer.models)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.PsychophysicalRegressionModel">PsychophysicalRegressionModel (class in bauer.models)</a>
 </li>
     </ul></td>
   </tr></table>
@@ -369,6 +438,18 @@
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api_reference.html#bauer.core.RegressionModel">RegressionModel (class in bauer.core)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.RiskLapseModel">RiskLapseModel (class in bauer.models)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.RiskLapseRegressionModel">RiskLapseRegressionModel (class in bauer.models)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api_reference.html#bauer.models.RiskModel">RiskModel (class in bauer.models)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.RiskModelProbabilityDistortion">RiskModelProbabilityDistortion (class in bauer.models)</a>
+</li>
+        <li><a href="api_reference.html#bauer.models.RiskRegressionModel">RiskRegressionModel (class in bauer.models)</a>
 </li>
     </ul></td>
   </tr></table>
@@ -422,7 +503,7 @@
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=938c9ccc"></script>
+</div><script src="_static/documentation_options.js?v=e259d695"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

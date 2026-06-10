@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood" href="lesson5.html"><link rel="prev" title="Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv)" href="lesson3.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Lesson 4: Flexible Noise Curves — FlexibleNoiseComparisonModel and FlexibleNoiseRiskModel - bauer 0.2.0 documentation</title>
+        <title>Lesson 4: Flexible Noise Curves — FlexibleNoiseComparisonModel and FlexibleNoiseRiskModel - bauer 0.3.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -162,7 +162,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">bauer 0.2.0 documentation</div></a>
+      <a href="../index.html"><div class="brand">bauer 0.3.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.2.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.3.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -206,12 +206,15 @@
 <li class="toctree-l2"><a class="reference internal" href="lesson5.html">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</a></li>
 <li class="toctree-l2"><a class="reference internal" href="lesson8.html">Lesson 8: DDM vs probit on the Garcia magnitude task</a></li>
 <li class="toctree-l2"><a class="reference internal" href="lesson9.html">Lesson 9: Choice + Reaction Time Models — DDM and Race-Diffusion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson10_fixed_vs_random_effects.html">Lesson 10: Fixed vs random effects (<code class="docutils literal notranslate"><span class="pre">fixed_regressors</span></code> / <code class="docutils literal notranslate"><span class="pre">random_regressors</span></code>)</a></li>
 </ul>
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Reference</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history.html">History</a></li>
 </ul>
 
 </div>
@@ -318,7 +321,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import arviz as az
-from bauer.utils.data import load_garcia2022, load_dehollander2024
+from bauer.utils.data import load_garcia2022, load_dehollander2024_symbolic
 from bauer.models import (MagnitudeComparisonModel, FlexibleNoiseComparisonModel,
                            RiskModel, FlexibleNoiseRiskModel)
 
@@ -367,8 +370,10 @@ df_mag = load_garcia2022(task=&#39;magnitude&#39;)
 print(f&quot;Garcia magnitude  |  subjects: {df_mag.index.get_level_values(&#39;subject&#39;).nunique()},  &quot;
       f&quot;trials: {len(df_mag)}&quot;)
 
-# de Hollander et al. (2024, bioRxiv) — Arabic-numeral gambles
-df_sym = load_dehollander2024(task=&#39;symbolic&#39;)
+# de Hollander et al. (2024, bioRxiv) — Arabic-numeral gambles. In bauer 0.3.0
+# this is loaded with the dedicated symbolic loader (the old
+# load_dehollander2024(task=&#39;symbolic&#39;) wrapper was removed).
+df_sym = load_dehollander2024_symbolic()
 print(f&quot;Arabic numerals   |  subjects: {df_sym.index.get_level_values(&#39;subject&#39;).nunique()},  &quot;
       f&quot;trials: {len(df_sym)}&quot;)
 </pre></div>
@@ -732,10 +737,16 @@ plt.tight_layout()
 stake_pal = dict(zip([&#39;Low stakes&#39;, &#39;Mid stakes&#39;, &#39;High stakes&#39;], sns.color_palette(&#39;YlOrRd&#39;, 3)))
 
 def add_model_ppc(df_orig, df_prepped, model, idata, model_name):
-    &quot;&quot;&quot;Two-step PPC via summarize_ppc_group.&quot;&quot;&quot;
-    ppc_df  = model.ppc(df_orig, idata, var_names=[&#39;ll_bernoulli&#39;])
-    ppc_ll  = ppc_df.xs(&#39;ll_bernoulli&#39;, level=&#39;variable&#39;)
-    sample_cols = ppc_ll.columns.tolist()
+    &quot;&quot;&quot;Two-step PPC via summarize_ppc_group.
+
+    bauer 0.3.0 unified PPC: model.ppc(data, idata) returns a long frame indexed
+    by (paradigm index..., ppc_sample) with one &#39;simulated_choice&#39; column.
+    Unstack ppc_sample to wide layout and join the paradigm columns we need.
+    &quot;&quot;&quot;
+    ppc_df  = model.ppc(df_orig, idata)
+    ppc_ll  = ppc_df[&#39;simulated_choice&#39;].unstack(&#39;ppc_sample&#39;)
+    ppc_ll  = ppc_ll.join(df_orig[[&#39;p1&#39;, &#39;n1&#39;, &#39;n2&#39;]])
+    sample_cols = [c for c in ppc_ll.columns if c not in (&#39;p1&#39;, &#39;n1&#39;, &#39;n2&#39;)]
 
     ppc_flat = ppc_ll.reset_index()
     risky_first = (ppc_flat[&#39;p1&#39;] == 0.55)
@@ -960,7 +971,7 @@ if &#39;AffineNoise&#39; in compare_sym.index and &#39;FlexNoise&#39; in compare
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=938c9ccc"></script>
+</div><script src="../_static/documentation_options.js?v=e259d695"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>

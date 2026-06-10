@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Architecture &amp; Concepts" href="concepts.html"><link rel="prev" title="bauer" href="index.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="prev" title="Usage" href="usage.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Installation - bauer 0.3.0 documentation</title>
+        <title>History - bauer 0.3.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -191,8 +191,8 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
-<ul class="current">
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Installation</a></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="concepts.html">Architecture &amp; Concepts</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
@@ -210,10 +210,10 @@
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Reference</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
-<li class="toctree-l1"><a class="reference internal" href="history.html">History</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">History</a></li>
 </ul>
 
 </div>
@@ -234,7 +234,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="_sources/installation.rst.txt" title="View this page">
+  <a class="muted-link" href="_sources/history.rst.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -252,80 +252,131 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="installation">
-<h1>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h1>
-<p>bauer has three install “profiles” depending on what you need. Pick one.</p>
-<section id="choice-only-models-cpu">
-<h2>1. Choice-only models (CPU)<a class="headerlink" href="#choice-only-models-cpu" title="Link to this heading">¶</a></h2>
-<p>For the static (cumulative-normal) choice models — psychophysical, magnitude
-comparison, risky choice — the base install is enough:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ruffgroup/bauer
-<span class="nb">cd</span><span class="w"> </span>bauer
-pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.<span class="w">          </span><span class="c1"># (or: pip install bauer, once on PyPI)</span>
-</pre></div>
-</div>
-</section>
-<section id="ddm-rdm-models-the-fast-sampler-cpu-laptop">
-<h2>2. DDM / RDM models + the fast sampler (CPU laptop)<a class="headerlink" href="#ddm-rdm-models-the-fast-sampler-cpu-laptop" title="Link to this heading">¶</a></h2>
-<p>The reaction-time models (drift-diffusion, race-diffusion) need the WFPT
-likelihood from <strong>HSSM</strong>, and you’ll want the <strong>numpyro (JAX) backend</strong>, which
-is far faster than the default <code class="docutils literal notranslate"><span class="pre">pymc</span></code> backend (see
-<a class="reference internal" href="#backend-speed"><span class="std std-ref">Choosing a sampler backend (this is the speed knob)</span></a> below). The <code class="docutils literal notranslate"><span class="pre">[ddm]</span></code> extra pulls all of this:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[ddm]&quot;</span><span class="w">   </span><span class="c1"># hssm + jax (CPU) + numpyro + blackjax</span>
-</pre></div>
-</div>
-</section>
-<section id="gpu-workstation-or-cluster">
-<h2>3. GPU (workstation or cluster)<a class="headerlink" href="#gpu-workstation-or-cluster" title="Link to this heading">¶</a></h2>
-<p>A single GPU gives a large additional speedup (a hierarchical n=64 DDM is
-~45 min on an L4 GPU vs many hours on CPU). <strong>GPU use is decided entirely by
-which JAX you install</strong> — there is no code flag. Install the CUDA build of
-JAX on top of the <code class="docutils literal notranslate"><span class="pre">[ddm]</span></code> extra:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[ddm]&quot;</span>
-pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;jax[cuda12]&quot;</span><span class="w">     </span><span class="c1"># CUDA 12 build of JAX</span>
-</pre></div>
-</div>
-<p>Then just fit with <code class="docutils literal notranslate"><span class="pre">backend='numpyro'</span></code> (below) — bauer uses the GPU
-automatically; you do <strong>not</strong> pass a device argument, and <code class="docutils literal notranslate"><span class="pre">chain_method</span></code> is
-auto-set to <code class="docutils literal notranslate"><span class="pre">'vectorized'</span></code> so the chains run together on the one GPU.</p>
-</section>
-<section id="choosing-a-sampler-backend-this-is-the-speed-knob">
-<span id="backend-speed"></span><h2>Choosing a sampler backend (this is the speed knob)<a class="headerlink" href="#choosing-a-sampler-backend-this-is-the-speed-knob" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">model.sample()</span></code> takes a <code class="docutils literal notranslate"><span class="pre">backend</span></code>:</p>
+          <section id="history">
+<h1>History<a class="headerlink" href="#history" title="Link to this heading">¶</a></h1>
+<section id="id1">
+<h2>0.3.0 (2026-06-10)<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h2>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>Breaking changes since 0.2.0</strong> — read before re-running old analyses:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">backend='pymc'</span></code> (the <strong>default</strong>) — PyMC’s NUTS. Reliable but <strong>slow</strong>.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">backend='numpyro'</span></code> — JAX-backed NUTS. <strong>Much faster</strong> (~3–10× on CPU,
-~5–30× on GPU), and it parallelises the chains automatically.</p></li>
+<li><p><strong>Group-level SD prior default changed</strong> <code class="docutils literal notranslate"><span class="pre">halfcauchy</span></code> → <code class="docutils literal notranslate"><span class="pre">halfnormal</span></code>
+(<code class="docutils literal notranslate"><span class="pre">BaseModel.group_sd_dist</span></code>). This silently changes the posterior of
+<strong>every hierarchical regression fit</strong>. HalfCauchy’s infinite-variance
+tail let poorly-identified group SDs run away (funnels, divergences);
+HalfNormal’s light tail tames them. To reproduce pre-0.3.0 numbers,
+set <code class="docutils literal notranslate"><span class="pre">model.group_sd_dist</span> <span class="pre">=</span> <span class="pre">'halfcauchy'</span></code> per instance.</p></li>
+<li><p><strong>The</strong> <code class="docutils literal notranslate"><span class="pre">regressors=</span></code> <strong>keyword is deprecated</strong> in favour of the
+explicit <code class="docutils literal notranslate"><span class="pre">fixed_regressors=</span></code> (population-mean design, no per-subject
+offset) and <code class="docutils literal notranslate"><span class="pre">random_regressors=</span></code> (per-subject random effect) split.
+<code class="docutils literal notranslate"><span class="pre">regressors=</span></code> still works bit-for-bit (it maps to a random slope on
+every column) but now emits a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code>.</p></li>
+<li><p><strong>Default lapse group prior changed</strong> to Beta “1/x”
+(<code class="docutils literal notranslate"><span class="pre">p_lapse</span></code> / <code class="docutils literal notranslate"><span class="pre">p_outlier</span></code> transform <code class="docutils literal notranslate"><span class="pre">'beta'</span></code>); the old logit-Normal
+prior is opt-in via <code class="docutils literal notranslate"><span class="pre">model.lapse_group</span> <span class="pre">=</span> <span class="pre">'logit_normal'</span></code>.</p></li>
 </ul>
-<p>So for any non-trivial fit you want <code class="docutils literal notranslate"><span class="pre">backend='numpyro'</span></code>; on a GPU machine it
-then uses the GPU with no further changes. (<code class="docutils literal notranslate"><span class="pre">blackjax</span></code> is an alternative
-JAX backend; not generally needed.)</p>
-</section>
-<section id="conda-environments">
-<h2>Conda environments<a class="headerlink" href="#conda-environments" title="Link to this heading">¶</a></h2>
-<p>Equivalent conda envs are bundled: <code class="docutils literal notranslate"><span class="pre">environment.yml</span></code> (CPU) and
-<code class="docutils literal notranslate"><span class="pre">environment_cuda.yml</span></code> (GPU, with <code class="docutils literal notranslate"><span class="pre">jax[cuda12]</span></code>). Each ends by installing
-bauer editable:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>environment.yml<span class="w">        </span><span class="c1"># CPU, &#39;bauer&#39; env</span>
-<span class="c1"># or, on a GPU box:</span>
-conda<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>environment_cuda.yml<span class="w">   </span><span class="c1"># GPU, &#39;bauer_cuda&#39; env</span>
-conda<span class="w"> </span>activate<span class="w"> </span>bauer
-</pre></div>
 </div>
+<p><strong>Sampling robustness and convergence</strong> (what makes the DDM/RDM models above
+actually mix on real, multi-subject data):</p>
+<ul class="simple">
+<li><p><strong>RT outlier contaminant</strong> (<code class="docutils literal notranslate"><span class="pre">p_outlier</span></code>) baked into every DDM and
+race-diffusion model (HSSM-style mixture). On a fraction <code class="docutils literal notranslate"><span class="pre">p_outlier</span></code> of
+trials the response is a flat-over-RT lapse rather than the diffusion
+process. <strong>Fixed</strong> <code class="docutils literal notranslate"><span class="pre">p_outlier</span> <span class="pre">=</span> <span class="pre">0.05</span></code> by default (set <code class="docutils literal notranslate"><span class="pre">0.0</span></code> for pure
+WFPT, <code class="docutils literal notranslate"><span class="pre">'hierarchical'</span></code> to estimate it). This is what cracks the
+66-subject DDM: the slow-RT tail otherwise breaks convergence, inflates
+Pareto-k (unreliable LOO), and shows up as a PPC tail misfit — one cause,
+three symptoms, all fixed (r̂ 1.59 → 1.00, min ESS 7 → 3200+).</p></li>
+<li><p><strong>Configurable group-SD prior</strong> <code class="docutils literal notranslate"><span class="pre">group_sd_dist</span></code> (<code class="docutils literal notranslate"><span class="pre">'halfnormal'</span></code> |
+<code class="docutils literal notranslate"><span class="pre">'halfcauchy'</span></code>); see the breaking note above.</p></li>
+<li><p><strong>Opt-in multipath Pathfinder init</strong> (<code class="docutils literal notranslate"><span class="pre">find_init='pathfinder'</span></code>,
+MAP-seeded) for genuinely multimodal posteriors; <code class="docutils literal notranslate"><span class="pre">'mapjitter'</span></code> remains
+the default and is usually sufficient once the contaminant is in.</p></li>
+<li><p>New guide <code class="docutils literal notranslate"><span class="pre">notes/fitting_ddm_without_divergences.md</span></code> in the source tree —
+the full recipe and a symptom → diagnosis → fix catalogue for DDM/RDM
+convergence.</p></li>
+</ul>
+<p><strong>Fixed vs random effects API</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">fixed_regressors</span></code> / <code class="docutils literal notranslate"><span class="pre">random_regressors</span></code> on the regression models
+(static choice and the DDM magnitude-comparison regression model), letting
+you put a population-mean (fixed) effect on a between-subjects covariate
+while keeping a per-subject random intercept — the correct parameterisation
+for group contrasts (a random slope on a between-subjects covariate is
+non-identified; bauer now warns). New tutorial: <em>Fixed vs random effects</em>.</p></li>
+</ul>
+<p><strong>Other modelling additions</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">memory_as_sv</span></code> DDM variant: routes the frozen memory noise into Ratcliff
+across-trial drift variability <code class="docutils literal notranslate"><span class="pre">sv</span></code> (perceptual noise stays within-trial),
+making the two noise sources separately identifiable. Composes with the
+contaminant.</p></li>
+<li><p>Race-diffusion <code class="docutils literal notranslate"><span class="pre">fit_w_d</span></code> / <code class="docutils literal notranslate"><span class="pre">fit_w_s</span></code> toggles to fix the discriminative
+gain (w_d ≡ 1) or ablate the overall-magnitude (sum) drift term.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">consistent_choice_noise</span></code> for static choice models: normalise the choice
+likelihood by the SD of the noisy posterior mean (KLW/DDM-consistent),
+matching how the accumulator models treat decision noise.</p></li>
+</ul>
+<p>The original 0.3.0 feature set (unreleased until now):</p>
+<ul class="simple">
+<li><p><strong>DDM and race-diffusion models</strong> for choice + RT data, sharing the same
+Bayesian observer cognitive front-end as the static-choice models:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">DDMMagnitudeComparisonModel</span></code>, <code class="docutils literal notranslate"><span class="pre">DDMFlexibleNoiseComparisonModel</span></code>,
+<code class="docutils literal notranslate"><span class="pre">DDMRiskModel</span></code>, <code class="docutils literal notranslate"><span class="pre">DDMFlexibleNoiseRiskModel</span></code> (+ regression variant)
+— Wiener WFPT likelihood via <code class="docutils literal notranslate"><span class="pre">hssm.likelihoods.logp_ddm</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RaceDiffusionMagnitudeComparisonModel</span></code>,
+<code class="docutils literal notranslate"><span class="pre">RaceDiffusionFlexibleNoiseComparisonModel</span></code>,
+<code class="docutils literal notranslate"><span class="pre">RaceDiffusionRiskModel</span></code>, <code class="docutils literal notranslate"><span class="pre">RaceDiffusionFlexibleNoiseRiskModel</span></code>
+(+ regression variant) — analytical Wald-race likelihood with
+<code class="docutils literal notranslate"><span class="pre">advantage=True</span></code> decomposition by default
+(van Ravenzwaaij 2020 style).</p></li>
+</ul>
+</li>
+<li><p><strong>JAX backend</strong> support via <code class="docutils literal notranslate"><span class="pre">--backend</span> <span class="pre">{numpyro,blackjax}</span></code> in the
+CLI fit scripts. JAX-NUTS is 1.5–3× faster on CPU and 5–30× faster on
+GPU (NVIDIA L4, with <code class="docutils literal notranslate"><span class="pre">chain_method='vectorized'</span></code> so chains run in
+parallel on a single device).</p></li>
+<li><p><strong>CLI fit scripts</strong> under <code class="docutils literal notranslate"><span class="pre">bauer/scripts/</span></code>:
+<code class="docutils literal notranslate"><span class="pre">fit_garcia.py</span></code>, <code class="docutils literal notranslate"><span class="pre">fit_dehollander2024.py</span></code>, <code class="docutils literal notranslate"><span class="pre">fit_dehollander_tms.py</span></code>.</p></li>
+<li><p><strong>SLURM job templates</strong> under <code class="docutils literal notranslate"><span class="pre">bauer/scripts/slurm_jobs/</span></code> for cluster
+fitting, including a CUDA-env build job, a generic <code class="docutils literal notranslate"><span class="pre">run_fit.sh</span></code>
+wrapper, a JAX backend benchmark, and a full per-dataset production
+submit script.</p></li>
+<li><p><strong>Bundled datasets</strong> added (loaders in <code class="docutils literal notranslate"><span class="pre">bauer.utils.data</span></code>):
+<code class="docutils literal notranslate"><span class="pre">load_dehollander2024_risk</span></code> (dotcloud, N=30),
+<code class="docutils literal notranslate"><span class="pre">load_dehollander2024_symbolic</span></code> (Arabic-numeral risk, N=58),
+<code class="docutils literal notranslate"><span class="pre">load_dehollander_tms_risk</span></code> (TMS risky choice, N=35 sessions 2/3),
+<code class="docutils literal notranslate"><span class="pre">load_bedi2026</span></code> (Bedi 2026 abstract-value estimation pilot, N=13).</p></li>
+<li><p><strong>Unified PPC API</strong>: <code class="docutils literal notranslate"><span class="pre">BaseModel.ppc</span></code> now returns the same long-format
+DataFrame as the DDM/RDM PPCs — index = paradigm levels + <code class="docutils literal notranslate"><span class="pre">ppc_sample</span></code>,
+single <code class="docutils literal notranslate"><span class="pre">simulated_choice</span></code> column.</p></li>
+<li><p>Renamed <code class="docutils literal notranslate"><span class="pre">polynomial_order</span></code> → <code class="docutils literal notranslate"><span class="pre">spline_order</span></code> throughout (no
+backwards-compat alias).</p></li>
+<li><p>Cleanup: removed <code class="docutils literal notranslate"><span class="pre">SafeVsRisky*</span></code> family, <code class="docutils literal notranslate"><span class="pre">RNPModel</span></code>, several
+deprecated <code class="docutils literal notranslate"><span class="pre">prior_estimate</span></code> options in <code class="docutils literal notranslate"><span class="pre">RiskModel</span></code>, and the
+<code class="docutils literal notranslate"><span class="pre">incorporate_probability</span></code> parameter. 26 stale dev notebooks deleted;
+bundled CSVs trimmed of derived columns.</p></li>
+</ul>
 </section>
-<section id="development-docs">
-<h2>Development / docs<a class="headerlink" href="#development-docs" title="Link to this heading">¶</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span><span class="w">      </span><span class="c1"># flake8 / pytest / pre-commit</span>
-pre-commit<span class="w"> </span>install<span class="w">           </span><span class="c1"># run flake8 on every commit (matches CI)</span>
-pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[docs]&quot;</span><span class="w">     </span><span class="c1"># sphinx / nbsphinx, to build these docs</span>
-</pre></div>
-</div>
+<section id="id2">
+<h2>0.2.0 (2026-04-03)<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Refactored model classes into a dedicated <code class="docutils literal notranslate"><span class="pre">bauer/models/</span></code> package
+(<code class="docutils literal notranslate"><span class="pre">psychophysics</span></code>, <code class="docutils literal notranslate"><span class="pre">magnitude</span></code>, <code class="docutils literal notranslate"><span class="pre">risky_choice</span></code> submodules).</p></li>
+<li><p>Added <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> with fully declared runtime and optional dependencies.</p></li>
+<li><p>Added <code class="docutils literal notranslate"><span class="pre">environment.yml</span></code> for reproducible conda environment setup.</p></li>
+<li><p>Added tutorial notebooks covering psychophysics / magnitude comparison,
+risky choice with the KLW model, and de Hollander et al. (2024) stake effects.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">load_dehollander2024()</span></code> data loader added to <code class="docutils literal notranslate"><span class="pre">bauer.utils.data</span></code>.</p></li>
+<li><p>Documentation expanded with API reference, concepts page, and tutorial.</p></li>
+</ul>
 </section>
-<section id="runtime-dependencies">
-<h2>Runtime dependencies<a class="headerlink" href="#runtime-dependencies" title="Link to this heading">¶</a></h2>
-<p>Core (always): <code class="docutils literal notranslate"><span class="pre">pymc</span> <span class="pre">&gt;=</span> <span class="pre">5</span></code>, <code class="docutils literal notranslate"><span class="pre">pytensor</span></code>, <code class="docutils literal notranslate"><span class="pre">pandas</span></code>, <code class="docutils literal notranslate"><span class="pre">numpy</span></code>, <code class="docutils literal notranslate"><span class="pre">patsy</span></code>,
-<code class="docutils literal notranslate"><span class="pre">arviz</span> <span class="pre">&lt;</span> <span class="pre">1.0</span></code>, <code class="docutils literal notranslate"><span class="pre">scipy</span></code>, <code class="docutils literal notranslate"><span class="pre">seaborn</span></code>, <code class="docutils literal notranslate"><span class="pre">matplotlib</span></code>. The <code class="docutils literal notranslate"><span class="pre">[ddm]</span></code> extra
-adds <code class="docutils literal notranslate"><span class="pre">hssm</span></code>, <code class="docutils literal notranslate"><span class="pre">jax</span></code>, <code class="docutils literal notranslate"><span class="pre">numpyro</span></code>, <code class="docutils literal notranslate"><span class="pre">blackjax</span></code>.</p>
+<section id="id3">
+<h2>0.1.0 (2022-11-17)<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>First release on PyPI.</p></li>
+</ul>
 </section>
 </section>
 
@@ -334,23 +385,15 @@ adds <code class="docutils literal notranslate"><span class="pre">hssm</span></c
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="concepts.html">
-              <div class="page-info">
-                <div class="context">
-                  <span>Next</span>
-                </div>
-                <div class="title">Architecture &amp; Concepts</div>
-              </div>
-              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
-            </a>
-          <a class="prev-page" href="index.html">
+          
+          <a class="prev-page" href="usage.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Home</div>
+                <div class="title">Usage</div>
                 
               </div>
             </a>
@@ -384,14 +427,10 @@ adds <code class="docutils literal notranslate"><span class="pre">hssm</span></c
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Installation</a><ul>
-<li><a class="reference internal" href="#choice-only-models-cpu">1. Choice-only models (CPU)</a></li>
-<li><a class="reference internal" href="#ddm-rdm-models-the-fast-sampler-cpu-laptop">2. DDM / RDM models + the fast sampler (CPU laptop)</a></li>
-<li><a class="reference internal" href="#gpu-workstation-or-cluster">3. GPU (workstation or cluster)</a></li>
-<li><a class="reference internal" href="#choosing-a-sampler-backend-this-is-the-speed-knob">Choosing a sampler backend (this is the speed knob)</a></li>
-<li><a class="reference internal" href="#conda-environments">Conda environments</a></li>
-<li><a class="reference internal" href="#development-docs">Development / docs</a></li>
-<li><a class="reference internal" href="#runtime-dependencies">Runtime dependencies</a></li>
+<li><a class="reference internal" href="#">History</a><ul>
+<li><a class="reference internal" href="#id1">0.3.0 (2026-06-10)</a></li>
+<li><a class="reference internal" href="#id2">0.2.0 (2026-04-03)</a></li>
+<li><a class="reference internal" href="#id3">0.1.0 (2022-11-17)</a></li>
 </ul>
 </li>
 </ul>

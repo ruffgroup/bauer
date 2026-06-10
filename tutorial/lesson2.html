@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv)" href="lesson3.html"><link rel="prev" title="Lesson 1: An Introduction to Psychophysical Modelling" href="lesson1.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Lesson 2: Risky Choice — Psychometric Functions and the Noise–Risk Link - bauer 0.2.0 documentation</title>
+        <title>Lesson 2: Risky Choice — Psychometric Functions and the Noise–Risk Link - bauer 0.3.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -162,7 +162,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">bauer 0.2.0 documentation</div></a>
+      <a href="../index.html"><div class="brand">bauer 0.3.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.2.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.3.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -206,12 +206,15 @@
 <li class="toctree-l2"><a class="reference internal" href="lesson5.html">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</a></li>
 <li class="toctree-l2"><a class="reference internal" href="lesson8.html">Lesson 8: DDM vs probit on the Garcia magnitude task</a></li>
 <li class="toctree-l2"><a class="reference internal" href="lesson9.html">Lesson 9: Choice + Reaction Time Models — DDM and Race-Diffusion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson10_fixed_vs_random_effects.html">Lesson 10: Fixed vs random effects (<code class="docutils literal notranslate"><span class="pre">fixed_regressors</span></code> / <code class="docutils literal notranslate"><span class="pre">random_regressors</span></code>)</a></li>
 </ul>
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Reference</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history.html">History</a></li>
 </ul>
 
 </div>
@@ -504,7 +507,7 @@ Non-symbolic:  15150 trials, 64 subjects
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 4 jobs)
 NUTS: [nu_mu_untransformed, nu_sd, nu_offset, bias_mu, bias_sd, bias_offset]
-Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 59 seconds.
+Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 49 seconds.
 The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
 The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
 </pre></div></div>
@@ -525,7 +528,7 @@ Symbolic fit done
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 4 jobs)
 NUTS: [nu_mu_untransformed, nu_sd, nu_offset, bias_mu, bias_sd, bias_offset]
-Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 61 seconds.
+Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 47 seconds.
 The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
 The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
 </pre></div></div>
@@ -653,8 +656,8 @@ Non-symbolic fit done
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Symbolic         noise-bias ρ = -0.402 (p = 0.0010)
-Non-symbolic     noise-bias ρ = -0.383 (p = 0.0018)
+Symbolic         noise-bias ρ = -0.400 (p = 0.0011)
+Non-symbolic     noise-bias ρ = -0.380 (p = 0.0019)
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
@@ -842,7 +845,7 @@ Non-symbolic     noise-bias ρ = -0.383 (p = 0.0018)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 4 jobs)
 NUTS: [evidence_sd_mu, evidence_sd_sd, evidence_sd_offset, prior_sd_mu, prior_sd_sd, prior_sd_offset]
-Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 929 seconds.
+Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 704 seconds.
 The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
 The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
 </pre></div></div>
@@ -969,7 +972,7 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=938c9ccc"></script>
+</div><script src="../_static/documentation_options.js?v=e259d695"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>

@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="API Reference" href="../api_reference.html"><link rel="prev" title="Lesson 8: DDM vs probit on the Garcia magnitude task" href="lesson8.html">
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Lesson 10: Fixed vs random effects (fixed_regressors / random_regressors)" href="lesson10_fixed_vs_random_effects.html"><link rel="prev" title="Lesson 8: DDM vs probit on the Garcia magnitude task" href="lesson8.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Lesson 9: Choice + Reaction Time Models — DDM and Race-Diffusion - bauer 0.2.0 documentation</title>
+        <title>Lesson 9: Choice + Reaction Time Models — DDM and Race-Diffusion - bauer 0.3.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -162,7 +162,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">bauer 0.2.0 documentation</div></a>
+      <a href="../index.html"><div class="brand">bauer 0.3.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.2.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.3.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -206,12 +206,15 @@
 <li class="toctree-l2"><a class="reference internal" href="lesson5.html">Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood</a></li>
 <li class="toctree-l2"><a class="reference internal" href="lesson8.html">Lesson 8: DDM vs probit on the Garcia magnitude task</a></li>
 <li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Lesson 9: Choice + Reaction Time Models — DDM and Race-Diffusion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lesson10_fixed_vs_random_effects.html">Lesson 10: Fixed vs random effects (<code class="docutils literal notranslate"><span class="pre">fixed_regressors</span></code> / <code class="docutils literal notranslate"><span class="pre">random_regressors</span></code>)</a></li>
 </ul>
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Reference</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history.html">History</a></li>
 </ul>
 
 </div>
@@ -572,45 +575,12 @@ Dropped 67 / 1635 trials with rt &lt; 0.20s (4.1%); min rt now 0.202s.
 </pre></div>
 </div>
 </div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Initializing NUTS using adapt_full...
-Multiprocess sampling (4 chains in 4 jobs)
-NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset, n2_evidence_sd_mu_untransformed, n2_evidence_sd_sd, n2_evidence_sd_offset, prior_mu_mu, prior_mu_sd, prior_mu_offset, prior_sd_mu_untransformed, prior_sd_sd, prior_sd_offset, a_mu_untransformed, a_sd, a_offset, t0_mu_untransformed, t0_sd, t0_offset]
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "d5558157a08b4abc80f9eae8a69223dc", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Sampling 4 chains for 600 tune and 600 draw iterations (2_400 + 2_400 draws total) took 172 seconds.
-There were 8 divergences after tuning. Increase `target_accept` or reparameterize.
-The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
-The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
-</pre></div></div>
-</div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Saved ddm fit to /Users/gdehol/.bauer_tutorial_cache/garcia_n8_rtmin200_ddm.nc
+Loading cached ddm fit from /Users/gdehol/.bauer_tutorial_cache/garcia_n8_rtmin200_ddm.nc
 </pre></div></div>
 </div>
 <p>(We use <code class="docutils literal notranslate"><span class="pre">draws=600,</span> <span class="pre">tune=600</span></code> to keep tutorial wall time manageable. For production fits, use the bauer defaults <code class="docutils literal notranslate"><span class="pre">draws=1000,</span> <span class="pre">tune=1000</span></code> — see lesson 4.)</p>
@@ -1095,46 +1065,12 @@ Max r̂:       1.010
 </pre></div>
 </div>
 </div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Initializing NUTS using adapt_full...
-Multiprocess sampling (2 chains in 2 jobs)
-NUTS: [n1_evidence_sd_mu_untransformed, n1_evidence_sd_sd, n1_evidence_sd_offset, n2_evidence_sd_mu_untransformed, n2_evidence_sd_sd, n2_evidence_sd_offset, prior_mu_mu, prior_mu_sd, prior_mu_offset, prior_sd_mu_untransformed, prior_sd_sd, prior_sd_offset, w_0_mu_untransformed, w_0_sd, w_0_offset, a_mu_untransformed, a_sd, a_offset, t0_mu_untransformed, t0_sd, t0_offset]
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "3177287e220d4445a1f56773f982d3e4", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area rendered_html docutils container">
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 123 seconds.
-There were 5 divergences after tuning. Increase `target_accept` or reparameterize.
-We recommend running at least 4 chains for robust computation of convergence diagnostics
-The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
-The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
-</pre></div></div>
-</div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Saved rdm_noadv fit to /Users/gdehol/.bauer_tutorial_cache/garcia_n8_rtmin200_rdm_noadv.nc
+Loading cached rdm_noadv fit from /Users/gdehol/.bauer_tutorial_cache/garcia_n8_rtmin200_rdm_noadv.nc
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
@@ -1236,12 +1172,12 @@ Saved rdm_noadv fit to /Users/gdehol/.bauer_tutorial_cache/garcia_n8_rtmin200_rd
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="../api_reference.html">
+          <a class="next-page" href="lesson10_fixed_vs_random_effects.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">API Reference</div>
+                <div class="title">Lesson 10: Fixed vs random effects (<code class="docutils literal notranslate"><span class="pre">fixed_regressors</span></code> / <code class="docutils literal notranslate"><span class="pre">random_regressors</span></code>)</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -1320,7 +1256,7 @@ Saved rdm_noadv fit to /Users/gdehol/.bauer_tutorial_cache/garcia_n8_rtmin200_rd
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=938c9ccc"></script>
+</div><script src="../_static/documentation_options.js?v=e259d695"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
