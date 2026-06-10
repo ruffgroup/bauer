@@ -1057,10 +1057,22 @@ class LapseModel(BaseModel):
     lapse_mu_mean = 0.02
     lapse_mu_kappa = 8.0
     lapse_kappa_sd = 3.0
+    # ``p_lapse`` mirrors the DDM/RDM ``p_outlier`` API:
+    #   - None (default): the per-subject lapse rate is estimated hierarchically
+    #     (the original, backward-compatible behaviour) under ``lapse_group``.
+    #   - a FLOAT: the choice-lapse rate is FIXED at that value; it is NOT a
+    #     sampled parameter, so it cannot funnel/diverge. Useful for stabilising
+    #     hard geometries (e.g. full-prior estimation) where an unmodelled lapse
+    #     hurts convergence but a free hierarchical lapse trades one funnel for
+    #     another.
+    p_lapse = None
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
 
+        if isinstance(self.p_lapse, (int, float)):
+            # Fixed choice-lapse rate: not a free parameter.
+            return pars
         pars['p_lapse'] = _lapse_param_spec(self.lapse_group,
                                             self.lapse_mu_mean,
                                             self.lapse_mu_kappa,
@@ -1074,7 +1086,10 @@ class LapseModel(BaseModel):
 
     def get_model_inputs(self, parameters):
         model_inputs = super().get_model_inputs(parameters)
-        model_inputs['p_lapse'] = parameters['p_lapse']
+        if isinstance(self.p_lapse, (int, float)):
+            model_inputs['p_lapse'] = pt.constant(float(self.p_lapse))
+        else:
+            model_inputs['p_lapse'] = parameters['p_lapse']
         return model_inputs
 
 
