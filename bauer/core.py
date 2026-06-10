@@ -3,7 +3,7 @@ import warnings
 import pandas as pd
 import pymc as pm
 import numpy as np
-from .utils.bayes import cumulative_normal, get_diff_dist, get_posterior
+from .utils.bayes import cumulative_normal, get_diff_dist, get_posterior, posterior_mean_sd
 from .utils.math import logistic, softplus_np, logistic_np, logit_np, inverse_softplus_np
 import pytensor.tensor as pt
 from patsy import dmatrix, build_design_matrices
@@ -104,6 +104,11 @@ class BaseModel(object):
     # (verified: vectorized regression-DDM converges ~1/7 seeds without it).
     # ``None`` = use the backend's default init.
     recommended_init: str | None = None
+    # KLW-consistent posterior-mean-SD choice noise: the static choice
+    # likelihood normalizes by the SD of the noisy posterior mean (w*sigma_e),
+    # not the raw evidence SD. Default False keeps the historical behaviour;
+    # accumulators (DDM/RDM) already use posterior_mean_sd internally.
+    consistent_choice_noise = False
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -170,7 +175,16 @@ class BaseModel(object):
                                           model_inputs['n2_evidence_mu'],
                                           model_inputs['n2_evidence_sd'])
 
-        diff_mu, diff_sd = get_diff_dist(post_n2_mu, model_inputs['n2_evidence_sd'], post_n1_mu, model_inputs['n1_evidence_sd'])
+        # KLW-consistent noise: the decision variable is the noisy posterior
+        # mean (mu_hat = w*r), whose across-trial SD is w*sigma_e
+        # (posterior_mean_sd), not the raw evidence SD. Default keeps the
+        # historical raw-evidence_sd normalization (back-compat).
+        if getattr(self, 'consistent_choice_noise', False) and not getattr(self, 'flat_observer_prior', False):
+            sd1 = posterior_mean_sd(model_inputs['n1_prior_sd'], model_inputs['n1_evidence_sd'])
+            sd2 = posterior_mean_sd(model_inputs['n2_prior_sd'], model_inputs['n2_evidence_sd'])
+        else:
+            sd1, sd2 = model_inputs['n1_evidence_sd'], model_inputs['n2_evidence_sd']
+        diff_mu, diff_sd = get_diff_dist(post_n2_mu, sd2, post_n1_mu, sd1)
 
         if self.save_trialwise_n_estimates:
             pm.Deterministic('n1_hat', post_n1_mu)
