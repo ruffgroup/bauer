@@ -101,11 +101,17 @@ def _value_from_theta_hat(posterior, ori_grid, G_on_grid, d_ori, q_per=Q_PER):
     -------
     (C, S, M) tensor of value estimates.
     """
-    # Loss of each candidate estimate under the posterior: (S, M, O_cand)
+    # Loss of each candidate estimate under the posterior: (S, M, O_cand).
+    # Written as a matmul rather than broadcast-and-sum: the latter materialises
+    # an (S, O, M, O_cand) intermediate, which is O(N^3) per subject and runs a
+    # 26-subject fit out of 64 GB at N = 101.
     cos_dt = ptm.cos(ori_grid[:, None] - ori_grid[None, :])          # (O, O_cand)
     loss_kernel = (1.0 - cos_dt) ** (q_per / 2.0)
-    loss = pt.sum(posterior[:, :, :, None] * loss_kernel[None, :, None, :] * d_ori,
-                  axis=1)                                            # (S, M, O_cand)
+    post_sm_o = posterior.dimshuffle(0, 2, 1)                        # (S, M, O)
+    S, M, O = post_sm_o.shape[0], post_sm_o.shape[1], post_sm_o.shape[2]
+    loss = pt.dot(pt.reshape(post_sm_o, (S * M, O)),
+                  loss_kernel * d_ori)                               # (S*M, O_cand)
+    loss = pt.reshape(loss, (S, M, loss_kernel.shape[1]))            # (S, M, O_cand)
 
     # Softmin.  tau = loss increment for a one-cell error, so the weights have
     # an effective width of about one grid cell.
@@ -717,9 +723,16 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
 
         # p(response_v | source_v) = Σ_m p(m_v | source_v) * pushforward_weights(m_v)
         # Shape: (S, C, N_source, V)
-        p_resp_given_source = pt.sum(
-            p_mv_given_v[:, :, :, :, None] * val_weights2[:, :, None, :, :] * d_val,
-            axis=3)  # (S, C, N_source, V)
+        # (S, C, N_source, N_rep) x (S, C, N_rep, V) -> (S, C, N_source, V).
+        # batched_dot rather than broadcast-and-sum: the latter builds an
+        # (S, C, N_source, N_rep, V) intermediate, O(N^3) per subject.
+        _S, _C = p_mv_given_v.shape[0], p_mv_given_v.shape[1]
+        _Ns, _Nr = p_mv_given_v.shape[2], p_mv_given_v.shape[3]
+        _V = val_weights2.shape[3]
+        p_resp_given_source = pt.reshape(
+            pt.batched_dot(pt.reshape(p_mv_given_v, (_S * _C, _Ns, _Nr)),
+                           pt.reshape(val_weights2, (_S * _C, _Nr, _V))) * d_val,
+            (_S, _C, _Ns, _V))
 
         # Marginalize over v_per:
         # p_response(v_hat | theta_0) = Σ_v_per p(v_hat | v_per) * p(v_per | theta_0) * d_val
