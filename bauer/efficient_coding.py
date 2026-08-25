@@ -174,7 +174,8 @@ def _no_seam_mask(ori_grid, encoded_locs):
     return ptm.sigmoid(-excess / (0.5 * step + 1e-12))
 
 
-def _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori, q_per=Q_PER):
+def _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori, q_per=Q_PER,
+                          n_cand=None):
     """Map a perceptual posterior to a value estimate, per paper Eqs. 4 and 7.
 
     theta_hat = argmin_t E_post[(1 - cos(theta - t))^(q_per/2)].  For q_per = 2
@@ -220,20 +221,28 @@ def _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori, q_per=Q_PER):
 
     # Parabolic refinement of the grid argmin.  The loss is circular in the
     # candidate axis, so the neighbours wrap.
-    n_cand = loss.shape[1]
+    # Gather the loss at the argmin and its two neighbours with a one-hot
+    # contraction over the CANDIDATE axis, whose length is a Python int known at
+    # graph-build time. Both the (arange, index) pair and take_along_axis emit a
+    # pt.arange over a symbolic length, which JAX refuses to JIT ("requires the
+    # arguments of jax.numpy.arange to be constants") -- that is what kills the
+    # numpyro sampler.
+    n_cand = int(n_cand) if n_cand is not None else int(ori_grid.type.shape[0])
     i = pt.argmin(loss, axis=1)                                      # (S*M,)
-    rows = pt.arange(loss.shape[0])
-    l_m = loss[rows, (i - 1) % n_cand]
-    l_0 = loss[rows, i]
-    l_p = loss[rows, (i + 1) % n_cand]
+    cand = pt.arange(n_cand)                                         # static length
+    def _at(idx):
+        return pt.sum(loss * pt.eq(cand[None, :], idx[:, None]), axis=1)
+    l_m = _at((i - 1) % n_cand)
+    l_0 = _at(i)
+    l_p = _at((i + 1) % n_cand)
     denom = l_m - 2.0 * l_0 + l_p
     delta = pt.switch(pt.gt(denom, 1e-30), 0.5 * (l_m - l_p) / (denom + 1e-30), 0.0)
     delta = pt.clip(delta, -0.5, 0.5)
-    f = pt.mod(pt.cast(i, 'floatX') + delta, pt.cast(n_cand, 'floatX'))  # (S*M,)
+    f = pt.mod(pt.cast(i, 'floatX') + delta, np.float64(n_cand))  # (S*M,)
 
     # Linear interpolation of G at the fractional index.  Index n_cand of G_ext
     # is 180 deg, NOT a wrap back to 0 deg.
-    i0 = pt.clip(pt.floor(f), 0, pt.cast(n_cand, 'floatX') - 1.0)
+    i0 = pt.clip(pt.floor(f), 0, np.float64(n_cand) - 1.0)
     w = f - i0
     i0 = pt.cast(i0, 'int64')
     v_hat = G_ext[:, i0] * (1.0 - w)[None, :] + G_ext[:, i0 + 1] * w[None, :]  # (C, S*M)
@@ -504,7 +513,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
 
         # Steps 3-4: q_per-optimal perceptual estimate, then v_hat = G(theta_hat)
         v_hat = _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori,
-                                      q_per=self.q_per)  # (C, S, M)
+                                      q_per=self.q_per,
+                                      n_cand=self.grid_resolution)  # (C, S, M)
 
         # Step 5: Pushforward to value grid
         h_val = d_val * 0.75
@@ -868,7 +878,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
 
         # q_per-optimal perceptual estimate, then v_per(m) = G(theta_hat(m))
         v_per = _value_from_theta_hat(posterior_ori, ori_grid, G_ext, d_ori,
-                                      q_per=self.q_per)  # (C, S, M)
+                                      q_per=self.q_per,
+                                      n_cand=self.grid_resolution)  # (C, S, M)
 
         # Pushforward to value grid: p(v_per | theta_0)
         h_val_push = d_val * 0.75

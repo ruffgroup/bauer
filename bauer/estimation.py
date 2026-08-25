@@ -219,9 +219,16 @@ class EstimationBaseModel(BaseModel):
             ix = pt.cast(pt.floor(frac_ix), 'int64')
             ix = pt.clip(ix, 0, n - 2)
             w = frac_ix - pt.cast(ix, 'float64')
-            row_indices = pt.arange(cdf_row.shape[0])
-            val_lo = cdf_row[row_indices, ix]
-            val_hi = cdf_row[row_indices, ix + 1]
+            # One-hot contraction over the GRID axis, whose length is a Python
+            # int. Indexing rows with pt.arange(cdf_row.shape[0]) emits an
+            # arange over a symbolic trial count, which JAX cannot JIT, so the
+            # numpyro sampler dies on any model whose trial count is not folded
+            # to a constant.
+            grid_ix = pt.arange(n)                                # static length
+            oh_lo = pt.eq(grid_ix[None, :], ix[:, None])
+            oh_hi = pt.eq(grid_ix[None, :], (ix + 1)[:, None])
+            val_lo = pt.sum(cdf_row * oh_lo, axis=1)
+            val_hi = pt.sum(cdf_row * oh_hi, axis=1)
             return val_lo + w * (val_hi - val_lo)
 
         cdf_lo = interp_per_row(cdf, frac_lo)
