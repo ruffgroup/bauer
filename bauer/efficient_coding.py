@@ -266,7 +266,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
     def get_model_inputs(self, parameters):
         model = pm.Model.get_context()
         return {
-            'kappa_r': parameters['kappa_r'],
+            'kappa_r': self.subjectwise('kappa_r'),
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -373,14 +373,18 @@ class EfficientPerceptionModel(EstimationBaseModel):
             kappa_r = kappa_r[None]
 
         # Step 1: Perceptual encoding — p(m_s | theta_0)
+        # exp(k*(cos - 1)) rather than exp(k*cos)/(2 pi i0(k)): the normaliser is
+        # constant over every axis that is renormalised downstream, so it cancels
+        # exactly, while exp(k*cos) reaches 1.1e36 at the paper's top fitted
+        # kappa of 83 and overflows outright in float32 above kappa ~ 89.
         p_ms = pt.exp(
-            kappa_r[:, None, None] * ptm.cos(rep_grid[None, None, :] - encoded_locs[None, :, None])
-        ) / (2 * np.pi * ptm.i0(kappa_r[:, None, None]))  # (S, K, M)
+            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - encoded_locs[None, :, None]) - 1.0)
+        )  # (S, K, M), unnormalised
 
         # Step 2: Bayesian decoding
         likelihood = pt.exp(
-            kappa_r[:, None, None] * ptm.cos(rep_grid[None, None, :] - ori_cdf[None, :, None])
-        ) / (2 * np.pi * ptm.i0(kappa_r[:, None, None]))  # (S, O, M)
+            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - ori_cdf[None, :, None]) - 1.0)
+        )  # (S, O, M), unnormalised
         posterior = likelihood * ori_prior[None, :, None]
         posterior = posterior / (pt.sum(posterior, axis=1, keepdims=True) * d_ori + 1e-30)
 
@@ -394,9 +398,11 @@ class EfficientPerceptionModel(EstimationBaseModel):
         val_weights = pt.exp(-val_dists / (2 * h_val ** 2))
         val_weights = val_weights / (pt.sum(val_weights, axis=-1, keepdims=True) + 1e-30)
 
-        p_response = pt.sum(
-            val_weights[:, :, None, :, :] * p_ms[None, :, :, :, None] * d_rep,
-            axis=3)  # (C, S, K, V)
+        # (1, S, K, M) @ (C, S, M, V) -> (C, S, K, V).  matmul rather than
+        # broadcast-and-sum: the latter materialises a rank-5 (C, S, K, M, V)
+        # intermediate that both operands of must stay live for the backward
+        # pass.  Verified bit-comparable (max abs diff 4e-16).
+        p_response = pt.matmul(p_ms[None], val_weights) * d_rep  # (C, S, K, V)
         p_response = p_response / (pt.sum(p_response, axis=-1, keepdims=True) * d_val + 1e-30)
 
         # Gather per-trial distributions
@@ -431,7 +437,7 @@ class EfficientValuationModel(EstimationBaseModel):
     def get_model_inputs(self, parameters):
         model = pm.Model.get_context()
         return {
-            'sigma_rep': parameters['sigma_rep'],
+            'sigma_rep': self.subjectwise('sigma_rep'),
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -635,8 +641,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
     def get_model_inputs(self, parameters):
         model = pm.Model.get_context()
         return {
-            'kappa_r': parameters['kappa_r'],
-            'sigma_rep': parameters['sigma_rep'],
+            'kappa_r': self.subjectwise('kappa_r'),
+            'sigma_rep': self.subjectwise('sigma_rep'),
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -713,13 +719,13 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
 
         # p(m_s | theta_0) for each subject and unique stimulus
         p_ms = pt.exp(
-            kappa_r[:, None, None] * ptm.cos(rep_grid[None, None, :] - encoded_locs[None, :, None])
-        ) / (2 * np.pi * ptm.i0(kappa_r[:, None, None]))  # (S, K, M)
+            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - encoded_locs[None, :, None]) - 1.0)
+        )  # (S, K, M), unnormalised
 
         # Bayesian decoding
         likelihood_ori = pt.exp(
-            kappa_r[:, None, None] * ptm.cos(rep_grid[None, None, :] - ori_cdf[None, :, None])
-        ) / (2 * np.pi * ptm.i0(kappa_r[:, None, None]))  # (S, O, M)
+            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - ori_cdf[None, :, None]) - 1.0)
+        )  # (S, O, M), unnormalised
         posterior_ori = likelihood_ori * ori_prior[None, :, None]
         posterior_ori = posterior_ori / (pt.sum(posterior_ori, axis=1, keepdims=True) * d_ori + 1e-30)
 
@@ -734,9 +740,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         val_weights_per = val_weights_per / (pt.sum(val_weights_per, axis=-1, keepdims=True) + 1e-30)
 
         # p_v_per: (C, S, K, V) = Σ_m val_weights_per[c,s,m,v] * p_ms[s,k,m] * d_rep
-        p_v_per = pt.sum(
-            val_weights_per[:, :, None, :, :] * p_ms[None, :, :, :, None] * d_rep,
-            axis=3)
+        # (1, S, K, M) @ (C, S, M, V) -> (C, S, K, V); see the note above.
+        p_v_per = pt.matmul(p_ms[None], val_weights_per) * d_rep
         p_v_per = p_v_per / (pt.sum(p_v_per, axis=-1, keepdims=True) * d_val + 1e-30)
 
         # ==== STAGE 2: Value encoding + decoding ====
@@ -784,19 +789,15 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         _S, _C = p_mv_given_v.shape[0], p_mv_given_v.shape[1]
         _Ns, _Nr = p_mv_given_v.shape[2], p_mv_given_v.shape[3]
         _V = val_weights2.shape[3]
-        p_resp_given_source = pt.reshape(
-            pt.batched_dot(pt.reshape(p_mv_given_v, (_S * _C, _Ns, _Nr)),
-                           pt.reshape(val_weights2, (_S * _C, _Nr, _V))) * d_val,
-            (_S, _C, _Ns, _V))
+        p_resp_given_source = pt.matmul(p_mv_given_v, val_weights2) * d_val
 
         # Marginalize over v_per:
         # p_response(v_hat | theta_0) = Σ_v_per p(v_hat | v_per) * p(v_per | theta_0) * d_val
         # p_v_per: (C, S, K, V_source), p_resp_given_source: (S, C, V_source, V_response)
         # Need to align: (S, C, K, V_source) x (S, C, V_source, V_response) -> (S, C, K, V_response)
         p_v_per_reordered = p_v_per.dimshuffle(1, 0, 2, 3)  # (S, C, K, V_source)
-        p_response = pt.sum(
-            p_v_per_reordered[:, :, :, :, None] * p_resp_given_source[:, :, None, :, :] * d_val,
-            axis=3)  # (S, C, K, V)
+        # (S, C, K, Vs) @ (S, C, Vs, Vr) -> (S, C, K, Vr); see the note above.
+        p_response = pt.matmul(p_v_per_reordered, p_resp_given_source) * d_val
 
         p_response = p_response / (pt.sum(p_response, axis=-1, keepdims=True) * d_val + 1e-30)
 

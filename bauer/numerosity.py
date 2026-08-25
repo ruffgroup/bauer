@@ -104,8 +104,8 @@ class LogEncodingEstimationModel(EstimationBaseModel):
     def get_model_inputs(self, parameters):
         model = pm.Model.get_context()
         return {
-            'nu': parameters['nu'],
-            'sigma_motor': parameters['sigma_motor'],
+            'nu': self.subjectwise('nu'),
+            'sigma_motor': self.subjectwise('sigma_motor'),
             'n': model['n'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -288,10 +288,10 @@ class FlexibleEncodingEstimationModel(LogEncodingEstimationModel):
             for c_ix in range(len(self.conditions)):
                 for i in range(self.n_poly - 1):
                     key = self._enc_key(c_ix, i)
-                    model_inputs[key] = parameters[key]
+                    model_inputs[key] = self.subjectwise(key)
         else:
             for i in range(self.n_poly - 1):
-                model_inputs[f'enc_inc_{i}'] = parameters[f'enc_inc_{i}']
+                model_inputs[f'enc_inc_{i}'] = self.subjectwise(f'enc_inc_{i}')
         return model_inputs
 
     def _setup_grids(self, paradigm):

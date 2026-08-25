@@ -24,6 +24,30 @@ class EstimationBaseModel(BaseModel):
         - get_model_inputs(parameters)
     """
 
+    def subjectwise(self, name):
+        """The subject-level `(n_subjects,)` RV, NOT its trialwise expansion.
+
+        `BaseModel.get_parameter_values` hands every free parameter back through
+        `get_trialwise_variable`, i.e. already indexed out to `(n_trials,)`.
+        That is right for models that compute a scalar per trial, but these
+        grid models build a `(n_subjects, ..., n_response)` table and then gather
+        it with `subject_ix`.  Feeding them the trialwise vector makes the
+        leading axis `n_trials`, so `table[subject_ix]` reads the first
+        `n_subjects` TRIALS -- all of which belong to subject 0.  Every subject
+        then shares subject 0's parameters, the group SD gets exactly zero
+        gradient, and the table is `n_trials / n_subjects` times larger than it
+        needs to be.
+
+        Single-subject fits were unaffected: `pt.tile` of a scalar makes every
+        row identical, so the gather picked a correct row.
+        """
+        model = pm.Model.get_context()
+        var = model[name]
+        if var.ndim == 0:
+            n_sub = len(model.coords['subject']) if 'subject' in model.coords else 1
+            var = pt.tile(var[None], n_sub)
+        return var
+
     def __init__(self, paradigm=None, grid_resolution=101, response_bin_width=0.5,
                  lapse_rate=0.01, **kwargs):
         """
