@@ -61,12 +61,67 @@ V_MAX = 42.0
 # repulsion away from the cardinal orientations by roughly a factor of four.
 Q_PER = 8.0
 
-# Priors.  kappa_r's must cover the range the paper actually fits it over --
-# a 50-point grid spanning [2, 101], with best-fit means of 12-83.  A
-# softplus(N(3, 1)) prior puts 95% of its mass in [0.67, 6.07] and only 0.7%
-# above 12, so it would simply pin every subject near 3.
-KAPPA_R_PRIOR = {'mu_intercept': 25.0, 'sigma_intercept': 20.0,
-                 'transform': 'softplus'}
+# ---------------------------------------------------------------------------
+# kappa_r in interpretable units
+# ---------------------------------------------------------------------------
+# kappa_r is a von Mises concentration in DOUBLED-angle space (phi = 2*theta),
+# which makes it hard to reason about.  Circular SD in phi is ~1/sqrt(kappa)
+# radians, so the corresponding ORIENTATION SD is half that, in degrees:
+#
+#     kappa =  12 -> 8.3 deg     kappa =  83 -> 3.1 deg
+#     kappa =  30 -> 5.2 deg     kappa = 443 -> 1.4 deg
+#
+# The paper's fitted kappa_r of 12-83 is therefore 3-8 deg of perceptual noise,
+# which is what you would expect for 2%-contrast gratings.
+
+
+def orientation_sd_from_kappa(kappa):
+    """Orientation SD in degrees implied by a doubled-angle von Mises kappa."""
+    return np.rad2deg(1.0 / np.sqrt(kappa)) / 2.0
+
+
+def kappa_from_orientation_sd(sd_deg):
+    """Inverse of :func:`orientation_sd_from_kappa`."""
+    return (np.rad2deg(1.0) / 2.0 / sd_deg) ** 2
+
+
+def max_resolvable_kappa(grid_resolution):
+    """Largest kappa an N-point orientation grid can distinguish.
+
+    The grid spans [0, 180) degrees in N steps, so its orientation step is
+    180/N degrees.  Once the noise SD falls below one step the likelihood is
+    flat in kappa and the parameter is unidentified -- posteriors simply run
+    off to wherever the prior stops them.  Closed form: (N / 2*pi)**2.
+
+        N =  31 -> kappa above  24 is unresolvable (5.8 deg step)
+        N =  51 -> kappa above  66 is unresolvable (3.5 deg step)
+        N = 101 -> kappa above 258 is unresolvable (1.8 deg step)
+
+    Observed: a single-subject fit at N=51 with a loose prior returned
+    kappa_r = 443, i.e. 1.4 deg of noise on a 3.5 deg grid -- 2.6x narrower
+    than one cell, and pure prior/flat-likelihood wandering.
+    """
+    return (grid_resolution / (2.0 * np.pi)) ** 2
+
+
+def kappa_r_prior(grid_resolution=None):
+    """Prior on kappa_r, capped at what the grid can actually resolve.
+
+    Centred to cover the paper's fitted 12-83 (3-8 deg of noise).  When the
+    grid is coarse enough that this would spill into the unresolvable region,
+    the prior is tightened so it stops before the flat part of the likelihood
+    rather than letting the sampler wander there.
+    """
+    mu, sigma = 30.0, 20.0
+    if grid_resolution is not None:
+        k_max = max_resolvable_kappa(grid_resolution)
+        mu, sigma = min(mu, k_max / 2.0), min(sigma, k_max / 4.0)
+    return {'mu_intercept': mu, 'sigma_intercept': sigma,
+            'transform': 'softplus'}
+
+
+# Back-compat default for callers that do not know their grid yet.
+KAPPA_R_PRIOR = kappa_r_prior()
 SIGMA_REP_PRIOR = {'mu_intercept': 0.5, 'sigma_intercept': 1.0,
                    'transform': 'softplus'}
 
@@ -205,7 +260,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
 
     def get_free_parameters(self):
         return {
-            'kappa_r': KAPPA_R_PRIOR,
+            'kappa_r': kappa_r_prior(self.grid_resolution),
         }
 
     def get_model_inputs(self, parameters):
@@ -573,7 +628,7 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
 
     def get_free_parameters(self):
         return {
-            'kappa_r': KAPPA_R_PRIOR,
+            'kappa_r': kappa_r_prior(self.grid_resolution),
             'sigma_rep': SIGMA_REP_PRIOR,
         }
 
