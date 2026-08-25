@@ -126,6 +126,54 @@ SIGMA_REP_PRIOR = {'mu_intercept': 0.5, 'sigma_intercept': 1.0,
                    'transform': 'softplus'}
 
 
+def _efficient_cdf_pt(prior, d_ori):
+    """Efficient-coding transform F(theta) from an orientation prior (Eq. 1).
+
+    Tensor version, so the prior can depend on a fitted parameter.  `prior` is
+    (S, O) and unnormalised; returns (S, O) mapped onto [0, 2*pi).
+    """
+    p = prior / (pt.sum(prior, axis=-1, keepdims=True) * d_ori + 1e-30)
+    c = pt.cumsum(p * d_ori, axis=-1)
+    c = c - c[..., :1]
+    return c / (c[..., -1:] + 1e-30) * 2 * np.pi
+
+
+def _interp_pt(x, xp_last, values):
+    """Linear interpolation of `values` (S, O) at positions `x` (K,) given a
+    uniform grid spanning [0, xp_last).  Used to locate each stimulus on a
+    parameter-dependent encoding transform."""
+    n = values.shape[-1]
+    f = x / xp_last * pt.cast(n, 'floatX')
+    i0 = pt.clip(pt.floor(f), 0, pt.cast(n, 'floatX') - 2.0)
+    w = f - i0
+    i0 = pt.cast(i0, 'int64')
+    return values[..., i0] * (1.0 - w) + values[..., i0 + 1] * w
+
+
+def _no_seam_mask(ori_grid, encoded_locs):
+    """Indicator that a hypothesised orientation is on the same side of the
+    0/180 deg seam as the stimulus.
+
+    Orientation is pi-periodic, so 0 deg and 180 deg are the same grating -- but
+    G is not: G(0 deg) = 2 CHF and G(180 deg) = 42 CHF.  A participant who has
+    learned the mapping never confuses the two ends; the observed bias curves
+    show no sign of 2-CHF bids for near-180 deg gratings.  Restricting the
+    perceptual posterior to the non-wrapping side encodes that, and removes the
+    predictive blow-ups in the outermost orientation bins.
+
+    Implemented as a smooth (differentiable) window rather than a hard cut, of
+    width one grid cell, so it does not reintroduce a discontinuity.
+    """
+    d = ori_grid[None, :] - encoded_locs[:, None]                    # (K, O)
+    wrapped = pt.abs(pt.mod(d + np.pi, 2 * np.pi) - np.pi)           # circular distance
+    straight = pt.abs(d)                                             # distance on the line
+    # A candidate crosses the seam when the short way round is not the direct
+    # way; suppress those smoothly.
+    excess = straight - wrapped
+    step = (ori_grid[1] - ori_grid[0]) if ori_grid.ndim else 0.1
+    return ptm.sigmoid(-excess / (0.5 * step + 1e-12))
+
+
 def _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori, q_per=Q_PER):
     """Map a perceptual posterior to a value estimate, per paper Eqs. 4 and 7.
 
@@ -220,6 +268,29 @@ def orientation_to_value_np(orientation_deg, mapping='linear'):
 # Orientation priors
 # ============================================================================
 
+PRIOR_WEIGHT_PRIOR = {'mu_intercept': 0.5, 'sigma_intercept': 0.5,
+                      'transform': 'logistic'}
+
+
+def orientation_prior_pt(phi, weight):
+    """Orientation prior with a free peakedness, p(phi) ~ 1 - w*|sin phi|.
+
+    Nests both fixed variants exactly: w = 0 is the uniform short-term prior,
+    w = 0.5 is the paper's long-term cardinal prior (2 - |sin phi|, up to the
+    normalising constant).  w -> 1 concentrates all the mass on the cardinals.
+
+    `weight` may be a scalar or a per-subject vector; the returned prior is
+    (S, O) and normalised over the orientation axis.
+    """
+    # No implicit reshaping: the caller decides the broadcast, otherwise a
+    # (S, 1) weight silently becomes (S, 1, 1) and every downstream tensor
+    # gains a phantom axis.
+    w = pt.as_tensor_variable(weight)
+    p = 1.0 - w * pt.abs(ptm.sin(phi))
+    p = pt.maximum(p, 1e-6)
+    return p
+
+
 def long_term_orientation_prior_np(phi):
     """Long-term orientation prior: p(phi) proportional to 2 - |sin(phi)|.
 
@@ -253,7 +324,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
 
     def __init__(self, paradigm=None, perceptual_prior='long_term',
                  grid_resolution=101, rep_grid_resolution=None, q_per=Q_PER,
-                 **kwargs):
+                 fit_prior_weight=False, no_seam_crossing=False, **kwargs):
         """
         Parameters
         ----------
@@ -269,17 +340,22 @@ class EfficientPerceptionModel(EstimationBaseModel):
         self.perceptual_prior = perceptual_prior
         self.rep_grid_resolution = rep_grid_resolution or grid_resolution
         self.q_per = q_per
+        self.fit_prior_weight = fit_prior_weight
+        self.no_seam_crossing = no_seam_crossing
         super().__init__(paradigm, grid_resolution=grid_resolution, **kwargs)
 
     def get_free_parameters(self):
-        return {
-            'kappa_r': kappa_r_prior(self.grid_resolution),
-        }
+        pars = {'kappa_r': kappa_r_prior(self.grid_resolution)}
+        if self.fit_prior_weight:
+            pars['prior_weight'] = PRIOR_WEIGHT_PRIOR
+        return pars
 
     def get_model_inputs(self, parameters):
         model = pm.Model.get_context()
         return {
             'kappa_r': self.subjectwise('kappa_r'),
+            **({'prior_weight': self.subjectwise('prior_weight')}
+               if self.fit_prior_weight else {}),
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -375,9 +451,23 @@ class EfficientPerceptionModel(EstimationBaseModel):
         ori_grid = pt.as_tensor_variable(self.ori_grid)
         rep_grid = pt.as_tensor_variable(self.rep_grid)
         val_grid = pt.as_tensor_variable(self.val_grid)
-        ori_prior = pt.as_tensor_variable(self.ori_prior)
-        ori_cdf = pt.as_tensor_variable(self.ori_cdf)
-        encoded_locs = pt.as_tensor_variable(self.encoded_stimulus_locs)
+        if self.fit_prior_weight:
+            # Prior peakedness is fitted, so the efficient-coding transform it
+            # induces (and therefore where each stimulus lands in
+            # representational space) has to be rebuilt inside the graph.
+            w = model_inputs['prior_weight'][:, None]                # (S, 1)
+            ori_prior = orientation_prior_pt(ori_grid[None, :], w)   # (S, O)
+            ori_prior = ori_prior / (pt.sum(ori_prior, axis=-1, keepdims=True)
+                                     * self.d_ori + 1e-30)
+            ori_cdf = _efficient_cdf_pt(ori_prior, self.d_ori)       # (S, O)
+            encoded_locs = _interp_pt(
+                pt.as_tensor_variable(self.unique_orientations_rad),
+                2 * np.pi, ori_cdf)                                  # (S, K)
+        else:
+            ori_prior = pt.as_tensor_variable(self.ori_prior)[None, :]
+            ori_cdf = pt.as_tensor_variable(self.ori_cdf)[None, :]
+            encoded_locs = pt.as_tensor_variable(
+                self.encoded_stimulus_locs)[None, :]
 
         mappings = list(self.value_on_ori_grid.keys())
         G_on_grid = pt.as_tensor_variable(
@@ -398,14 +488,18 @@ class EfficientPerceptionModel(EstimationBaseModel):
         # exactly, while exp(k*cos) reaches 1.1e36 at the paper's top fitted
         # kappa of 83 and overflows outright in float32 above kappa ~ 89.
         p_ms = pt.exp(
-            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - encoded_locs[None, :, None]) - 1.0)
+            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - encoded_locs[:, :, None]) - 1.0)
         )  # (S, K, M), unnormalised
 
         # Step 2: Bayesian decoding
         likelihood = pt.exp(
-            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - ori_cdf[None, :, None]) - 1.0)
+            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - ori_cdf[:, :, None]) - 1.0)
         )  # (S, O, M), unnormalised
-        posterior = likelihood * ori_prior[None, :, None]
+        posterior = likelihood * ori_prior[:, :, None]
+        if self.no_seam_crossing:
+            posterior = posterior * _no_seam_mask(ori_grid, encoded_locs)[:, :, None] \
+                if encoded_locs.ndim == 1 else posterior * pt.mean(
+                    _no_seam_mask(ori_grid, encoded_locs[0]), axis=0)[None, :, None]
         posterior = posterior / (pt.sum(posterior, axis=1, keepdims=True) * d_ori + 1e-30)
 
         # Steps 3-4: q_per-optimal perceptual estimate, then v_hat = G(theta_hat)
@@ -646,23 +740,27 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
 
     def __init__(self, paradigm=None, perceptual_prior='long_term',
                  grid_resolution=101, rep_grid_resolution=None, q_per=Q_PER,
-                 **kwargs):
+                 fit_prior_weight=False, no_seam_crossing=False, **kwargs):
         super().__init__(paradigm, perceptual_prior=perceptual_prior,
                          grid_resolution=grid_resolution,
                          rep_grid_resolution=rep_grid_resolution,
-                         q_per=q_per, **kwargs)
+                         q_per=q_per, fit_prior_weight=fit_prior_weight,
+                         no_seam_crossing=no_seam_crossing, **kwargs)
 
     def get_free_parameters(self):
-        return {
-            'kappa_r': kappa_r_prior(self.grid_resolution),
-            'sigma_rep': SIGMA_REP_PRIOR,
-        }
+        pars = {'kappa_r': kappa_r_prior(self.grid_resolution),
+                'sigma_rep': SIGMA_REP_PRIOR}
+        if self.fit_prior_weight:
+            pars['prior_weight'] = PRIOR_WEIGHT_PRIOR
+        return pars
 
     def get_model_inputs(self, parameters):
         model = pm.Model.get_context()
         return {
             'kappa_r': self.subjectwise('kappa_r'),
             'sigma_rep': self.subjectwise('sigma_rep'),
+            **({'prior_weight': self.subjectwise('prior_weight')}
+               if self.fit_prior_weight else {}),
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -710,9 +808,23 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         ori_grid = pt.as_tensor_variable(self.ori_grid)
         rep_grid = pt.as_tensor_variable(self.rep_grid)
         val_grid = pt.as_tensor_variable(self.val_grid)
-        ori_prior = pt.as_tensor_variable(self.ori_prior)
-        ori_cdf = pt.as_tensor_variable(self.ori_cdf)
-        encoded_locs = pt.as_tensor_variable(self.encoded_stimulus_locs)
+        if self.fit_prior_weight:
+            # Prior peakedness is fitted, so the efficient-coding transform it
+            # induces (and therefore where each stimulus lands in
+            # representational space) has to be rebuilt inside the graph.
+            w = model_inputs['prior_weight'][:, None]                # (S, 1)
+            ori_prior = orientation_prior_pt(ori_grid[None, :], w)   # (S, O)
+            ori_prior = ori_prior / (pt.sum(ori_prior, axis=-1, keepdims=True)
+                                     * self.d_ori + 1e-30)
+            ori_cdf = _efficient_cdf_pt(ori_prior, self.d_ori)       # (S, O)
+            encoded_locs = _interp_pt(
+                pt.as_tensor_variable(self.unique_orientations_rad),
+                2 * np.pi, ori_cdf)                                  # (S, K)
+        else:
+            ori_prior = pt.as_tensor_variable(self.ori_prior)[None, :]
+            ori_cdf = pt.as_tensor_variable(self.ori_cdf)[None, :]
+            encoded_locs = pt.as_tensor_variable(
+                self.encoded_stimulus_locs)[None, :]
 
         mappings = list(self.value_on_ori_grid.keys())
         G_on_grid = pt.as_tensor_variable(
@@ -741,14 +853,17 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
 
         # p(m_s | theta_0) for each subject and unique stimulus
         p_ms = pt.exp(
-            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - encoded_locs[None, :, None]) - 1.0)
+            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - encoded_locs[:, :, None]) - 1.0)
         )  # (S, K, M), unnormalised
 
         # Bayesian decoding
         likelihood_ori = pt.exp(
-            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - ori_cdf[None, :, None]) - 1.0)
+            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - ori_cdf[:, :, None]) - 1.0)
         )  # (S, O, M), unnormalised
-        posterior_ori = likelihood_ori * ori_prior[None, :, None]
+        posterior_ori = likelihood_ori * ori_prior[:, :, None]
+        if self.no_seam_crossing:
+            posterior_ori = posterior_ori * pt.mean(
+                _no_seam_mask(ori_grid, encoded_locs[0]), axis=0)[None, :, None]
         posterior_ori = posterior_ori / (pt.sum(posterior_ori, axis=1, keepdims=True) * d_ori + 1e-30)
 
         # q_per-optimal perceptual estimate, then v_per(m) = G(theta_hat(m))
