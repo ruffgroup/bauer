@@ -126,30 +126,34 @@ SIGMA_REP_PRIOR = {'mu_intercept': 0.5, 'sigma_intercept': 1.0,
                    'transform': 'softplus'}
 
 
-def _value_from_theta_hat(posterior, ori_grid, G_on_grid, d_ori, q_per=Q_PER):
+def _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori, q_per=Q_PER):
     """Map a perceptual posterior to a value estimate, per paper Eqs. 4 and 7.
 
-    Replaces two steps that were previously separate:
+    theta_hat = argmin_t E_post[(1 - cos(theta - t))^(q_per/2)].  For q_per = 2
+    this is the circular posterior mean and has a closed form; for the paper's
+    q_per = 8 it does not, so it is minimised on the orientation grid and then
+    refined to sub-grid resolution by fitting a parabola to the loss at the
+    three points around the minimum.
 
-      1. theta_hat = argmin_t E_post[(1 - cos(theta - t))^(q_per/2)].  For
-         q_per = 2 this is the circular posterior mean and has a closed form;
-         for the paper's q_per = 8 it does not, so it is minimised on the
-         orientation grid.  A softmin keeps it differentiable for NUTS, with the
-         temperature set to the loss increment of being one grid cell off, so
-         the estimator interpolates smoothly between grid points rather than
-         snapping to them.
+    The refinement is not cosmetic.  A plain grid argmin makes theta_hat -- and
+    therefore the whole likelihood -- a STEP function of kappa_r, and NUTS cannot
+    integrate that: on a 26-subject fit it drove the step size to ~2e-4 and hit
+    the 1023-step treedepth cap on every iteration, for an ETA of 24 h.  The
+    parabolic vertex moves continuously with kappa_r, so the surface is smooth
+    and differentiable almost everywhere, and it removes the +-d_ori/2 snapping
+    error (0.9 CHF at N=101) into the bargain.
 
-      2. v_hat = G(theta_hat).  The softmin weights are applied directly to G on
-         the grid.  Crucially this is NOT a circular kernel: orientation is
-         pi-periodic but G is not (G(0 deg) = 2 CHF, G(180 deg) = 42 CHF), so a
-         `1 - cos` kernel pulls low-value grid points into estimates near 180
-         deg and collapses the highest-value stimuli by >10 CHF.
+    ``G_ext`` is G evaluated on ``ori_grid`` PLUS one extra point at 2*pi, i.e.
+    180 deg.  Orientation is pi-periodic but G is not -- G(0 deg) = 2 CHF and
+    G(180 deg) = 42 CHF -- so the value interpolation must run off the end of
+    the grid to 180 deg rather than wrapping around to 0 deg.
 
     Parameters
     ----------
     posterior : (S, O, M) tensor, normalised over the orientation axis O.
     ori_grid : (O,) doubled-angle orientation grid.
-    G_on_grid : (C, O) value of each grid orientation under each mapping.
+    G_ext : (C, O + 1) value of each grid orientation under each mapping, with
+        the 2*pi endpoint appended.
     d_ori : float, orientation grid spacing.
 
     Returns
@@ -158,25 +162,34 @@ def _value_from_theta_hat(posterior, ori_grid, G_on_grid, d_ori, q_per=Q_PER):
     """
     # Loss of each candidate estimate under the posterior: (S, M, O_cand).
     # Written as a matmul rather than broadcast-and-sum: the latter materialises
-    # an (S, O, M, O_cand) intermediate, which is O(N^3) per subject and runs a
-    # 26-subject fit out of 64 GB at N = 101.
+    # an (S, O, M, O_cand) intermediate, O(N^3) per subject.
     cos_dt = ptm.cos(ori_grid[:, None] - ori_grid[None, :])          # (O, O_cand)
     loss_kernel = (1.0 - cos_dt) ** (q_per / 2.0)
     post_sm_o = posterior.dimshuffle(0, 2, 1)                        # (S, M, O)
     S, M, O = post_sm_o.shape[0], post_sm_o.shape[1], post_sm_o.shape[2]
     loss = pt.dot(pt.reshape(post_sm_o, (S * M, O)),
                   loss_kernel * d_ori)                               # (S*M, O_cand)
-    loss = pt.reshape(loss, (S, M, loss_kernel.shape[1]))            # (S, M, O_cand)
 
-    # Softmin.  tau = loss increment for a one-cell error, so the weights have
-    # an effective width of about one grid cell.
-    tau = (1.0 - np.cos(d_ori)) ** (q_per / 2.0)
-    logits = -(loss - pt.min(loss, axis=-1, keepdims=True)) / tau
-    w = pt.exp(logits)
-    w = w / (pt.sum(w, axis=-1, keepdims=True) + 1e-30)              # (S, M, O_cand)
+    # Parabolic refinement of the grid argmin.  The loss is circular in the
+    # candidate axis, so the neighbours wrap.
+    n_cand = loss.shape[1]
+    i = pt.argmin(loss, axis=1)                                      # (S*M,)
+    rows = pt.arange(loss.shape[0])
+    l_m = loss[rows, (i - 1) % n_cand]
+    l_0 = loss[rows, i]
+    l_p = loss[rows, (i + 1) % n_cand]
+    denom = l_m - 2.0 * l_0 + l_p
+    delta = pt.switch(pt.gt(denom, 1e-30), 0.5 * (l_m - l_p) / (denom + 1e-30), 0.0)
+    delta = pt.clip(delta, -0.5, 0.5)
+    f = pt.mod(pt.cast(i, 'floatX') + delta, pt.cast(n_cand, 'floatX'))  # (S*M,)
 
-    # v_hat = sum_j w_j G(theta_j), linear in value space -- no circular wrap.
-    v_hat = pt.sum(w[None, :, :, :] * G_on_grid[:, None, None, :], axis=-1)
+    # Linear interpolation of G at the fractional index.  Index n_cand of G_ext
+    # is 180 deg, NOT a wrap back to 0 deg.
+    i0 = pt.clip(pt.floor(f), 0, pt.cast(n_cand, 'floatX') - 1.0)
+    w = f - i0
+    i0 = pt.cast(i0, 'int64')
+    v_hat = G_ext[:, i0] * (1.0 - w)[None, :] + G_ext[:, i0 + 1] * w[None, :]  # (C, S*M)
+    v_hat = pt.reshape(v_hat, (G_ext.shape[0], S, M))
     return pt.clip(v_hat, V_MIN, V_MAX)                              # (C, S, M)
 
 
@@ -306,10 +319,15 @@ class EfficientPerceptionModel(EstimationBaseModel):
         # The paradigm tells us which mapping conditions are present
         mappings = list(paradigm['mapping'].astype(str).unique()) if 'mapping' in paradigm.columns else ['linear']
         self.value_on_ori_grid = {}
+        self.value_on_ori_grid_ext = {}
         for mapping in mappings:
             # Convert ori_grid (radians, doubled) back to degrees [0, 180]
             ori_deg = self.ori_grid / (2 * np.pi) * 180
             self.value_on_ori_grid[mapping] = orientation_to_value_np(ori_deg, mapping)
+            # G is NOT pi-periodic: append the 180 deg endpoint so the value
+            # interpolation runs off the end of the grid instead of wrapping.
+            self.value_on_ori_grid_ext[mapping] = orientation_to_value_np(
+                np.append(ori_deg, 180.0), mapping)
 
         # Unique stimulus orientations (in degrees) from paradigm
         self.unique_orientations_deg = np.sort(paradigm['orientation'].unique())
@@ -364,6 +382,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
         mappings = list(self.value_on_ori_grid.keys())
         G_on_grid = pt.as_tensor_variable(
             np.stack([self.value_on_ori_grid[m] for m in mappings]))
+        G_ext = pt.as_tensor_variable(
+            np.stack([self.value_on_ori_grid_ext[m] for m in mappings]))
 
         d_ori = self.d_ori
         d_rep = self.d_rep
@@ -389,7 +409,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
         posterior = posterior / (pt.sum(posterior, axis=1, keepdims=True) * d_ori + 1e-30)
 
         # Steps 3-4: q_per-optimal perceptual estimate, then v_hat = G(theta_hat)
-        v_hat = _value_from_theta_hat(posterior, ori_grid, G_on_grid, d_ori,
+        v_hat = _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori,
                                       q_per=self.q_per)  # (C, S, M)
 
         # Step 5: Pushforward to value grid
@@ -697,6 +717,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         mappings = list(self.value_on_ori_grid.keys())
         G_on_grid = pt.as_tensor_variable(
             np.stack([self.value_on_ori_grid[m] for m in mappings]))
+        G_ext = pt.as_tensor_variable(
+            np.stack([self.value_on_ori_grid_ext[m] for m in mappings]))
 
         val_cdfs = pt.as_tensor_variable(
             np.stack([self.val_cdfs[m] for m in mappings]))
@@ -730,7 +752,7 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         posterior_ori = posterior_ori / (pt.sum(posterior_ori, axis=1, keepdims=True) * d_ori + 1e-30)
 
         # q_per-optimal perceptual estimate, then v_per(m) = G(theta_hat(m))
-        v_per = _value_from_theta_hat(posterior_ori, ori_grid, G_on_grid, d_ori,
+        v_per = _value_from_theta_hat(posterior_ori, ori_grid, G_ext, d_ori,
                                       q_per=self.q_per)  # (C, S, M)
 
         # Pushforward to value grid: p(v_per | theta_0)
