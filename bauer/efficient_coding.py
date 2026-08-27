@@ -184,7 +184,7 @@ def _seam_mask(encoded_positions, rep_grid, step):
 
 
 def _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori, q_per=Q_PER,
-                          n_cand=None):
+                          n_cand=None, cand_mask=None):
     """Map a perceptual posterior to a value estimate, per paper Eqs. 4 and 7.
 
     theta_hat = argmin_t E_post[(1 - cos(theta - t))^(q_per/2)].  For q_per = 2
@@ -228,6 +228,13 @@ def _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori, q_per=Q_PER,
     loss = pt.dot(pt.reshape(post_sm_o, (S * M, O)),
                   loss_kernel * d_ori)                               # (S*M, O_cand)
 
+    # Restrict the estimate to a category as well as the posterior.  Masking
+    # only the posterior is not enough: the argmin runs over candidates, so a
+    # truncated posterior can still be summarised by an orientation outside the
+    # category, and the parabolic refinement then interpolates across the cut.
+    if cand_mask is not None:
+        loss = loss + (1.0 - cand_mask)[None, :] * 1e6
+
     # Parabolic refinement of the grid argmin.  The loss is circular in the
     # candidate axis, so the neighbours wrap.
     # Gather the loss at the argmin and its two neighbours with a one-hot
@@ -258,6 +265,33 @@ def _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori, q_per=Q_PER,
     v_hat = G_ext[:, i0] * (1.0 - w)[None, :] + G_ext[:, i0 + 1] * w[None, :]  # (C, S*M)
     v_hat = pt.reshape(v_hat, (G_ext.shape[0], S, M))
     return pt.clip(v_hat, V_MIN, V_MAX)                              # (C, S, M)
+
+
+def cardinal_category_masks(ori_grid, grid_resolution):
+    """Orientation-space categories bounded by the cardinals at 0, 90 and 180.
+
+    The paper gates the value distribution by "below, at, or above 90 deg",
+    assumed to be inferred without error.  Because G is monotonic, that is the
+    same statement as truncating orientation perception at the cardinals, which
+    is where it actually belongs: it is mapping-independent, and it also closes
+    the 0/180 boundary for free, since "below 90" cannot wrap round to 175 deg.
+
+    Returns (masks, edges): masks is (3, O) over the doubled-angle grid --
+    below 90, at 90, above 90 -- and edges are the same three categories in
+    degrees, for labelling stimuli.
+    """
+    theta = np.rad2deg(ori_grid) / 2.0                       # (O,) in [0, 180)
+    step = 180.0 / grid_resolution
+    at = np.abs(theta - 90.0) <= step
+    below = (theta < 90.0 - step)
+    above = (theta > 90.0 + step)
+    return np.stack([below, at, above]).astype(float), step
+
+
+def cardinal_category_of(orientation_deg, step):
+    """0 = below 90, 1 = at 90, 2 = above 90."""
+    o = np.asarray(orientation_deg, dtype=float)
+    return np.where(np.abs(o - 90.0) <= step, 1, np.where(o < 90.0, 0, 2)).astype(int)
 
 
 def orientation_to_value_np(orientation_deg, mapping='linear'):
@@ -388,7 +422,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
     def __init__(self, paradigm=None, perceptual_prior='long_term',
                  grid_resolution=101, rep_grid_resolution=None, q_per=Q_PER,
                  fit_prior_weight=False, prior_fourier_order=0,
-                 no_seam_crossing=False, **kwargs):
+                 no_seam_crossing=False, cardinal_truncation=False, **kwargs):
         """
         Parameters
         ----------
@@ -410,6 +444,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
             raise ValueError("fit_prior_weight and prior_fourier_order are two "
                              "parameterisations of the same thing; pick one.")
         self.no_seam_crossing = no_seam_crossing
+        self.cardinal_truncation = cardinal_truncation
         super().__init__(paradigm, grid_resolution=grid_resolution, **kwargs)
 
     def fourier_prior_parameters(self):
@@ -492,6 +527,9 @@ class EfficientPerceptionModel(EstimationBaseModel):
         self.unique_orientations_deg = np.sort(paradigm['orientation'].unique())
         # Convert to doubled-angle radians
         self.unique_orientations_rad = self.unique_orientations_deg * np.pi / 180.0 * 2
+        _, _step = cardinal_category_masks(np.linspace(0, 2 * np.pi, self.grid_resolution,
+                                                       endpoint=False), self.grid_resolution)
+        self.stimulus_categories = cardinal_category_of(self.unique_orientations_deg, _step)
 
         # For each unique orientation, find F_ori(theta_0) via interpolation
         self.encoded_stimulus_locs = np.interp(
@@ -600,25 +638,58 @@ class EfficientPerceptionModel(EstimationBaseModel):
         posterior = posterior / (pt.sum(posterior, axis=1, keepdims=True) * d_ori + 1e-30)
 
         # Steps 3-4: q_per-optimal perceptual estimate, then v_hat = G(theta_hat)
-        v_hat = _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori,
-                                      q_per=self.q_per,
-                                      n_cand=self.grid_resolution)  # (C, S, M)
-
-        # Step 5: Pushforward to value grid
-        h_val = d_val * 0.75
-        val_dists = (v_hat[:, :, :, None] - val_grid[None, None, None, :]) ** 2
-        val_weights = pt.exp(-val_dists / (2 * h_val ** 2))
-        val_weights = val_weights / (pt.sum(val_weights, axis=-1, keepdims=True) + 1e-30)
-
-        # (1, S, K, M) @ (C, S, M, V) -> (C, S, K, V).  matmul rather than
-        # broadcast-and-sum: the latter materialises a rank-5 (C, S, K, M, V)
-        # intermediate that both operands of must stay live for the backward
-        # pass.  Verified bit-comparable (max abs diff 4e-16).
-        p_response = pt.matmul(p_ms[None], val_weights) * d_rep  # (C, S, K, V)
+        # Steps 3-5: theta_hat, then push G(theta_hat) onto the value grid.
+        # Truncation at the cardinals, when on, happens inside.
+        p_response = self._category_pushforward(posterior, p_ms, ori_grid, G_ext,
+                                                val_grid, d_ori, d_rep, d_val)
         p_response = p_response / (pt.sum(p_response, axis=-1, keepdims=True) * d_val + 1e-30)
 
         # Gather per-trial distributions
         return p_response[mapping_ix, subject_ix, stimulus_ix, :]  # (n_trials, V)
+
+
+    def _category_pushforward(self, posterior_ori, p_ms, ori_grid, G_ext,
+                              val_grid, d_ori, d_rep, d_val):
+        """(C, S, K, V): p(v_per | stimulus), with cardinal truncation if on.
+
+        With truncation the perceptual posterior -- and the candidate set the
+        estimate is chosen from -- is restricted to the category the stimulus
+        falls in: below 90 deg, at 90 deg, or above 90 deg.  Only three masks
+        exist, so this costs 3x the theta_hat step rather than one pass per
+        stimulus, and the expensive value-stage matmuls are untouched.
+        """
+        N = int(self.grid_resolution)
+        h_val = d_val * 0.75
+
+        def pushforward(v):                      # (C,S,M) -> (C,S,M,V)
+            dist = (v[:, :, :, None] - val_grid[None, None, None, :]) ** 2
+            w = pt.exp(-dist / (2 * h_val ** 2))
+            return w / (pt.sum(w, axis=-1, keepdims=True) + 1e-30)
+
+        if not self.cardinal_truncation:
+            v = _value_from_theta_hat(posterior_ori, ori_grid, G_ext, d_ori,
+                                      q_per=self.q_per, n_cand=N)
+            return pt.matmul(p_ms[None], pushforward(v)) * d_rep
+
+        masks, _ = cardinal_category_masks(self.ori_grid, N)
+        cats = self.stimulus_categories
+        total = None
+        for c in range(masks.shape[0]):
+            if not (cats == c).any():
+                continue
+            mask = pt.as_tensor_variable(masks[c])
+            post = posterior_ori * mask[None, :, None]
+            post = post / (pt.sum(post, axis=1, keepdims=True) * d_ori + 1e-30)
+            v = _value_from_theta_hat(post, ori_grid, G_ext, d_ori,
+                                      q_per=self.q_per, n_cand=N, cand_mask=mask)
+            part = pt.matmul(p_ms[None], pushforward(v)) * d_rep      # (C, S, K, V)
+            # Select the stimuli of this category with a constant indicator
+            # rather than by slicing and re-concatenating: advanced indexing on
+            # the stimulus axis leaves a symbolic K, which JAX cannot compile.
+            ind = pt.as_tensor_variable((cats == c).astype(float))    # (K,)
+            part = part * ind[None, None, :, None]
+            total = part if total is None else total + part
+        return total
 
     def _get_response_grid(self):
         return self.val_grid
@@ -839,13 +910,14 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
     def __init__(self, paradigm=None, perceptual_prior='long_term',
                  grid_resolution=101, rep_grid_resolution=None, q_per=Q_PER,
                  fit_prior_weight=False, prior_fourier_order=0,
-                 no_seam_crossing=False, **kwargs):
+                 no_seam_crossing=False, cardinal_truncation=False, **kwargs):
         super().__init__(paradigm, perceptual_prior=perceptual_prior,
                          grid_resolution=grid_resolution,
                          rep_grid_resolution=rep_grid_resolution,
                          q_per=q_per, fit_prior_weight=fit_prior_weight,
                          prior_fourier_order=prior_fourier_order,
-                         no_seam_crossing=no_seam_crossing, **kwargs)
+                         no_seam_crossing=no_seam_crossing,
+                         cardinal_truncation=cardinal_truncation, **kwargs)
 
     def get_free_parameters(self):
         pars = {'kappa_r': kappa_r_prior(self.grid_resolution),
@@ -985,19 +1057,10 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         posterior_ori = posterior_ori / (pt.sum(posterior_ori, axis=1, keepdims=True) * d_ori + 1e-30)
 
         # q_per-optimal perceptual estimate, then v_per(m) = G(theta_hat(m))
-        v_per = _value_from_theta_hat(posterior_ori, ori_grid, G_ext, d_ori,
-                                      q_per=self.q_per,
-                                      n_cand=self.grid_resolution)  # (C, S, M)
-
-        # Pushforward to value grid: p(v_per | theta_0)
-        h_val_push = d_val * 0.75
-        val_dists_per = (v_per[:, :, :, None] - val_grid[None, None, None, :]) ** 2  # (C, S, M, V)
-        val_weights_per = pt.exp(-val_dists_per / (2 * h_val_push ** 2))
-        val_weights_per = val_weights_per / (pt.sum(val_weights_per, axis=-1, keepdims=True) + 1e-30)
-
-        # p_v_per: (C, S, K, V) = Σ_m val_weights_per[c,s,m,v] * p_ms[s,k,m] * d_rep
-        # (1, S, K, M) @ (C, S, M, V) -> (C, S, K, V); see the note above.
-        p_v_per = pt.matmul(p_ms[None], val_weights_per) * d_rep
+        # Perceptually induced value distribution, with the cardinal-category
+        # truncation applied inside when it is switched on.
+        p_v_per = self._category_pushforward(posterior_ori, p_ms, ori_grid, G_ext,
+                                             val_grid, d_ori, d_rep, d_val)
         p_v_per = p_v_per / (pt.sum(p_v_per, axis=-1, keepdims=True) * d_val + 1e-30)
 
         # ==== STAGE 2: Value encoding + decoding ====
