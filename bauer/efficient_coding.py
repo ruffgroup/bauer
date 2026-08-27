@@ -647,7 +647,6 @@ class EfficientPerceptionModel(EstimationBaseModel):
         # Gather per-trial distributions
         return p_response[mapping_ix, subject_ix, stimulus_ix, :]  # (n_trials, V)
 
-
     def _category_pushforward(self, posterior_ori, p_ms, ori_grid, G_ext,
                               val_grid, d_ori, d_rep, d_val):
         """(C, S, K, V): p(v_per | stimulus), with cardinal truncation if on.
