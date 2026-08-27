@@ -138,11 +138,18 @@ def _efficient_cdf_pt(prior, d_ori):
     return c / (c[..., -1:] + 1e-30) * 2 * np.pi
 
 
-def _interp_pt(x, xp_last, values):
+def _interp_pt(x, xp_last, values, n=None):
     """Linear interpolation of `values` (S, O) at positions `x` (K,) given a
     uniform grid spanning [0, xp_last).  Used to locate each stimulus on a
-    parameter-dependent encoding transform."""
-    n = values.shape[-1]
+    parameter-dependent encoding transform.
+
+    `n` is the grid length as a PYTHON int.  Taking it from `values.shape[-1]`
+    instead makes the interpolation index depend on a symbolic shape, and JAX
+    then refuses to JIT the graph ("Shapes must be 1D sequences of concrete
+    values of integer type") the moment the caller is hierarchical -- which is
+    every real fit.
+    """
+    n = int(n) if n is not None else int(values.type.shape[-1])
     f = x / xp_last * pt.cast(n, 'floatX')
     i0 = pt.clip(pt.floor(f), 0, pt.cast(n, 'floatX') - 2.0)
     w = f - i0
@@ -467,14 +474,26 @@ class EfficientPerceptionModel(EstimationBaseModel):
             # Prior peakedness is fitted, so the efficient-coding transform it
             # induces (and therefore where each stimulus lands in
             # representational space) has to be rebuilt inside the graph.
-            w = model_inputs['prior_weight'][:, None]                # (S, 1)
+            # pt.specify_shape is load-bearing, not decoration: without it the
+            # (S, O) tensors built from a FITTED prior have no static shape, so
+            # every downstream reshape carries a symbolic S, and JAX refuses to
+            # JIT the graph ("Shapes must be 1D sequences of concrete values of
+            # integer type") as soon as the fit is hierarchical.
+            n_sub = (len(model.coords['subject'])
+                     if 'subject' in getattr(model, 'coords', {}) else 1)
+            N_ori = int(self.grid_resolution)
+            w = pt.specify_shape(model_inputs['prior_weight'], (n_sub,))[:, None]
             ori_prior = orientation_prior_pt(ori_grid[None, :], w)   # (S, O)
             ori_prior = ori_prior / (pt.sum(ori_prior, axis=-1, keepdims=True)
                                      * self.d_ori + 1e-30)
-            ori_cdf = _efficient_cdf_pt(ori_prior, self.d_ori)       # (S, O)
+            ori_prior = pt.specify_shape(ori_prior, (n_sub, N_ori))
+            ori_cdf = pt.specify_shape(
+                _efficient_cdf_pt(ori_prior, self.d_ori), (n_sub, N_ori))
             encoded_locs = _interp_pt(
                 pt.as_tensor_variable(self.unique_orientations_rad),
-                2 * np.pi, ori_cdf)                                  # (S, K)
+                2 * np.pi, ori_cdf, n=self.grid_resolution)          # (S, K)
+            encoded_locs = pt.specify_shape(
+                encoded_locs, (n_sub, len(self.unique_orientations_rad)))
         else:
             ori_prior = pt.as_tensor_variable(self.ori_prior)[None, :]
             ori_cdf = pt.as_tensor_variable(self.ori_cdf)[None, :]
@@ -823,14 +842,26 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
             # Prior peakedness is fitted, so the efficient-coding transform it
             # induces (and therefore where each stimulus lands in
             # representational space) has to be rebuilt inside the graph.
-            w = model_inputs['prior_weight'][:, None]                # (S, 1)
+            # pt.specify_shape is load-bearing, not decoration: without it the
+            # (S, O) tensors built from a FITTED prior have no static shape, so
+            # every downstream reshape carries a symbolic S, and JAX refuses to
+            # JIT the graph ("Shapes must be 1D sequences of concrete values of
+            # integer type") as soon as the fit is hierarchical.
+            n_sub = (len(model.coords['subject'])
+                     if 'subject' in getattr(model, 'coords', {}) else 1)
+            N_ori = int(self.grid_resolution)
+            w = pt.specify_shape(model_inputs['prior_weight'], (n_sub,))[:, None]
             ori_prior = orientation_prior_pt(ori_grid[None, :], w)   # (S, O)
             ori_prior = ori_prior / (pt.sum(ori_prior, axis=-1, keepdims=True)
                                      * self.d_ori + 1e-30)
-            ori_cdf = _efficient_cdf_pt(ori_prior, self.d_ori)       # (S, O)
+            ori_prior = pt.specify_shape(ori_prior, (n_sub, N_ori))
+            ori_cdf = pt.specify_shape(
+                _efficient_cdf_pt(ori_prior, self.d_ori), (n_sub, N_ori))
             encoded_locs = _interp_pt(
                 pt.as_tensor_variable(self.unique_orientations_rad),
-                2 * np.pi, ori_cdf)                                  # (S, K)
+                2 * np.pi, ori_cdf, n=self.grid_resolution)          # (S, K)
+            encoded_locs = pt.specify_shape(
+                encoded_locs, (n_sub, len(self.unique_orientations_rad)))
         else:
             ori_prior = pt.as_tensor_variable(self.ori_prior)[None, :]
             ori_cdf = pt.as_tensor_variable(self.ori_cdf)[None, :]
