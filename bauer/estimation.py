@@ -324,11 +324,20 @@ class EstimationBaseModel(BaseModel):
         response_grid = self._get_response_grid()
         dv = response_grid[1] - response_grid[0]
 
-        # Inverse CDF sampling
+        # Inverse CDF sampling.  The lapse is mixed in here, not only in
+        # bin_probability: without it simulated datasets are the no-lapse
+        # model, and any PPC built on them is checking a model the likelihood
+        # never fitted -- visible wherever the fitted distribution is sharp
+        # (e.g. under a hard category gate, where it is a spike).
+        pdf = trial_dist_np / (np.sum(trial_dist_np * dv, axis=-1, keepdims=True) + 1e-30)
+        lapse_rate = getattr(self, 'lapse_rate', 0.0) or 0.0
+        if lapse_rate:
+            uniform = np.full_like(pdf, 1.0 / (response_grid[-1] - response_grid[0]))
+            pdf = (1.0 - lapse_rate) * pdf + lapse_rate * uniform
+
         all_samples = []
         for _ in range(n_samples):
             u = np.random.uniform(size=trial_dist_np.shape[0])
-            pdf = trial_dist_np / (np.sum(trial_dist_np * dv, axis=-1, keepdims=True) + 1e-30)
             cdf = np.cumsum(pdf * dv, axis=-1)
             indices = np.argmax(cdf >= u[:, np.newaxis], axis=-1)
             # Add uniform jitter within the bin

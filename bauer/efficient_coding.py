@@ -150,28 +150,30 @@ def _interp_pt(x, xp_last, values):
     return values[..., i0] * (1.0 - w) + values[..., i0 + 1] * w
 
 
-def _no_seam_mask(ori_grid, encoded_locs):
-    """Indicator that a hypothesised orientation is on the same side of the
-    0/180 deg seam as the stimulus.
+def _seam_mask(encoded_positions, rep_grid, step):
+    """(..., O, M) indicator that a hypothesised orientation and the measurement
+    that produced it lie on the same side of the 0/180 deg seam.
 
     Orientation is pi-periodic, so 0 deg and 180 deg are the same grating -- but
     G is not: G(0 deg) = 2 CHF and G(180 deg) = 42 CHF.  A participant who has
-    learned the mapping never confuses the two ends; the observed bias curves
-    show no sign of 2-CHF bids for near-180 deg gratings.  Restricting the
-    perceptual posterior to the non-wrapping side encodes that, and removes the
-    predictive blow-ups in the outermost orientation bins.
+    learned the mapping never bids 2 CHF for a 179 deg grating, so the decoder
+    must not put posterior mass on the far side of the seam from its own
+    measurement.  Note the reference is the MEASUREMENT (rep_grid), not the
+    stimulus: the observer does not know the stimulus, and referencing it makes
+    the mask a (K, O) object that cannot even be broadcast against the
+    (S, O, M) posterior.
 
-    Implemented as a smooth (differentiable) window rather than a hard cut, of
-    width one grid cell, so it does not reintroduce a discontinuity.
+    Implemented as a smooth (differentiable) window one grid cell wide rather
+    than a hard cut, so it does not reintroduce a discontinuity for NUTS.
+    Allowed pairs get 0.5 rather than 1.0, which cancels in the renormalisation
+    that always follows.
     """
-    d = ori_grid[None, :] - encoded_locs[:, None]                    # (K, O)
+    d = encoded_positions[..., None] - rep_grid                      # (..., O, M)
     wrapped = pt.abs(pt.mod(d + np.pi, 2 * np.pi) - np.pi)           # circular distance
     straight = pt.abs(d)                                             # distance on the line
     # A candidate crosses the seam when the short way round is not the direct
     # way; suppress those smoothly.
-    excess = straight - wrapped
-    step = (ori_grid[1] - ori_grid[0]) if ori_grid.ndim else 0.1
-    return ptm.sigmoid(-excess / (0.5 * step + 1e-12))
+    return ptm.sigmoid(-(straight - wrapped) / (0.5 * step + 1e-12))
 
 
 def _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori, q_per=Q_PER,
@@ -230,6 +232,7 @@ def _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori, q_per=Q_PER,
     n_cand = int(n_cand) if n_cand is not None else int(ori_grid.type.shape[0])
     i = pt.argmin(loss, axis=1)                                      # (S*M,)
     cand = pt.arange(n_cand)                                         # static length
+
     def _at(idx):
         return pt.sum(loss * pt.eq(cand[None, :], idx[:, None]), axis=1)
     l_m = _at((i - 1) % n_cand)
@@ -506,9 +509,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
         )  # (S, O, M), unnormalised
         posterior = likelihood * ori_prior[:, :, None]
         if self.no_seam_crossing:
-            posterior = posterior * _no_seam_mask(ori_grid, encoded_locs)[:, :, None] \
-                if encoded_locs.ndim == 1 else posterior * pt.mean(
-                    _no_seam_mask(ori_grid, encoded_locs[0]), axis=0)[None, :, None]
+            posterior = posterior * _seam_mask(ori_cdf, rep_grid, self.d_ori)
         posterior = posterior / (pt.sum(posterior, axis=1, keepdims=True) * d_ori + 1e-30)
 
         # Steps 3-4: q_per-optimal perceptual estimate, then v_hat = G(theta_hat)
@@ -872,8 +873,7 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         )  # (S, O, M), unnormalised
         posterior_ori = likelihood_ori * ori_prior[:, :, None]
         if self.no_seam_crossing:
-            posterior_ori = posterior_ori * pt.mean(
-                _no_seam_mask(ori_grid, encoded_locs[0]), axis=0)[None, :, None]
+            posterior_ori = posterior_ori * _seam_mask(ori_cdf, rep_grid, self.d_ori)
         posterior_ori = posterior_ori / (pt.sum(posterior_ori, axis=1, keepdims=True) * d_ori + 1e-30)
 
         # q_per-optimal perceptual estimate, then v_per(m) = G(theta_hat(m))
@@ -957,18 +957,50 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
 
 
 class CategoricalSequentialModel(SequentialEfficientCodingModel):
-    """Sequential model with cardinal categorical stabilization.
+    """Sequential model with cardinal categorical stabilization (paper, Fig. 6).
 
-    Same as SequentialEfficientCodingModel, but applies a category gate at the
-    output: stimuli below/at/above 90 degrees are constrained to have value
-    estimates in the corresponding category (below/at/above v_mid).
+    Perceptual and value encoding/decoding are untouched; a hard category gate
+    is applied to the final value-estimate distribution p(v_hat | phi_0).
+    Stimuli fall into three categories relative to the 90 deg cardinal --
+    below, at, above -- where "at" is within one model grid step of 90 deg.  In
+    value space the middle category is [v_mid - delta, v_mid + delta] with
+    v_mid = 22 CHF and delta = 0.25 CHF, and the outer categories are the values
+    below and above that interval.  Mass outside the implied category is set to
+    zero and the rest renormalised.
+
+    Descriptive, and deliberately free-parameter-free: it is a proxy for the
+    regime in which precision near the cardinal is high enough to remove
+    category-level confusions, not a mechanism.  Motivated by the localized
+    collapse of response variability at 90 deg, which every ungated
+    architecture gets backwards in at least one mapping (it predicts a variance
+    *peak* there for any mapping whose slope is steep at the cardinal).
     """
 
-    def _compute_trial_distributions(self, model_inputs):
-        # Get the base sequential model's response distribution
-        # Then apply the category gate
-        # For now, delegate to parent and note that the gate
-        # should be applied to p_response before computing log_prob
+    V_MID = 22.0
+    DELTA = 0.25
 
-        # TODO: Implement category gate. For now, use parent.
-        return super()._compute_trial_distributions(model_inputs)
+    def _setup_grids(self, paradigm):
+        super()._setup_grids(paradigm)
+
+        step_deg = 180.0 / self.grid_resolution
+        ori_deg = np.rad2deg(self.unique_orientations_rad) / 2.0          # (K,)
+        v = self.val_grid                                                 # (V,)
+
+        at_cardinal = np.abs(ori_deg - 90.0) <= step_deg
+        below = ori_deg < 90.0 - step_deg
+
+        mid = np.abs(v - self.V_MID) <= self.DELTA
+        low = v < self.V_MID - self.DELTA
+        high = v > self.V_MID + self.DELTA
+
+        mask = np.where(at_cardinal[:, None], mid[None, :],
+                        np.where(below[:, None], low[None, :], high[None, :]))
+        self.category_mask = mask.astype(float)                           # (K, V)
+
+    def _compute_trial_distributions(self, model_inputs):
+        trial_dist = super()._compute_trial_distributions(model_inputs)   # (T, V)
+        model = pm.Model.get_context()
+        stimulus_ix = model['stimulus_ix']
+        mask = pt.as_tensor_variable(self.category_mask)[stimulus_ix]     # (T, V)
+        gated = trial_dist * mask
+        return gated / (pt.sum(gated, axis=-1, keepdims=True) * self.d_val + 1e-30)
