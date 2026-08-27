@@ -310,6 +310,50 @@ def orientation_prior_pt(phi, weight):
     return p
 
 
+def fourier_orientation_prior_pt(phi, coefs):
+    """Circular Fourier prior, p(phi) ~ exp(sum_k a_k cos(k phi) + b_k sin(k phi)).
+
+    `phi` is the DOUBLED angle, so harmonic k has period 180/k degrees in
+    orientation: k=1 is cos(2 theta), the horizontal-vs-vertical asymmetry;
+    k=2 is cos(4 theta), the cardinal-vs-oblique term that reproduces the
+    paper's 2 - |sin phi| at a_2 ~ 0.31; k>=3 refines the shape further.  The
+    sine terms break mirror symmetry about 0 deg, which no cosine-only prior
+    can do.
+
+    Positive and exactly periodic by construction -- the reason to prefer this
+    over a spline through knots at 0/45/90/135/180, which needs a periodic
+    boundary condition bolted on and can still go negative.  Nests uniform at
+    coefs = 0.
+
+    `coefs` is a list of (a_k, b_k) pairs, each broadcastable against `phi`.
+    """
+    logp = pt.zeros_like(phi)
+    for k, (a, b) in enumerate(coefs, start=1):
+        logp = logp + a * ptm.cos(k * phi) + b * ptm.sin(k * phi)
+    # Subtract the max before exponentiating; the caller renormalises anyway,
+    # and without it a large coefficient overflows before normalisation.
+    logp = logp - pt.max(logp, axis=-1, keepdims=True)
+    return pt.exp(logp)
+
+
+def fourier_coef_prior(k):
+    """Prior on harmonic k: weakly informative for the two interpretable terms,
+    a roughness penalty above them.
+
+    k = 1 (horizontal vs vertical) and k = 2 (cardinal vs oblique) are the
+    shapes there is a scientific claim about, so they get sigma = 0.5 -- loose
+    enough that the paper's fitted a_2 = 0.31 sits well inside it.  From k = 3
+    the coefficients only add wiggle, so sigma falls as 0.5 / (k-1)^2 and a
+    higher harmonic has to be strongly supported to show up.  This is the
+    circular equivalent of a smoothing-spline penalty: include as many
+    harmonics as you like and let the data decide how much structure survives,
+    rather than picking an order by hand.
+    """
+    sigma = 0.5 if k <= 2 else 0.5 / (k - 1) ** 2
+    return {'mu_intercept': 0.0, 'sigma_intercept': sigma,
+            'transform': 'identity'}
+
+
 def long_term_orientation_prior_np(phi):
     """Long-term orientation prior: p(phi) proportional to 2 - |sin(phi)|.
 
@@ -343,7 +387,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
 
     def __init__(self, paradigm=None, perceptual_prior='long_term',
                  grid_resolution=101, rep_grid_resolution=None, q_per=Q_PER,
-                 fit_prior_weight=False, no_seam_crossing=False, **kwargs):
+                 fit_prior_weight=False, prior_fourier_order=0,
+                 no_seam_crossing=False, **kwargs):
         """
         Parameters
         ----------
@@ -360,13 +405,30 @@ class EfficientPerceptionModel(EstimationBaseModel):
         self.rep_grid_resolution = rep_grid_resolution or grid_resolution
         self.q_per = q_per
         self.fit_prior_weight = fit_prior_weight
+        self.prior_fourier_order = int(prior_fourier_order)
+        if self.fit_prior_weight and self.prior_fourier_order:
+            raise ValueError("fit_prior_weight and prior_fourier_order are two "
+                             "parameterisations of the same thing; pick one.")
         self.no_seam_crossing = no_seam_crossing
         super().__init__(paradigm, grid_resolution=grid_resolution, **kwargs)
+
+    def fourier_prior_parameters(self):
+        """{name: prior} for the free Fourier coefficients (empty when off)."""
+        return {f'prior_{c}{k}': fourier_coef_prior(k)
+                for k in range(1, self.prior_fourier_order + 1)
+                for c in 'ab'}
+
+    def fourier_coefs(self, model_inputs, n_sub):
+        """[(a_k, b_k)] as (S, 1) tensors, ready to broadcast against phi."""
+        return [(pt.specify_shape(model_inputs[f'prior_a{k}'], (n_sub,))[:, None],
+                 pt.specify_shape(model_inputs[f'prior_b{k}'], (n_sub,))[:, None])
+                for k in range(1, self.prior_fourier_order + 1)]
 
     def get_free_parameters(self):
         pars = {'kappa_r': kappa_r_prior(self.grid_resolution)}
         if self.fit_prior_weight:
             pars['prior_weight'] = PRIOR_WEIGHT_PRIOR
+        pars.update(self.fourier_prior_parameters())
         return pars
 
     def get_model_inputs(self, parameters):
@@ -375,6 +437,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
             'kappa_r': self.subjectwise('kappa_r'),
             **({'prior_weight': self.subjectwise('prior_weight')}
                if self.fit_prior_weight else {}),
+            **{name: self.subjectwise(name)
+               for name in self.fourier_prior_parameters()},
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -470,8 +534,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
         ori_grid = pt.as_tensor_variable(self.ori_grid)
         rep_grid = pt.as_tensor_variable(self.rep_grid)
         val_grid = pt.as_tensor_variable(self.val_grid)
-        if self.fit_prior_weight:
-            # Prior peakedness is fitted, so the efficient-coding transform it
+        if self.fit_prior_weight or self.prior_fourier_order:
+            # The prior shape is fitted, so the efficient-coding transform it
             # induces (and therefore where each stimulus lands in
             # representational space) has to be rebuilt inside the graph.
             # pt.specify_shape is load-bearing, not decoration: without it the
@@ -482,8 +546,12 @@ class EfficientPerceptionModel(EstimationBaseModel):
             n_sub = (len(model.coords['subject'])
                      if 'subject' in getattr(model, 'coords', {}) else 1)
             N_ori = int(self.grid_resolution)
-            w = pt.specify_shape(model_inputs['prior_weight'], (n_sub,))[:, None]
-            ori_prior = orientation_prior_pt(ori_grid[None, :], w)   # (S, O)
+            if self.prior_fourier_order:
+                ori_prior = fourier_orientation_prior_pt(
+                    ori_grid[None, :], self.fourier_coefs(model_inputs, n_sub))
+            else:
+                w = pt.specify_shape(model_inputs['prior_weight'], (n_sub,))[:, None]
+                ori_prior = orientation_prior_pt(ori_grid[None, :], w)   # (S, O)
             ori_prior = ori_prior / (pt.sum(ori_prior, axis=-1, keepdims=True)
                                      * self.d_ori + 1e-30)
             ori_prior = pt.specify_shape(ori_prior, (n_sub, N_ori))
@@ -770,11 +838,13 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
 
     def __init__(self, paradigm=None, perceptual_prior='long_term',
                  grid_resolution=101, rep_grid_resolution=None, q_per=Q_PER,
-                 fit_prior_weight=False, no_seam_crossing=False, **kwargs):
+                 fit_prior_weight=False, prior_fourier_order=0,
+                 no_seam_crossing=False, **kwargs):
         super().__init__(paradigm, perceptual_prior=perceptual_prior,
                          grid_resolution=grid_resolution,
                          rep_grid_resolution=rep_grid_resolution,
                          q_per=q_per, fit_prior_weight=fit_prior_weight,
+                         prior_fourier_order=prior_fourier_order,
                          no_seam_crossing=no_seam_crossing, **kwargs)
 
     def get_free_parameters(self):
@@ -782,6 +852,7 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                 'sigma_rep': SIGMA_REP_PRIOR}
         if self.fit_prior_weight:
             pars['prior_weight'] = PRIOR_WEIGHT_PRIOR
+        pars.update(self.fourier_prior_parameters())
         return pars
 
     def get_model_inputs(self, parameters):
@@ -791,6 +862,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
             'sigma_rep': self.subjectwise('sigma_rep'),
             **({'prior_weight': self.subjectwise('prior_weight')}
                if self.fit_prior_weight else {}),
+            **{name: self.subjectwise(name)
+               for name in self.fourier_prior_parameters()},
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -838,8 +911,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         ori_grid = pt.as_tensor_variable(self.ori_grid)
         rep_grid = pt.as_tensor_variable(self.rep_grid)
         val_grid = pt.as_tensor_variable(self.val_grid)
-        if self.fit_prior_weight:
-            # Prior peakedness is fitted, so the efficient-coding transform it
+        if self.fit_prior_weight or self.prior_fourier_order:
+            # The prior shape is fitted, so the efficient-coding transform it
             # induces (and therefore where each stimulus lands in
             # representational space) has to be rebuilt inside the graph.
             # pt.specify_shape is load-bearing, not decoration: without it the
@@ -850,8 +923,12 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
             n_sub = (len(model.coords['subject'])
                      if 'subject' in getattr(model, 'coords', {}) else 1)
             N_ori = int(self.grid_resolution)
-            w = pt.specify_shape(model_inputs['prior_weight'], (n_sub,))[:, None]
-            ori_prior = orientation_prior_pt(ori_grid[None, :], w)   # (S, O)
+            if self.prior_fourier_order:
+                ori_prior = fourier_orientation_prior_pt(
+                    ori_grid[None, :], self.fourier_coefs(model_inputs, n_sub))
+            else:
+                w = pt.specify_shape(model_inputs['prior_weight'], (n_sub,))[:, None]
+                ori_prior = orientation_prior_pt(ori_grid[None, :], w)   # (S, O)
             ori_prior = ori_prior / (pt.sum(ori_prior, axis=-1, keepdims=True)
                                      * self.d_ori + 1e-30)
             ori_prior = pt.specify_shape(ori_prior, (n_sub, N_ori))
