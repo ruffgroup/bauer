@@ -50,7 +50,6 @@ def _translate_deprecated_kwargs(func):
     return wrapper
 
 
-
 def _group_sd_rv(name, scale, dist='halfnormal', dims=None):
     """Group-level SD prior for a hierarchical node.
 
