@@ -998,9 +998,11 @@ class EfficientValuationModel(EstimationBaseModel):
         p_response = p_response / (pt.sum(p_response, axis=-1, keepdims=True) * d_val + 1e-30)
 
         # ---- Step 6: Per-trial distribution ----
-        trial_dist = p_response[subject_ix, mapping_ix, stimulus_ix, :]  # (n_trials, V)
-
-        return trial_dist
+        # Padded onto the wider response grid like the other models; without
+        # this the valuation model alone returns an 81-point distribution
+        # against an 85-point response grid and dies at graph-build time.
+        return self._pad_to_response_grid(
+            p_response[subject_ix, mapping_ix, stimulus_ix, :])
 
     def _get_response_grid(self):
         return getattr(self, 'response_grid', self.val_grid)
