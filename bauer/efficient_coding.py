@@ -656,7 +656,12 @@ class EfficientPerceptionModel(EstimationBaseModel):
                                                 val_grid, d_ori, d_rep, d_val)
         p_response = p_response / (pt.sum(p_response, axis=-1, keepdims=True) * d_val + 1e-30)
 
-        # Gather per-trial distributions
+        # Gate, then motor noise, then gather per-trial distributions
+        n_sub = self._n_subjects(model)
+        p_response = self._gate_value_table(p_response.dimshuffle(1, 0, 2, 3)
+                                            ).dimshuffle(1, 0, 2, 3)
+        p_response = self._apply_motor_noise(p_response, model_inputs, val_grid,
+                                             d_val, n_sub, 'CSKV')
         return p_response[mapping_ix, subject_ix, stimulus_ix, :]  # (n_trials, V)
 
     @staticmethod
@@ -675,6 +680,16 @@ class EfficientPerceptionModel(EstimationBaseModel):
             return int(np.max(model['subject_ix'].get_value())) + 1
         except Exception:
             return 1
+
+    def _gate_value_table(self, p_response):
+        """Hook for a category gate on the (S, C, K, V) table.  Base: no gate.
+
+        It lives at table level, not per trial, so motor noise can be applied
+        AFTER it: execution noise happens after the decision, and it is the
+        only thing that should be able to push a response across a category
+        boundary.  Gating afterwards would clip exactly that.
+        """
+        return p_response
 
     def _apply_motor_noise(self, p_response, model_inputs, val_grid, d_val,
                            n_sub, layout):
@@ -1180,11 +1195,12 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
 
         p_response = p_response / (pt.sum(p_response, axis=-1, keepdims=True) * d_val + 1e-30)
 
-        # ---- Per-trial distribution ----
-        # p_response: (S, C, K, V)
-        trial_dist = p_response[subject_ix, mapping_ix, stimulus_ix, :]
-
-        return trial_dist
+        # ---- Gate, then motor noise, then the per-trial gather ----
+        n_sub = self._n_subjects(model)
+        p_response = self._gate_value_table(p_response)
+        p_response = self._apply_motor_noise(p_response, model_inputs, val_grid,
+                                             d_val, n_sub, 'SCKV')
+        return p_response[subject_ix, mapping_ix, stimulus_ix, :]
 
 
 class CategoricalSequentialModel(SequentialEfficientCodingModel):
@@ -1228,10 +1244,7 @@ class CategoricalSequentialModel(SequentialEfficientCodingModel):
                         np.where(below[:, None], low[None, :], high[None, :]))
         self.category_mask = mask.astype(float)                           # (K, V)
 
-    def _compute_trial_distributions(self, model_inputs):
-        trial_dist = super()._compute_trial_distributions(model_inputs)   # (T, V)
-        model = pm.Model.get_context()
-        stimulus_ix = model['stimulus_ix']
-        mask = pt.as_tensor_variable(self.category_mask)[stimulus_ix]     # (T, V)
-        gated = trial_dist * mask
+    def _gate_value_table(self, p_response):
+        mask = pt.as_tensor_variable(self.category_mask)                  # (K, V)
+        gated = p_response * mask[None, None, :, :]
         return gated / (pt.sum(gated, axis=-1, keepdims=True) * self.d_val + 1e-30)
