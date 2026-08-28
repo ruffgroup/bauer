@@ -124,21 +124,32 @@ def kappa_r_prior(grid_resolution=None):
     if grid_resolution is not None:
         k_max = max_resolvable_kappa(grid_resolution)
         mu, sigma = min(mu, k_max / 2.0), min(sigma, k_max / 4.0)
+    # The group-SD prior has to be scaled to THIS parameter, not left at
+    # bauer's 0.25 default: kappa_r lives on a scale of tens, so HalfNormal(0.25)
+    # is ~80x too tight and collapses the fit to complete pooling -- every
+    # subject gets the same kappa and the between-subject variance vanishes.
+    # HalfCauchy hid this behind its tail; HalfNormal cannot.
+    #
+    # 1.5x the parameter's own prior SD, deliberately generous: the two errors
+    # are not symmetric. Too loose costs a little regularisation; too tight
+    # destroys the between-subject variance, and it does so silently -- the fit
+    # converges beautifully and every subject gets the same number.
     return {'mu_intercept': mu, 'sigma_intercept': sigma,
+            'cauchy_sigma_intercept': 1.5 * sigma,
             'transform': 'softplus'}
 
 
 # Back-compat default for callers that do not know their grid yet.
 KAPPA_R_PRIOR = kappa_r_prior()
 SIGMA_REP_PRIOR = {'mu_intercept': 0.5, 'sigma_intercept': 1.0,
-                   'transform': 'softplus'}
+                   'cauchy_sigma_intercept': 1.5, 'transform': 'softplus'}
 # Motor (response-execution) noise, in CHF.  Identified almost entirely by the
 # 90 deg cardinal: with categorical perception and the value gate the model
 # predicts a delta at 22 CHF there, so whatever spread the data show at that
 # one stimulus is the hand on the slider, not perception or valuation.  The
 # observed SD at 90 deg is 0.53-0.68 CHF, hence a prior centred just below 1.
 SIGMA_MOTOR_PRIOR = {'mu_intercept': 0.5, 'sigma_intercept': 0.5,
-                     'transform': 'softplus'}
+                     'cauchy_sigma_intercept': 0.75, 'transform': 'softplus'}
 
 
 def _efficient_cdf_pt(prior, d_ori):
@@ -337,7 +348,7 @@ def orientation_to_value_np(orientation_deg, mapping='linear'):
 # ============================================================================
 
 PRIOR_WEIGHT_PRIOR = {'mu_intercept': 0.5, 'sigma_intercept': 0.5,
-                      'transform': 'logistic'}
+                      'cauchy_sigma_intercept': 0.75, 'transform': 'logistic'}
 
 
 def orientation_prior_pt(phi, weight):
@@ -400,7 +411,7 @@ def fourier_coef_prior(k):
     """
     sigma = 0.5 if k <= 2 else 0.5 / (k - 1) ** 2
     return {'mu_intercept': 0.0, 'sigma_intercept': sigma,
-            'transform': 'identity'}
+            'cauchy_sigma_intercept': 1.5 * sigma, 'transform': 'identity'}
 
 
 def long_term_orientation_prior_np(phi):
