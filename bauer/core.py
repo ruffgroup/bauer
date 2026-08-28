@@ -3,7 +3,7 @@ import warnings
 import pandas as pd
 import pymc as pm
 import numpy as np
-from .utils.bayes import cumulative_normal, get_diff_dist, get_posterior
+from .utils.bayes import cumulative_normal, get_diff_dist, get_posterior, posterior_mean_sd
 from .utils.math import logistic, softplus_np, logistic_np, logit_np, inverse_softplus_np
 import pytensor.tensor as pt
 from patsy import dmatrix, build_design_matrices
@@ -55,14 +55,11 @@ def _group_sd_rv(name, scale, dist='halfnormal', dims=None):
 
     ``'halfcauchy'`` (``HalfCauchy(beta=scale)``) is bauer's historical pre-0.3.0
     default but has an infinite-variance heavy tail: a poorly-identified group SD
-    can wander to huge values, producing a funnel and divergences.
-    ``'halfnormal'`` (``HalfNormal(sigma=scale)``) has a light tail that tames
-    the SD and removes that pathology, at the cost of mild over-shrinkage if
-    true between-subject heterogeneity is large.
-
-    Ported from upstream bauer 0.3.0 so this branch can compare the two on the
-    efficient-coding models, where kappa_r is weakly identified and has been
-    running past the grid's resolution ceiling under the Cauchy tail.
+    can wander to huge values, producing a funnel and divergences (seen e.g. on
+    DDM noise components and near-0 lapse rates). ``'halfnormal'``
+    (``HalfNormal(sigma=scale)``) has a light tail that tames the SD and removes
+    that pathology, at the cost of mild over-shrinkage if true between-subject
+    heterogeneity is large.
     """
     if dist == 'halfnormal':
         return pm.HalfNormal(name, sigma=scale, dims=dims)
@@ -75,6 +72,16 @@ def _group_sd_rv(name, scale, dist='halfnormal', dims=None):
 class BaseModel(object):
 
     paradigm_keys = []
+
+    # Group-level SD prior family for hierarchical nodes: 'halfcauchy'
+    # (default, historical) or 'halfnormal' (tamer tail; avoids the group-SD
+    # funnel that drives divergences when between-subject variance is weakly
+    # identified). See _group_sd_rv. Set per-instance/subclass to override.
+    # Group-level SD prior. Default 'halfnormal' (light tail) as of 0.3.0:
+    # HalfCauchy's infinite-variance tail let poorly-identified group SDs run
+    # away (funnel + divergences, e.g. the 66-subject DDM/RDM). Set to
+    # 'halfcauchy' per-instance to restore the pre-0.3.0 behaviour.
+    group_sd_dist = 'halfnormal'
 
     # Per-model-class hints for the NUTS sampler.
     #
@@ -101,6 +108,11 @@ class BaseModel(object):
     # (verified: vectorized regression-DDM converges ~1/7 seeds without it).
     # ``None`` = use the backend's default init.
     recommended_init: str | None = None
+    # KLW-consistent posterior-mean-SD choice noise: the static choice
+    # likelihood normalizes by the SD of the noisy posterior mean (w*sigma_e),
+    # not the raw evidence SD. Default False keeps the historical behaviour;
+    # accumulators (DDM/RDM) already use posterior_mean_sd internally.
+    consistent_choice_noise = False
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -167,7 +179,16 @@ class BaseModel(object):
                                           model_inputs['n2_evidence_mu'],
                                           model_inputs['n2_evidence_sd'])
 
-        diff_mu, diff_sd = get_diff_dist(post_n2_mu, model_inputs['n2_evidence_sd'], post_n1_mu, model_inputs['n1_evidence_sd'])
+        # KLW-consistent noise: the decision variable is the noisy posterior
+        # mean (mu_hat = w*r), whose across-trial SD is w*sigma_e
+        # (posterior_mean_sd), not the raw evidence SD. Default keeps the
+        # historical raw-evidence_sd normalization (back-compat).
+        if getattr(self, 'consistent_choice_noise', False) and not getattr(self, 'flat_observer_prior', False):
+            sd1 = posterior_mean_sd(model_inputs['n1_prior_sd'], model_inputs['n1_evidence_sd'])
+            sd2 = posterior_mean_sd(model_inputs['n2_prior_sd'], model_inputs['n2_evidence_sd'])
+        else:
+            sd1, sd2 = model_inputs['n1_evidence_sd'], model_inputs['n2_evidence_sd']
+        diff_mu, diff_sd = get_diff_dist(post_n2_mu, sd2, post_n1_mu, sd1)
 
         if self.save_trialwise_n_estimates:
             pm.Deterministic('n1_hat', post_n1_mu)
@@ -232,7 +253,8 @@ class BaseModel(object):
             for key, info in self.free_parameters.items():
                 self.build_prior(key, flat_prior=flat_prior, **info)
 
-    def build_prior(self, name, mu_intercept=None, sigma_intercept=None, transform='identity', flat_prior=False):
+    def build_prior(self, name, mu_intercept=None, sigma_intercept=None, transform='identity',
+                    flat_prior=False, beta_mu_mean=0.05, beta_mu_kappa=8.0, **kwargs):
 
         model = pm.Model.get_context()
 
@@ -243,10 +265,19 @@ class BaseModel(object):
                 pm.Flat(name)
             elif transform == 'softplus':
                 pm.HalfFlat(name)
-            elif transform == 'logistic':
+            elif transform in ('logistic', 'beta'):
                 pm.Uniform(name, lower=0, upper=1)
             else:
                 raise NotImplementedError
+            return
+
+        if transform == 'beta':
+            # Single-subject Beta prior with the same small-mean / heavy-tail
+            # shape used by the hierarchical 'beta' group prior (see
+            # build_hierarchical_nodes). Concentration = beta_mu_kappa.
+            a0 = beta_mu_mean * beta_mu_kappa
+            b0 = (1.0 - beta_mu_mean) * beta_mu_kappa
+            pm.Beta(name, alpha=a0, beta=b0)
             return
 
         if mu_intercept is None:
@@ -354,8 +385,18 @@ class BaseModel(object):
             divergences persist.
         draws, tune : int
             Posterior and warmup draws per chain.
+        find_init : {None, 'mapjitter', 'priorjitter', 'pathfinder'}
+            Starting-point strategy. ``None`` uses the class default
+            (``recommended_init``; ``'mapjitter'`` for DDM/Race). ``'mapjitter'``
+            = MAP centre + prior-scaled jitter; ``'priorjitter'`` = prior-central
+            centre + jitter; ``'pathfinder'`` = seed each chain from a multipath
+            Pathfinder draw (variational; lands in the typical set — best for
+            nasty high-dimensional DDM geometries, needs ``pymc_extras``, falls
+            back to ``'mapjitter'`` if unavailable). Ignored if ``initvals`` is
+            passed in ``**kwargs``.
         **kwargs
             Forwarded to the underlying sampler. Notably:
+
             - pymc backend: ``init=`` (e.g. 'jitter+adapt_full' for dense
               mass adaptation), ``cores=``, ``random_seed=``.
             - JAX backends: ``nuts_kwargs={'dense_mass': True}``,
@@ -375,13 +416,24 @@ class BaseModel(object):
         # instead of relying on the backend's generic jitter init. This is
         # what stops hard DDM/regression posteriors from being a seed
         # lottery. Skipped if the user supplied their own ``initvals``.
+        #
+        # ``find_init='pathfinder'`` runs multipath Pathfinder (variational;
+        # lands in the typical set rather than at the MAP mode) and seeds each
+        # chain from a distinct Pathfinder draw — the right lever for nasty
+        # high-dimensional DDM geometries where MAP is the wrong target. See
+        # get_initial_points / _pathfinder_initial_points.
         if find_init is None:
             find_init = self.recommended_init
         if find_init and 'initvals' not in kwargs:
             seed = kwargs.get('random_seed', None)
-            kwargs['initvals'] = self.get_initial_points(
-                chains=chains, use_map=(find_init != 'priorjitter'),
-                seed=seed if isinstance(seed, int) else None)
+            seed = seed if isinstance(seed, int) else None
+            if find_init == 'pathfinder':
+                kwargs['initvals'] = self._pathfinder_initial_points(
+                    chains=chains, seed=seed)
+            else:
+                kwargs['initvals'] = self.get_initial_points(
+                    chains=chains, use_map=(find_init != 'priorjitter'),
+                    seed=seed)
 
         if backend == 'pymc':
             # When we supply our own dispersed initvals, avoid a jitter-adding
@@ -475,6 +527,153 @@ class BaseModel(object):
                 jit = rng.normal(0.0, jitter_frac * scale, size=centre[k].shape)
                 pt[k] = (centre[k] + jit).astype(ip[k].dtype)
             points.append(pt)
+        return points
+
+    def _pathfinder_initial_points(self, chains=4, seed=None,
+                                   num_paths=8, **pathfinder_kwargs):
+        """Pathfinder-based dispersed per-chain starting points.
+
+        Runs **multipath Pathfinder** (a variational method that lands in the
+        posterior's *typical set*, not at the MAP mode) on the built
+        ``estimation_model`` via :func:`pymc_extras.inference.fit`, then turns
+        ``chains`` of its draws into per-chain ``initvals`` dicts on the model's
+        **value-variable (unconstrained) scale** — the exact format
+        :meth:`get_initial_points` returns (keyed by ``model.initial_point()``
+        names, e.g. ``a_mu_untransformed``, ``s_log__``, ``p_logodds__``), so it
+        is a drop-in replacement as a sampler ``initvals``.
+
+        This is the right init lever for hard, high-dimensional DDM/RDM
+        posteriors: MAP (the ``'mapjitter'`` centre) is in the wrong place in
+        high dimensions (the mode is not in the typical set), whereas
+        Pathfinder draws already sit where the chains should warm up.
+
+        Robustness
+        ----------
+        If ``pymc_extras`` is missing, or Pathfinder errors / returns too few
+        usable draws, this falls back to :meth:`get_initial_points`
+        (MAP + jitter) with a :class:`UserWarning` — so a fit never crashes for
+        want of the optional dependency.
+
+        Parameters
+        ----------
+        chains : int
+            Number of per-chain initval dicts to return.
+        seed : int or None
+            Seed forwarded to Pathfinder for reproducibility.
+        num_paths : int
+            Number of Pathfinder paths (multipath). Default 8.
+        **pathfinder_kwargs
+            Extra keyword arguments forwarded to
+            ``pymc_extras.inference.fit(method='pathfinder', ...)``.
+        """
+        def _fallback(reason):
+            warnings.warn(
+                f"Pathfinder init unavailable ({reason}); "
+                "falling back to mapjitter initial points.")
+            return self.get_initial_points(chains=chains, use_map=True,
+                                           seed=seed)
+
+        try:
+            from pymc_extras.inference import fit as pmx_fit
+        except Exception as e:  # pragma: no cover - optional dependency
+            return _fallback(f"could not import pymc_extras ({e})")
+
+        # Draw at least as many Pathfinder samples as we need chains, with a
+        # comfortable margin so we can pick well-separated draws.
+        num_draws = pathfinder_kwargs.pop('num_draws',
+                                          max(1000, 50 * chains))
+
+        # Seed Pathfinder's OWN optimization from a plausible, data-informed
+        # point (the MAP) so its paths start in the valid region. Without this,
+        # on nasty DDM/RDM geometries Pathfinder can wander into the WFPT's
+        # flat/-inf zone and hand NUTS a frozen, all-divergent starting point
+        # (observed: independent-noise DDM -> 4000/4000 divergences, within-
+        # chain SD 0). If MAP fails, fall back to Pathfinder's default init.
+        seed_initvals = pathfinder_kwargs.pop('initvals', None)
+        if seed_initvals is None:
+            try:
+                with self.estimation_model:
+                    seed_initvals = pm.find_MAP(progressbar=False)
+            except Exception:  # pragma: no cover - robustness
+                seed_initvals = None
+
+        try:
+            with self.estimation_model:
+                pf_idata = pmx_fit(
+                    method='pathfinder', num_paths=num_paths,
+                    num_draws=num_draws, random_seed=seed,
+                    initvals=seed_initvals, **pathfinder_kwargs)
+        except Exception as e:  # pragma: no cover - robustness
+            return _fallback(f"pathfinder failed ({e})")
+
+        try:
+            return self._pathfinder_idata_to_initvals(pf_idata, chains, seed)
+        except Exception as e:  # pragma: no cover - robustness
+            return _fallback(f"could not convert pathfinder draws ({e})")
+
+    def _pathfinder_idata_to_initvals(self, pf_idata, chains, seed):
+        """Convert a Pathfinder ``InferenceData`` into ``chains`` value-variable
+        (unconstrained-scale) initval dicts, matching ``initial_point()`` keys.
+
+        Pathfinder returns draws on the **constrained / natural** scale, keyed
+        by free-RV name. The sampler wants ``initvals`` on the **value-variable
+        (unconstrained) scale** keyed by value-var name (what
+        ``model.initial_point()`` uses). For each free RV we apply its
+        transform's ``forward`` (e.g. log / logodds) to map the constrained
+        draw to the unconstrained value the sampler expects; untransformed RVs
+        pass through unchanged.
+        """
+        import pytensor
+
+        rng = np.random.default_rng(seed)
+        post = pf_idata.posterior
+        # Flatten (chain, draw) into a single sample axis and pick `chains`
+        # distinct draws to disperse the NUTS chains across the typical set.
+        n_pf = int(post.sizes['chain'] * post.sizes['draw'])
+        stacked = post.stack(_sample=('chain', 'draw'))
+        n_take = min(chains, n_pf)
+        sel = rng.choice(n_pf, size=n_take, replace=(n_pf < chains))
+
+        model = self.estimation_model
+        ip = model.initial_point()  # value-var-name -> array (template)
+
+        # Map each free RV to (value-var name, forward-transform or None),
+        # precompiling a forward function per transformed RV for speed.
+        rv_specs = []
+        for rv, value_var in model.rvs_to_values.items():
+            if rv.name not in post:
+                # Deterministics / RVs Pathfinder didn't return — skip; the
+                # sampler will initialise these from the model default.
+                continue
+            transform = model.rvs_to_transforms.get(rv, None)
+            if transform is None:
+                fwd_fn = None
+            else:
+                inp = pt.tensor(name='_c', dtype='float64',
+                                shape=(None,) * rv.ndim)
+                fwd_expr = transform.forward(inp, *rv.owner.inputs)
+                fwd_fn = pytensor.function(
+                    [inp], fwd_expr, on_unused_input='ignore')
+            rv_specs.append((rv.name, value_var.name, fwd_fn))
+
+        points = []
+        for s in sel:
+            pt_dict = {}
+            for rv_name, val_name, fwd_fn in rv_specs:
+                constrained = np.asarray(
+                    stacked[rv_name].isel(_sample=int(s)).values,
+                    dtype='float64')
+                if fwd_fn is None:
+                    unconstrained = constrained
+                else:
+                    unconstrained = np.asarray(fwd_fn(constrained))
+                pt_dict[val_name] = unconstrained.astype(
+                    ip[val_name].dtype).reshape(ip[val_name].shape)
+            points.append(pt_dict)
+
+        # If Pathfinder produced fewer draws than chains (degenerate), recycle.
+        while len(points) < chains:
+            points.append({k: v.copy() for k, v in points[-1].items()})
         return points
 
     def fit_map(self, filter_pars=True, progressbar=True, **kwargs):
@@ -616,14 +815,57 @@ class BaseModel(object):
 
     def build_hierarchical_nodes(self, name, mu_intercept=None, sigma_intercept=None,
                                  cauchy_sigma_intercept=None, transform='identity',
-                                 min_value=0.0, **kwargs):
+                                 min_value=0.0, beta_mu_mean=0.05, beta_mu_kappa=8.0,
+                                 beta_kappa_sd=3.0, **kwargs):
         """Build a hierarchical (group_mu, group_sd, per-subject offset) node.
 
-        ``transform`` ∈ {'identity', 'softplus', 'logistic'}. When ``transform`` is
-        'softplus' and ``min_value > 0``, the transformed parameter has a hard
-        lower bound: ``param = min_value + softplus(x)``. Used to keep e.g. the
-        DDM/RDM threshold ``a`` away from the a→0 collapse mode.
+        ``transform`` ∈ {'identity', 'softplus', 'logistic', 'beta'}. When
+        ``transform`` is 'softplus' and ``min_value > 0``, the transformed
+        parameter has a hard lower bound: ``param = min_value + softplus(x)``.
+        Used to keep e.g. the DDM/RDM threshold ``a`` away from the a→0 collapse
+        mode.
+
+        Hierarchical-Beta group prior (``transform='beta'``)
+        ----------------------------------------------------
+        A per-subject rate in ``(0, 1)`` whose population density is
+        concentrated near 0 with a heavy upper tail — the "1/x"-like shape — for
+        parameters such as a lapse / outlier rate, where most subjects are ≈ 0
+        but a minority genuinely lapse a lot. This replaces the logit-Normal
+        parameterization (``transform='logistic'``), which **funnels** when the
+        true rate ≈ 0: the per-subject logit → −∞, the group SD inflates without
+        bound, and NUTS diverges.
+
+        The model is::
+
+            mu     ~ Beta(beta_mu_mean·beta_mu_kappa, (1-beta_mu_mean)·beta_mu_kappa)
+            kappa  = 2 + exp(log_kappa),   log_kappa ~ Normal(0, beta_kappa_sd)
+            p[s]   ~ Beta(alpha, beta),    alpha = mu·kappa, beta = (1-mu)·kappa
+
+        ``mu`` is the group-mean rate (prior mean ``beta_mu_mean``, default
+        0.05); ``kappa`` is the population concentration. The per-subject density
+        is ``∝ p^(alpha-1)(1-p)^(beta-1)``: when ``alpha = mu·kappa < 1`` (small
+        ``mu``) this is an integrable spike at 0 (the "1/x" shape) with a fat
+        upper tail, exactly matching "most subjects ≈ 0, a few disengaged". The
+        ``kappa = 2 + exp(...)`` floor keeps ``beta = (1-mu)·kappa > 1`` so the
+        density is bounded near 1 (no spurious upper-edge spike) while still
+        allowing ``alpha < 1``. ``p[s]`` is sampled directly as a ``pm.Beta``,
+        whose default log-odds transform gives NUTS a clean unconstrained
+        geometry without the logit funnel (the per-subject scale is set by the
+        *data-informed* Beta, not a shared inflating SD). Group nodes
+        ``{name}_mu`` and ``{name}_kappa`` are exposed for reporting (so
+        ``get_groupwise_parameter_estimates`` keeps working via ``{name}_mu``).
         """
+
+        if transform == 'beta':
+            a0 = beta_mu_mean * beta_mu_kappa
+            b0 = (1.0 - beta_mu_mean) * beta_mu_kappa
+            group_mu = pm.Beta(f'{name}_mu', alpha=a0, beta=b0)
+            log_kappa = pm.Normal(f'{name}_log_kappa', mu=0.0, sigma=beta_kappa_sd)
+            group_kappa = pm.Deterministic(f'{name}_kappa',
+                                           2.0 + pt.exp(log_kappa))
+            alpha = group_mu * group_kappa
+            beta = (1.0 - group_mu) * group_kappa
+            return pm.Beta(name, alpha=alpha, beta=beta, dims=('subject',))
 
         if mu_intercept is None:
             mu_intercept = 0.0
@@ -692,7 +934,13 @@ class BaseModel(object):
         mu_pars = pd.concat([idata.posterior[par + '_mu'].to_dataframe() for par in self.free_parameters], axis=1, keys=parameters, names=['parameter']).droplevel(1, axis=1)
 
         if include_sd:
-            sd_pars = pd.concat([idata.posterior[par + '_sd'].to_dataframe() for par in self.free_parameters], axis=1, keys=self.free_parameters, names=['parameter']).droplevel(1, axis=1)
+            # 'beta' group priors expose a concentration ({par}_kappa) instead
+            # of a Normal scale ({par}_sd); fall back to it so reporting works.
+            def _spread(par):
+                if par + '_sd' in idata.posterior:
+                    return idata.posterior[par + '_sd'].to_dataframe()
+                return idata.posterior[par + '_kappa'].to_dataframe()
+            sd_pars = pd.concat([_spread(par) for par in self.free_parameters], axis=1, keys=self.free_parameters, names=['parameter']).droplevel(1, axis=1)
             pars = pd.concat((mu_pars, sd_pars), keys=['mu', 'sd'], names=['type'], axis=1)
 
         else:
@@ -725,6 +973,14 @@ class BaseModel(object):
             if 'transform' not in pars.keys():
                 pars['transform'] = 'identity'
 
+            if pars['transform'] == 'beta':
+                mean = pars.get('beta_mu_mean', 0.05)
+                kappa = pars.get('beta_mu_kappa', 8.0)
+                samples_pars[key] = np.random.beta(mean * kappa,
+                                                   (1.0 - mean) * kappa,
+                                                   n_subjects)
+                continue
+
             samples_pars[key] = np.random.normal(pars['mu_intercept'], pars['sigma_intercept'], n_subjects)
             if pars['transform'] == 'softplus':
                 samples_pars[key] = softplus_np(samples_pars[key])
@@ -741,7 +997,8 @@ class BaseModel(object):
     def forward_transform(self, data, parameter):
         transform = self.free_parameters[parameter]['transform']
 
-        if transform == 'identity':
+        if transform in ('identity', 'beta'):
+            # 'beta' rates already live in (0, 1) — natural == sampling scale.
             return data
         elif transform == 'softplus':
             return softplus_np(data)
@@ -751,7 +1008,7 @@ class BaseModel(object):
     def backward_transform(self, data, parameter):
         transform = self.free_parameters[parameter]['transform']
 
-        if transform == 'identity':
+        if transform in ('identity', 'beta'):
             return data
         elif transform == 'softplus':
             return inverse_softplus_np(data)
@@ -784,12 +1041,49 @@ class BaseModel(object):
 BaseModel.__init__ = _translate_deprecated_kwargs(BaseModel.__init__)
 
 
+def _lapse_param_spec(group, mu_mean, mu_kappa, kappa_sd):
+    """Free-parameter spec dict for a lapse / outlier rate in (0, 1).
+
+    ``group='logit_normal'`` (default) reproduces the historical logit-Normal
+    hierarchical prior (centred at ``mu_mean``). ``group='beta'`` selects the
+    hierarchical-Beta "1/x"-like group prior (see
+    :meth:`BaseModel.build_hierarchical_nodes`), which is concentrated near 0
+    with a heavy upper tail and removes the logit funnel that arises when the
+    true rate ≈ 0.
+    """
+    if group == 'beta':
+        return {'transform': 'beta',
+                'beta_mu_mean': mu_mean,
+                'beta_mu_kappa': mu_kappa,
+                'beta_kappa_sd': kappa_sd}
+    elif group == 'logit_normal':
+        return {'mu_intercept': logit_np(mu_mean), 'transform': 'logistic'}
+    raise ValueError(
+        f"lapse_group must be 'logit_normal' or 'beta', got {group!r}.")
+
+
 class LapseModel(BaseModel):
+    """Static-choice model with a per-subject random-lapse rate ``p_lapse``.
+
+    ``lapse_group`` selects the group prior on the per-subject lapse rate:
+    ``'logit_normal'`` (legacy opt-in; Beta is now the default) or ``'beta'`` (the
+    heavy-tailed "1/x"-like hierarchical Beta; see
+    :meth:`BaseModel.build_hierarchical_nodes`). The Beta option is preferable
+    when most subjects lapse ≈ 0 (it avoids the logit funnel).
+    """
+
+    lapse_group = 'beta'
+    lapse_mu_mean = 0.02
+    lapse_mu_kappa = 8.0
+    lapse_kappa_sd = 3.0
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
 
-        pars['p_lapse'] = {'mu_intercept': logit_np(0.02), 'transform': 'logistic'}
+        pars['p_lapse'] = _lapse_param_spec(self.lapse_group,
+                                            self.lapse_mu_mean,
+                                            self.lapse_mu_kappa,
+                                            self.lapse_kappa_sd)
         return pars
 
     def _get_choice_predictions(self, model_inputs):
@@ -803,16 +1097,192 @@ class LapseModel(BaseModel):
         return model_inputs
 
 
+class RTLapseMixin(object):
+    """RT-aware lapse / outlier-contaminant mixture for sequential-sampling
+    (DDM / RDM) likelihoods, mirroring HSSM's ``p_outlier`` mechanism.
+
+    The static-choice :class:`LapseModel` lapses *choices* only
+    (``p = p·(1-λ) + 0.5·λ``); that is correct for the cumulative-normal
+    Bernoulli likelihood but **wrong** for a likelihood defined jointly over
+    ``(rt, choice)``. A response-time model needs an RT-aware contaminant: on a
+    fraction ``p_outlier`` of trials the observation is assumed to come from a
+    process unrelated to the decision (fast guesses, lapses of attention,
+    delayed/anticipatory responses), modelled by a flat density over RT.
+
+    Following HSSM (``hssm.distribution_utils.dist``), the per-trial
+    log-likelihood becomes the numerically-stable mixture::
+
+        logp = log( (1 - p_outlier) * exp(ll_model)
+                    + p_outlier * exp(lapse_logp) + 1e-29 )
+
+    where ``ll_model`` is the WFPT (DDM) / Wald-race (RDM) log-density and
+    ``lapse_logp`` is the contaminant log-density.
+
+    Contaminant density
+    -------------------
+    HSSM's default lapse distribution is ``Uniform(0, lapse_upper)`` over RT
+    (``lapse_upper`` = 20 s), and the contaminant choice is 50/50. The joint
+    (rt, choice) contaminant density is therefore::
+
+        f_lapse(rt, choice) = 0.5 / lapse_upper      for 0 <= rt <= lapse_upper
+                            = 0                       otherwise
+
+    so ``lapse_logp = log(0.5) - log(lapse_upper)`` — a constant, independent of
+    the trial (every observed RT in a fitted dataset is well within the bound).
+    This 0.5/upper joint form (RT *and* choice uniform) is the conceptually
+    complete contaminant; HSSM's code path happens to score only the RT margin
+    (``-log(lapse_upper)``), but since the term is an additive constant inside
+    the mixture this changes only the absolute scale of the contaminant weight,
+    not the inference about decision parameters. The factor is documented here
+    for reproducibility. Set ``lapse_choice_5050=False`` to drop the ``log(0.5)``
+    and exactly match HSSM's RT-only convention.
+
+    Parameters
+    ----------
+    lapse_upper : float
+        Upper bound (seconds) of the uniform contaminant RT density. Default
+        20.0 (HSSM default). Must exceed the largest observed RT.
+    lapse_choice_5050 : bool
+        If True (default), the contaminant assigns 50/50 over the two
+        responses (joint density 0.5/upper). If False, match HSSM's RT-only
+        margin (1/upper).
+
+    The free parameter is named ``p_outlier`` (HSSM's name).
+
+    Group prior on ``p_outlier``
+    ----------------------------
+    ``lapse_group`` selects how the *per-subject* outlier rate is regularized
+    across subjects:
+
+    - ``'logit_normal'`` (legacy opt-in; Beta is now the default): hierarchical
+      logit-Normal, centred at ``logit(0.05)``. This **funnels** when subjects'
+      true lapse ≈ 0 — the per-subject logit → −∞, the group SD inflates, and
+      NUTS diverges.
+    - ``'beta'``: hierarchical Beta "1/x"-like group prior (group mean μ +
+      concentration κ; density ``∝ p^(μκ-1)`` — a spike at 0 with a heavy upper
+      tail). See :meth:`BaseModel.build_hierarchical_nodes`. Recommended on
+      clean data, where it removes the funnel because the per-subject rate lives
+      in (0, 1) directly rather than on an unbounded logit.
+    """
+
+    # HSSM-matching defaults; overridable per-instance via __init__ kwargs of
+    # the concrete classes, which set these attributes before super().__init__.
+    lapse_upper = 20.0
+    lapse_choice_5050 = True
+    # ``p_outlier`` mirrors HSSM's API:
+    #   - a FLOAT (default 0.05, HSSM's default) -> the contaminant rate is
+    #     FIXED at that value; it is NOT a sampled parameter, so it cannot
+    #     funnel/diverge. This is the recommended/default mode.
+    #   - 'hierarchical' -> per-subject estimated rate (bauer extension; weakly
+    #     identified in the WFPT/Wald mixture, prone to divergences -- opt-in).
+    # Estimating a single (non-hierarchical) rate is not yet supported; HSSM's
+    # own default is the fixed value anyway.
+    p_outlier = 0.05
+    # Whether simulate()/ppc() GENERATE contaminant trials. Default True to
+    # MATCH HSSM (the Frank-lab reference): HSSM's posterior predictive applies
+    # the lapse in its RandomVariable.rng_fn (`_apply_lapse_model`) after the
+    # clean ssms draw, so a fraction p_outlier of predicted trials are
+    # Uniform(0, lapse_upper) x 50/50-choice contaminants. (HSSM's standalone
+    # `simulate_data` helper is the clean exception.) Set False for the
+    # alternative "robustness-only" reading -- p_outlier as a likelihood
+    # down-weighting device, not a generative process -- where the predictor
+    # shows the clean decision model (and a PPC honestly "misses" the RT tail).
+    simulate_contaminant = True
+    # Group prior for the per-subject rate (only used when p_outlier='hierarchical').
+    lapse_group = 'beta'
+    lapse_mu_mean = 0.05
+    lapse_mu_kappa = 8.0
+    lapse_kappa_sd = 3.0
+
+    def get_free_parameters(self):
+        pars = super().get_free_parameters()
+        if isinstance(self.p_outlier, (int, float)):
+            # Fixed contaminant rate (HSSM default): not a free parameter.
+            return pars
+        spec = _lapse_param_spec(self.lapse_group,
+                                 self.lapse_mu_mean,
+                                 self.lapse_mu_kappa,
+                                 self.lapse_kappa_sd)
+        if self.lapse_group == 'logit_normal':
+            # Preserve the historical sigma_intercept=0.5 on the logit prior.
+            spec['sigma_intercept'] = 0.5
+        pars['p_outlier'] = spec
+        return pars
+
+    def get_model_inputs(self, parameters):
+        model_inputs = super().get_model_inputs(parameters)
+        if isinstance(self.p_outlier, (int, float)):
+            model_inputs['p_outlier'] = pt.constant(float(self.p_outlier))
+        else:
+            model_inputs['p_outlier'] = parameters['p_outlier']
+        return model_inputs
+
+    def _lapse_logp_const(self):
+        """Constant log-density of the uniform RT (× 50/50 choice) contaminant."""
+        const = -np.log(self.lapse_upper)
+        if self.lapse_choice_5050:
+            const += np.log(0.5)
+        return float(const)
+
+    def _mix_with_lapse(self, ll_model, p_outlier):
+        """HSSM-style numerically-stable lapse mixture of per-trial log-densities.
+
+        ``ll_model`` is the (per-trial) WFPT / Wald-race log-likelihood; the
+        contaminant is a flat density with constant log-value
+        :meth:`_lapse_logp_const`. Returns the mixed per-trial log-likelihood.
+        """
+        lapse_logp = pt.constant(self._lapse_logp_const())
+        # log( (1-p)·exp(ll) + p·exp(lapse) + 1e-29 ), via logaddexp for stability.
+        log_keep = pt.log1p(-p_outlier) + ll_model
+        log_lapse = pt.log(p_outlier) + lapse_logp
+        mixed = pt.logaddexp(log_keep, log_lapse)
+        # Match HSSM's +1e-29 guard against log(0) when both terms underflow.
+        return pt.logaddexp(mixed, pt.constant(np.log(1e-29)))
+
+
 class RegressionModel(BaseModel):
 
-    def __init__(self, regressors=None):
+    def __init__(self, regressors=None, fixed_regressors=None,
+                 random_regressors=None):
+        """Patsy-formula regression on model parameters (fixed/random split).
 
-        if regressors is None:
-            self.regressors = {}
-        else:
-            self.regressors = regressors
+        * ``fixed_regressors={param: formula}`` -- population-mean design (pure
+          fixed effects, e.g. a between-subjects ``'C(group)'`` contrast).
+        * ``random_regressors={param: formula}`` -- which terms ALSO carry a
+          per-subject random effect. Omitted -> default ``'1'`` (random
+          intercept only), the correct structure for between-subjects designs.
+          Random terms must be a subset of the fixed design's columns.
 
+        Legacy ``regressors=`` is DEPRECATED: it put a per-subject random effect
+        on *every* term (a spurious random slope on between-subjects contrasts).
+        Mapped to ``fixed_regressors = random_regressors = regressors`` (old
+        behaviour, bit-for-bit) with a DeprecationWarning.
+        """
+        if regressors is not None and (fixed_regressors is not None
+                                       or random_regressors is not None):
+            raise ValueError("Pass either the deprecated `regressors` OR "
+                             "`fixed_regressors`/`random_regressors`, not both.")
+
+        if regressors is not None:
+            warnings.warn(
+                "`regressors` is deprecated: it puts a per-subject random "
+                "effect on EVERY term (a random slope even on between-subjects "
+                "contrasts like group). Use `fixed_regressors` (population "
+                "means) + `random_regressors` (per-subject effects; default "
+                "intercept-only). Mapping regressors -> fixed_regressors = "
+                "random_regressors = regressors (preserves old behaviour).",
+                DeprecationWarning, stacklevel=2)
+            fixed_regressors = dict(regressors)
+            random_regressors = dict(regressors)
+
+        self.fixed_regressors = dict(fixed_regressors) if fixed_regressors else {}
+        self.random_regressors = (dict(random_regressors)
+                                  if random_regressors is not None else None)
+        # design matrices are built from the FIXED design; `regressors` kept as
+        # an alias so existing introspection (self.regressors[...]) still works.
+        self.regressors = self.fixed_regressors
         self.design_matrices = {}
+        self._random_cols = {}        # param -> indices of random cols in fixed design
 
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
         paradigm_ = super()._get_paradigm(paradigm, subject_mapping=subject_mapping)
@@ -823,6 +1293,7 @@ class RegressionModel(BaseModel):
             dm = self.build_design_matrix(paradigm, key)
             self.design_matrices[key] = dm
             paradigm_[f'_dm_{key}'] = np.asarray(dm)
+            self._compute_random_cols(paradigm, key, dm)
 
         return paradigm_
 
@@ -831,6 +1302,47 @@ class RegressionModel(BaseModel):
             self.regressors[parameter] = '1'
 
         return dmatrix(self.regressors[parameter], data)
+
+    def _random_formula(self, parameter):
+        """Random-effects formula for a parameter (default: intercept only)."""
+        if self.random_regressors is None:
+            return '1'
+        return self.random_regressors.get(parameter, '1')
+
+    def _compute_random_cols(self, data, parameter, fixed_dm):
+        """Indices of the fixed-design columns that carry a per-subject random
+        effect, per `random_regressors`. Validates subset + warns on a
+        between-subjects column given a random effect (the classic footgun)."""
+        fixed_names = list(fixed_dm.design_info.column_names)
+        rand_dm = dmatrix(self._random_formula(parameter), data)
+        rand_names = list(rand_dm.design_info.column_names)
+        cols = []
+        for nm in rand_names:
+            if nm not in fixed_names:
+                raise ValueError(
+                    f"random_regressors term '{nm}' for {parameter!r} is not a "
+                    f"column of its fixed design {fixed_names}. Random terms "
+                    "must be a subset of the fixed design.")
+            cols.append(fixed_names.index(nm))
+        # between-subjects guard: a random column constant within every subject
+        if 'subject' in getattr(data, 'columns', []) or (
+                hasattr(data, 'index') and 'subject' in getattr(data.index, 'names', [])):
+            subj = (data['subject'] if 'subject' in getattr(data, 'columns', [])
+                    else data.index.get_level_values('subject'))
+            arr = np.asarray(fixed_dm)
+            subj = np.asarray(subj)
+            for nm, j in zip(rand_names, cols):
+                within = pd.Series(arr[:, j]).groupby(subj).nunique()
+                if (within <= 1).all() and nm != 'Intercept':
+                    warnings.warn(
+                        f"random_regressors for {parameter!r} includes '{nm}', "
+                        "which is constant within subject (a between-subjects "
+                        "regressor). A per-subject random effect on it is "
+                        "non-identified for off-group subjects and makes the "
+                        "between-subject variance heteroscedastic. Put it only "
+                        "in fixed_regressors unless this is intended.",
+                        UserWarning, stacklevel=2)
+        self._random_cols[parameter] = cols
 
     def rebuild_design_matrix(self, paradigm, parameter):
         assert (hasattr(self, 'design_matrices')), 'Model needs to have design matrices as an attribute (model.design_matrices...) based on original data for rebuilding design matrices (HINT: use `.build_estimation_model()`)'
@@ -959,12 +1471,41 @@ class RegressionModel(BaseModel):
                              sigma=sigma,
                              dims=(f'{name}_regressors',))
 
-        group_sd = _group_sd_rv(f'{name}_sd', cauchy_sigma,
-                                getattr(self, 'group_sd_dist', 'halfnormal'),
-                                dims=(f'{name}_regressors',))
-        subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject', f'{name}_regressors'))
+        n_fixed = self.design_matrices[name].shape[1]
+        rcols = self._random_cols.get(name, list(range(n_fixed)))
 
-        return pm.Deterministic(name, group_mu + group_sd * subject_offset, dims=('subject', f'{name}_regressors'))
+        if list(rcols) == list(range(n_fixed)):
+            # Random effect on every column == legacy behaviour (deprecated
+            # `regressors`, or random_regressors mirroring the full design).
+            # Keep the exact old graph (names, dims, coords) bit-for-bit.
+            group_sd = _group_sd_rv(f'{name}_sd', cauchy_sigma,
+                                    getattr(self, 'group_sd_dist', 'halfnormal'),
+                                    dims=(f'{name}_regressors',))
+            subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1,
+                                       dims=('subject', f'{name}_regressors'))
+            return pm.Deterministic(name, group_mu + group_sd * subject_offset,
+                                    dims=('subject', f'{name}_regressors'))
+
+        # Random effect on a SUBSET of columns: build sd/offset only over the
+        # random columns (no non-identified nuisance dims) and scatter their
+        # contribution back onto the full coefficient vector, so downstream
+        # (get_trialwise_variable, ppc, subjectwise estimates) is unchanged.
+        col_names = list(self.design_matrices[name].design_info.column_names)
+        re_coord = f'{name}_re'
+        model.add_coord(re_coord, [col_names[i] for i in rcols])
+        cauchy_re = np.asarray(cauchy_sigma)[list(rcols)]
+        group_sd = _group_sd_rv(f'{name}_sd', cauchy_re,
+                                getattr(self, 'group_sd_dist', 'halfnormal'),
+                                dims=(re_coord,))
+        subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1,
+                                   dims=('subject', re_coord))
+        # one-hot scatter (n_random, n_fixed) mapping random cols -> full design
+        S = np.zeros((len(rcols), n_fixed))
+        for r, j in enumerate(rcols):
+            S[r, j] = 1.0
+        random_contrib = pt.dot(group_sd * subject_offset, S)   # (subject, n_fixed)
+        return pm.Deterministic(name, group_mu + random_contrib,
+                                dims=('subject', f'{name}_regressors'))
 
     def fit_map(self, filter_pars=True, **kwargs):
 

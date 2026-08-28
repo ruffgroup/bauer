@@ -19,12 +19,14 @@ from .risky_choice import (
     FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
     ExpectedUtilityRiskModel, ExpectedUtilityRiskRegressionModel,
     PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
-    AffineNoiseRiskModel,
+    AffineNoiseRiskModel, AffineNoiseRiskRegressionModel,
+    PowerLawEncodingRiskModel, PowerLawEncodingRiskRegressionModel,
 )
 
 try:
     from .ddm import (
         DDMMixin,
+        DDMLapseMixin,
         DDMMagnitudeComparisonModel,
         DDMMagnitudeComparisonRegressionModel,
         DDMFlexibleNoiseComparisonModel,
@@ -49,6 +51,7 @@ from .legacy import (
 
 from .race import (
     RaceMixin,
+    RaceLapseMixin,
     RaceDiffusionMagnitudeComparisonModel,
     RaceDiffusionFlexibleNoiseComparisonModel,
     RaceDiffusionPowerLawNoiseComparisonModel,

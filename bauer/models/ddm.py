@@ -19,6 +19,8 @@ HSSM convention (used here):
     rt  reaction time, in seconds — must be > 0
 """
 
+import warnings
+
 import numpy as np
 import pandas as pd
 import pymc as pm
@@ -34,6 +36,7 @@ from .risky_choice import (
     FlexibleNoiseRiskModel, FlexibleNoiseRiskRegressionModel,
     PowerLawNoiseRiskModel, PowerLawNoiseRiskRegressionModel,
 )
+from ..core import RTLapseMixin
 from ..utils.bayes import get_posterior, posterior_mean_sd
 from ..utils.math import inverse_softplus_np
 
@@ -564,6 +567,146 @@ class DDMMixin:
         return _drift_and_sv_from_snr(model_inputs, v_scale=v_scale)
 
 
+class DDMLapseMixin(RTLapseMixin):
+    """RT-aware lapse / outlier mixture for :class:`DDMMixin` likelihoods.
+
+    Adds a free ``p_outlier`` parameter and replaces the bare WFPT
+    log-likelihood with the HSSM-style contaminant mixture (see
+    :class:`bauer.core.RTLapseMixin` for the math and contaminant-density
+    documentation). On a fraction ``p_outlier`` of trials the observed
+    ``(rt, choice)`` is treated as a draw from a flat density over RT rather
+    than from the diffusion process.
+
+    Compose to the LEFT of :class:`DDMMixin` so this mixin's overrides of
+    ``build_likelihood`` / ``build_loglik_model`` win, e.g.::
+
+        class DDMRiskLapseModel(DDMLapseMixin, DDMRiskModel): ...
+    """
+
+    def build_likelihood(self, parameters, save_p_choice=False):
+        if logp_ddm is None:
+            raise ImportError(
+                "DDM models require hssm. Install with: pip install bauer[ddm]"
+            )
+        model = pm.Model.get_context()
+        if '_rt_choice_data' not in model.named_vars:
+            raise ValueError(
+                "DDM models require 'rt' and 'choice' columns in the paradigm."
+            )
+        model_inputs = self.get_model_inputs(parameters)
+
+        # memory_as_sv routes the frozen memory error into across-trial drift
+        # variability (sv), so the WFPT becomes the sv-aware variant. Compose
+        # that with the contaminant mixture below.
+        if self.memory_as_sv:
+            if logp_ddm_sdv is None:
+                raise ImportError(
+                    "memory_as_sv=True requires hssm.likelihoods.logp_ddm_sdv. "
+                    "Install/upgrade hssm.")
+            v, sv = self._get_drift_and_sv(model_inputs, parameters)
+            pm.Deterministic('sv', sv)
+        else:
+            v = self._get_drift(model_inputs, parameters)
+        if save_p_choice:
+            pm.Deterministic('drift', v)
+
+        a = parameters['a']
+        z = pt.constant(0.5) if self.fix_z else parameters['z']
+        t0 = parameters['t0']
+        p_outlier = model_inputs['p_outlier']
+
+        observed = model['_rt_choice_data'].get_value()
+
+        if self.memory_as_sv:
+            def _logp(value, v_, a_, z_, t_, sv_, p_):
+                ll = logp_ddm_sdv(value, v_, a_, z_, t_, sv_)
+                return self._mix_with_lapse(ll, p_)
+            pm.CustomDist('ll', v, a, z, t0, sv, p_outlier,
+                          logp=_logp, observed=observed)
+        else:
+            def _logp(value, v_, a_, z_, t_, p_):
+                ll = logp_ddm(value, v_, a_, z_, t_)
+                return self._mix_with_lapse(ll, p_)
+            pm.CustomDist('ll', v, a, z, t0, p_outlier,
+                          logp=_logp, observed=observed)
+
+    def build_loglik_model(self, paradigm, parameters):
+        if isinstance(parameters, pd.DataFrame):
+            parameters = parameters.to_dict(orient='list')
+        with pm.Model() as self.loglik_model:
+            paradigm_ = self._get_paradigm(paradigm=paradigm)
+            self.set_paradigm(paradigm_)
+            for key, value in parameters.items():
+                pm.Data(key, value)
+            params = self.get_parameter_values()
+            model_inputs = self.get_model_inputs(params)
+            if self.memory_as_sv:
+                v, sv = self._get_drift_and_sv(model_inputs, params)
+            else:
+                v = self._get_drift(model_inputs, params)
+            a, t0 = params['a'], params['t0']
+            z = pt.constant(0.5) if self.fix_z else params['z']
+            p_outlier = model_inputs['p_outlier']
+            mc = pm.Model.get_context()
+            signed = pt.switch(mc['choice'], 1.0, -1.0)
+            data = pt.stack([mc['rt'], signed], axis=1)
+            ll = (logp_ddm_sdv(data, v, a, z, t0, sv) if self.memory_as_sv
+                  else logp_ddm(data, v, a, z, t0))
+            per_trial = self._mix_with_lapse(ll, p_outlier)
+            pm.Deterministic('per_trial_ll', per_trial)
+
+    def _p_outlier_per_row(self, out_df, parameters):
+        """Per-row contaminant rate for simulate(): fixed scalar, or per-subject
+        when p_outlier is estimated. Falls back to 0 (no contaminant) if the
+        per-subject value can't be resolved."""
+        n = len(out_df)
+        if isinstance(self.p_outlier, (int, float)):
+            return np.full(n, float(self.p_outlier))
+        try:
+            if isinstance(parameters, pd.DataFrame) and 'p_outlier' in parameters:
+                subj = out_df.index.get_level_values('subject')
+                return subj.map(parameters['p_outlier']).to_numpy(dtype=float)
+            if isinstance(parameters, dict) and 'p_outlier' in parameters:
+                val = np.asarray(parameters['p_outlier'], dtype=float)
+                if val.size == 1:
+                    return np.full(n, float(val))
+        except Exception:
+            pass
+        warnings.warn("DDMLapseMixin.simulate: could not resolve per-subject "
+                      "p_outlier; simulating with no contaminant.")
+        return np.zeros(n)
+
+    def simulate(self, paradigm, parameters, n_samples=1, random_seed=None):
+        """Simulate (rt, choice); optionally generate the outlier contaminant.
+
+        Draws the decision process via :meth:`DDMMixin.simulate`, then by default
+        (``simulate_contaminant=True``, matching HSSM's posterior predictive)
+        replaces a fraction ``p_outlier`` of trials with a contaminant
+        (``rt ~ Uniform(0, lapse_upper)``, 50/50 choice). Set
+        ``simulate_contaminant=False`` for the clean decision process only (the
+        "p_outlier as likelihood-robustness, not generative" reading).
+        """
+        out_df = super().simulate(paradigm, parameters, n_samples=n_samples,
+                                  random_seed=random_seed)
+        if not getattr(self, 'simulate_contaminant', False):
+            # Match HSSM: p_outlier is likelihood-only; simulate the clean
+            # decision process. Set simulate_contaminant=True to generate them.
+            return out_df
+        rng = np.random.default_rng(random_seed)
+        prow = self._p_outlier_per_row(out_df, parameters)
+        is_lapse = rng.random(len(out_df)) < prow
+        if is_lapse.any():
+            k = int(is_lapse.sum())
+            out_df = out_df.copy()
+            rt = out_df['simulated_rt'].to_numpy().copy()
+            ch = out_df['simulated_choice'].to_numpy().copy()
+            rt[is_lapse] = rng.uniform(0.0, self.lapse_upper, k)
+            ch[is_lapse] = rng.random(k) < 0.5
+            out_df['simulated_rt'] = rt
+            out_df['simulated_choice'] = ch
+        return out_df
+
+
 def _drift_from_snr(model_inputs, v_scale=None, flat_observer_prior=False):
     """Drift = ((post_n2_mu - post_n1_mu) + threshold) / sqrt(sd1^2 + sd2^2).
 
@@ -713,7 +856,7 @@ def _drift_and_sv_from_snr(model_inputs, v_scale=None):
     return v, sv
 
 
-class DDMMagnitudeComparisonModel(DDMMixin, MagnitudeComparisonModel):
+class DDMMagnitudeComparisonModel(DDMLapseMixin, DDMMixin, MagnitudeComparisonModel):
     """DDM variant of MagnitudeComparisonModel.
 
     Drift is the subjective signal-to-noise of the perceived log-magnitude
@@ -750,7 +893,7 @@ class DDMMagnitudeComparisonModel(DDMMixin, MagnitudeComparisonModel):
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMMagnitudeComparisonRegressionModel(DDMMixin, MagnitudeComparisonRegressionModel):
+class DDMMagnitudeComparisonRegressionModel(DDMLapseMixin, DDMMixin, MagnitudeComparisonRegressionModel):
     """DDM variant of :class:`MagnitudeComparisonRegressionModel`.
 
     Patsy-formula regression on the cognitive front-end (``n1_evidence_sd``,
@@ -771,10 +914,11 @@ class DDMMagnitudeComparisonRegressionModel(DDMMixin, MagnitudeComparisonRegress
     'control'/'dyscalculia' column joined onto the trial dataframe).
     """
 
-    def __init__(self, paradigm, regressors, fit_prior=False,
+    def __init__(self, paradigm, regressors=None, fit_prior=False,
                  fit_separate_evidence_sd=None, memory_model='independent',
                  save_trialwise_estimates=False,
-                 fit_v_scale=False, fix_z=True, memory_as_sv=False):
+                 fit_v_scale=False, fix_z=True, memory_as_sv=False,
+                 fixed_regressors=None, random_regressors=None):
         self.fit_v_scale = fit_v_scale
         self.fix_z = fix_z
         self.memory_as_sv = memory_as_sv
@@ -784,6 +928,8 @@ class DDMMagnitudeComparisonRegressionModel(DDMMixin, MagnitudeComparisonRegress
             fit_separate_evidence_sd=fit_separate_evidence_sd,
             memory_model=memory_model,
             save_trialwise_estimates=save_trialwise_estimates,
+            fixed_regressors=fixed_regressors,
+            random_regressors=random_regressors,
         )
 
     def _get_drift(self, model_inputs, parameters):
@@ -792,7 +938,7 @@ class DDMMagnitudeComparisonRegressionModel(DDMMixin, MagnitudeComparisonRegress
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
+class DDMFlexibleNoiseComparisonModel(DDMLapseMixin, DDMMixin, FlexibleNoiseComparisonModel):
     """DDM variant of FlexibleNoiseComparisonModel.
 
     Drift uses the same SNR-of-perceived-difference formula as
@@ -832,7 +978,7 @@ class DDMFlexibleNoiseComparisonModel(DDMMixin, FlexibleNoiseComparisonModel):
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMRiskModel(DDMMixin, RiskModel):
+class DDMRiskModel(DDMLapseMixin, DDMMixin, RiskModel):
     """DDM variant of :class:`RiskModel` for risky-choice tasks.
 
     Drift is the SNR of the perceived log-EU difference:
@@ -872,7 +1018,7 @@ class DDMRiskModel(DDMMixin, RiskModel):
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMRiskRegressionModel(DDMMixin, RiskRegressionModel):
+class DDMRiskRegressionModel(DDMLapseMixin, DDMMixin, RiskRegressionModel):
     """DDM variant of :class:`RiskRegressionModel`.
 
     Patsy-formula regression on the cognitive front-end (``n1_evidence_sd``,
@@ -916,7 +1062,7 @@ class DDMRiskRegressionModel(DDMMixin, RiskRegressionModel):
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMFlexibleNoiseRiskModel(DDMMixin, FlexibleNoiseRiskModel):
+class DDMFlexibleNoiseRiskModel(DDMLapseMixin, DDMMixin, FlexibleNoiseRiskModel):
     """DDM variant of :class:`FlexibleNoiseRiskModel` for risky choice with
     stimulus-dependent (B-spline) encoding noise.
 
@@ -952,7 +1098,7 @@ class DDMFlexibleNoiseRiskModel(DDMMixin, FlexibleNoiseRiskModel):
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMFlexibleNoiseRiskRegressionModel(DDMMixin, FlexibleNoiseRiskRegressionModel):
+class DDMFlexibleNoiseRiskRegressionModel(DDMLapseMixin, DDMMixin, FlexibleNoiseRiskRegressionModel):
     """DDM variant of :class:`FlexibleNoiseRiskRegressionModel`.
 
     Patsy-formula regression on noise spline coefficients (auto-expanded if
@@ -997,7 +1143,7 @@ class DDMFlexibleNoiseRiskRegressionModel(DDMMixin, FlexibleNoiseRiskRegressionM
 # DDM × PowerLawNoise variants
 # ============================================================
 
-class DDMPowerLawNoiseComparisonModel(DDMMixin, PowerLawNoiseComparisonModel):
+class DDMPowerLawNoiseComparisonModel(DDMLapseMixin, DDMMixin, PowerLawNoiseComparisonModel):
     """DDM variant of :class:`PowerLawNoiseComparisonModel`.
 
     Drift uses the same SNR-of-perceived-difference formula as
@@ -1025,7 +1171,7 @@ class DDMPowerLawNoiseComparisonModel(DDMMixin, PowerLawNoiseComparisonModel):
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMPowerLawNoiseComparisonRegressionModel(DDMMixin, PowerLawNoiseComparisonRegressionModel):
+class DDMPowerLawNoiseComparisonRegressionModel(DDMLapseMixin, DDMMixin, PowerLawNoiseComparisonRegressionModel):
     """DDM + power-law noise + patsy-formula regression on parameters.
 
     Use to let ``noise_exponent`` vary across conditions (e.g. across
@@ -1051,7 +1197,7 @@ class DDMPowerLawNoiseComparisonRegressionModel(DDMMixin, PowerLawNoiseCompariso
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMPowerLawNoiseRiskModel(DDMMixin, PowerLawNoiseRiskModel):
+class DDMPowerLawNoiseRiskModel(DDMLapseMixin, DDMMixin, PowerLawNoiseRiskModel):
     """DDM + power-law noise for risky choice. Drift = SNR of perceived
     log-EU difference (same as :class:`DDMRiskModel`)."""
 
@@ -1076,7 +1222,7 @@ class DDMPowerLawNoiseRiskModel(DDMMixin, PowerLawNoiseRiskModel):
                                flat_observer_prior=getattr(self, 'flat_observer_prior', False))
 
 
-class DDMPowerLawNoiseRiskRegressionModel(DDMMixin, PowerLawNoiseRiskRegressionModel):
+class DDMPowerLawNoiseRiskRegressionModel(DDMLapseMixin, DDMMixin, PowerLawNoiseRiskRegressionModel):
     """DDM + power-law-noise risky choice + patsy-formula regression.
 
     Same multi-inheritance pattern as the flex versions. Targetable

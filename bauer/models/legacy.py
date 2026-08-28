@@ -13,6 +13,17 @@ import pytensor.tensor as pt
 from ..core import BaseModel, RegressionModel
 from ..utils.bayes import get_posterior, cumulative_normal
 
+# DDMMixin lives in .ddm, whose import is optional (needs the hssm/jax extras).
+# bauer.models.__init__ guards the .ddm import in a try/except, so legacy must
+# too: without this, `class DDMSafeVsRiskyModel(DDMMixin, ...)` below raises
+# NameError and makes the whole bauer.models package unimportable on any install
+# lacking the DDM extras. Fall back to `object` so legacy stays importable; the
+# DDM* legacy class is not re-exported and is only functional when ddm loads.
+try:
+    from .ddm import DDMMixin
+except Exception:
+    DDMMixin = object
+
 
 class SafeVsRiskyModel(BaseModel):
     """Bayesian observer model for risky choice between a safe and a risky option.
@@ -729,3 +740,113 @@ class JointSafeVsRiskyModel(BaseModel):
         )
 
         return p_risky
+
+
+def _safe_vs_risky_drift(model_inputs, domain, v_scale=None):
+    """
+    DDM drift for SafeVsRiskyModel.
+
+    Upper boundary is choice=True = chose risky.
+
+    Static model:
+        gain: p_risky = P(diff > threshold)
+        loss: p_risky = P(diff < threshold)
+
+    Therefore:
+        gain drift = (diff_mu - threshold) / diff_sd
+        loss drift = (threshold - diff_mu) / diff_sd
+    """
+
+    mi = model_inputs
+    risky_first = mi["risky_first"]
+
+    mu1 = pt.where(risky_first, mi["prior_mu_risky"], mi["prior_mu_safe"])
+
+    mu2 = pt.where(risky_first, mi["prior_mu_safe"], mi["prior_mu_risky"])
+
+    sd1 = pt.where(risky_first, mi["prior_sd_risky"], mi["prior_sd_safe"])
+
+    sd2 = pt.where(risky_first, mi["prior_sd_safe"], mi["prior_sd_risky"])
+
+    post1_mu, post1_sd = get_posterior(mu1, sd1, mi["logn1"], mi["ev_sd1"])
+
+    post2_mu, post2_sd = get_posterior(mu2, sd2, mi["logn2"], mi["ev_sd2"])
+
+    risky_post = pt.where(risky_first, post1_mu, post2_mu)
+    safe_post = pt.where(risky_first, post2_mu, post1_mu)
+
+    decision_sd1 = post1_sd**2 / mi["ev_sd1"]
+    decision_sd2 = post2_sd**2 / mi["ev_sd2"]
+
+    risky_decision_sd = pt.where(risky_first, decision_sd1, decision_sd2)
+
+    safe_decision_sd = pt.where(risky_first, decision_sd2, decision_sd1)
+
+    diff_mu = risky_post - safe_post
+    diff_sd = pt.sqrt(risky_decision_sd**2 + safe_decision_sd**2)
+
+    safe_prob = pt.where(risky_first, mi["p2"], mi["p1"])
+    risky_prob = pt.where(risky_first, mi["p1"], mi["p2"])
+    threshold = pt.log(safe_prob / risky_prob)
+
+    gain_drift = (diff_mu - threshold) / diff_sd
+    loss_drift = (threshold - diff_mu) / diff_sd
+
+    if domain == "gain":
+        drift = gain_drift
+    elif domain == "loss":
+        drift = loss_drift
+    else:
+        raise ValueError("domain must be 'gain' or 'loss'")
+
+    if v_scale is not None:
+        drift = v_scale * drift
+
+    return drift
+
+
+class DDMSafeVsRiskyModel(DDMMixin, SafeVsRiskyModel):
+    """
+    DDM variant of SafeVsRiskyModel.
+
+    The static cumulative-normal choice rule is replaced by a Wiener
+    first-passage-time likelihood.
+
+    Required columns:
+        n1, n2, p1, p2, choice, rt
+
+    choice=True is interpreted as choosing the risky option.
+    """
+
+    def __init__(
+        self,
+        data=None,
+        domain="gain",
+        separate_priors=True,
+        fix_prior_mus=False,
+        fix_prior_sds=False,
+        separate_evidence_sd=True,
+        fit_v_scale=False,
+        fix_z=True,
+    ):
+        self.fit_v_scale = fit_v_scale
+        self.fix_z = fix_z
+
+        SafeVsRiskyModel.__init__(
+            self,
+            data=data,
+            domain=domain,
+            separate_priors=separate_priors,
+            fix_prior_mus=fix_prior_mus,
+            fix_prior_sds=fix_prior_sds,
+            separate_evidence_sd=separate_evidence_sd,
+        )
+
+    def _get_drift(self, model_inputs, parameters):
+        v_scale = parameters["v_scale"] if self.fit_v_scale else None
+
+        return _safe_vs_risky_drift(
+            model_inputs,
+            domain=self.domain,
+            v_scale=v_scale,
+        )

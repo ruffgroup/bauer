@@ -86,13 +86,6 @@ Risky choice models
    :members:
    :show-inheritance:
 
-.. autoclass:: bauer.models.RNPModel
-   :members:
-   :show-inheritance:
-
-.. autoclass:: bauer.models.RNPRegressionModel
-   :show-inheritance:
-
 .. autoclass:: bauer.models.FlexibleNoiseRiskModel
    :members:
    :show-inheritance:
@@ -112,7 +105,13 @@ Utilities
 
 .. autofunction:: bauer.utils.data.load_garcia2022
 
-.. autofunction:: bauer.utils.data.load_dehollander2024
+.. autofunction:: bauer.utils.data.load_dehollander2024_risk
+
+.. autofunction:: bauer.utils.data.load_dehollander2024_symbolic
+
+.. autofunction:: bauer.utils.data.load_dehollander_tms_risk
+
+.. autofunction:: bauer.utils.data.load_bedi2026
 
 .. autofunction:: bauer.utils.bayes.get_posterior
 .. autofunction:: bauer.utils.bayes.get_posterior_np
