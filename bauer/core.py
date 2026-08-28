@@ -50,6 +50,29 @@ def _translate_deprecated_kwargs(func):
     return wrapper
 
 
+
+def _group_sd_rv(name, scale, dist='halfnormal', dims=None):
+    """Group-level SD prior for a hierarchical node.
+
+    ``'halfcauchy'`` (``HalfCauchy(beta=scale)``) is bauer's historical pre-0.3.0
+    default but has an infinite-variance heavy tail: a poorly-identified group SD
+    can wander to huge values, producing a funnel and divergences.
+    ``'halfnormal'`` (``HalfNormal(sigma=scale)``) has a light tail that tames
+    the SD and removes that pathology, at the cost of mild over-shrinkage if
+    true between-subject heterogeneity is large.
+
+    Ported from upstream bauer 0.3.0 so this branch can compare the two on the
+    efficient-coding models, where kappa_r is weakly identified and has been
+    running past the grid's resolution ceiling under the Cauchy tail.
+    """
+    if dist == 'halfnormal':
+        return pm.HalfNormal(name, sigma=scale, dims=dims)
+    if dist == 'halfcauchy':
+        return pm.HalfCauchy(name, beta=scale, dims=dims)
+    raise ValueError(
+        f"group_sd_dist must be 'halfcauchy' or 'halfnormal', got {dist!r}")
+
+
 class BaseModel(object):
 
     paradigm_keys = []
@@ -636,7 +659,8 @@ class BaseModel(object):
         else:
             raise NotImplementedError
 
-        group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma_intercept)
+        group_sd = _group_sd_rv(f'{name}_sd', cauchy_sigma_intercept,
+                                getattr(self, 'group_sd_dist', 'halfnormal'))
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject',))
 
         if transform == 'identity':
@@ -936,7 +960,9 @@ class RegressionModel(BaseModel):
                              sigma=sigma,
                              dims=(f'{name}_regressors',))
 
-        group_sd = pm.HalfCauchy(f'{name}_sd', cauchy_sigma, dims=(f'{name}_regressors',))
+        group_sd = _group_sd_rv(f'{name}_sd', cauchy_sigma,
+                                getattr(self, 'group_sd_dist', 'halfnormal'),
+                                dims=(f'{name}_regressors',))
         subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject', f'{name}_regressors'))
 
         return pm.Deterministic(name, group_mu + group_sd * subject_offset, dims=('subject', f'{name}_regressors'))

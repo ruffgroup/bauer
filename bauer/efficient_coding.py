@@ -124,6 +124,13 @@ def kappa_r_prior(grid_resolution=None):
 KAPPA_R_PRIOR = kappa_r_prior()
 SIGMA_REP_PRIOR = {'mu_intercept': 0.5, 'sigma_intercept': 1.0,
                    'transform': 'softplus'}
+# Motor (response-execution) noise, in CHF.  Identified almost entirely by the
+# 90 deg cardinal: with categorical perception and the value gate the model
+# predicts a delta at 22 CHF there, so whatever spread the data show at that
+# one stimulus is the hand on the slider, not perception or valuation.  The
+# observed SD at 90 deg is 0.53-0.68 CHF, hence a prior centred just below 1.
+SIGMA_MOTOR_PRIOR = {'mu_intercept': 0.5, 'sigma_intercept': 0.5,
+                     'transform': 'softplus'}
 
 
 def _efficient_cdf_pt(prior, d_ori):
@@ -422,7 +429,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
     def __init__(self, paradigm=None, perceptual_prior='long_term',
                  grid_resolution=101, rep_grid_resolution=None, q_per=Q_PER,
                  fit_prior_weight=False, prior_fourier_order=0,
-                 no_seam_crossing=False, cardinal_truncation=False, **kwargs):
+                 no_seam_crossing=False, cardinal_truncation=False,
+                 fit_motor_noise=False, **kwargs):
         """
         Parameters
         ----------
@@ -445,6 +453,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
                              "parameterisations of the same thing; pick one.")
         self.no_seam_crossing = no_seam_crossing
         self.cardinal_truncation = cardinal_truncation
+        self.fit_motor_noise = fit_motor_noise
         super().__init__(paradigm, grid_resolution=grid_resolution, **kwargs)
 
     def fourier_prior_parameters(self):
@@ -464,6 +473,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
         if self.fit_prior_weight:
             pars['prior_weight'] = PRIOR_WEIGHT_PRIOR
         pars.update(self.fourier_prior_parameters())
+        if self.fit_motor_noise:
+            pars['sigma_motor'] = SIGMA_MOTOR_PRIOR
         return pars
 
     def get_model_inputs(self, parameters):
@@ -474,6 +485,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
                if self.fit_prior_weight else {}),
             **{name: self.subjectwise(name)
                for name in self.fourier_prior_parameters()},
+            **({'sigma_motor': self.subjectwise('sigma_motor')}
+               if self.fit_motor_noise else {}),
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -581,8 +594,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
             # every downstream reshape carries a symbolic S, and JAX refuses to
             # JIT the graph ("Shapes must be 1D sequences of concrete values of
             # integer type") as soon as the fit is hierarchical.
-            n_sub = (len(model.coords['subject'])
-                     if 'subject' in getattr(model, 'coords', {}) else 1)
+            n_sub = self._n_subjects(model)
             N_ori = int(self.grid_resolution)
             if self.prior_fourier_order:
                 ori_prior = fourier_orientation_prior_pt(
@@ -646,6 +658,50 @@ class EfficientPerceptionModel(EstimationBaseModel):
 
         # Gather per-trial distributions
         return p_response[mapping_ix, subject_ix, stimulus_ix, :]  # (n_trials, V)
+
+    @staticmethod
+    def _n_subjects(model):
+        """Subject count, valid in BOTH the estimation and the predict graphs.
+
+        `predict`/`simulate` build a pm.Model without coords, so reading
+        `model.coords['subject']` silently gives 1 there and every
+        specify_shape downstream then fails with "dim 0 of input has shape 26,
+        expected 1" -- but only in the prediction path, i.e. only when you go
+        to draw the PPC, long after the fit succeeded.
+        """
+        if 'subject' in getattr(model, 'coords', {}):
+            return len(model.coords['subject'])
+        try:
+            return int(np.max(model['subject_ix'].get_value())) + 1
+        except Exception:
+            return 1
+
+    def _apply_motor_noise(self, p_response, model_inputs, val_grid, d_val,
+                           n_sub, layout):
+        """Convolve the response distribution with Gaussian motor noise.
+
+        Response execution happens after every stage of inference, so it is a
+        convolution on the response axis, the same for every trial of a
+        subject.  Applied to the (subject, condition, stimulus, value) table
+        before the per-trial gather, so it costs one batched V x V matmul
+        rather than one per trial.
+        """
+        if not self.fit_motor_noise:
+            return p_response
+        sm = pt.specify_shape(model_inputs['sigma_motor'], (n_sub,))
+        diff = val_grid[None, :, None] - val_grid[None, None, :]      # (1, V, V)
+        kern = pt.exp(-0.5 * (diff / sm[:, None, None]) ** 2)         # (S, V, V)
+        kern = kern / (pt.sum(kern, axis=-1, keepdims=True) * d_val + 1e-30)
+
+        C = len(self.value_on_ori_grid)
+        K = len(self.unique_orientations_rad)
+        V = int(self.grid_resolution)
+        if layout == 'CSKV':
+            p_response = p_response.dimshuffle(1, 0, 2, 3)            # -> (S,C,K,V)
+        flat = pt.reshape(p_response, (n_sub, C * K, V))
+        flat = pt.matmul(flat, kern) * d_val
+        out = pt.reshape(flat, (n_sub, C, K, V))
+        return out.dimshuffle(1, 0, 2, 3) if layout == 'CSKV' else out
 
     def _category_pushforward(self, posterior_ori, p_ms, ori_grid, G_ext,
                               val_grid, d_ori, d_rep, d_val):
@@ -909,14 +965,16 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
     def __init__(self, paradigm=None, perceptual_prior='long_term',
                  grid_resolution=101, rep_grid_resolution=None, q_per=Q_PER,
                  fit_prior_weight=False, prior_fourier_order=0,
-                 no_seam_crossing=False, cardinal_truncation=False, **kwargs):
+                 no_seam_crossing=False, cardinal_truncation=False,
+                 fit_motor_noise=False, **kwargs):
         super().__init__(paradigm, perceptual_prior=perceptual_prior,
                          grid_resolution=grid_resolution,
                          rep_grid_resolution=rep_grid_resolution,
                          q_per=q_per, fit_prior_weight=fit_prior_weight,
                          prior_fourier_order=prior_fourier_order,
                          no_seam_crossing=no_seam_crossing,
-                         cardinal_truncation=cardinal_truncation, **kwargs)
+                         cardinal_truncation=cardinal_truncation,
+                         fit_motor_noise=fit_motor_noise, **kwargs)
 
     def get_free_parameters(self):
         pars = {'kappa_r': kappa_r_prior(self.grid_resolution),
@@ -924,6 +982,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         if self.fit_prior_weight:
             pars['prior_weight'] = PRIOR_WEIGHT_PRIOR
         pars.update(self.fourier_prior_parameters())
+        if self.fit_motor_noise:
+            pars['sigma_motor'] = SIGMA_MOTOR_PRIOR
         return pars
 
     def get_model_inputs(self, parameters):
@@ -935,6 +995,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                if self.fit_prior_weight else {}),
             **{name: self.subjectwise(name)
                for name in self.fourier_prior_parameters()},
+            **({'sigma_motor': self.subjectwise('sigma_motor')}
+               if self.fit_motor_noise else {}),
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -991,8 +1053,7 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
             # every downstream reshape carries a symbolic S, and JAX refuses to
             # JIT the graph ("Shapes must be 1D sequences of concrete values of
             # integer type") as soon as the fit is hierarchical.
-            n_sub = (len(model.coords['subject'])
-                     if 'subject' in getattr(model, 'coords', {}) else 1)
+            n_sub = self._n_subjects(model)
             N_ori = int(self.grid_resolution)
             if self.prior_fourier_order:
                 ori_prior = fourier_orientation_prior_pt(
