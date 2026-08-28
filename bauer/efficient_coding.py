@@ -51,9 +51,17 @@ MAPPING_VALUES['uniform'] = MAPPING_VALUES['linear']
 MAPPING_VALUES['misaligned'] = MAPPING_VALUES['cdf']
 MAPPING_VALUES['aligned'] = MAPPING_VALUES['inverse_cdf']
 
-# Value range
+# Value range.  V_MIN/V_MAX bound the LATENT value domain -- the range G can
+# produce -- while the RESPONSE domain is wider at the bottom: the BDM slider
+# runs from 0, and 26 trials (0.29%) carry bids below 2 CHF at ordinary RTs.
+# Leaving the response grid at [2, 42] clips those into the bottom bin and,
+# worse, truncates the predicted distribution for every near-floor stimulus,
+# which shows up in the PPC as predicted bias at the low edge that the data do
+# not have.  42 is a real ceiling (the slider stops there), so the top is not
+# extended: clipping there is the task, not an artefact.
 V_MIN = 2.0
 V_MAX = 42.0
+RESPONSE_MIN = 0.0
 
 # Perceptual loss exponent.  Bedi et al. fix q_per = 8 across all fits (and
 # q_val = 2, the posterior mean, in value space).  q_per = 2 would make the
@@ -508,6 +516,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
         # Value grid
         self.val_grid = np.linspace(V_MIN, V_MAX, N)
         self.d_val = self.val_grid[1] - self.val_grid[0]
+        self._setup_response_grid()
 
         # Orientation prior
         if self.perceptual_prior == 'long_term':
@@ -662,7 +671,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
                                             ).dimshuffle(1, 0, 2, 3)
         p_response = self._apply_motor_noise(p_response, model_inputs, val_grid,
                                              d_val, n_sub, 'CSKV')
-        return p_response[mapping_ix, subject_ix, stimulus_ix, :]  # (n_trials, V)
+        return self._pad_to_response_grid(
+            p_response[mapping_ix, subject_ix, stimulus_ix, :])
 
     @staticmethod
     def _n_subjects(model):
@@ -762,7 +772,28 @@ class EfficientPerceptionModel(EstimationBaseModel):
         return total
 
     def _get_response_grid(self):
-        return self.val_grid
+        return getattr(self, 'response_grid', self.val_grid)
+
+    def _setup_response_grid(self):
+        """Response grid = the value grid extended down to RESPONSE_MIN."""
+        step = self.val_grid[1] - self.val_grid[0]
+        self._n_response_pad = int(round((V_MIN - RESPONSE_MIN) / step))
+        self.response_grid = np.concatenate([
+            self.val_grid[0] - step * np.arange(self._n_response_pad, 0, -1),
+            self.val_grid])
+
+    def _pad_to_response_grid(self, trial_dist):
+        """Zero-pad a (T, V) distribution onto the wider response grid.
+
+        The model cannot produce a value below V_MIN -- G does not go there --
+        so the extra bins carry no density of their own; what they do is give
+        the lapse component somewhere to live and stop bin_probability from
+        clipping a sub-2 CHF bid into the bottom bin."""
+        n = getattr(self, '_n_response_pad', 0)
+        if not n:
+            return trial_dist
+        return pt.concatenate(
+            [pt.zeros((trial_dist.shape[0], n)), trial_dist], axis=1)
 
 
 class EfficientValuationModel(EstimationBaseModel):
@@ -802,6 +833,7 @@ class EfficientValuationModel(EstimationBaseModel):
 
         self.val_grid = np.linspace(V_MIN, V_MAX, N)
         self.d_val = self.val_grid[1] - self.val_grid[0]
+        self._setup_response_grid()
 
         # Rep grid in value space
         self.val_rep_grid = np.linspace(V_MIN, V_MAX, N)
@@ -960,7 +992,28 @@ class EfficientValuationModel(EstimationBaseModel):
         return trial_dist
 
     def _get_response_grid(self):
-        return self.val_grid
+        return getattr(self, 'response_grid', self.val_grid)
+
+    def _setup_response_grid(self):
+        """Response grid = the value grid extended down to RESPONSE_MIN."""
+        step = self.val_grid[1] - self.val_grid[0]
+        self._n_response_pad = int(round((V_MIN - RESPONSE_MIN) / step))
+        self.response_grid = np.concatenate([
+            self.val_grid[0] - step * np.arange(self._n_response_pad, 0, -1),
+            self.val_grid])
+
+    def _pad_to_response_grid(self, trial_dist):
+        """Zero-pad a (T, V) distribution onto the wider response grid.
+
+        The model cannot produce a value below V_MIN -- G does not go there --
+        so the extra bins carry no density of their own; what they do is give
+        the lapse component somewhere to live and stop bin_probability from
+        clipping a sub-2 CHF bid into the bottom bin."""
+        n = getattr(self, '_n_response_pad', 0)
+        if not n:
+            return trial_dist
+        return pt.concatenate(
+            [pt.zeros((trial_dist.shape[0], n)), trial_dist], axis=1)
 
 
 class SequentialEfficientCodingModel(EfficientPerceptionModel):
@@ -1200,7 +1253,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         p_response = self._gate_value_table(p_response)
         p_response = self._apply_motor_noise(p_response, model_inputs, val_grid,
                                              d_val, n_sub, 'SCKV')
-        return p_response[subject_ix, mapping_ix, stimulus_ix, :]
+        return self._pad_to_response_grid(
+            p_response[subject_ix, mapping_ix, stimulus_ix, :])
 
 
 class CategoricalSequentialModel(SequentialEfficientCodingModel):
