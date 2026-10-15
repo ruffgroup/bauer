@@ -112,6 +112,39 @@ def max_resolvable_kappa(grid_resolution):
     return (grid_resolution / (2.0 * np.pi)) ** 2
 
 
+VALUE_KERNELS = ('cell', 'point')
+
+
+def value_noise_kernel(x, mu, sigma, d, kind='cell'):
+    """Unnormalised Gaussian value noise p(x | mu, sigma) on a grid of spacing d.
+
+    'cell' integrates the Gaussian over each grid cell [x - d/2, x + d/2]
+    (a difference of erfs); 'point' evaluates the density at the grid points.
+
+    'point' breaks down once sigma falls below the grid spacing: every grid
+    point sits several sigma from mu, exp() underflows to 0 for the whole row
+    in float32 (exp(-104) is the floor), the row normalises to 0, and the
+    trial likelihood is left to the lapse term.  That region has no gradient,
+    so a NUTS chain that drifts into it cannot leave (2026-10, categorical
+    fits: one chain per fit frozen at sigma_rep ~ 0.01 CHF on a 0.5 CHF grid,
+    r_hat 1.53).  'cell' always puts the mass in the cell that contains mu, so
+    sigma -> 0 is the smooth deterministic limit instead of a cliff.
+
+    The upper tail uses erfc so that cells far above mu keep their (small)
+    mass instead of cancelling to 0 in erf(a) - erf(b) with both near 1.
+    """
+    if kind == 'point':
+        return pt.exp(-0.5 * ((x - mu) / sigma) ** 2)
+    if kind != 'cell':
+        raise ValueError(f"value kernel must be one of {VALUE_KERNELS}, got {kind!r}")
+    s = sigma * np.sqrt(2.0)
+    hi = (x - mu + 0.5 * d) / s
+    lo = (x - mu - 0.5 * d) / s
+    below = 0.5 * (pt.erf(hi) - pt.erf(lo))
+    above = 0.5 * (pt.erfc(lo) - pt.erfc(hi))
+    return pt.maximum(pt.switch(lo > 0, above, below), 0.0)
+
+
 def kappa_r_prior(grid_resolution=None):
     """Prior on kappa_r, capped at what the grid can actually resolve.
 
@@ -449,7 +482,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
                  grid_resolution=101, rep_grid_resolution=None, q_per=Q_PER,
                  fit_prior_weight=False, prior_fourier_order=0,
                  no_seam_crossing=False, cardinal_truncation=False,
-                 fit_motor_noise=False, **kwargs):
+                 fit_motor_noise=False, value_kernel='cell', **kwargs):
         """
         Parameters
         ----------
@@ -473,6 +506,9 @@ class EfficientPerceptionModel(EstimationBaseModel):
         self.no_seam_crossing = no_seam_crossing
         self.cardinal_truncation = cardinal_truncation
         self.fit_motor_noise = fit_motor_noise
+        if value_kernel not in VALUE_KERNELS:
+            raise ValueError(f"value_kernel must be one of {VALUE_KERNELS}")
+        self.value_kernel = value_kernel
         super().__init__(paradigm, grid_resolution=grid_resolution, **kwargs)
 
     def fourier_prior_parameters(self):
@@ -820,7 +856,11 @@ class EfficientValuationModel(EstimationBaseModel):
     paradigm_keys = ['orientation']
     base_parameters = ['sigma_rep']
 
-    def __init__(self, paradigm=None, grid_resolution=101, **kwargs):
+    def __init__(self, paradigm=None, grid_resolution=101, value_kernel='cell',
+                 **kwargs):
+        if value_kernel not in VALUE_KERNELS:
+            raise ValueError(f"value_kernel must be one of {VALUE_KERNELS}")
+        self.value_kernel = value_kernel
         super().__init__(paradigm, grid_resolution=grid_resolution, **kwargs)
 
     def get_free_parameters(self):
@@ -957,7 +997,10 @@ class EfficientValuationModel(EstimationBaseModel):
         # rep_grid = val_grid (same grid for value representation)
         # Shape: (S, C, K, N)
         rep_diffs = val_grid[None, None, None, :] - encoded_locs[None, :, :, None]  # (1, C, K, N)
-        p_mv = pt.exp(-0.5 * (rep_diffs / sigma_rep[:, None, None, None]) ** 2)
+        p_mv = value_noise_kernel(val_grid[None, None, None, :],
+                                  encoded_locs[None, :, :, None],
+                                  sigma_rep[:, None, None, None], d_val,
+                                  self.value_kernel)
         # Normalize (truncation + normalization)
         p_mv = p_mv / (pt.sum(p_mv, axis=-1, keepdims=True) * d_val + 1e-30)
 
@@ -970,8 +1013,9 @@ class EfficientValuationModel(EstimationBaseModel):
         # Wait, this is (1, C, N_val, N_rep) but we need to match m on rep_grid
         # Actually m IS on val_grid too (same grid)
         # p(m | v) = TruncGauss(m; F_val(v), sigma_rep^2)
-        decode_likelihood = pt.exp(
-            -0.5 * ((val_grid[None, None, None, :] - val_encoded[None, :, :, None]) / sigma_rep[:, None, None, None]) ** 2
+        decode_likelihood = value_noise_kernel(
+            val_grid[None, None, None, :], val_encoded[None, :, :, None],
+            sigma_rep[:, None, None, None], d_val, self.value_kernel,
         )  # (S, C, N_val, N_rep)
         decode_likelihood = decode_likelihood / (pt.sum(decode_likelihood, axis=-1, keepdims=True) * d_val + 1e-30)
 
@@ -1047,7 +1091,7 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                  grid_resolution=101, rep_grid_resolution=None, q_per=Q_PER,
                  fit_prior_weight=False, prior_fourier_order=0,
                  no_seam_crossing=False, cardinal_truncation=False,
-                 fit_motor_noise=False, **kwargs):
+                 fit_motor_noise=False, value_kernel='cell', **kwargs):
         super().__init__(paradigm, perceptual_prior=perceptual_prior,
                          grid_resolution=grid_resolution,
                          rep_grid_resolution=rep_grid_resolution,
@@ -1055,7 +1099,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                          prior_fourier_order=prior_fourier_order,
                          no_seam_crossing=no_seam_crossing,
                          cardinal_truncation=cardinal_truncation,
-                         fit_motor_noise=fit_motor_noise, **kwargs)
+                         fit_motor_noise=fit_motor_noise,
+                         value_kernel=value_kernel, **kwargs)
 
     def get_free_parameters(self):
         pars = {'kappa_r': kappa_r_prior(self.grid_resolution),
@@ -1214,7 +1259,10 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         # val_cdfs: (C, N_v), val_grid: (N_rep) — same grid for both
         # Shape: (S, C, N_source_v, N_rep)
         rep_diffs = val_grid[None, None, None, :] - val_cdfs[None, :, :, None]  # (1, C, N, N)
-        p_mv_given_v = pt.exp(-0.5 * (rep_diffs / sigma_rep[:, None, None, None]) ** 2)
+        p_mv_given_v = value_noise_kernel(val_grid[None, None, None, :],
+                                          val_cdfs[None, :, :, None],
+                                          sigma_rep[:, None, None, None], d_val,
+                                          self.value_kernel)
         p_mv_given_v = p_mv_given_v / (pt.sum(p_mv_given_v, axis=-1, keepdims=True) * d_val + 1e-30)
 
         # Bayesian decoding in value space
