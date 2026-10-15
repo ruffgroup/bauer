@@ -429,6 +429,25 @@ def fourier_orientation_prior_pt(phi, coefs):
     return pt.exp(logp)
 
 
+# Weight of the cardinal peak component, logistic: logit -2 puts the prior
+# median at ~0.12, i.e. "a small peak" unless the data ask for more.
+CARDINAL_PEAK_PRIOR = {'mu_intercept': -2.0, 'sigma_intercept': 1.0,
+                       'cauchy_sigma_intercept': 0.75, 'transform': 'logistic'}
+
+
+def cardinal_peak_pt(phi, width_deg):
+    """Narrow von Mises bumps at the cardinals, as a density over doubled angle.
+
+    `phi` is the doubled angle, so the cardinals 0 and 90 deg sit at phi = 0
+    and pi.  `width_deg` is the SD of each bump in ORIENTATION degrees; on the
+    doubled axis that is 2x as wide, and the von Mises concentration is
+    1 / (2 * width_rad)^2.  Normalised by the caller.
+    """
+    kappa = 1.0 / (2.0 * np.deg2rad(width_deg)) ** 2
+    return (pt.exp(kappa * (ptm.cos(phi) - 1.0))
+            + pt.exp(kappa * (ptm.cos(phi - np.pi) - 1.0)))
+
+
 def fourier_coef_prior(k):
     """Prior on harmonic k: weakly informative for the two interpretable terms,
     a roughness penalty above them.
@@ -482,7 +501,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
                  grid_resolution=101, rep_grid_resolution=None, q_per=Q_PER,
                  fit_prior_weight=False, prior_fourier_order=0,
                  no_seam_crossing=False, cardinal_truncation=False,
-                 fit_motor_noise=False, value_kernel='cell', **kwargs):
+                 fit_motor_noise=False, value_kernel='cell',
+                 cardinal_peak_width=0.0, **kwargs):
         """
         Parameters
         ----------
@@ -509,7 +529,38 @@ class EfficientPerceptionModel(EstimationBaseModel):
         if value_kernel not in VALUE_KERNELS:
             raise ValueError(f"value_kernel must be one of {VALUE_KERNELS}")
         self.value_kernel = value_kernel
+        # > 0: mix narrow cardinal peaks (this SD, orientation degrees) into the
+        # perceptual prior with a free per-subject weight 'cardinal_peak'.
+        self.cardinal_peak_width = float(cardinal_peak_width)
         super().__init__(paradigm, grid_resolution=grid_resolution, **kwargs)
+
+    @property
+    def prior_is_fitted(self):
+        return bool(self.fit_prior_weight or self.prior_fourier_order
+                    or self.cardinal_peak_width > 0)
+
+    def fitted_orientation_prior(self, model_inputs, ori_grid, n_sub):
+        """(S, O) perceptual prior density when any part of it is free.
+
+        Base shape: Fourier series, free |sin| weight, or the fixed prior; then
+        optionally mixed with narrow cardinal peaks:
+            p = (1 - lam) * base + lam * peaks,   lam = cardinal_peak in (0, 1).
+        """
+        if self.prior_fourier_order:
+            base = fourier_orientation_prior_pt(
+                ori_grid[None, :], self.fourier_coefs(model_inputs, n_sub))
+        elif self.fit_prior_weight:
+            w = pt.specify_shape(model_inputs['prior_weight'], (n_sub,))[:, None]
+            base = orientation_prior_pt(ori_grid[None, :], w)
+        else:
+            base = pt.tile(pt.as_tensor_variable(self.ori_prior)[None, :], (n_sub, 1))
+        base = base / (pt.sum(base, axis=-1, keepdims=True) * self.d_ori + 1e-30)
+        if self.cardinal_peak_width > 0:
+            pk = cardinal_peak_pt(ori_grid, self.cardinal_peak_width)[None, :]
+            pk = pk / (pt.sum(pk, axis=-1, keepdims=True) * self.d_ori)
+            lam = pt.specify_shape(model_inputs['cardinal_peak'], (n_sub,))[:, None]
+            base = (1.0 - lam) * base + lam * pk
+        return base
 
     def fourier_prior_parameters(self):
         """{name: prior} for the free Fourier coefficients (empty when off)."""
@@ -527,6 +578,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
         pars = {'kappa_r': kappa_r_prior(self.grid_resolution)}
         if self.fit_prior_weight:
             pars['prior_weight'] = PRIOR_WEIGHT_PRIOR
+        if self.cardinal_peak_width > 0:
+            pars['cardinal_peak'] = CARDINAL_PEAK_PRIOR
         pars.update(self.fourier_prior_parameters())
         if self.fit_motor_noise:
             pars['sigma_motor'] = SIGMA_MOTOR_PRIOR
@@ -538,6 +591,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
             'kappa_r': self.subjectwise('kappa_r'),
             **({'prior_weight': self.subjectwise('prior_weight')}
                if self.fit_prior_weight else {}),
+            **({'cardinal_peak': self.subjectwise('cardinal_peak')}
+               if self.cardinal_peak_width > 0 else {}),
             **{name: self.subjectwise(name)
                for name in self.fourier_prior_parameters()},
             **({'sigma_motor': self.subjectwise('sigma_motor')}
@@ -641,7 +696,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
         ori_grid = pt.as_tensor_variable(self.ori_grid)
         rep_grid = pt.as_tensor_variable(self.rep_grid)
         val_grid = pt.as_tensor_variable(self.val_grid)
-        if self.fit_prior_weight or self.prior_fourier_order:
+        if self.prior_is_fitted:
             # The prior shape is fitted, so the efficient-coding transform it
             # induces (and therefore where each stimulus lands in
             # representational space) has to be rebuilt inside the graph.
@@ -652,14 +707,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
             # integer type") as soon as the fit is hierarchical.
             n_sub = self._n_subjects(model)
             N_ori = int(self.grid_resolution)
-            if self.prior_fourier_order:
-                ori_prior = fourier_orientation_prior_pt(
-                    ori_grid[None, :], self.fourier_coefs(model_inputs, n_sub))
-            else:
-                w = pt.specify_shape(model_inputs['prior_weight'], (n_sub,))[:, None]
-                ori_prior = orientation_prior_pt(ori_grid[None, :], w)   # (S, O)
-            ori_prior = ori_prior / (pt.sum(ori_prior, axis=-1, keepdims=True)
-                                     * self.d_ori + 1e-30)
+            ori_prior = self.fitted_orientation_prior(model_inputs, ori_grid, n_sub)
             ori_prior = pt.specify_shape(ori_prior, (n_sub, N_ori))
             ori_cdf = pt.specify_shape(
                 _efficient_cdf_pt(ori_prior, self.d_ori), (n_sub, N_ori))
@@ -1091,7 +1139,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                  grid_resolution=101, rep_grid_resolution=None, q_per=Q_PER,
                  fit_prior_weight=False, prior_fourier_order=0,
                  no_seam_crossing=False, cardinal_truncation=False,
-                 fit_motor_noise=False, value_kernel='cell', **kwargs):
+                 fit_motor_noise=False, value_kernel='cell',
+                 cardinal_peak_width=0.0, **kwargs):
         super().__init__(paradigm, perceptual_prior=perceptual_prior,
                          grid_resolution=grid_resolution,
                          rep_grid_resolution=rep_grid_resolution,
@@ -1100,13 +1149,16 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                          no_seam_crossing=no_seam_crossing,
                          cardinal_truncation=cardinal_truncation,
                          fit_motor_noise=fit_motor_noise,
-                         value_kernel=value_kernel, **kwargs)
+                         value_kernel=value_kernel,
+                         cardinal_peak_width=cardinal_peak_width, **kwargs)
 
     def get_free_parameters(self):
         pars = {'kappa_r': kappa_r_prior(self.grid_resolution),
                 'sigma_rep': SIGMA_REP_PRIOR}
         if self.fit_prior_weight:
             pars['prior_weight'] = PRIOR_WEIGHT_PRIOR
+        if self.cardinal_peak_width > 0:
+            pars['cardinal_peak'] = CARDINAL_PEAK_PRIOR
         pars.update(self.fourier_prior_parameters())
         if self.fit_motor_noise:
             pars['sigma_motor'] = SIGMA_MOTOR_PRIOR
@@ -1119,6 +1171,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
             'sigma_rep': self.subjectwise('sigma_rep'),
             **({'prior_weight': self.subjectwise('prior_weight')}
                if self.fit_prior_weight else {}),
+            **({'cardinal_peak': self.subjectwise('cardinal_peak')}
+               if self.cardinal_peak_width > 0 else {}),
             **{name: self.subjectwise(name)
                for name in self.fourier_prior_parameters()},
             **({'sigma_motor': self.subjectwise('sigma_motor')}
@@ -1170,7 +1224,7 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         ori_grid = pt.as_tensor_variable(self.ori_grid)
         rep_grid = pt.as_tensor_variable(self.rep_grid)
         val_grid = pt.as_tensor_variable(self.val_grid)
-        if self.fit_prior_weight or self.prior_fourier_order:
+        if self.prior_is_fitted:
             # The prior shape is fitted, so the efficient-coding transform it
             # induces (and therefore where each stimulus lands in
             # representational space) has to be rebuilt inside the graph.
@@ -1181,14 +1235,7 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
             # integer type") as soon as the fit is hierarchical.
             n_sub = self._n_subjects(model)
             N_ori = int(self.grid_resolution)
-            if self.prior_fourier_order:
-                ori_prior = fourier_orientation_prior_pt(
-                    ori_grid[None, :], self.fourier_coefs(model_inputs, n_sub))
-            else:
-                w = pt.specify_shape(model_inputs['prior_weight'], (n_sub,))[:, None]
-                ori_prior = orientation_prior_pt(ori_grid[None, :], w)   # (S, O)
-            ori_prior = ori_prior / (pt.sum(ori_prior, axis=-1, keepdims=True)
-                                     * self.d_ori + 1e-30)
+            ori_prior = self.fitted_orientation_prior(model_inputs, ori_grid, n_sub)
             ori_prior = pt.specify_shape(ori_prior, (n_sub, N_ori))
             ori_cdf = pt.specify_shape(
                 _efficient_cdf_pt(ori_prior, self.d_ori), (n_sub, N_ori))
