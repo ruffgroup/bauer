@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bauer"
-version = "0.2.0"
+version = "0.5.0"
 description = "Bayesian Estimation of Perceptual, Numerical and Risky Choice"
-authors = [{ name = "Gilles de Hollander", email = "giles.de.hollander@gmail.com" }]
+authors = [{ name = "Gilles de Hollander", email = "gilles.de.hollander@gmail.com" }]
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.10"

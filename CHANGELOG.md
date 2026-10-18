@@ -3,7 +3,100 @@
 All notable changes to **bauer** are documented here. This project loosely
 follows [Keep a Changelog](https://keepachangelog.com/) and semantic versioning.
 
-## 0.3.0
+## 0.5.0 (2026-10-18)
+
+The headline of this release is a much-extended `bauer.efficient_coding`
+module: the efficient-coding models of Bedi et al. (2026) for orientation ->
+value judgements (BDM bids), now hierarchical, JAX/numpyro-compilable, and
+carrying the model extensions used for the paper fits. It also fixes a serious
+bug that made every *hierarchical* fit of the grid-based estimation models
+invalid (see "Fixed").
+
+> **Version note.** A `v0.4.0` tag exists on the side branch
+> `feature/rdm-fix-wd-default` (RDM `fit_w_d=False` default + cell-means
+> random-effect ergonomics). It was never released and is **not** part of
+> `main` or of this release; 0.5.0 skips the number to avoid colliding with
+> that tag. In 0.5.0 the race models still default to `fit_w_d=True`.
+
+### Fixed
+
+- **Hierarchical estimation fits used subject 0's parameters for everyone.**
+  `EstimationBaseModel` grid models (all efficient-coding models and the three
+  `bauer.numerosity` models) were handed trialwise-expanded parameters and then
+  gathered `table[subject_ix]` from the first `n_subjects` *trials*, all of
+  which belong to subject 0. The data contributed nothing for any other
+  subject and the group SD had zero gradient. Single-subject fits were
+  unaffected. New `EstimationBaseModel.subjectwise(name)` returns the
+  subject-level RV. **Re-run any hierarchical fit of these models made with
+  bauer <= 0.3.0.**
+- Efficient-coding group-SD priors are now scaled to each parameter
+  (1.5x its own prior SD) instead of bauer's generic 0.25, which under
+  HalfNormal forced complete pooling of `kappa_r` (all subjects identical).
+- `predict`/`simulate` of efficient-coding models no longer fail with a
+  subject-count shape mismatch when drawing PPCs from fitted-prior fits.
+- `EstimationBaseModel.simulate` now mixes in the lapse, so PPC draws come
+  from the same model the likelihood fits.
+- JAX-compilability: index gathers (`pt.arange` over symbolic lengths) in the
+  parabolic theta-hat refinement and in `bin_probability` replaced by one-hot
+  contractions; fitted-prior tensors get static shapes. Hierarchical fits now
+  JIT under numpyro (previously failed within minutes on multi-subject data).
+- Memory: rank-5 broadcast-and-sums replaced by `pt.matmul` (cut O(N^3)
+  intermediates that OOM'd at grid 101); drops deprecated `pt.batched_dot`.
+- The q_per loss argmin is refined to sub-grid resolution (parabolic vertex),
+  making the likelihood smooth in `kappa_r`; the plain grid argmin produced a
+  step function that NUTS could not integrate.
+
+### Added — `bauer.efficient_coding` (Bedi et al. 2026)
+
+Models: `EfficientPerceptionModel` (efficient coding + Bayesian decoding in
+orientation space, `kappa_r`), `EfficientValuationModel` (veridical
+perception, efficient coding in value space, `sigma_rep`),
+`SequentialEfficientCodingModel` (both stages), and
+`CategoricalSequentialModel` — previously a stub, now the paper's Fig. 6 hard
+category gate at 90 deg / 22 CHF (no free parameters).
+
+Options (all default off / backward-compatible unless noted):
+
+- `fit_prior_weight` — fitted prior peakedness `p(phi) ~ 1 - w|sin phi|`,
+  nesting uniform (w=0) and the paper's long-term prior (w=0.5).
+- `prior_fourier_order=K` — orientation prior as a K-harmonic circular Fourier
+  series (k=1 horizontal-vs-vertical, k=2 cardinal-vs-oblique, k>=3 under a
+  `0.5/(k-1)^2` roughness prior).
+- `cardinal_peak_width` — narrow von Mises peaks at 0/90 deg mixed into the
+  perceptual prior with a free per-subject weight.
+- `cardinal_truncation` — truncate orientation perception at 0/90/180 deg.
+- `no_seam_crossing` — no 0/180 deg seam crossing (measurement-referenced
+  mask, smooth one-cell window).
+- `fit_motor_noise` — per-subject Gaussian motor noise on the response axis,
+  applied after the category gate (gate now acts on the (S,C,K,V) table).
+- `value_kernel='cell'` (**new default**) — cell-integrated (erf) value-noise
+  kernel; stays well-defined as `sigma_rep` drops below the grid step.
+  `value_kernel='point'` restores the old behaviour for re-evaluating older
+  traces.
+- Response grid extends down to 0 CHF (latent value domain stays [2, 42]);
+  the valuation model is padded onto the response grid too.
+- `fit_mapping_shrinkage` — per-subject lambda pulling the internal
+  orientation->value mapping toward the straight line.
+- `kappa_r` prior capped at what the orientation grid can resolve.
+
+### Added — other
+
+- `bauer.utils.diagnostics.trim_stuck_chains` — conservative removal of a
+  chain isolated from an agreeing majority on group-level `*_mu` parameters
+  (never gates on log-density).
+- Tutorial lesson 7 (numerosity estimation) re-run against the hierarchical
+  subject-axis fix.
+- `notes/choice_vs_ddm_decision_noise_inconsistency.md` — design note on the
+  static-choice vs DDM/RDM noise normalisation (addressed by the opt-in
+  `consistent_choice_noise` flag).
+
+### Maintenance
+
+- Version strings made consistent (`pyproject.toml`, `bauer.__version__`,
+  `CITATION.cff`); bumpversion config now targets `pyproject.toml` and
+  `CITATION.cff` instead of the removed `setup.py`.
+
+## 0.3.0 (2026-06-10)
 
 This release makes bauer's sequential-sampling (DDM / RDM) models converge on
 real, messy data. The headline is a fixed-rate RT-outlier contaminant baked
