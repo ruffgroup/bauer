@@ -549,7 +549,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
                  no_seam_crossing=False, cardinal_truncation=False,
                  fit_motor_noise=False, value_kernel='cell',
                  cardinal_peak_width=0.0, fit_mapping_shrinkage=False,
-                 fit_mapping_offsets=False, fit_lapse=False, **kwargs):
+                 fit_mapping_offsets=False, fit_lapse=False,
+                 offset_group_mean=False, **kwargs):
         """
         Parameters
         ----------
@@ -587,6 +588,12 @@ class EfficientPerceptionModel(EstimationBaseModel):
         if fit_mapping_offsets not in OFFSET_BASES:
             raise ValueError(f"fit_mapping_offsets must be one of {OFFSET_BASES}")
         self.fit_mapping_offsets = fit_mapping_offsets
+        # Free population-mean offset curve per mapping (coefficients ~ N(0, 1)),
+        # with the subject offsets as deviations around it.  Without it the
+        # offsets are centred on 0, so any SHARED distortion of the mapping has
+        # to come from mapping_shrinkage; with it, the shared distortion is
+        # free-form and lambda is redundant.
+        self.offset_group_mean = bool(offset_group_mean)
         # Free per-subject lapse rate.  The lapse is then mixed into the trial
         # distribution itself, so the fixed base-class lapse is switched off.
         self.fit_lapse = bool(fit_lapse)
@@ -946,7 +953,12 @@ class EfficientPerceptionModel(EstimationBaseModel):
             dims = ('subject', 'offset_mapping', 'offset_stimulus')
         tau = pm.HalfNormal('mapping_offset_sd', sigma=MAPPING_OFFSET_TAU_SD)
         z = pm.Normal('mapping_offset_z', 0.0, 1.0, shape=(n_sub, C, K), dims=dims)
-        return pm.Deterministic('mapping_offset', tau * z, dims=dims)
+        off = tau * z
+        if self.offset_group_mean:
+            mu = pm.Normal('mapping_offset_mu', 0.0, 1.0, shape=(C, K),
+                           dims=dims[1:] if dims else None)
+            off = mu[None] + off
+        return pm.Deterministic('mapping_offset', off, dims=dims)
 
     def _offset_table(self, model_inputs, model):
         """(C, S, O + 1) offset on the internal mapping, or None."""
@@ -1328,7 +1340,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                  no_seam_crossing=False, cardinal_truncation=False,
                  fit_motor_noise=False, value_kernel='cell',
                  cardinal_peak_width=0.0, fit_mapping_shrinkage=False,
-                 fit_mapping_offsets=False, fit_lapse=False, **kwargs):
+                 fit_mapping_offsets=False, fit_lapse=False,
+                 offset_group_mean=False, **kwargs):
         super().__init__(paradigm, perceptual_prior=perceptual_prior,
                          grid_resolution=grid_resolution,
                          rep_grid_resolution=rep_grid_resolution,
@@ -1341,7 +1354,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                          cardinal_peak_width=cardinal_peak_width,
                          fit_mapping_shrinkage=fit_mapping_shrinkage,
                          fit_mapping_offsets=fit_mapping_offsets,
-                         fit_lapse=fit_lapse, **kwargs)
+                         fit_lapse=fit_lapse, offset_group_mean=offset_group_mean,
+                         **kwargs)
 
     def get_free_parameters(self):
         pars = {'kappa_r': kappa_r_prior(self.grid_resolution),
