@@ -434,6 +434,25 @@ def fourier_orientation_prior_pt(phi, coefs):
 CARDINAL_PEAK_PRIOR = {'mu_intercept': -2.0, 'sigma_intercept': 1.0,
                        'cauchy_sigma_intercept': 0.75, 'transform': 'logistic'}
 
+# Mapping shrinkage lambda: the observer's internal orientation->value mapping
+# is the true mapping pulled toward the straight line through its endpoints,
+#     G_lambda(theta) = (1 - lambda) G(theta) + lambda L(theta),
+#     L(theta) = V_MIN + (V_MAX - V_MIN) theta / 180 deg.
+# It adds bias toward the line WITHOUT adding noise, and flattens the slope
+# perceptual noise passes through where G is steep -- the two signatures the
+# two-stage fits miss (abstract_values, 2026-10: model-free regression of the
+# bid error on L - G gives 0.30, positive in 35/35 participants; the fitted
+# categorical model leaves ~1/3 of it as residual). L(90 deg) = 22 CHF = G(90
+# deg), so the cardinal category gate is unaffected.  Logit -1.5 puts the prior
+# median at ~0.18.
+MAPPING_SHRINKAGE_PRIOR = {'mu_intercept': -1.5, 'sigma_intercept': 1.0,
+                           'cauchy_sigma_intercept': 0.75, 'transform': 'logistic'}
+
+
+def linear_value_np(orientation_deg):
+    """The straight line from V_MIN at 0 deg to V_MAX at 180 deg."""
+    return V_MIN + (V_MAX - V_MIN) * np.asarray(orientation_deg, dtype=float) / 180.0
+
 
 def cardinal_peak_pt(phi, width_deg):
     """Narrow von Mises bumps at the cardinals, as a density over doubled angle.
@@ -502,7 +521,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
                  fit_prior_weight=False, prior_fourier_order=0,
                  no_seam_crossing=False, cardinal_truncation=False,
                  fit_motor_noise=False, value_kernel='cell',
-                 cardinal_peak_width=0.0, **kwargs):
+                 cardinal_peak_width=0.0, fit_mapping_shrinkage=False, **kwargs):
         """
         Parameters
         ----------
@@ -532,6 +551,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
         # > 0: mix narrow cardinal peaks (this SD, orientation degrees) into the
         # perceptual prior with a free per-subject weight 'cardinal_peak'.
         self.cardinal_peak_width = float(cardinal_peak_width)
+        # Free per-subject shrinkage of the internal mapping toward a line.
+        self.fit_mapping_shrinkage = bool(fit_mapping_shrinkage)
         super().__init__(paradigm, grid_resolution=grid_resolution, **kwargs)
 
     @property
@@ -583,6 +604,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
         pars.update(self.fourier_prior_parameters())
         if self.fit_motor_noise:
             pars['sigma_motor'] = SIGMA_MOTOR_PRIOR
+        if self.fit_mapping_shrinkage:
+            pars['mapping_shrinkage'] = MAPPING_SHRINKAGE_PRIOR
         return pars
 
     def get_model_inputs(self, parameters):
@@ -597,6 +620,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
                for name in self.fourier_prior_parameters()},
             **({'sigma_motor': self.subjectwise('sigma_motor')}
                if self.fit_motor_noise else {}),
+            **({'mapping_shrinkage': self.subjectwise('mapping_shrinkage')}
+               if self.fit_mapping_shrinkage else {}),
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -646,6 +671,9 @@ class EfficientPerceptionModel(EstimationBaseModel):
             # interpolation runs off the end of the grid instead of wrapping.
             self.value_on_ori_grid_ext[mapping] = orientation_to_value_np(
                 np.append(ori_deg, 180.0), mapping)
+        # Reference line for the mapping shrinkage (same 180 deg endpoint).
+        self.linear_on_ori_grid_ext = linear_value_np(
+            np.append(self.ori_grid / (2 * np.pi) * 180, 180.0))
 
         # Unique stimulus orientations (in degrees) from paradigm
         self.unique_orientations_deg = np.sort(paradigm['orientation'].unique())
@@ -757,7 +785,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
         # Steps 3-5: theta_hat, then push G(theta_hat) onto the value grid.
         # Truncation at the cardinals, when on, happens inside.
         p_response = self._category_pushforward(posterior, p_ms, ori_grid, G_ext,
-                                                val_grid, d_ori, d_rep, d_val)
+                                                val_grid, d_ori, d_rep, d_val,
+                                                self._shrinkage(model_inputs, model))
         p_response = p_response / (pt.sum(p_response, axis=-1, keepdims=True) * d_val + 1e-30)
 
         # Gate, then motor noise, then gather per-trial distributions
@@ -823,8 +852,33 @@ class EfficientPerceptionModel(EstimationBaseModel):
         out = pt.reshape(flat, (n_sub, C, K, V))
         return out.dimshuffle(1, 0, 2, 3) if layout == 'CSKV' else out
 
+    def _shrinkage(self, model_inputs, model):
+        """(S,) mapping shrinkage, or None when it is not fitted."""
+        if not self.fit_mapping_shrinkage:
+            return None
+        return pt.specify_shape(model_inputs['mapping_shrinkage'],
+                                (self._n_subjects(model),))
+
+    def _theta_hat_to_value(self, post, ori_grid, G_ext, d_ori, N, shrink,
+                            cand_mask=None):
+        """(C, S, M) value of the perceptual estimate under the INTERNAL mapping.
+
+        Without shrinkage that is G(theta_hat).  With it, (1 - lambda) G + lambda L;
+        both are linear in the table, so theta_hat is computed once and the
+        reference line is simply interpolated as one more 'condition' row.
+        """
+        if shrink is None:
+            return _value_from_theta_hat(post, ori_grid, G_ext, d_ori,
+                                         q_per=self.q_per, n_cand=N, cand_mask=cand_mask)
+        C = len(self.value_on_ori_grid)
+        L = pt.as_tensor_variable(self.linear_on_ori_grid_ext)[None, :]
+        v = _value_from_theta_hat(post, ori_grid, pt.concatenate([G_ext, L], axis=0),
+                                  d_ori, q_per=self.q_per, n_cand=N, cand_mask=cand_mask)
+        lam = shrink[None, :, None]
+        return (1.0 - lam) * v[:C] + lam * v[C:]
+
     def _category_pushforward(self, posterior_ori, p_ms, ori_grid, G_ext,
-                              val_grid, d_ori, d_rep, d_val):
+                              val_grid, d_ori, d_rep, d_val, shrink=None):
         """(C, S, K, V): p(v_per | stimulus), with cardinal truncation if on.
 
         With truncation the perceptual posterior -- and the candidate set the
@@ -842,8 +896,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
             return w / (pt.sum(w, axis=-1, keepdims=True) + 1e-30)
 
         if not self.cardinal_truncation:
-            v = _value_from_theta_hat(posterior_ori, ori_grid, G_ext, d_ori,
-                                      q_per=self.q_per, n_cand=N)
+            v = self._theta_hat_to_value(posterior_ori, ori_grid, G_ext, d_ori, N, shrink)
             return pt.matmul(p_ms[None], pushforward(v)) * d_rep
 
         masks, _ = cardinal_category_masks(self.ori_grid, N)
@@ -855,8 +908,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
             mask = pt.as_tensor_variable(masks[c])
             post = posterior_ori * mask[None, :, None]
             post = post / (pt.sum(post, axis=1, keepdims=True) * d_ori + 1e-30)
-            v = _value_from_theta_hat(post, ori_grid, G_ext, d_ori,
-                                      q_per=self.q_per, n_cand=N, cand_mask=mask)
+            v = self._theta_hat_to_value(post, ori_grid, G_ext, d_ori, N, shrink,
+                                         cand_mask=mask)
             part = pt.matmul(p_ms[None], pushforward(v)) * d_rep      # (C, S, K, V)
             # Select the stimuli of this category with a constant indicator
             # rather than by slicing and re-concatenating: advanced indexing on
@@ -1140,7 +1193,7 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                  fit_prior_weight=False, prior_fourier_order=0,
                  no_seam_crossing=False, cardinal_truncation=False,
                  fit_motor_noise=False, value_kernel='cell',
-                 cardinal_peak_width=0.0, **kwargs):
+                 cardinal_peak_width=0.0, fit_mapping_shrinkage=False, **kwargs):
         super().__init__(paradigm, perceptual_prior=perceptual_prior,
                          grid_resolution=grid_resolution,
                          rep_grid_resolution=rep_grid_resolution,
@@ -1150,7 +1203,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                          cardinal_truncation=cardinal_truncation,
                          fit_motor_noise=fit_motor_noise,
                          value_kernel=value_kernel,
-                         cardinal_peak_width=cardinal_peak_width, **kwargs)
+                         cardinal_peak_width=cardinal_peak_width,
+                         fit_mapping_shrinkage=fit_mapping_shrinkage, **kwargs)
 
     def get_free_parameters(self):
         pars = {'kappa_r': kappa_r_prior(self.grid_resolution),
@@ -1162,6 +1216,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         pars.update(self.fourier_prior_parameters())
         if self.fit_motor_noise:
             pars['sigma_motor'] = SIGMA_MOTOR_PRIOR
+        if self.fit_mapping_shrinkage:
+            pars['mapping_shrinkage'] = MAPPING_SHRINKAGE_PRIOR
         return pars
 
     def get_model_inputs(self, parameters):
@@ -1177,6 +1233,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                for name in self.fourier_prior_parameters()},
             **({'sigma_motor': self.subjectwise('sigma_motor')}
                if self.fit_motor_noise else {}),
+            **({'mapping_shrinkage': self.subjectwise('mapping_shrinkage')}
+               if self.fit_mapping_shrinkage else {}),
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -1293,7 +1351,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         # Perceptually induced value distribution, with the cardinal-category
         # truncation applied inside when it is switched on.
         p_v_per = self._category_pushforward(posterior_ori, p_ms, ori_grid, G_ext,
-                                             val_grid, d_ori, d_rep, d_val)
+                                             val_grid, d_ori, d_rep, d_val,
+                                             self._shrinkage(model_inputs, model))
         p_v_per = p_v_per / (pt.sum(p_v_per, axis=-1, keepdims=True) * d_val + 1e-30)
 
         # ==== STAGE 2: Value encoding + decoding ====
