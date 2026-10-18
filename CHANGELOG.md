@@ -84,8 +84,7 @@ Options (all default off / backward-compatible unless noted):
 - `bauer.utils.diagnostics.trim_stuck_chains` — conservative removal of a
   chain isolated from an agreeing majority on group-level `*_mu` parameters
   (never gates on log-density).
-- Tutorial lesson 7 (numerosity estimation) re-run against the hierarchical
-  subject-axis fix.
+- Tutorial lessons 6 and 7 notebooks re-executed (outputs refreshed).
 - `notes/choice_vs_ddm_decision_noise_inconsistency.md` — design note on the
   static-choice vs DDM/RDM noise normalisation (addressed by the opt-in
   `consistent_choice_noise` flag).
