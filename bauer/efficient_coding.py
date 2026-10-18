@@ -467,6 +467,13 @@ LAPSE_PRIOR = {'mu_intercept': -5.3, 'sigma_intercept': 1.0,
 # between odd and even trials of the same subject x orientation, i.e. a
 # persistent ~1.1 CHF component no smooth mapping can produce.
 MAPPING_OFFSET_TAU_SD = 0.5
+# 'spline' variant: the offsets are a smooth function of orientation -- cubic
+# B-splines with interior knots every 22.5 deg (11 coefficients per subject x
+# mapping).  The persistent residual is smooth: its cross-half correlation is
+# 0.46 at the same orientation, 0.38 at 7.5 deg, 0.26 at 15, 0.17 at 22.5 and
+# ~0 by 37.5 deg, so a per-stimulus offset mostly spends parameters on noise.
+OFFSET_SPLINE_KNOT_STEP = 22.5
+OFFSET_BASES = (False, 'cell', 'spline')
 
 
 def linear_value_np(orientation_deg):
@@ -575,7 +582,11 @@ class EfficientPerceptionModel(EstimationBaseModel):
         # Free per-subject shrinkage of the internal mapping toward a line.
         self.fit_mapping_shrinkage = bool(fit_mapping_shrinkage)
         # Free per-subject x mapping x stimulus offsets on the internal mapping.
-        self.fit_mapping_offsets = bool(fit_mapping_offsets)
+        if fit_mapping_offsets is True:
+            fit_mapping_offsets = 'cell'
+        if fit_mapping_offsets not in OFFSET_BASES:
+            raise ValueError(f"fit_mapping_offsets must be one of {OFFSET_BASES}")
+        self.fit_mapping_offsets = fit_mapping_offsets
         # Free per-subject lapse rate.  The lapse is then mixed into the trial
         # distribution itself, so the fixed base-class lapse is switched off.
         self.fit_lapse = bool(fit_lapse)
@@ -888,15 +899,29 @@ class EfficientPerceptionModel(EstimationBaseModel):
         return out.dimshuffle(1, 0, 2, 3) if layout == 'CSKV' else out
 
     def _setup_offset_basis(self, paradigm):
-        """(O + 1, K) linear-interpolation weights from the K stimulus
-        orientations onto the extended orientation grid (held constant beyond
-        the outermost stimuli), for the mapping offsets.  The 90 deg stimulus
-        is excluded from the free offsets: the cardinal gate pins it to 22 CHF.
+        """(O + 1, J) basis mapping the J offset coefficients onto the extended
+        orientation grid.
+
+        'cell': linear-interpolation weights from the stimulus orientations
+        (held constant beyond the outermost stimuli); the 90 deg stimulus is
+        excluded, since the cardinal gate pins it to 22 CHF.
+        'spline': cubic B-splines, interior knots every OFFSET_SPLINE_KNOT_STEP.
+        ``offset_stimuli_deg`` labels the coefficients (stimulus orientation, or
+        the spline's peak location).
         """
+        grid_deg = np.append(self.ori_grid / (2 * np.pi) * 180, 180.0)
+        if self.fit_mapping_offsets == 'spline':
+            from scipy.interpolate import BSpline
+            k = 3
+            inner = np.arange(OFFSET_SPLINE_KNOT_STEP, 180.0, OFFSET_SPLINE_KNOT_STEP)
+            t = np.r_[[0.0] * (k + 1), inner, [180.0] * (k + 1)]
+            B = BSpline.design_matrix(grid_deg, t, k).toarray()
+            self.offset_basis = B                                        # (O+1, J)
+            self.offset_stimuli_deg = grid_deg[B.argmax(0)]
+            return
         stim = np.sort(paradigm['orientation'].unique()).astype(float)
         free = np.abs(stim - 90.0) > 1e-6
         self.offset_stimuli_deg = stim[free]
-        grid_deg = np.append(self.ori_grid / (2 * np.pi) * 180, 180.0)
         eye = np.eye(len(stim))
         W = np.stack([np.interp(grid_deg, stim, eye[k]) for k in range(len(stim))], axis=1)
         self.offset_basis = W[:, free]                                   # (O+1, K_free)
