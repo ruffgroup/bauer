@@ -91,6 +91,9 @@ Options (all default off / backward-compatible unless noted):
 
 ### Maintenance
 
+- Pin `matplotlib<3.11`: 3.11 removed `matplotlib.style.core`, which
+  `arviz_plots` 0.8 (imported by `arviz` 0.23) still uses, so `import arviz`
+  failed on fresh installs.
 - Version strings made consistent (`pyproject.toml`, `bauer.__version__`,
   `CITATION.cff`); bumpversion config now targets `pyproject.toml` and
   `CITATION.cff` instead of the removed `setup.py`.

@@ -14,7 +14,10 @@ dependencies = [
     "numpy",
     "pandas",
     "scipy",
-    "matplotlib",
+    # <3.11: matplotlib 3.11 removed matplotlib.style.core, which arviz_plots
+    # 0.8 (imported by arviz 0.23 at import time) still uses -> `import arviz`
+    # raises AttributeError.
+    "matplotlib<3.11",
     "seaborn",
     "pymc>=5",
     "pytensor",
