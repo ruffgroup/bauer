@@ -9,7 +9,7 @@ type: software
 license: MIT
 repository-code: "https://github.com/ruffgroup/bauer"
 url: "https://ruffgroup.github.io/bauer/"
-version: "0.2.0"
+version: "0.5.0"
 authors:
   - family-names: "de Hollander"
     given-names: "Gilles"

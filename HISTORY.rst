@@ -2,6 +2,14 @@
 History
 =======
 
+0.5.0 (2026-10-18)
+------------------
+
+Extended ``bauer.efficient_coding`` (Bedi et al. 2026 models, hierarchical and
+numpyro-compilable) and a fix for hierarchical grid-based estimation fits that
+used subject 0's parameters for every subject. See ``CHANGELOG.md`` for the
+full list. (``v0.4.0`` was an unreleased side-branch tag and is not included.)
+
 0.3.0 (2026-06-10)
 ------------------
 

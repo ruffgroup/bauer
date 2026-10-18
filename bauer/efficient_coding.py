@@ -51,9 +51,306 @@ MAPPING_VALUES['uniform'] = MAPPING_VALUES['linear']
 MAPPING_VALUES['misaligned'] = MAPPING_VALUES['cdf']
 MAPPING_VALUES['aligned'] = MAPPING_VALUES['inverse_cdf']
 
-# Value range
+# Value range.  V_MIN/V_MAX bound the LATENT value domain -- the range G can
+# produce -- while the RESPONSE domain is wider at the bottom: the BDM slider
+# runs from 0, and 26 trials (0.29%) carry bids below 2 CHF at ordinary RTs.
+# Leaving the response grid at [2, 42] clips those into the bottom bin and,
+# worse, truncates the predicted distribution for every near-floor stimulus,
+# which shows up in the PPC as predicted bias at the low edge that the data do
+# not have.  42 is a real ceiling (the slider stops there), so the top is not
+# extended: clipping there is the task, not an artefact.
 V_MIN = 2.0
 V_MAX = 42.0
+RESPONSE_MIN = 0.0
+
+# Perceptual loss exponent.  Bedi et al. fix q_per = 8 across all fits (and
+# q_val = 2, the posterior mean, in value space).  q_per = 2 would make the
+# perceptual estimator the circular posterior mean, which under-predicts
+# repulsion away from the cardinal orientations by roughly a factor of four.
+Q_PER = 8.0
+
+# ---------------------------------------------------------------------------
+# kappa_r in interpretable units
+# ---------------------------------------------------------------------------
+# kappa_r is a von Mises concentration in DOUBLED-angle space (phi = 2*theta),
+# which makes it hard to reason about.  Circular SD in phi is ~1/sqrt(kappa)
+# radians, so the corresponding ORIENTATION SD is half that, in degrees:
+#
+#     kappa =  12 -> 8.3 deg     kappa =  83 -> 3.1 deg
+#     kappa =  30 -> 5.2 deg     kappa = 443 -> 1.4 deg
+#
+# The paper's fitted kappa_r of 12-83 is therefore 3-8 deg of perceptual noise,
+# which is what you would expect for 2%-contrast gratings.
+
+
+def orientation_sd_from_kappa(kappa):
+    """Orientation SD in degrees implied by a doubled-angle von Mises kappa."""
+    return np.rad2deg(1.0 / np.sqrt(kappa)) / 2.0
+
+
+def kappa_from_orientation_sd(sd_deg):
+    """Inverse of :func:`orientation_sd_from_kappa`."""
+    return (np.rad2deg(1.0) / 2.0 / sd_deg) ** 2
+
+
+def max_resolvable_kappa(grid_resolution):
+    """Largest kappa an N-point orientation grid can distinguish.
+
+    The grid spans [0, 180) degrees in N steps, so its orientation step is
+    180/N degrees.  Once the noise SD falls below one step the likelihood is
+    flat in kappa and the parameter is unidentified -- posteriors simply run
+    off to wherever the prior stops them.  Closed form: (N / 2*pi)**2.
+
+        N =  31 -> kappa above  24 is unresolvable (5.8 deg step)
+        N =  51 -> kappa above  66 is unresolvable (3.5 deg step)
+        N = 101 -> kappa above 258 is unresolvable (1.8 deg step)
+
+    Observed: a single-subject fit at N=51 with a loose prior returned
+    kappa_r = 443, i.e. 1.4 deg of noise on a 3.5 deg grid -- 2.6x narrower
+    than one cell, and pure prior/flat-likelihood wandering.
+    """
+    return (grid_resolution / (2.0 * np.pi)) ** 2
+
+
+VALUE_KERNELS = ('cell', 'point')
+
+
+def value_noise_kernel(x, mu, sigma, d, kind='cell'):
+    """Unnormalised Gaussian value noise p(x | mu, sigma) on a grid of spacing d.
+
+    'cell' integrates the Gaussian over each grid cell [x - d/2, x + d/2]
+    (a difference of erfs); 'point' evaluates the density at the grid points.
+
+    'point' breaks down once sigma falls below the grid spacing: every grid
+    point sits several sigma from mu, exp() underflows to 0 for the whole row
+    in float32 (exp(-104) is the floor), the row normalises to 0, and the
+    trial likelihood is left to the lapse term.  That region has no gradient,
+    so a NUTS chain that drifts into it cannot leave (2026-10, categorical
+    fits: one chain per fit frozen at sigma_rep ~ 0.01 CHF on a 0.5 CHF grid,
+    r_hat 1.53).  'cell' always puts the mass in the cell that contains mu, so
+    sigma -> 0 is the smooth deterministic limit instead of a cliff.
+
+    The upper tail uses erfc so that cells far above mu keep their (small)
+    mass instead of cancelling to 0 in erf(a) - erf(b) with both near 1.
+    """
+    if kind == 'point':
+        return pt.exp(-0.5 * ((x - mu) / sigma) ** 2)
+    if kind != 'cell':
+        raise ValueError(f"value kernel must be one of {VALUE_KERNELS}, got {kind!r}")
+    s = sigma * np.sqrt(2.0)
+    hi = (x - mu + 0.5 * d) / s
+    lo = (x - mu - 0.5 * d) / s
+    below = 0.5 * (pt.erf(hi) - pt.erf(lo))
+    above = 0.5 * (pt.erfc(lo) - pt.erfc(hi))
+    return pt.maximum(pt.switch(lo > 0, above, below), 0.0)
+
+
+def kappa_r_prior(grid_resolution=None):
+    """Prior on kappa_r, capped at what the grid can actually resolve.
+
+    Centred to cover the paper's fitted 12-83 (3-8 deg of noise).  When the
+    grid is coarse enough that this would spill into the unresolvable region,
+    the prior is tightened so it stops before the flat part of the likelihood
+    rather than letting the sampler wander there.
+    """
+    mu, sigma = 30.0, 20.0
+    if grid_resolution is not None:
+        k_max = max_resolvable_kappa(grid_resolution)
+        mu, sigma = min(mu, k_max / 2.0), min(sigma, k_max / 4.0)
+    # The group-SD prior has to be scaled to THIS parameter, not left at
+    # bauer's 0.25 default: kappa_r lives on a scale of tens, so HalfNormal(0.25)
+    # is ~80x too tight and collapses the fit to complete pooling -- every
+    # subject gets the same kappa and the between-subject variance vanishes.
+    # HalfCauchy hid this behind its tail; HalfNormal cannot.
+    #
+    # 1.5x the parameter's own prior SD, deliberately generous: the two errors
+    # are not symmetric. Too loose costs a little regularisation; too tight
+    # destroys the between-subject variance, and it does so silently -- the fit
+    # converges beautifully and every subject gets the same number.
+    return {'mu_intercept': mu, 'sigma_intercept': sigma,
+            'cauchy_sigma_intercept': 1.5 * sigma,
+            'transform': 'softplus'}
+
+
+# Back-compat default for callers that do not know their grid yet.
+KAPPA_R_PRIOR = kappa_r_prior()
+SIGMA_REP_PRIOR = {'mu_intercept': 0.5, 'sigma_intercept': 1.0,
+                   'cauchy_sigma_intercept': 1.5, 'transform': 'softplus'}
+# Motor (response-execution) noise, in CHF.  Identified almost entirely by the
+# 90 deg cardinal: with categorical perception and the value gate the model
+# predicts a delta at 22 CHF there, so whatever spread the data show at that
+# one stimulus is the hand on the slider, not perception or valuation.  The
+# observed SD at 90 deg is 0.53-0.68 CHF, hence a prior centred just below 1.
+SIGMA_MOTOR_PRIOR = {'mu_intercept': 0.5, 'sigma_intercept': 0.5,
+                     'cauchy_sigma_intercept': 0.75, 'transform': 'softplus'}
+
+
+def _efficient_cdf_pt(prior, d_ori):
+    """Efficient-coding transform F(theta) from an orientation prior (Eq. 1).
+
+    Tensor version, so the prior can depend on a fitted parameter.  `prior` is
+    (S, O) and unnormalised; returns (S, O) mapped onto [0, 2*pi).
+    """
+    p = prior / (pt.sum(prior, axis=-1, keepdims=True) * d_ori + 1e-30)
+    c = pt.cumsum(p * d_ori, axis=-1)
+    c = c - c[..., :1]
+    return c / (c[..., -1:] + 1e-30) * 2 * np.pi
+
+
+def _interp_pt(x, xp_last, values, n=None):
+    """Linear interpolation of `values` (S, O) at positions `x` (K,) given a
+    uniform grid spanning [0, xp_last).  Used to locate each stimulus on a
+    parameter-dependent encoding transform.
+
+    `n` is the grid length as a PYTHON int.  Taking it from `values.shape[-1]`
+    instead makes the interpolation index depend on a symbolic shape, and JAX
+    then refuses to JIT the graph ("Shapes must be 1D sequences of concrete
+    values of integer type") the moment the caller is hierarchical -- which is
+    every real fit.
+    """
+    n = int(n) if n is not None else int(values.type.shape[-1])
+    f = x / xp_last * pt.cast(n, 'floatX')
+    i0 = pt.clip(pt.floor(f), 0, pt.cast(n, 'floatX') - 2.0)
+    w = f - i0
+    i0 = pt.cast(i0, 'int64')
+    return values[..., i0] * (1.0 - w) + values[..., i0 + 1] * w
+
+
+def _seam_mask(encoded_positions, rep_grid, step):
+    """(..., O, M) indicator that a hypothesised orientation and the measurement
+    that produced it lie on the same side of the 0/180 deg seam.
+
+    Orientation is pi-periodic, so 0 deg and 180 deg are the same grating -- but
+    G is not: G(0 deg) = 2 CHF and G(180 deg) = 42 CHF.  A participant who has
+    learned the mapping never bids 2 CHF for a 179 deg grating, so the decoder
+    must not put posterior mass on the far side of the seam from its own
+    measurement.  Note the reference is the MEASUREMENT (rep_grid), not the
+    stimulus: the observer does not know the stimulus, and referencing it makes
+    the mask a (K, O) object that cannot even be broadcast against the
+    (S, O, M) posterior.
+
+    Implemented as a smooth (differentiable) window one grid cell wide rather
+    than a hard cut, so it does not reintroduce a discontinuity for NUTS.
+    Allowed pairs get 0.5 rather than 1.0, which cancels in the renormalisation
+    that always follows.
+    """
+    d = encoded_positions[..., None] - rep_grid                      # (..., O, M)
+    wrapped = pt.abs(pt.mod(d + np.pi, 2 * np.pi) - np.pi)           # circular distance
+    straight = pt.abs(d)                                             # distance on the line
+    # A candidate crosses the seam when the short way round is not the direct
+    # way; suppress those smoothly.
+    return ptm.sigmoid(-(straight - wrapped) / (0.5 * step + 1e-12))
+
+
+def _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori, q_per=Q_PER,
+                          n_cand=None, cand_mask=None):
+    """Map a perceptual posterior to a value estimate, per paper Eqs. 4 and 7.
+
+    theta_hat = argmin_t E_post[(1 - cos(theta - t))^(q_per/2)].  For q_per = 2
+    this is the circular posterior mean and has a closed form; for the paper's
+    q_per = 8 it does not, so it is minimised on the orientation grid and then
+    refined to sub-grid resolution by fitting a parabola to the loss at the
+    three points around the minimum.
+
+    The refinement is not cosmetic.  A plain grid argmin makes theta_hat -- and
+    therefore the whole likelihood -- a STEP function of kappa_r, and NUTS cannot
+    integrate that: on a 26-subject fit it drove the step size to ~2e-4 and hit
+    the 1023-step treedepth cap on every iteration, for an ETA of 24 h.  The
+    parabolic vertex moves continuously with kappa_r, so the surface is smooth
+    and differentiable almost everywhere, and it removes the +-d_ori/2 snapping
+    error (0.9 CHF at N=101) into the bargain.
+
+    ``G_ext`` is G evaluated on ``ori_grid`` PLUS one extra point at 2*pi, i.e.
+    180 deg.  Orientation is pi-periodic but G is not -- G(0 deg) = 2 CHF and
+    G(180 deg) = 42 CHF -- so the value interpolation must run off the end of
+    the grid to 180 deg rather than wrapping around to 0 deg.
+
+    Parameters
+    ----------
+    posterior : (S, O, M) tensor, normalised over the orientation axis O.
+    ori_grid : (O,) doubled-angle orientation grid.
+    G_ext : (C, O + 1) value of each grid orientation under each mapping, with
+        the 2*pi endpoint appended.
+    d_ori : float, orientation grid spacing.
+
+    Returns
+    -------
+    (C, S, M) tensor of value estimates.
+    """
+    # Loss of each candidate estimate under the posterior: (S, M, O_cand).
+    # Written as a matmul rather than broadcast-and-sum: the latter materialises
+    # an (S, O, M, O_cand) intermediate, O(N^3) per subject.
+    cos_dt = ptm.cos(ori_grid[:, None] - ori_grid[None, :])          # (O, O_cand)
+    loss_kernel = (1.0 - cos_dt) ** (q_per / 2.0)
+    post_sm_o = posterior.dimshuffle(0, 2, 1)                        # (S, M, O)
+    S, M, O = post_sm_o.shape[0], post_sm_o.shape[1], post_sm_o.shape[2]
+    loss = pt.dot(pt.reshape(post_sm_o, (S * M, O)),
+                  loss_kernel * d_ori)                               # (S*M, O_cand)
+
+    # Restrict the estimate to a category as well as the posterior.  Masking
+    # only the posterior is not enough: the argmin runs over candidates, so a
+    # truncated posterior can still be summarised by an orientation outside the
+    # category, and the parabolic refinement then interpolates across the cut.
+    if cand_mask is not None:
+        loss = loss + (1.0 - cand_mask)[None, :] * 1e6
+
+    # Parabolic refinement of the grid argmin.  The loss is circular in the
+    # candidate axis, so the neighbours wrap.
+    # Gather the loss at the argmin and its two neighbours with a one-hot
+    # contraction over the CANDIDATE axis, whose length is a Python int known at
+    # graph-build time. Both the (arange, index) pair and take_along_axis emit a
+    # pt.arange over a symbolic length, which JAX refuses to JIT ("requires the
+    # arguments of jax.numpy.arange to be constants") -- that is what kills the
+    # numpyro sampler.
+    n_cand = int(n_cand) if n_cand is not None else int(ori_grid.type.shape[0])
+    i = pt.argmin(loss, axis=1)                                      # (S*M,)
+    cand = pt.arange(n_cand)                                         # static length
+
+    def _at(idx):
+        return pt.sum(loss * pt.eq(cand[None, :], idx[:, None]), axis=1)
+    l_m = _at((i - 1) % n_cand)
+    l_0 = _at(i)
+    l_p = _at((i + 1) % n_cand)
+    denom = l_m - 2.0 * l_0 + l_p
+    delta = pt.switch(pt.gt(denom, 1e-30), 0.5 * (l_m - l_p) / (denom + 1e-30), 0.0)
+    delta = pt.clip(delta, -0.5, 0.5)
+    f = pt.mod(pt.cast(i, 'floatX') + delta, np.float64(n_cand))  # (S*M,)
+
+    # Linear interpolation of G at the fractional index.  Index n_cand of G_ext
+    # is 180 deg, NOT a wrap back to 0 deg.
+    i0 = pt.clip(pt.floor(f), 0, np.float64(n_cand) - 1.0)
+    w = f - i0
+    i0 = pt.cast(i0, 'int64')
+    v_hat = G_ext[:, i0] * (1.0 - w)[None, :] + G_ext[:, i0 + 1] * w[None, :]  # (C, S*M)
+    v_hat = pt.reshape(v_hat, (G_ext.shape[0], S, M))
+    return pt.clip(v_hat, V_MIN, V_MAX)                              # (C, S, M)
+
+
+def cardinal_category_masks(ori_grid, grid_resolution):
+    """Orientation-space categories bounded by the cardinals at 0, 90 and 180.
+
+    The paper gates the value distribution by "below, at, or above 90 deg",
+    assumed to be inferred without error.  Because G is monotonic, that is the
+    same statement as truncating orientation perception at the cardinals, which
+    is where it actually belongs: it is mapping-independent, and it also closes
+    the 0/180 boundary for free, since "below 90" cannot wrap round to 175 deg.
+
+    Returns (masks, edges): masks is (3, O) over the doubled-angle grid --
+    below 90, at 90, above 90 -- and edges are the same three categories in
+    degrees, for labelling stimuli.
+    """
+    theta = np.rad2deg(ori_grid) / 2.0                       # (O,) in [0, 180)
+    step = 180.0 / grid_resolution
+    at = np.abs(theta - 90.0) <= step
+    below = (theta < 90.0 - step)
+    above = (theta > 90.0 + step)
+    return np.stack([below, at, above]).astype(float), step
+
+
+def cardinal_category_of(orientation_deg, step):
+    """0 = below 90, 1 = at 90, 2 = above 90."""
+    o = np.asarray(orientation_deg, dtype=float)
+    return np.where(np.abs(o - 90.0) <= step, 1, np.where(o < 90.0, 0, 2)).astype(int)
 
 
 def orientation_to_value_np(orientation_deg, mapping='linear'):
@@ -82,6 +379,111 @@ def orientation_to_value_np(orientation_deg, mapping='linear'):
 # ============================================================================
 # Orientation priors
 # ============================================================================
+
+PRIOR_WEIGHT_PRIOR = {'mu_intercept': 0.5, 'sigma_intercept': 0.5,
+                      'cauchy_sigma_intercept': 0.75, 'transform': 'logistic'}
+
+
+def orientation_prior_pt(phi, weight):
+    """Orientation prior with a free peakedness, p(phi) ~ 1 - w*|sin phi|.
+
+    Nests both fixed variants exactly: w = 0 is the uniform short-term prior,
+    w = 0.5 is the paper's long-term cardinal prior (2 - |sin phi|, up to the
+    normalising constant).  w -> 1 concentrates all the mass on the cardinals.
+
+    `weight` may be a scalar or a per-subject vector; the returned prior is
+    (S, O) and normalised over the orientation axis.
+    """
+    # No implicit reshaping: the caller decides the broadcast, otherwise a
+    # (S, 1) weight silently becomes (S, 1, 1) and every downstream tensor
+    # gains a phantom axis.
+    w = pt.as_tensor_variable(weight)
+    p = 1.0 - w * pt.abs(ptm.sin(phi))
+    p = pt.maximum(p, 1e-6)
+    return p
+
+
+def fourier_orientation_prior_pt(phi, coefs):
+    """Circular Fourier prior, p(phi) ~ exp(sum_k a_k cos(k phi) + b_k sin(k phi)).
+
+    `phi` is the DOUBLED angle, so harmonic k has period 180/k degrees in
+    orientation: k=1 is cos(2 theta), the horizontal-vs-vertical asymmetry;
+    k=2 is cos(4 theta), the cardinal-vs-oblique term that reproduces the
+    paper's 2 - |sin phi| at a_2 ~ 0.31; k>=3 refines the shape further.  The
+    sine terms break mirror symmetry about 0 deg, which no cosine-only prior
+    can do.
+
+    Positive and exactly periodic by construction -- the reason to prefer this
+    over a spline through knots at 0/45/90/135/180, which needs a periodic
+    boundary condition bolted on and can still go negative.  Nests uniform at
+    coefs = 0.
+
+    `coefs` is a list of (a_k, b_k) pairs, each broadcastable against `phi`.
+    """
+    logp = pt.zeros_like(phi)
+    for k, (a, b) in enumerate(coefs, start=1):
+        logp = logp + a * ptm.cos(k * phi) + b * ptm.sin(k * phi)
+    # Subtract the max before exponentiating; the caller renormalises anyway,
+    # and without it a large coefficient overflows before normalisation.
+    logp = logp - pt.max(logp, axis=-1, keepdims=True)
+    return pt.exp(logp)
+
+
+# Weight of the cardinal peak component, logistic: logit -2 puts the prior
+# median at ~0.12, i.e. "a small peak" unless the data ask for more.
+CARDINAL_PEAK_PRIOR = {'mu_intercept': -2.0, 'sigma_intercept': 1.0,
+                       'cauchy_sigma_intercept': 0.75, 'transform': 'logistic'}
+
+# Mapping shrinkage lambda: the observer's internal orientation->value mapping
+# is the true mapping pulled toward the straight line through its endpoints,
+#     G_lambda(theta) = (1 - lambda) G(theta) + lambda L(theta),
+#     L(theta) = V_MIN + (V_MAX - V_MIN) theta / 180 deg.
+# It adds bias toward the line WITHOUT adding noise, and flattens the slope
+# perceptual noise passes through where G is steep -- the two signatures the
+# two-stage fits miss (abstract_values, 2026-10: model-free regression of the
+# bid error on L - G gives 0.30, positive in 35/35 participants; the fitted
+# categorical model leaves ~1/3 of it as residual). L(90 deg) = 22 CHF = G(90
+# deg), so the cardinal category gate is unaffected.  Logit -1.5 puts the prior
+# median at ~0.18.
+MAPPING_SHRINKAGE_PRIOR = {'mu_intercept': -1.5, 'sigma_intercept': 1.0,
+                           'cauchy_sigma_intercept': 0.75, 'transform': 'logistic'}
+
+
+def linear_value_np(orientation_deg):
+    """The straight line from V_MIN at 0 deg to V_MAX at 180 deg."""
+    return V_MIN + (V_MAX - V_MIN) * np.asarray(orientation_deg, dtype=float) / 180.0
+
+
+def cardinal_peak_pt(phi, width_deg):
+    """Narrow von Mises bumps at the cardinals, as a density over doubled angle.
+
+    `phi` is the doubled angle, so the cardinals 0 and 90 deg sit at phi = 0
+    and pi.  `width_deg` is the SD of each bump in ORIENTATION degrees; on the
+    doubled axis that is 2x as wide, and the von Mises concentration is
+    1 / (2 * width_rad)^2.  Normalised by the caller.
+    """
+    kappa = 1.0 / (2.0 * np.deg2rad(width_deg)) ** 2
+    return (pt.exp(kappa * (ptm.cos(phi) - 1.0))
+            + pt.exp(kappa * (ptm.cos(phi - np.pi) - 1.0)))
+
+
+def fourier_coef_prior(k):
+    """Prior on harmonic k: weakly informative for the two interpretable terms,
+    a roughness penalty above them.
+
+    k = 1 (horizontal vs vertical) and k = 2 (cardinal vs oblique) are the
+    shapes there is a scientific claim about, so they get sigma = 0.5 -- loose
+    enough that the paper's fitted a_2 = 0.31 sits well inside it.  From k = 3
+    the coefficients only add wiggle, so sigma falls as 0.5 / (k-1)^2 and a
+    higher harmonic has to be strongly supported to show up.  This is the
+    circular equivalent of a smoothing-spline penalty: include as many
+    harmonics as you like and let the data decide how much structure survives,
+    rather than picking an order by hand.
+    """
+    sigma = 0.5 if k <= 2 else 0.5 / (k - 1) ** 2
+    return {'mu_intercept': 0.0, 'sigma_intercept': sigma,
+            'cauchy_sigma_intercept': 1.5 * sigma, 'transform': 'identity'}
+
 
 def long_term_orientation_prior_np(phi):
     """Long-term orientation prior: p(phi) proportional to 2 - |sin(phi)|.
@@ -115,7 +517,11 @@ class EfficientPerceptionModel(EstimationBaseModel):
     base_parameters = ['kappa_r']
 
     def __init__(self, paradigm=None, perceptual_prior='long_term',
-                 grid_resolution=101, rep_grid_resolution=None, **kwargs):
+                 grid_resolution=101, rep_grid_resolution=None, q_per=Q_PER,
+                 fit_prior_weight=False, prior_fourier_order=0,
+                 no_seam_crossing=False, cardinal_truncation=False,
+                 fit_motor_noise=False, value_kernel='cell',
+                 cardinal_peak_width=0.0, fit_mapping_shrinkage=False, **kwargs):
         """
         Parameters
         ----------
@@ -130,18 +536,92 @@ class EfficientPerceptionModel(EstimationBaseModel):
         """
         self.perceptual_prior = perceptual_prior
         self.rep_grid_resolution = rep_grid_resolution or grid_resolution
+        self.q_per = q_per
+        self.fit_prior_weight = fit_prior_weight
+        self.prior_fourier_order = int(prior_fourier_order)
+        if self.fit_prior_weight and self.prior_fourier_order:
+            raise ValueError("fit_prior_weight and prior_fourier_order are two "
+                             "parameterisations of the same thing; pick one.")
+        self.no_seam_crossing = no_seam_crossing
+        self.cardinal_truncation = cardinal_truncation
+        self.fit_motor_noise = fit_motor_noise
+        if value_kernel not in VALUE_KERNELS:
+            raise ValueError(f"value_kernel must be one of {VALUE_KERNELS}")
+        self.value_kernel = value_kernel
+        # > 0: mix narrow cardinal peaks (this SD, orientation degrees) into the
+        # perceptual prior with a free per-subject weight 'cardinal_peak'.
+        self.cardinal_peak_width = float(cardinal_peak_width)
+        # Free per-subject shrinkage of the internal mapping toward a line.
+        self.fit_mapping_shrinkage = bool(fit_mapping_shrinkage)
         super().__init__(paradigm, grid_resolution=grid_resolution, **kwargs)
 
+    @property
+    def prior_is_fitted(self):
+        return bool(self.fit_prior_weight or self.prior_fourier_order
+                    or self.cardinal_peak_width > 0)
+
+    def fitted_orientation_prior(self, model_inputs, ori_grid, n_sub):
+        """(S, O) perceptual prior density when any part of it is free.
+
+        Base shape: Fourier series, free |sin| weight, or the fixed prior; then
+        optionally mixed with narrow cardinal peaks:
+            p = (1 - lam) * base + lam * peaks,   lam = cardinal_peak in (0, 1).
+        """
+        if self.prior_fourier_order:
+            base = fourier_orientation_prior_pt(
+                ori_grid[None, :], self.fourier_coefs(model_inputs, n_sub))
+        elif self.fit_prior_weight:
+            w = pt.specify_shape(model_inputs['prior_weight'], (n_sub,))[:, None]
+            base = orientation_prior_pt(ori_grid[None, :], w)
+        else:
+            base = pt.tile(pt.as_tensor_variable(self.ori_prior)[None, :], (n_sub, 1))
+        base = base / (pt.sum(base, axis=-1, keepdims=True) * self.d_ori + 1e-30)
+        if self.cardinal_peak_width > 0:
+            pk = cardinal_peak_pt(ori_grid, self.cardinal_peak_width)[None, :]
+            pk = pk / (pt.sum(pk, axis=-1, keepdims=True) * self.d_ori)
+            lam = pt.specify_shape(model_inputs['cardinal_peak'], (n_sub,))[:, None]
+            base = (1.0 - lam) * base + lam * pk
+        return base
+
+    def fourier_prior_parameters(self):
+        """{name: prior} for the free Fourier coefficients (empty when off)."""
+        return {f'prior_{c}{k}': fourier_coef_prior(k)
+                for k in range(1, self.prior_fourier_order + 1)
+                for c in 'ab'}
+
+    def fourier_coefs(self, model_inputs, n_sub):
+        """[(a_k, b_k)] as (S, 1) tensors, ready to broadcast against phi."""
+        return [(pt.specify_shape(model_inputs[f'prior_a{k}'], (n_sub,))[:, None],
+                 pt.specify_shape(model_inputs[f'prior_b{k}'], (n_sub,))[:, None])
+                for k in range(1, self.prior_fourier_order + 1)]
+
     def get_free_parameters(self):
-        return {
-            'kappa_r': {'mu_intercept': 3.0, 'sigma_intercept': 1.0,
-                        'transform': 'softplus'},
-        }
+        pars = {'kappa_r': kappa_r_prior(self.grid_resolution)}
+        if self.fit_prior_weight:
+            pars['prior_weight'] = PRIOR_WEIGHT_PRIOR
+        if self.cardinal_peak_width > 0:
+            pars['cardinal_peak'] = CARDINAL_PEAK_PRIOR
+        pars.update(self.fourier_prior_parameters())
+        if self.fit_motor_noise:
+            pars['sigma_motor'] = SIGMA_MOTOR_PRIOR
+        if self.fit_mapping_shrinkage:
+            pars['mapping_shrinkage'] = MAPPING_SHRINKAGE_PRIOR
+        return pars
 
     def get_model_inputs(self, parameters):
         model = pm.Model.get_context()
         return {
-            'kappa_r': parameters['kappa_r'],
+            'kappa_r': self.subjectwise('kappa_r'),
+            **({'prior_weight': self.subjectwise('prior_weight')}
+               if self.fit_prior_weight else {}),
+            **({'cardinal_peak': self.subjectwise('cardinal_peak')}
+               if self.cardinal_peak_width > 0 else {}),
+            **{name: self.subjectwise(name)
+               for name in self.fourier_prior_parameters()},
+            **({'sigma_motor': self.subjectwise('sigma_motor')}
+               if self.fit_motor_noise else {}),
+            **({'mapping_shrinkage': self.subjectwise('mapping_shrinkage')}
+               if self.fit_mapping_shrinkage else {}),
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -163,6 +643,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
         # Value grid
         self.val_grid = np.linspace(V_MIN, V_MAX, N)
         self.d_val = self.val_grid[1] - self.val_grid[0]
+        self._setup_response_grid()
 
         # Orientation prior
         if self.perceptual_prior == 'long_term':
@@ -181,15 +662,26 @@ class EfficientPerceptionModel(EstimationBaseModel):
         # The paradigm tells us which mapping conditions are present
         mappings = list(paradigm['mapping'].astype(str).unique()) if 'mapping' in paradigm.columns else ['linear']
         self.value_on_ori_grid = {}
+        self.value_on_ori_grid_ext = {}
         for mapping in mappings:
             # Convert ori_grid (radians, doubled) back to degrees [0, 180]
             ori_deg = self.ori_grid / (2 * np.pi) * 180
             self.value_on_ori_grid[mapping] = orientation_to_value_np(ori_deg, mapping)
+            # G is NOT pi-periodic: append the 180 deg endpoint so the value
+            # interpolation runs off the end of the grid instead of wrapping.
+            self.value_on_ori_grid_ext[mapping] = orientation_to_value_np(
+                np.append(ori_deg, 180.0), mapping)
+        # Reference line for the mapping shrinkage (same 180 deg endpoint).
+        self.linear_on_ori_grid_ext = linear_value_np(
+            np.append(self.ori_grid / (2 * np.pi) * 180, 180.0))
 
         # Unique stimulus orientations (in degrees) from paradigm
         self.unique_orientations_deg = np.sort(paradigm['orientation'].unique())
         # Convert to doubled-angle radians
         self.unique_orientations_rad = self.unique_orientations_deg * np.pi / 180.0 * 2
+        _, _step = cardinal_category_masks(np.linspace(0, 2 * np.pi, self.grid_resolution,
+                                                       endpoint=False), self.grid_resolution)
+        self.stimulus_categories = cardinal_category_of(self.unique_orientations_deg, _step)
 
         # For each unique orientation, find F_ori(theta_0) via interpolation
         self.encoded_stimulus_locs = np.interp(
@@ -232,13 +724,37 @@ class EfficientPerceptionModel(EstimationBaseModel):
         ori_grid = pt.as_tensor_variable(self.ori_grid)
         rep_grid = pt.as_tensor_variable(self.rep_grid)
         val_grid = pt.as_tensor_variable(self.val_grid)
-        ori_prior = pt.as_tensor_variable(self.ori_prior)
-        ori_cdf = pt.as_tensor_variable(self.ori_cdf)
-        encoded_locs = pt.as_tensor_variable(self.encoded_stimulus_locs)
+        if self.prior_is_fitted:
+            # The prior shape is fitted, so the efficient-coding transform it
+            # induces (and therefore where each stimulus lands in
+            # representational space) has to be rebuilt inside the graph.
+            # pt.specify_shape is load-bearing, not decoration: without it the
+            # (S, O) tensors built from a FITTED prior have no static shape, so
+            # every downstream reshape carries a symbolic S, and JAX refuses to
+            # JIT the graph ("Shapes must be 1D sequences of concrete values of
+            # integer type") as soon as the fit is hierarchical.
+            n_sub = self._n_subjects(model)
+            N_ori = int(self.grid_resolution)
+            ori_prior = self.fitted_orientation_prior(model_inputs, ori_grid, n_sub)
+            ori_prior = pt.specify_shape(ori_prior, (n_sub, N_ori))
+            ori_cdf = pt.specify_shape(
+                _efficient_cdf_pt(ori_prior, self.d_ori), (n_sub, N_ori))
+            encoded_locs = _interp_pt(
+                pt.as_tensor_variable(self.unique_orientations_rad),
+                2 * np.pi, ori_cdf, n=self.grid_resolution)          # (S, K)
+            encoded_locs = pt.specify_shape(
+                encoded_locs, (n_sub, len(self.unique_orientations_rad)))
+        else:
+            ori_prior = pt.as_tensor_variable(self.ori_prior)[None, :]
+            ori_cdf = pt.as_tensor_variable(self.ori_cdf)[None, :]
+            encoded_locs = pt.as_tensor_variable(
+                self.encoded_stimulus_locs)[None, :]
 
         mappings = list(self.value_on_ori_grid.keys())
         G_on_grid = pt.as_tensor_variable(
             np.stack([self.value_on_ori_grid[m] for m in mappings]))
+        G_ext = pt.as_tensor_variable(
+            np.stack([self.value_on_ori_grid_ext[m] for m in mappings]))
 
         d_ori = self.d_ori
         d_rep = self.d_rep
@@ -248,46 +764,184 @@ class EfficientPerceptionModel(EstimationBaseModel):
             kappa_r = kappa_r[None]
 
         # Step 1: Perceptual encoding — p(m_s | theta_0)
+        # exp(k*(cos - 1)) rather than exp(k*cos)/(2 pi i0(k)): the normaliser is
+        # constant over every axis that is renormalised downstream, so it cancels
+        # exactly, while exp(k*cos) reaches 1.1e36 at the paper's top fitted
+        # kappa of 83 and overflows outright in float32 above kappa ~ 89.
         p_ms = pt.exp(
-            kappa_r[:, None, None] * ptm.cos(rep_grid[None, None, :] - encoded_locs[None, :, None])
-        ) / (2 * np.pi * ptm.i0(kappa_r[:, None, None]))  # (S, K, M)
+            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - encoded_locs[:, :, None]) - 1.0)
+        )  # (S, K, M), unnormalised
 
         # Step 2: Bayesian decoding
         likelihood = pt.exp(
-            kappa_r[:, None, None] * ptm.cos(rep_grid[None, None, :] - ori_cdf[None, :, None])
-        ) / (2 * np.pi * ptm.i0(kappa_r[:, None, None]))  # (S, O, M)
-        posterior = likelihood * ori_prior[None, :, None]
+            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - ori_cdf[:, :, None]) - 1.0)
+        )  # (S, O, M), unnormalised
+        posterior = likelihood * ori_prior[:, :, None]
+        if self.no_seam_crossing:
+            posterior = posterior * _seam_mask(ori_cdf, rep_grid, self.d_ori)
         posterior = posterior / (pt.sum(posterior, axis=1, keepdims=True) * d_ori + 1e-30)
 
-        # Step 3: Circular posterior mean
-        sin_mean = pt.sum(posterior * ptm.sin(ori_grid)[None, :, None] * d_ori, axis=1)
-        cos_mean = pt.sum(posterior * ptm.cos(ori_grid)[None, :, None] * d_ori, axis=1)
-        theta_hat = pt.mod(ptm.arctan2(sin_mean, cos_mean) + 2 * np.pi, 2 * np.pi)
-
-        # Step 4: Value from perceptual estimate via soft interpolation
-        h = d_ori * 0.5
-        cos_dist = 1 - ptm.cos(theta_hat[:, :, None] - ori_grid[None, None, :])
-        weights = pt.exp(-cos_dist / (2 * h ** 2))
-        weights = weights / (pt.sum(weights, axis=-1, keepdims=True) + 1e-30)
-        v_hat = pt.sum(weights[None, :, :, :] * G_on_grid[:, None, None, :], axis=-1)  # (C, S, M)
-        v_hat = pt.clip(v_hat, V_MIN, V_MAX)
-
-        # Step 5: Pushforward to value grid
-        h_val = d_val * 0.75
-        val_dists = (v_hat[:, :, :, None] - val_grid[None, None, None, :]) ** 2
-        val_weights = pt.exp(-val_dists / (2 * h_val ** 2))
-        val_weights = val_weights / (pt.sum(val_weights, axis=-1, keepdims=True) + 1e-30)
-
-        p_response = pt.sum(
-            val_weights[:, :, None, :, :] * p_ms[None, :, :, :, None] * d_rep,
-            axis=3)  # (C, S, K, V)
+        # Steps 3-4: q_per-optimal perceptual estimate, then v_hat = G(theta_hat)
+        # Steps 3-5: theta_hat, then push G(theta_hat) onto the value grid.
+        # Truncation at the cardinals, when on, happens inside.
+        p_response = self._category_pushforward(posterior, p_ms, ori_grid, G_ext,
+                                                val_grid, d_ori, d_rep, d_val,
+                                                self._shrinkage(model_inputs, model))
         p_response = p_response / (pt.sum(p_response, axis=-1, keepdims=True) * d_val + 1e-30)
 
-        # Gather per-trial distributions
-        return p_response[mapping_ix, subject_ix, stimulus_ix, :]  # (n_trials, V)
+        # Gate, then motor noise, then gather per-trial distributions
+        n_sub = self._n_subjects(model)
+        p_response = self._gate_value_table(p_response.dimshuffle(1, 0, 2, 3)
+                                            ).dimshuffle(1, 0, 2, 3)
+        p_response = self._apply_motor_noise(p_response, model_inputs, val_grid,
+                                             d_val, n_sub, 'CSKV')
+        return self._pad_to_response_grid(
+            p_response[mapping_ix, subject_ix, stimulus_ix, :])
+
+    @staticmethod
+    def _n_subjects(model):
+        """Subject count, valid in BOTH the estimation and the predict graphs.
+
+        `predict`/`simulate` build a pm.Model without coords, so reading
+        `model.coords['subject']` silently gives 1 there and every
+        specify_shape downstream then fails with "dim 0 of input has shape 26,
+        expected 1" -- but only in the prediction path, i.e. only when you go
+        to draw the PPC, long after the fit succeeded.
+        """
+        if 'subject' in getattr(model, 'coords', {}):
+            return len(model.coords['subject'])
+        try:
+            return int(np.max(model['subject_ix'].get_value())) + 1
+        except Exception:
+            return 1
+
+    def _gate_value_table(self, p_response):
+        """Hook for a category gate on the (S, C, K, V) table.  Base: no gate.
+
+        It lives at table level, not per trial, so motor noise can be applied
+        AFTER it: execution noise happens after the decision, and it is the
+        only thing that should be able to push a response across a category
+        boundary.  Gating afterwards would clip exactly that.
+        """
+        return p_response
+
+    def _apply_motor_noise(self, p_response, model_inputs, val_grid, d_val,
+                           n_sub, layout):
+        """Convolve the response distribution with Gaussian motor noise.
+
+        Response execution happens after every stage of inference, so it is a
+        convolution on the response axis, the same for every trial of a
+        subject.  Applied to the (subject, condition, stimulus, value) table
+        before the per-trial gather, so it costs one batched V x V matmul
+        rather than one per trial.
+        """
+        if not self.fit_motor_noise:
+            return p_response
+        sm = pt.specify_shape(model_inputs['sigma_motor'], (n_sub,))
+        diff = val_grid[None, :, None] - val_grid[None, None, :]      # (1, V, V)
+        kern = pt.exp(-0.5 * (diff / sm[:, None, None]) ** 2)         # (S, V, V)
+        kern = kern / (pt.sum(kern, axis=-1, keepdims=True) * d_val + 1e-30)
+
+        C = len(self.value_on_ori_grid)
+        K = len(self.unique_orientations_rad)
+        V = int(self.grid_resolution)
+        if layout == 'CSKV':
+            p_response = p_response.dimshuffle(1, 0, 2, 3)            # -> (S,C,K,V)
+        flat = pt.reshape(p_response, (n_sub, C * K, V))
+        flat = pt.matmul(flat, kern) * d_val
+        out = pt.reshape(flat, (n_sub, C, K, V))
+        return out.dimshuffle(1, 0, 2, 3) if layout == 'CSKV' else out
+
+    def _shrinkage(self, model_inputs, model):
+        """(S,) mapping shrinkage, or None when it is not fitted."""
+        if not self.fit_mapping_shrinkage:
+            return None
+        return pt.specify_shape(model_inputs['mapping_shrinkage'],
+                                (self._n_subjects(model),))
+
+    def _theta_hat_to_value(self, post, ori_grid, G_ext, d_ori, N, shrink,
+                            cand_mask=None):
+        """(C, S, M) value of the perceptual estimate under the INTERNAL mapping.
+
+        Without shrinkage that is G(theta_hat).  With it, (1 - lambda) G + lambda L;
+        both are linear in the table, so theta_hat is computed once and the
+        reference line is simply interpolated as one more 'condition' row.
+        """
+        if shrink is None:
+            return _value_from_theta_hat(post, ori_grid, G_ext, d_ori,
+                                         q_per=self.q_per, n_cand=N, cand_mask=cand_mask)
+        C = len(self.value_on_ori_grid)
+        L = pt.as_tensor_variable(self.linear_on_ori_grid_ext)[None, :]
+        v = _value_from_theta_hat(post, ori_grid, pt.concatenate([G_ext, L], axis=0),
+                                  d_ori, q_per=self.q_per, n_cand=N, cand_mask=cand_mask)
+        lam = shrink[None, :, None]
+        return (1.0 - lam) * v[:C] + lam * v[C:]
+
+    def _category_pushforward(self, posterior_ori, p_ms, ori_grid, G_ext,
+                              val_grid, d_ori, d_rep, d_val, shrink=None):
+        """(C, S, K, V): p(v_per | stimulus), with cardinal truncation if on.
+
+        With truncation the perceptual posterior -- and the candidate set the
+        estimate is chosen from -- is restricted to the category the stimulus
+        falls in: below 90 deg, at 90 deg, or above 90 deg.  Only three masks
+        exist, so this costs 3x the theta_hat step rather than one pass per
+        stimulus, and the expensive value-stage matmuls are untouched.
+        """
+        N = int(self.grid_resolution)
+        h_val = d_val * 0.75
+
+        def pushforward(v):                      # (C,S,M) -> (C,S,M,V)
+            dist = (v[:, :, :, None] - val_grid[None, None, None, :]) ** 2
+            w = pt.exp(-dist / (2 * h_val ** 2))
+            return w / (pt.sum(w, axis=-1, keepdims=True) + 1e-30)
+
+        if not self.cardinal_truncation:
+            v = self._theta_hat_to_value(posterior_ori, ori_grid, G_ext, d_ori, N, shrink)
+            return pt.matmul(p_ms[None], pushforward(v)) * d_rep
+
+        masks, _ = cardinal_category_masks(self.ori_grid, N)
+        cats = self.stimulus_categories
+        total = None
+        for c in range(masks.shape[0]):
+            if not (cats == c).any():
+                continue
+            mask = pt.as_tensor_variable(masks[c])
+            post = posterior_ori * mask[None, :, None]
+            post = post / (pt.sum(post, axis=1, keepdims=True) * d_ori + 1e-30)
+            v = self._theta_hat_to_value(post, ori_grid, G_ext, d_ori, N, shrink,
+                                         cand_mask=mask)
+            part = pt.matmul(p_ms[None], pushforward(v)) * d_rep      # (C, S, K, V)
+            # Select the stimuli of this category with a constant indicator
+            # rather than by slicing and re-concatenating: advanced indexing on
+            # the stimulus axis leaves a symbolic K, which JAX cannot compile.
+            ind = pt.as_tensor_variable((cats == c).astype(float))    # (K,)
+            part = part * ind[None, None, :, None]
+            total = part if total is None else total + part
+        return total
 
     def _get_response_grid(self):
-        return self.val_grid
+        return getattr(self, 'response_grid', self.val_grid)
+
+    def _setup_response_grid(self):
+        """Response grid = the value grid extended down to RESPONSE_MIN."""
+        step = self.val_grid[1] - self.val_grid[0]
+        self._n_response_pad = int(round((V_MIN - RESPONSE_MIN) / step))
+        self.response_grid = np.concatenate([
+            self.val_grid[0] - step * np.arange(self._n_response_pad, 0, -1),
+            self.val_grid])
+
+    def _pad_to_response_grid(self, trial_dist):
+        """Zero-pad a (T, V) distribution onto the wider response grid.
+
+        The model cannot produce a value below V_MIN -- G does not go there --
+        so the extra bins carry no density of their own; what they do is give
+        the lapse component somewhere to live and stop bin_probability from
+        clipping a sub-2 CHF bid into the bottom bin."""
+        n = getattr(self, '_n_response_pad', 0)
+        if not n:
+            return trial_dist
+        return pt.concatenate(
+            [pt.zeros((trial_dist.shape[0], n)), trial_dist], axis=1)
 
 
 class EfficientValuationModel(EstimationBaseModel):
@@ -303,7 +957,11 @@ class EfficientValuationModel(EstimationBaseModel):
     paradigm_keys = ['orientation']
     base_parameters = ['sigma_rep']
 
-    def __init__(self, paradigm=None, grid_resolution=101, **kwargs):
+    def __init__(self, paradigm=None, grid_resolution=101, value_kernel='cell',
+                 **kwargs):
+        if value_kernel not in VALUE_KERNELS:
+            raise ValueError(f"value_kernel must be one of {VALUE_KERNELS}")
+        self.value_kernel = value_kernel
         super().__init__(paradigm, grid_resolution=grid_resolution, **kwargs)
 
     def get_free_parameters(self):
@@ -315,7 +973,7 @@ class EfficientValuationModel(EstimationBaseModel):
     def get_model_inputs(self, parameters):
         model = pm.Model.get_context()
         return {
-            'sigma_rep': parameters['sigma_rep'],
+            'sigma_rep': self.subjectwise('sigma_rep'),
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -327,6 +985,7 @@ class EfficientValuationModel(EstimationBaseModel):
 
         self.val_grid = np.linspace(V_MIN, V_MAX, N)
         self.d_val = self.val_grid[1] - self.val_grid[0]
+        self._setup_response_grid()
 
         # Rep grid in value space
         self.val_rep_grid = np.linspace(V_MIN, V_MAX, N)
@@ -439,7 +1098,10 @@ class EfficientValuationModel(EstimationBaseModel):
         # rep_grid = val_grid (same grid for value representation)
         # Shape: (S, C, K, N)
         rep_diffs = val_grid[None, None, None, :] - encoded_locs[None, :, :, None]  # (1, C, K, N)
-        p_mv = pt.exp(-0.5 * (rep_diffs / sigma_rep[:, None, None, None]) ** 2)
+        p_mv = value_noise_kernel(val_grid[None, None, None, :],
+                                  encoded_locs[None, :, :, None],
+                                  sigma_rep[:, None, None, None], d_val,
+                                  self.value_kernel)
         # Normalize (truncation + normalization)
         p_mv = p_mv / (pt.sum(p_mv, axis=-1, keepdims=True) * d_val + 1e-30)
 
@@ -452,8 +1114,9 @@ class EfficientValuationModel(EstimationBaseModel):
         # Wait, this is (1, C, N_val, N_rep) but we need to match m on rep_grid
         # Actually m IS on val_grid too (same grid)
         # p(m | v) = TruncGauss(m; F_val(v), sigma_rep^2)
-        decode_likelihood = pt.exp(
-            -0.5 * ((val_grid[None, None, None, :] - val_encoded[None, :, :, None]) / sigma_rep[:, None, None, None]) ** 2
+        decode_likelihood = value_noise_kernel(
+            val_grid[None, None, None, :], val_encoded[None, :, :, None],
+            sigma_rep[:, None, None, None], d_val, self.value_kernel,
         )  # (S, C, N_val, N_rep)
         decode_likelihood = decode_likelihood / (pt.sum(decode_likelihood, axis=-1, keepdims=True) * d_val + 1e-30)
 
@@ -480,12 +1143,35 @@ class EfficientValuationModel(EstimationBaseModel):
         p_response = p_response / (pt.sum(p_response, axis=-1, keepdims=True) * d_val + 1e-30)
 
         # ---- Step 6: Per-trial distribution ----
-        trial_dist = p_response[subject_ix, mapping_ix, stimulus_ix, :]  # (n_trials, V)
-
-        return trial_dist
+        # Padded onto the wider response grid like the other models; without
+        # this the valuation model alone returns an 81-point distribution
+        # against an 85-point response grid and dies at graph-build time.
+        return self._pad_to_response_grid(
+            p_response[subject_ix, mapping_ix, stimulus_ix, :])
 
     def _get_response_grid(self):
-        return self.val_grid
+        return getattr(self, 'response_grid', self.val_grid)
+
+    def _setup_response_grid(self):
+        """Response grid = the value grid extended down to RESPONSE_MIN."""
+        step = self.val_grid[1] - self.val_grid[0]
+        self._n_response_pad = int(round((V_MIN - RESPONSE_MIN) / step))
+        self.response_grid = np.concatenate([
+            self.val_grid[0] - step * np.arange(self._n_response_pad, 0, -1),
+            self.val_grid])
+
+    def _pad_to_response_grid(self, trial_dist):
+        """Zero-pad a (T, V) distribution onto the wider response grid.
+
+        The model cannot produce a value below V_MIN -- G does not go there --
+        so the extra bins carry no density of their own; what they do is give
+        the lapse component somewhere to live and stop bin_probability from
+        clipping a sub-2 CHF bid into the bottom bin."""
+        n = getattr(self, '_n_response_pad', 0)
+        if not n:
+            return trial_dist
+        return pt.concatenate(
+            [pt.zeros((trial_dist.shape[0], n)), trial_dist], axis=1)
 
 
 class SequentialEfficientCodingModel(EfficientPerceptionModel):
@@ -503,24 +1189,52 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
     base_parameters = ['kappa_r', 'sigma_rep']
 
     def __init__(self, paradigm=None, perceptual_prior='long_term',
-                 grid_resolution=101, rep_grid_resolution=None, **kwargs):
+                 grid_resolution=101, rep_grid_resolution=None, q_per=Q_PER,
+                 fit_prior_weight=False, prior_fourier_order=0,
+                 no_seam_crossing=False, cardinal_truncation=False,
+                 fit_motor_noise=False, value_kernel='cell',
+                 cardinal_peak_width=0.0, fit_mapping_shrinkage=False, **kwargs):
         super().__init__(paradigm, perceptual_prior=perceptual_prior,
                          grid_resolution=grid_resolution,
-                         rep_grid_resolution=rep_grid_resolution, **kwargs)
+                         rep_grid_resolution=rep_grid_resolution,
+                         q_per=q_per, fit_prior_weight=fit_prior_weight,
+                         prior_fourier_order=prior_fourier_order,
+                         no_seam_crossing=no_seam_crossing,
+                         cardinal_truncation=cardinal_truncation,
+                         fit_motor_noise=fit_motor_noise,
+                         value_kernel=value_kernel,
+                         cardinal_peak_width=cardinal_peak_width,
+                         fit_mapping_shrinkage=fit_mapping_shrinkage, **kwargs)
 
     def get_free_parameters(self):
-        return {
-            'kappa_r': {'mu_intercept': 3.0, 'sigma_intercept': 1.0,
-                        'transform': 'softplus'},
-            'sigma_rep': {'mu_intercept': 0.5, 'sigma_intercept': 1.0,
-                          'transform': 'softplus'},
-        }
+        pars = {'kappa_r': kappa_r_prior(self.grid_resolution),
+                'sigma_rep': SIGMA_REP_PRIOR}
+        if self.fit_prior_weight:
+            pars['prior_weight'] = PRIOR_WEIGHT_PRIOR
+        if self.cardinal_peak_width > 0:
+            pars['cardinal_peak'] = CARDINAL_PEAK_PRIOR
+        pars.update(self.fourier_prior_parameters())
+        if self.fit_motor_noise:
+            pars['sigma_motor'] = SIGMA_MOTOR_PRIOR
+        if self.fit_mapping_shrinkage:
+            pars['mapping_shrinkage'] = MAPPING_SHRINKAGE_PRIOR
+        return pars
 
     def get_model_inputs(self, parameters):
         model = pm.Model.get_context()
         return {
-            'kappa_r': parameters['kappa_r'],
-            'sigma_rep': parameters['sigma_rep'],
+            'kappa_r': self.subjectwise('kappa_r'),
+            'sigma_rep': self.subjectwise('sigma_rep'),
+            **({'prior_weight': self.subjectwise('prior_weight')}
+               if self.fit_prior_weight else {}),
+            **({'cardinal_peak': self.subjectwise('cardinal_peak')}
+               if self.cardinal_peak_width > 0 else {}),
+            **{name: self.subjectwise(name)
+               for name in self.fourier_prior_parameters()},
+            **({'sigma_motor': self.subjectwise('sigma_motor')}
+               if self.fit_motor_noise else {}),
+            **({'mapping_shrinkage': self.subjectwise('mapping_shrinkage')}
+               if self.fit_mapping_shrinkage else {}),
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -568,13 +1282,37 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         ori_grid = pt.as_tensor_variable(self.ori_grid)
         rep_grid = pt.as_tensor_variable(self.rep_grid)
         val_grid = pt.as_tensor_variable(self.val_grid)
-        ori_prior = pt.as_tensor_variable(self.ori_prior)
-        ori_cdf = pt.as_tensor_variable(self.ori_cdf)
-        encoded_locs = pt.as_tensor_variable(self.encoded_stimulus_locs)
+        if self.prior_is_fitted:
+            # The prior shape is fitted, so the efficient-coding transform it
+            # induces (and therefore where each stimulus lands in
+            # representational space) has to be rebuilt inside the graph.
+            # pt.specify_shape is load-bearing, not decoration: without it the
+            # (S, O) tensors built from a FITTED prior have no static shape, so
+            # every downstream reshape carries a symbolic S, and JAX refuses to
+            # JIT the graph ("Shapes must be 1D sequences of concrete values of
+            # integer type") as soon as the fit is hierarchical.
+            n_sub = self._n_subjects(model)
+            N_ori = int(self.grid_resolution)
+            ori_prior = self.fitted_orientation_prior(model_inputs, ori_grid, n_sub)
+            ori_prior = pt.specify_shape(ori_prior, (n_sub, N_ori))
+            ori_cdf = pt.specify_shape(
+                _efficient_cdf_pt(ori_prior, self.d_ori), (n_sub, N_ori))
+            encoded_locs = _interp_pt(
+                pt.as_tensor_variable(self.unique_orientations_rad),
+                2 * np.pi, ori_cdf, n=self.grid_resolution)          # (S, K)
+            encoded_locs = pt.specify_shape(
+                encoded_locs, (n_sub, len(self.unique_orientations_rad)))
+        else:
+            ori_prior = pt.as_tensor_variable(self.ori_prior)[None, :]
+            ori_cdf = pt.as_tensor_variable(self.ori_cdf)[None, :]
+            encoded_locs = pt.as_tensor_variable(
+                self.encoded_stimulus_locs)[None, :]
 
         mappings = list(self.value_on_ori_grid.keys())
         G_on_grid = pt.as_tensor_variable(
             np.stack([self.value_on_ori_grid[m] for m in mappings]))
+        G_ext = pt.as_tensor_variable(
+            np.stack([self.value_on_ori_grid_ext[m] for m in mappings]))
 
         val_cdfs = pt.as_tensor_variable(
             np.stack([self.val_cdfs[m] for m in mappings]))
@@ -597,41 +1335,24 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
 
         # p(m_s | theta_0) for each subject and unique stimulus
         p_ms = pt.exp(
-            kappa_r[:, None, None] * ptm.cos(rep_grid[None, None, :] - encoded_locs[None, :, None])
-        ) / (2 * np.pi * ptm.i0(kappa_r[:, None, None]))  # (S, K, M)
+            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - encoded_locs[:, :, None]) - 1.0)
+        )  # (S, K, M), unnormalised
 
         # Bayesian decoding
         likelihood_ori = pt.exp(
-            kappa_r[:, None, None] * ptm.cos(rep_grid[None, None, :] - ori_cdf[None, :, None])
-        ) / (2 * np.pi * ptm.i0(kappa_r[:, None, None]))  # (S, O, M)
-        posterior_ori = likelihood_ori * ori_prior[None, :, None]
+            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - ori_cdf[:, :, None]) - 1.0)
+        )  # (S, O, M), unnormalised
+        posterior_ori = likelihood_ori * ori_prior[:, :, None]
+        if self.no_seam_crossing:
+            posterior_ori = posterior_ori * _seam_mask(ori_cdf, rep_grid, self.d_ori)
         posterior_ori = posterior_ori / (pt.sum(posterior_ori, axis=1, keepdims=True) * d_ori + 1e-30)
 
-        # Circular posterior mean
-        sin_mean = pt.sum(posterior_ori * ptm.sin(ori_grid)[None, :, None] * d_ori, axis=1)
-        cos_mean = pt.sum(posterior_ori * ptm.cos(ori_grid)[None, :, None] * d_ori, axis=1)
-        theta_hat = pt.mod(ptm.arctan2(sin_mean, cos_mean) + 2 * np.pi, 2 * np.pi)  # (S, M)
-
-        # Value from perceptual estimate: v_per(m) = G(theta_hat(m))
-        h_ori = d_ori * 0.5
-        cos_dist = 1 - ptm.cos(theta_hat[:, :, None] - ori_grid[None, None, :])
-        weights_ori = pt.exp(-cos_dist / (2 * h_ori ** 2))
-        weights_ori = weights_ori / (pt.sum(weights_ori, axis=-1, keepdims=True) + 1e-30)  # (S, M, O)
-
-        # v_per for each condition: (C, S, M)
-        v_per = pt.sum(weights_ori[None, :, :, :] * G_on_grid[:, None, None, :], axis=-1)
-        v_per = pt.clip(v_per, V_MIN, V_MAX)
-
-        # Pushforward to value grid: p(v_per | theta_0)
-        h_val_push = d_val * 0.75
-        val_dists_per = (v_per[:, :, :, None] - val_grid[None, None, None, :]) ** 2  # (C, S, M, V)
-        val_weights_per = pt.exp(-val_dists_per / (2 * h_val_push ** 2))
-        val_weights_per = val_weights_per / (pt.sum(val_weights_per, axis=-1, keepdims=True) + 1e-30)
-
-        # p_v_per: (C, S, K, V) = Σ_m val_weights_per[c,s,m,v] * p_ms[s,k,m] * d_rep
-        p_v_per = pt.sum(
-            val_weights_per[:, :, None, :, :] * p_ms[None, :, :, :, None] * d_rep,
-            axis=3)
+        # q_per-optimal perceptual estimate, then v_per(m) = G(theta_hat(m))
+        # Perceptually induced value distribution, with the cardinal-category
+        # truncation applied inside when it is switched on.
+        p_v_per = self._category_pushforward(posterior_ori, p_ms, ori_grid, G_ext,
+                                             val_grid, d_ori, d_rep, d_val,
+                                             self._shrinkage(model_inputs, model))
         p_v_per = p_v_per / (pt.sum(p_v_per, axis=-1, keepdims=True) * d_val + 1e-30)
 
         # ==== STAGE 2: Value encoding + decoding ====
@@ -644,7 +1365,10 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         # val_cdfs: (C, N_v), val_grid: (N_rep) — same grid for both
         # Shape: (S, C, N_source_v, N_rep)
         rep_diffs = val_grid[None, None, None, :] - val_cdfs[None, :, :, None]  # (1, C, N, N)
-        p_mv_given_v = pt.exp(-0.5 * (rep_diffs / sigma_rep[:, None, None, None]) ** 2)
+        p_mv_given_v = value_noise_kernel(val_grid[None, None, None, :],
+                                          val_cdfs[None, :, :, None],
+                                          sigma_rep[:, None, None, None], d_val,
+                                          self.value_kernel)
         p_mv_given_v = p_mv_given_v / (pt.sum(p_mv_given_v, axis=-1, keepdims=True) * d_val + 1e-30)
 
         # Bayesian decoding in value space
@@ -673,41 +1397,75 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
 
         # p(response_v | source_v) = Σ_m p(m_v | source_v) * pushforward_weights(m_v)
         # Shape: (S, C, N_source, V)
-        p_resp_given_source = pt.sum(
-            p_mv_given_v[:, :, :, :, None] * val_weights2[:, :, None, :, :] * d_val,
-            axis=3)  # (S, C, N_source, V)
+        # (S, C, N_source, N_rep) x (S, C, N_rep, V) -> (S, C, N_source, V).
+        # batched_dot rather than broadcast-and-sum: the latter builds an
+        # (S, C, N_source, N_rep, V) intermediate, O(N^3) per subject.
+        _S, _C = p_mv_given_v.shape[0], p_mv_given_v.shape[1]
+        _Ns, _Nr = p_mv_given_v.shape[2], p_mv_given_v.shape[3]
+        _V = val_weights2.shape[3]
+        p_resp_given_source = pt.matmul(p_mv_given_v, val_weights2) * d_val
 
         # Marginalize over v_per:
         # p_response(v_hat | theta_0) = Σ_v_per p(v_hat | v_per) * p(v_per | theta_0) * d_val
         # p_v_per: (C, S, K, V_source), p_resp_given_source: (S, C, V_source, V_response)
         # Need to align: (S, C, K, V_source) x (S, C, V_source, V_response) -> (S, C, K, V_response)
         p_v_per_reordered = p_v_per.dimshuffle(1, 0, 2, 3)  # (S, C, K, V_source)
-        p_response = pt.sum(
-            p_v_per_reordered[:, :, :, :, None] * p_resp_given_source[:, :, None, :, :] * d_val,
-            axis=3)  # (S, C, K, V)
+        # (S, C, K, Vs) @ (S, C, Vs, Vr) -> (S, C, K, Vr); see the note above.
+        p_response = pt.matmul(p_v_per_reordered, p_resp_given_source) * d_val
 
         p_response = p_response / (pt.sum(p_response, axis=-1, keepdims=True) * d_val + 1e-30)
 
-        # ---- Per-trial distribution ----
-        # p_response: (S, C, K, V)
-        trial_dist = p_response[subject_ix, mapping_ix, stimulus_ix, :]
-
-        return trial_dist
+        # ---- Gate, then motor noise, then the per-trial gather ----
+        n_sub = self._n_subjects(model)
+        p_response = self._gate_value_table(p_response)
+        p_response = self._apply_motor_noise(p_response, model_inputs, val_grid,
+                                             d_val, n_sub, 'SCKV')
+        return self._pad_to_response_grid(
+            p_response[subject_ix, mapping_ix, stimulus_ix, :])
 
 
 class CategoricalSequentialModel(SequentialEfficientCodingModel):
-    """Sequential model with cardinal categorical stabilization.
+    """Sequential model with cardinal categorical stabilization (paper, Fig. 6).
 
-    Same as SequentialEfficientCodingModel, but applies a category gate at the
-    output: stimuli below/at/above 90 degrees are constrained to have value
-    estimates in the corresponding category (below/at/above v_mid).
+    Perceptual and value encoding/decoding are untouched; a hard category gate
+    is applied to the final value-estimate distribution p(v_hat | phi_0).
+    Stimuli fall into three categories relative to the 90 deg cardinal --
+    below, at, above -- where "at" is within one model grid step of 90 deg.  In
+    value space the middle category is [v_mid - delta, v_mid + delta] with
+    v_mid = 22 CHF and delta = 0.25 CHF, and the outer categories are the values
+    below and above that interval.  Mass outside the implied category is set to
+    zero and the rest renormalised.
+
+    Descriptive, and deliberately free-parameter-free: it is a proxy for the
+    regime in which precision near the cardinal is high enough to remove
+    category-level confusions, not a mechanism.  Motivated by the localized
+    collapse of response variability at 90 deg, which every ungated
+    architecture gets backwards in at least one mapping (it predicts a variance
+    *peak* there for any mapping whose slope is steep at the cardinal).
     """
 
-    def _compute_trial_distributions(self, model_inputs):
-        # Get the base sequential model's response distribution
-        # Then apply the category gate
-        # For now, delegate to parent and note that the gate
-        # should be applied to p_response before computing log_prob
+    V_MID = 22.0
+    DELTA = 0.25
 
-        # TODO: Implement category gate. For now, use parent.
-        return super()._compute_trial_distributions(model_inputs)
+    def _setup_grids(self, paradigm):
+        super()._setup_grids(paradigm)
+
+        step_deg = 180.0 / self.grid_resolution
+        ori_deg = np.rad2deg(self.unique_orientations_rad) / 2.0          # (K,)
+        v = self.val_grid                                                 # (V,)
+
+        at_cardinal = np.abs(ori_deg - 90.0) <= step_deg
+        below = ori_deg < 90.0 - step_deg
+
+        mid = np.abs(v - self.V_MID) <= self.DELTA
+        low = v < self.V_MID - self.DELTA
+        high = v > self.V_MID + self.DELTA
+
+        mask = np.where(at_cardinal[:, None], mid[None, :],
+                        np.where(below[:, None], low[None, :], high[None, :]))
+        self.category_mask = mask.astype(float)                           # (K, V)
+
+    def _gate_value_table(self, p_response):
+        mask = pt.as_tensor_variable(self.category_mask)                  # (K, V)
+        gated = p_response * mask[None, None, :, :]
+        return gated / (pt.sum(gated, axis=-1, keepdims=True) * self.d_val + 1e-30)

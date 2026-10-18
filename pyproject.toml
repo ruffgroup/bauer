@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bauer"
-version = "0.2.0"
+version = "0.5.0"
 description = "Bayesian Estimation of Perceptual, Numerical and Risky Choice"
-authors = [{ name = "Gilles de Hollander", email = "giles.de.hollander@gmail.com" }]
+authors = [{ name = "Gilles de Hollander", email = "gilles.de.hollander@gmail.com" }]
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,7 +14,10 @@ dependencies = [
     "numpy",
     "pandas",
     "scipy",
-    "matplotlib",
+    # <3.11: matplotlib 3.11 removed matplotlib.style.core, which arviz_plots
+    # 0.8 (imported by arviz 0.23 at import time) still uses -> `import arviz`
+    # raises AttributeError.
+    "matplotlib<3.11",
     "seaborn",
     "pymc>=5",
     "pytensor",

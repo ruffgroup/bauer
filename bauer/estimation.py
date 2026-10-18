@@ -24,6 +24,30 @@ class EstimationBaseModel(BaseModel):
         - get_model_inputs(parameters)
     """
 
+    def subjectwise(self, name):
+        """The subject-level `(n_subjects,)` RV, NOT its trialwise expansion.
+
+        `BaseModel.get_parameter_values` hands every free parameter back through
+        `get_trialwise_variable`, i.e. already indexed out to `(n_trials,)`.
+        That is right for models that compute a scalar per trial, but these
+        grid models build a `(n_subjects, ..., n_response)` table and then gather
+        it with `subject_ix`.  Feeding them the trialwise vector makes the
+        leading axis `n_trials`, so `table[subject_ix]` reads the first
+        `n_subjects` TRIALS -- all of which belong to subject 0.  Every subject
+        then shares subject 0's parameters, the group SD gets exactly zero
+        gradient, and the table is `n_trials / n_subjects` times larger than it
+        needs to be.
+
+        Single-subject fits were unaffected: `pt.tile` of a scalar makes every
+        row identical, so the gather picked a correct row.
+        """
+        model = pm.Model.get_context()
+        var = model[name]
+        if var.ndim == 0:
+            n_sub = len(model.coords['subject']) if 'subject' in model.coords else 1
+            var = pt.tile(var[None], n_sub)
+        return var
+
     def __init__(self, paradigm=None, grid_resolution=101, response_bin_width=0.5,
                  lapse_rate=0.01, **kwargs):
         """
@@ -195,9 +219,16 @@ class EstimationBaseModel(BaseModel):
             ix = pt.cast(pt.floor(frac_ix), 'int64')
             ix = pt.clip(ix, 0, n - 2)
             w = frac_ix - pt.cast(ix, 'float64')
-            row_indices = pt.arange(cdf_row.shape[0])
-            val_lo = cdf_row[row_indices, ix]
-            val_hi = cdf_row[row_indices, ix + 1]
+            # One-hot contraction over the GRID axis, whose length is a Python
+            # int. Indexing rows with pt.arange(cdf_row.shape[0]) emits an
+            # arange over a symbolic trial count, which JAX cannot JIT, so the
+            # numpyro sampler dies on any model whose trial count is not folded
+            # to a constant.
+            grid_ix = pt.arange(n)                                # static length
+            oh_lo = pt.eq(grid_ix[None, :], ix[:, None])
+            oh_hi = pt.eq(grid_ix[None, :], (ix + 1)[:, None])
+            val_lo = pt.sum(cdf_row * oh_lo, axis=1)
+            val_hi = pt.sum(cdf_row * oh_hi, axis=1)
             return val_lo + w * (val_hi - val_lo)
 
         cdf_lo = interp_per_row(cdf, frac_lo)
@@ -293,11 +324,20 @@ class EstimationBaseModel(BaseModel):
         response_grid = self._get_response_grid()
         dv = response_grid[1] - response_grid[0]
 
-        # Inverse CDF sampling
+        # Inverse CDF sampling.  The lapse is mixed in here, not only in
+        # bin_probability: without it simulated datasets are the no-lapse
+        # model, and any PPC built on them is checking a model the likelihood
+        # never fitted -- visible wherever the fitted distribution is sharp
+        # (e.g. under a hard category gate, where it is a spike).
+        pdf = trial_dist_np / (np.sum(trial_dist_np * dv, axis=-1, keepdims=True) + 1e-30)
+        lapse_rate = getattr(self, 'lapse_rate', 0.0) or 0.0
+        if lapse_rate:
+            uniform = np.full_like(pdf, 1.0 / (response_grid[-1] - response_grid[0]))
+            pdf = (1.0 - lapse_rate) * pdf + lapse_rate * uniform
+
         all_samples = []
         for _ in range(n_samples):
             u = np.random.uniform(size=trial_dist_np.shape[0])
-            pdf = trial_dist_np / (np.sum(trial_dist_np * dv, axis=-1, keepdims=True) + 1e-30)
             cdf = np.cumsum(pdf * dv, axis=-1)
             indices = np.argmax(cdf >= u[:, np.newaxis], axis=-1)
             # Add uniform jitter within the bin
