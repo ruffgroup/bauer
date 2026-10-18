@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Architecture &amp; Concepts" href="concepts.html"><link rel="prev" title="bauer" href="index.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Installation - bauer 0.3.0 documentation</title>
+        <title>Installation - bauer 0.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">bauer 0.3.0 documentation</div></a>
+      <a href="index.html"><div class="brand">bauer 0.5.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">bauer 0.3.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.5.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -271,7 +271,7 @@ pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </s
 likelihood from <strong>HSSM</strong>, and you’ll want the <strong>numpyro (JAX) backend</strong>, which
 is far faster than the default <code class="docutils literal notranslate"><span class="pre">pymc</span></code> backend (see
 <a class="reference internal" href="#backend-speed"><span class="std std-ref">Choosing a sampler backend (this is the speed knob)</span></a> below). The <code class="docutils literal notranslate"><span class="pre">[ddm]</span></code> extra pulls all of this:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[ddm]&quot;</span><span class="w">   </span><span class="c1"># hssm + jax (CPU) + numpyro + blackjax</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[ddm]"</span><span class="w">   </span><span class="c1"># hssm + jax (CPU) + numpyro + blackjax</span>
 </pre></div>
 </div>
 </section>
@@ -281,8 +281,8 @@ is far faster than the default <code class="docutils literal notranslate"><span 
 ~45 min on an L4 GPU vs many hours on CPU). <strong>GPU use is decided entirely by
 which JAX you install</strong> — there is no code flag. Install the CUDA build of
 JAX on top of the <code class="docutils literal notranslate"><span class="pre">[ddm]</span></code> extra:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[ddm]&quot;</span>
-pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;jax[cuda12]&quot;</span><span class="w">     </span><span class="c1"># CUDA 12 build of JAX</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[ddm]"</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"jax[cuda12]"</span><span class="w">     </span><span class="c1"># CUDA 12 build of JAX</span>
 </pre></div>
 </div>
 <p>Then just fit with <code class="docutils literal notranslate"><span class="pre">backend='numpyro'</span></code> (below) — bauer uses the GPU
@@ -306,18 +306,18 @@ JAX backend; not generally needed.)</p>
 <p>Equivalent conda envs are bundled: <code class="docutils literal notranslate"><span class="pre">environment.yml</span></code> (CPU) and
 <code class="docutils literal notranslate"><span class="pre">environment_cuda.yml</span></code> (GPU, with <code class="docutils literal notranslate"><span class="pre">jax[cuda12]</span></code>). Each ends by installing
 bauer editable:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>environment.yml<span class="w">        </span><span class="c1"># CPU, &#39;bauer&#39; env</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>environment.yml<span class="w">        </span><span class="c1"># CPU, 'bauer' env</span>
 <span class="c1"># or, on a GPU box:</span>
-conda<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>environment_cuda.yml<span class="w">   </span><span class="c1"># GPU, &#39;bauer_cuda&#39; env</span>
+conda<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>environment_cuda.yml<span class="w">   </span><span class="c1"># GPU, 'bauer_cuda' env</span>
 conda<span class="w"> </span>activate<span class="w"> </span>bauer
 </pre></div>
 </div>
 </section>
 <section id="development-docs">
 <h2>Development / docs<a class="headerlink" href="#development-docs" title="Link to this heading">¶</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span><span class="w">      </span><span class="c1"># flake8 / pytest / pre-commit</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[dev]"</span><span class="w">      </span><span class="c1"># flake8 / pytest / pre-commit</span>
 pre-commit<span class="w"> </span>install<span class="w">           </span><span class="c1"># run flake8 on every commit (matches CI)</span>
-pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[docs]&quot;</span><span class="w">     </span><span class="c1"># sphinx / nbsphinx, to build these docs</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[docs]"</span><span class="w">     </span><span class="c1"># sphinx / nbsphinx, to build these docs</span>
 </pre></div>
 </div>
 </section>
@@ -403,7 +403,7 @@ adds <code class="docutils literal notranslate"><span class="pre">hssm</span></c
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=e259d695"></script>
+</div><script src="_static/documentation_options.js?v=1dd76d02"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

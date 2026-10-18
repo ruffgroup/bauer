@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>bauer.utils.bayes - bauer 0.3.0 documentation</title>
+        <title>bauer.utils.bayes - bauer 0.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -160,7 +160,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../../index.html"><div class="brand">bauer 0.3.0 documentation</div></a>
+      <a href="../../../index.html"><div class="brand">bauer 0.5.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -181,7 +181,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.3.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.5.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -284,7 +284,7 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">posterior_mean_sd</span><span class="p">(</span><span class="n">prior_sd</span><span class="p">,</span> <span class="n">evidence_sd</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;SD of the posterior mean conditional on the true latent value.</span>
+<span class="w">    </span><span class="sd">"""SD of the posterior mean conditional on the true latent value.</span>
 
 <span class="sd">    For a Gaussian observer with prior V ~ N(μ_p, σ_p²) and a single noisy</span>
 <span class="sd">    observation x | V ~ N(V, σ_e²), the posterior mean μ_post(x) =</span>
@@ -300,7 +300,7 @@
 <span class="sd">    This is the principled within-trial diffusion noise for both DDM and RDM</span>
 <span class="sd">    accumulators when they integrate posterior-mean evidence over time</span>
 <span class="sd">    (Bogacz/Drugowitsch sequential-evidence-stream interpretation).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">var_p</span> <span class="o">=</span> <span class="n">prior_sd</span> <span class="o">**</span> <span class="mi">2</span>
     <span class="n">var_e</span> <span class="o">=</span> <span class="n">evidence_sd</span> <span class="o">**</span> <span class="mi">2</span>
     <span class="n">w</span> <span class="o">=</span> <span class="n">var_p</span> <span class="o">/</span> <span class="p">(</span><span class="n">var_p</span> <span class="o">+</span> <span class="n">var_e</span><span class="p">)</span>
@@ -308,7 +308,7 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">posterior_mean_sd_np</span><span class="p">(</span><span class="n">prior_sd</span><span class="p">,</span> <span class="n">evidence_sd</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;NumPy version of :func:`posterior_mean_sd`.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""NumPy version of :func:`posterior_mean_sd`."""</span>
     <span class="n">var_p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">prior_sd</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
     <span class="n">var_e</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">evidence_sd</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
     <span class="n">w</span> <span class="o">=</span> <span class="n">var_p</span> <span class="o">/</span> <span class="p">(</span><span class="n">var_p</span> <span class="o">+</span> <span class="n">var_e</span><span class="p">)</span>
@@ -335,43 +335,43 @@
 <div class="viewcode-block" id="summarize_ppc">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.bayes.summarize_ppc">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">summarize_ppc</span><span class="p">(</span><span class="n">ppc</span><span class="p">,</span> <span class="n">groupby</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Single-step PPC summary (legacy).  Prefer summarize_ppc_group for group-level PPCs.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Single-step PPC summary (legacy).  Prefer summarize_ppc_group for group-level PPCs."""</span>
     <span class="k">if</span> <span class="n">groupby</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">ppc</span> <span class="o">=</span> <span class="n">ppc</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">groupby</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
 
-    <span class="n">e</span> <span class="o">=</span> <span class="n">ppc</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to_frame</span><span class="p">(</span><span class="s1">&#39;p_predicted&#39;</span><span class="p">)</span>
+    <span class="n">e</span> <span class="o">=</span> <span class="n">ppc</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to_frame</span><span class="p">(</span><span class="s1">'p_predicted'</span><span class="p">)</span>
     <span class="n">hdi</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">az</span><span class="o">.</span><span class="n">hdi</span><span class="p">(</span><span class="n">ppc</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">values</span><span class="p">),</span> <span class="n">index</span><span class="o">=</span><span class="n">ppc</span><span class="o">.</span><span class="n">index</span><span class="p">,</span>
-                       <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;hdi025&#39;</span><span class="p">,</span> <span class="s1">&#39;hdi975&#39;</span><span class="p">])</span>
+                       <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">'hdi025'</span><span class="p">,</span> <span class="s1">'hdi975'</span><span class="p">])</span>
 
     <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">((</span><span class="n">e</span><span class="p">,</span> <span class="n">hdi</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span></div>
 
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">summarize_ppc_group</span><span class="p">(</span><span class="n">ppc</span><span class="p">,</span> <span class="n">condition_cols</span><span class="p">,</span> <span class="n">subject_col</span><span class="o">=</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="n">hdi_prob</span><span class="o">=</span><span class="mf">0.95</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Two-step group-mean PPC summary.</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">summarize_ppc_group</span><span class="p">(</span><span class="n">ppc</span><span class="p">,</span> <span class="n">condition_cols</span><span class="p">,</span> <span class="n">subject_col</span><span class="o">=</span><span class="s1">'subject'</span><span class="p">,</span> <span class="n">hdi_prob</span><span class="o">=</span><span class="mf">0.95</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Two-step group-mean PPC summary.</span>
 
 <span class="sd">    For each posterior sample, first averages simulated choices within each</span>
 <span class="sd">    (subject, condition) cell, then averages those subject means across subjects.</span>
 <span class="sd">    The HDI is then computed across the resulting per-sample group means.</span>
 
-<span class="sd">    This correctly represents &quot;where 95 % of plausible group-mean observations</span>
-<span class="sd">    would fall under the model&quot; — including both parameter uncertainty and</span>
+<span class="sd">    This correctly represents "where 95 % of plausible group-mean observations</span>
+<span class="sd">    would fall under the model" — including both parameter uncertainty and</span>
 <span class="sd">    Bernoulli noise — rather than the uncertainty on the per-trial probability.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
 <span class="sd">    ppc : pd.DataFrame, shape (trials, posterior_samples)</span>
-<span class="sd">        Raw PPC samples from ``model.ppc().xs(var_name, level=&#39;variable&#39;)``.</span>
+<span class="sd">        Raw PPC samples from ``model.ppc().xs(var_name, level='variable')``.</span>
 <span class="sd">        Posterior-sample columns can be any column not in *condition_cols* or</span>
 <span class="sd">        *subject_col*.  All grouping keys (including *subject_col*) must be</span>
 <span class="sd">        present either as index levels or as regular columns.</span>
 <span class="sd">    condition_cols : list of str</span>
 <span class="sd">        Condition dimensions to summarise over, e.g.</span>
-<span class="sd">        ``[&#39;n1&#39;, &#39;log_ratio_bin&#39;]`` or</span>
-<span class="sd">        ``[&#39;order&#39;, &#39;n_safe_bin&#39;, &#39;log_ratio_bin&#39;]``.</span>
+<span class="sd">        ``['n1', 'log_ratio_bin']`` or</span>
+<span class="sd">        ``['order', 'n_safe_bin', 'log_ratio_bin']``.</span>
 <span class="sd">        These must be index levels or columns of *ppc*.</span>
 <span class="sd">    subject_col : str</span>
-<span class="sd">        Name of the subject dimension (default ``&#39;subject&#39;``).</span>
+<span class="sd">        Name of the subject dimension (default ``'subject'``).</span>
 <span class="sd">    hdi_prob : float</span>
 <span class="sd">        Posterior mass for HDI interval (default 0.95).</span>
 
@@ -383,22 +383,22 @@
 
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
-<span class="sd">    &gt;&gt;&gt; ppc_ll = model.ppc(data, idata, var_names=[&#39;ll_bernoulli&#39;])</span>
-<span class="sd">    ...             .xs(&#39;ll_bernoulli&#39;, level=&#39;variable&#39;)</span>
+<span class="sd">    &gt;&gt;&gt; ppc_ll = model.ppc(data, idata, var_names=['ll_bernoulli'])</span>
+<span class="sd">    ...             .xs('ll_bernoulli', level='variable')</span>
 <span class="sd">    &gt;&gt;&gt; # add derived condition columns if needed</span>
 <span class="sd">    &gt;&gt;&gt; ppc_ll_flat = ppc_ll.reset_index()</span>
-<span class="sd">    &gt;&gt;&gt; ppc_ll_flat[&#39;bin&#39;] = pd.cut(ppc_ll_flat[&#39;log(n2/n1)&#39;], 12) \</span>
+<span class="sd">    &gt;&gt;&gt; ppc_ll_flat['bin'] = pd.cut(ppc_ll_flat['log(n2/n1)'], 12) \</span>
 <span class="sd">    ...                        .apply(lambda x: x.mid).astype(float)</span>
 <span class="sd">    &gt;&gt;&gt; summary = summarize_ppc_group(ppc_ll_flat,</span>
-<span class="sd">    ...                               condition_cols=[&#39;n1&#39;, &#39;bin&#39;])</span>
+<span class="sd">    ...                               condition_cols=['n1', 'bin'])</span>
 <span class="sd">    &gt;&gt;&gt; # summary has columns p_predicted, hdi025, hdi975 indexed by (n1, bin)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="c1"># After ppc_ll.reset_index(), pandas adds former-index columns as tuples</span>
-    <span class="c1"># (name, &#39;&#39;) because ppc_ll.columns is a MultiIndex(chain, draw).</span>
+    <span class="c1"># (name, '') because ppc_ll.columns is a MultiIndex(chain, draw).</span>
     <span class="c1"># Flatten those back to plain strings so the isinstance check works.</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ppc</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">MultiIndex</span><span class="p">):</span>
         <span class="n">ppc</span> <span class="o">=</span> <span class="n">ppc</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-        <span class="n">ppc</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">c</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="n">c</span>
+        <span class="n">ppc</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">c</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s1">''</span><span class="p">)</span> <span class="k">else</span> <span class="n">c</span>
                        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">ppc</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
 
     <span class="c1"># Posterior-sample columns have tuple names (chain, draw) — not strings.</span>
@@ -408,7 +408,7 @@
                    <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">excluded</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="nb">str</span><span class="p">)]</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">sample_cols</span><span class="p">:</span>
         <span class="c1"># Fallback when caller already renamed sample cols to integers</span>
-        <span class="n">sample_cols</span> <span class="o">=</span> <span class="n">ppc</span><span class="o">.</span><span class="n">select_dtypes</span><span class="p">(</span><span class="s1">&#39;number&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span>
+        <span class="n">sample_cols</span> <span class="o">=</span> <span class="n">ppc</span><span class="o">.</span><span class="n">select_dtypes</span><span class="p">(</span><span class="s1">'number'</span><span class="p">)</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span>
             <span class="nb">list</span><span class="p">(</span><span class="n">excluded</span><span class="p">))</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
 
     <span class="c1"># Step 1: average within (subject, condition) for each posterior sample</span>
@@ -418,11 +418,11 @@
     <span class="n">ppc_group</span> <span class="o">=</span> <span class="n">ppc_subj</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">condition_cols</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
 
     <span class="c1"># Step 3: mean and HDI across samples</span>
-    <span class="n">e</span> <span class="o">=</span> <span class="n">ppc_group</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to_frame</span><span class="p">(</span><span class="s1">&#39;p_predicted&#39;</span><span class="p">)</span>
+    <span class="n">e</span> <span class="o">=</span> <span class="n">ppc_group</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to_frame</span><span class="p">(</span><span class="s1">'p_predicted'</span><span class="p">)</span>
     <span class="n">hdi_vals</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
         <span class="n">az</span><span class="o">.</span><span class="n">hdi</span><span class="p">(</span><span class="n">ppc_group</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">hdi_prob</span><span class="o">=</span><span class="n">hdi_prob</span><span class="p">),</span>
         <span class="n">index</span><span class="o">=</span><span class="n">ppc_group</span><span class="o">.</span><span class="n">index</span><span class="p">,</span>
-        <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;hdi025&#39;</span><span class="p">,</span> <span class="s1">&#39;hdi975&#39;</span><span class="p">],</span>
+        <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">'hdi025'</span><span class="p">,</span> <span class="s1">'hdi975'</span><span class="p">],</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">e</span><span class="p">,</span> <span class="n">hdi_vals</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 </pre></div>
@@ -457,7 +457,7 @@
       
     </aside>
   </div>
-</div><script src="../../../_static/documentation_options.js?v=e259d695"></script>
+</div><script src="../../../_static/documentation_options.js?v=1dd76d02"></script>
     <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../../_static/scripts/furo.js?v=46bd48cc"></script>

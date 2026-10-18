@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Tutorials" href="tutorial/index.html"><link rel="prev" title="Installation" href="installation.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Architecture &amp; Concepts - bauer 0.3.0 documentation</title>
+        <title>Architecture &amp; Concepts - bauer 0.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">bauer 0.3.0 documentation</div></a>
+      <a href="index.html"><div class="brand">bauer 0.5.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">bauer 0.3.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.5.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -353,9 +353,9 @@ time exceeds the fastest RT, and the sampler gets stuck there.</p></li>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">RiskModel</span>              <span class="c1"># or DDMRiskModel, etc.</span>
 
-<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;my_choices.tsv&#39;</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">)</span>    <span class="c1"># your data</span>
-<span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;chose_second&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>  <span class="c1"># boolean: True = option 2</span>
-<span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span>                    <span class="c1"># subject as index (hierarchical)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">'my_choices.tsv'</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s1">'</span><span class="se">\t</span><span class="s1">'</span><span class="p">)</span>    <span class="c1"># your data</span>
+<span class="n">df</span><span class="p">[</span><span class="s1">'choice'</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">'chose_second'</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>  <span class="c1"># boolean: True = option 2</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">'subject'</span><span class="p">)</span>                    <span class="c1"># subject as index (hierarchical)</span>
 <span class="c1"># df must have n1, n2, p1, p2  (+ rt in seconds for DDM/RDM models)</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">RiskModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df</span><span class="p">)</span>
@@ -368,18 +368,18 @@ time exceeds the fastest RT, and the sampler gets stuck there.</p></li>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">bauer.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">MagnitudeComparisonModel</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_garcia2022</span>
 
-<span class="n">data</span> <span class="o">=</span> <span class="n">load_garcia2022</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s1">&#39;magnitude&#39;</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">load_garcia2022</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s1">'magnitude'</span><span class="p">)</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MagnitudeComparisonModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
 <span class="n">model</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-<span class="c1"># Full MCMC. backend=&#39;numpyro&#39; is much faster than the default &#39;pymc&#39;</span>
+<span class="c1"># Full MCMC. backend='numpyro' is much faster than the default 'pymc'</span>
 <span class="c1"># (and uses the GPU automatically if jax[cuda12] is installed) — see below.</span>
-<span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s1">&#39;numpyro&#39;</span><span class="p">)</span>
+<span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s1">'numpyro'</span><span class="p">)</span>
 
 <span class="c1"># ALWAYS check convergence before interpreting anything:</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">az</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;diagnostics&#39;</span><span class="p">))</span>    <span class="c1"># want r̂ ≤ 1.01, ESS ≥ ~400</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">az</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">'diagnostics'</span><span class="p">))</span>    <span class="c1"># want r̂ ≤ 1.01, ESS ≥ ~400</span>
 
 <span class="c1"># Parameter summaries</span>
 <span class="n">subj_pars</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">get_subjectwise_parameter_estimates</span><span class="p">(</span><span class="n">idata</span><span class="p">)</span>
@@ -516,7 +516,7 @@ uncertainty, not a failed fit.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=e259d695"></script>
+</div><script src="_static/documentation_options.js?v=1dd76d02"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

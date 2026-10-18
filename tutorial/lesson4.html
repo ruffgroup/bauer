@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood" href="lesson5.html"><link rel="prev" title="Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv)" href="lesson3.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Lesson 4: Flexible Noise Curves — FlexibleNoiseComparisonModel and FlexibleNoiseRiskModel - bauer 0.3.0 documentation</title>
+        <title>Lesson 4: Flexible Noise Curves — FlexibleNoiseComparisonModel and FlexibleNoiseRiskModel - bauer 0.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -162,7 +162,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">bauer 0.3.0 documentation</div></a>
+      <a href="../index.html"><div class="brand">bauer 0.5.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.3.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.5.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -315,7 +315,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>import warnings; warnings.filterwarnings(&#39;ignore&#39;)
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>import warnings; warnings.filterwarnings('ignore')
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -327,7 +327,7 @@ from bauer.models import (MagnitudeComparisonModel, FlexibleNoiseComparisonModel
 
 # ── AffineNoise: a simple alternative between MCM and FlexNoise ──────────────
 # The key idea: FlexibleNoiseComparisonModel uses B-spline basis functions to
-# parameterise ν(n).  If the deviation from Weber&#39;s law is just a constant noise
+# parameterise ν(n).  If the deviation from Weber's law is just a constant noise
 # floor (ν(n) = a + b·n instead of ν(n) = b·n), we can capture that with a
 # two-element basis [1, n̂] instead of 5 B-spline bases.
 #
@@ -337,45 +337,45 @@ from bauer.models import (MagnitudeComparisonModel, FlexibleNoiseComparisonModel
 class AffineNoiseComparisonModel(FlexibleNoiseComparisonModel):
     # Magnitude-comparison model with affine noise: v(n) = softplus(b0 + b1*n_hat)
     def __init__(self, paradigm, fit_separate_evidence_sd=True,
-                 fit_prior=False, memory_model=&#39;independent&#39;):
+                 fit_prior=False, memory_model='independent'):
         super().__init__(paradigm, fit_separate_evidence_sd=fit_separate_evidence_sd,
                          fit_prior=fit_prior, spline_order=2,
                          memory_model=memory_model)
 
-    def make_dm(self, x, variable=&#39;n1_evidence_sd&#39;):
+    def make_dm(self, x, variable='n1_evidence_sd'):
         # Override: [1, n_hat] basis instead of B-splines
-        min_n = self.paradigm[[&#39;n1&#39;, &#39;n2&#39;]].min().min()
-        max_n = self.paradigm[[&#39;n1&#39;, &#39;n2&#39;]].max().max()
+        min_n = self.paradigm[['n1', 'n2']].min().min()
+        max_n = self.paradigm[['n1', 'n2']].max().max()
         x_norm = (np.asarray(x, dtype=float) - min_n) / (max_n - min_n)
         return np.column_stack([np.ones_like(x_norm), x_norm])
 
 
 class AffineNoiseRiskModel(FlexibleNoiseRiskModel):
     # Risky-choice model with affine noise: v(n) = softplus(b0 + b1*n_hat)
-    def __init__(self, paradigm, prior_estimate=&#39;full&#39;,
-                 fit_separate_evidence_sd=True, memory_model=&#39;independent&#39;):
+    def __init__(self, paradigm, prior_estimate='full',
+                 fit_separate_evidence_sd=True, memory_model='independent'):
         super().__init__(paradigm, prior_estimate=prior_estimate,
                          fit_separate_evidence_sd=fit_separate_evidence_sd,
                          spline_order=2, memory_model=memory_model)
 
-    def make_dm(self, x, variable=&#39;n1_evidence_sd&#39;):
+    def make_dm(self, x, variable='n1_evidence_sd'):
         # Override: [1, n_hat] basis instead of B-splines
-        min_n = self.paradigm[[&#39;n1&#39;, &#39;n2&#39;]].min().min()
-        max_n = self.paradigm[[&#39;n1&#39;, &#39;n2&#39;]].max().max()
+        min_n = self.paradigm[['n1', 'n2']].min().min()
+        max_n = self.paradigm[['n1', 'n2']].max().max()
         x_norm = (np.asarray(x, dtype=float) - min_n) / (max_n - min_n)
         return np.column_stack([np.ones_like(x_norm), x_norm])
 
 # Garcia et al. (2022) — dot-array magnitude comparison
-df_mag = load_garcia2022(task=&#39;magnitude&#39;)
-print(f&quot;Garcia magnitude  |  subjects: {df_mag.index.get_level_values(&#39;subject&#39;).nunique()},  &quot;
-      f&quot;trials: {len(df_mag)}&quot;)
+df_mag = load_garcia2022(task='magnitude')
+print(f"Garcia magnitude  |  subjects: {df_mag.index.get_level_values('subject').nunique()},  "
+      f"trials: {len(df_mag)}")
 
 # de Hollander et al. (2024, bioRxiv) — Arabic-numeral gambles. In bauer 0.3.0
 # this is loaded with the dedicated symbolic loader (the old
-# load_dehollander2024(task=&#39;symbolic&#39;) wrapper was removed).
+# load_dehollander2024(task='symbolic') wrapper was removed).
 df_sym = load_dehollander2024_symbolic()
-print(f&quot;Arabic numerals   |  subjects: {df_sym.index.get_level_values(&#39;subject&#39;).nunique()},  &quot;
-      f&quot;trials: {len(df_sym)}&quot;)
+print(f"Arabic numerals   |  subjects: {df_sym.index.get_level_values('subject').nunique()},  "
+      f"trials: {len(df_sym)}")
 </pre></div>
 </div>
 </div>
@@ -398,18 +398,18 @@ fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
 # Left: noise curves in natural space
 ax = axes[0]
 noise_curves = [
-    (&#39;Linear  ν(n) = ν₀·n  [Weber / scale-invariant]&#39;,
-     nu0 * n_vals / n_vals.mean(),        &#39;#2166ac&#39;, &#39;-&#39;),
-    (&#39;Flat  ν(n) = const  [constant absolute noise]&#39;,
-     np.full_like(n_vals, nu0),           &#39;#d73027&#39;, &#39;--&#39;),
-    (&#39;Super-linear  [worse precision at large n]&#39;,
-     nu0 * (n_vals / n_vals.mean())**1.8, &#39;#1a9850&#39;, &#39;:&#39;),
+    ('Linear  ν(n) = ν₀·n  [Weber / scale-invariant]',
+     nu0 * n_vals / n_vals.mean(),        '#2166ac', '-'),
+    ('Flat  ν(n) = const  [constant absolute noise]',
+     np.full_like(n_vals, nu0),           '#d73027', '--'),
+    ('Super-linear  [worse precision at large n]',
+     nu0 * (n_vals / n_vals.mean())**1.8, '#1a9850', ':'),
 ]
 for label, nu_n, c, ls in noise_curves:
     ax.plot(n_vals, nu_n, lw=2.5, color=c, ls=ls, label=label)
-ax.set_xlabel(&#39;Magnitude  n&#39;)
-ax.set_ylabel(&#39;Natural-space noise  ν(n)&#39;)
-ax.set_title(&#39;Noise-vs-magnitude curve shapes&#39;)
+ax.set_xlabel('Magnitude  n')
+ax.set_ylabel('Natural-space noise  ν(n)')
+ax.set_title('Noise-vs-magnitude curve shapes')
 ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
 # Right: scale-invariance test — plot P(chose n2) vs (n2-n1)/n1
@@ -417,23 +417,23 @@ ax.legend(fontsize=8.5); sns.despine(ax=ax)
 #                                    = Φ(rel_diff / (√2 × ν₀))  — same for all n1!
 # With flat noise ν = const: P = Φ(rel_diff × n1 / (√2 × ν_const))  — varies with n1
 ax = axes[1]
-for n_ref, c, ls in [(8, &#39;#4393c3&#39;, &#39;-&#39;), (20, &#39;#1a9850&#39;, &#39;--&#39;), (36, &#39;#d73027&#39;, &#39;:&#39;)]:
+for n_ref, c, ls in [(8, '#4393c3', '-'), (20, '#1a9850', '--'), (36, '#d73027', ':')]:
     nu_lin  = nu0 * n_ref / n_vals.mean()   # linear noise at n_ref
     nu_flat = nu0                            # flat noise (constant)
     p_lin  = scipy_norm.cdf(rel_diffs * n_ref / (np.sqrt(2) * nu_lin))   # collapses!
     p_flat = scipy_norm.cdf(rel_diffs * n_ref / (np.sqrt(2) * nu_flat))  # shifts by n_ref
-    ax.plot(rel_diffs, p_lin,  color=c, lw=2.5, ls=ls, label=f&#39;Linear ν (n₁={n_ref})&#39;)
+    ax.plot(rel_diffs, p_lin,  color=c, lw=2.5, ls=ls, label=f'Linear ν (n₁={n_ref})')
     ax.plot(rel_diffs, p_flat, color=c, lw=1.2, ls=ls, alpha=.4)
-ax.axhline(.5, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
-ax.axvline(0,  ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
-ax.text(0.97, 0.07, &#39;Faint: flat ν (curves shift with n₁)&#39;,
-        transform=ax.transAxes, ha=&#39;right&#39;, fontsize=8, color=&#39;gray&#39;)
-ax.set_xlabel(&#39;Relative difference  (n₂ − n₁) / n₁&#39;)
-ax.set_ylabel(&#39;P(chose n₂)&#39;)
-ax.set_title(&#39;Weber’s law = scale invariance: linear ν curves collapse&#39;)
+ax.axhline(.5, ls='--', c='gray', lw=1)
+ax.axvline(0,  ls='--', c='gray', lw=1)
+ax.text(0.97, 0.07, 'Faint: flat ν (curves shift with n₁)',
+        transform=ax.transAxes, ha='right', fontsize=8, color='gray')
+ax.set_xlabel('Relative difference  (n₂ − n₁) / n₁')
+ax.set_ylabel('P(chose n₂)')
+ax.set_title('Weber’s law = scale invariance: linear ν curves collapse')
 ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
-plt.suptitle(&#39;Flexible noise: shape determines whether Weber’s law holds&#39;,
+plt.suptitle('Flexible noise: shape determines whether Weber’s law holds',
              fontsize=12, y=1.02)
 plt.tight_layout()
 </pre></div>
@@ -447,13 +447,13 @@ plt.tight_layout()
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># MagnitudeComparisonModel (MCM) — fixed log-space noise (Weber&#39;s-law null)
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># MagnitudeComparisonModel (MCM) — fixed log-space noise (Weber's-law null)
 # idata_kwargs passes extra arguments to pymc.sample_posterior_predictive;
 # log_likelihood=True stores trial-level log-likelihoods needed for ELPD comparison.
 model_mcm = MagnitudeComparisonModel(paradigm=df_mag, fit_separate_evidence_sd=True)
 model_mcm.build_estimation_model(data=df_mag, hierarchical=True)
 idata_mcm = model_mcm.sample(draws=200, tune=200, chains=4, progressbar=False,
-                              idata_kwargs={&#39;log_likelihood&#39;: True})
+                              idata_kwargs={'log_likelihood': True})
 </pre></div>
 </div>
 </div>
@@ -467,7 +467,7 @@ model_flex_mag = FlexibleNoiseComparisonModel(paradigm=df_mag,
                                                spline_order=5)
 model_flex_mag.build_estimation_model(paradigm=df_mag, hierarchical=True)
 idata_flex_mag = model_flex_mag.sample(draws=200, tune=200, chains=4, progressbar=False,
-                                        idata_kwargs={&#39;log_likelihood&#39;: True})
+                                        idata_kwargs={'log_likelihood': True})
 </pre></div>
 </div>
 </div>
@@ -480,7 +480,7 @@ model_affine_mag = AffineNoiseComparisonModel(paradigm=df_mag,
                                                fit_separate_evidence_sd=True)
 model_affine_mag.build_estimation_model(paradigm=df_mag, hierarchical=True)
 idata_affine_mag = model_affine_mag.sample(draws=200, tune=200, chains=4, progressbar=False,
-                                            idata_kwargs={&#39;log_likelihood&#39;: True})
+                                            idata_kwargs={'log_likelihood': True})
 </pre></div>
 </div>
 </div>
@@ -491,45 +491,45 @@ idata_affine_mag = model_affine_mag.sample(draws=200, tune=200, chains=4, progre
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>sd_curves_mag = model_flex_mag.get_sd_curve(idata=idata_flex_mag, variable=&#39;both&#39;,
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>sd_curves_mag = model_flex_mag.get_sd_curve(idata=idata_flex_mag, variable='both',
                                               group=True, data=df_mag.reset_index())
-sd_curves_aff = model_affine_mag.get_sd_curve(idata=idata_affine_mag, variable=&#39;both&#39;,
+sd_curves_aff = model_affine_mag.get_sd_curve(idata=idata_affine_mag, variable='both',
                                                 group=True, data=df_mag.reset_index())
-nu1_mcm = idata_mcm.posterior[&#39;n1_evidence_sd_mu&#39;].values.ravel()
-nu2_mcm = idata_mcm.posterior[&#39;n2_evidence_sd_mu&#39;].values.ravel()
+nu1_mcm = idata_mcm.posterior['n1_evidence_sd_mu'].values.ravel()
+nu2_mcm = idata_mcm.posterior['n2_evidence_sd_mu'].values.ravel()
 
 fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
-colors = {&#39;flex&#39;: &#39;#d73027&#39;, &#39;affine&#39;: &#39;#1a9850&#39;, &#39;mcm&#39;: &#39;#4393c3&#39;}
+colors = {'flex': '#d73027', 'affine': '#1a9850', 'mcm': '#4393c3'}
 
 for ax, (var_col, nu_mcm_samp, title) in zip(
         axes,
-        [(&#39;n1_evidence_sd&#39;, nu1_mcm, &#39;First option  σ₁(n)&#39;),
-         (&#39;n2_evidence_sd&#39;, nu2_mcm, &#39;Second option  σ₂(n)&#39;)]):
+        [('n1_evidence_sd', nu1_mcm, 'First option  σ₁(n)'),
+         ('n2_evidence_sd', nu2_mcm, 'Second option  σ₂(n)')]):
     # FlexNoise (B-spline)
-    grp = sd_curves_mag.groupby(level=&#39;x&#39;)[var_col]
+    grp = sd_curves_mag.groupby(level='x')[var_col]
     x_vals = grp.mean().index.values
     ax.fill_between(x_vals, grp.quantile(0.025).values, grp.quantile(0.975).values,
-                    alpha=.18, color=colors[&#39;flex&#39;])
-    ax.plot(x_vals, grp.mean().values, lw=2.5, color=colors[&#39;flex&#39;], label=&#39;FlexNoise (B-spline)&#39;)
+                    alpha=.18, color=colors['flex'])
+    ax.plot(x_vals, grp.mean().values, lw=2.5, color=colors['flex'], label='FlexNoise (B-spline)')
     # AffineNoise (intercept + linear)
-    grp_a = sd_curves_aff.groupby(level=&#39;x&#39;)[var_col]
+    grp_a = sd_curves_aff.groupby(level='x')[var_col]
     x_a = grp_a.mean().index.values
     ax.fill_between(x_a, grp_a.quantile(0.025).values, grp_a.quantile(0.975).values,
-                    alpha=.18, color=colors[&#39;affine&#39;])
-    ax.plot(x_a, grp_a.mean().values, lw=2.5, color=colors[&#39;affine&#39;], label=&#39;AffineNoise (a + b·n)&#39;)
+                    alpha=.18, color=colors['affine'])
+    ax.plot(x_a, grp_a.mean().values, lw=2.5, color=colors['affine'], label='AffineNoise (a + b·n)')
     # MCM reference (Weber: σ = ν₀ × n)
     nu0 = nu_mcm_samp.mean()
-    ax.plot(x_vals, nu0 * x_vals, ls=&#39;--&#39;, lw=2, color=colors[&#39;mcm&#39;],
-            label=f&#39;MCM (Weber)  ν₀={nu0:.2f}&#39;)
+    ax.plot(x_vals, nu0 * x_vals, ls='--', lw=2, color=colors['mcm'],
+            label=f'MCM (Weber)  ν₀={nu0:.2f}')
     ax.fill_between(x_vals,
                     np.percentile(nu_mcm_samp, 2.5) * x_vals,
                     np.percentile(nu_mcm_samp, 97.5) * x_vals,
-                    alpha=.10, color=colors[&#39;mcm&#39;])
-    ax.set_xlabel(&#39;Magnitude  n&#39;)
-    ax.set_ylabel(&#39;Natural-space noise  σ(n)&#39;)
+                    alpha=.10, color=colors['mcm'])
+    ax.set_xlabel('Magnitude  n')
+    ax.set_ylabel('Natural-space noise  σ(n)')
     ax.set_title(title); ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
-plt.suptitle(&#39;Dot arrays: MCM vs AffineNoise vs FlexNoise (95 % posterior interval)&#39;,
+plt.suptitle('Dot arrays: MCM vs AffineNoise vs FlexNoise (95 % posterior interval)',
              fontsize=12, y=1.02)
 plt.tight_layout()
 </pre></div>
@@ -549,10 +549,10 @@ plt.tight_layout()
 </pre></div>
 </div>
 <div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ELPD model comparison — dot arrays (3-way)
-compare_mag = az.compare({&#39;MCM (Weber)&#39;:   idata_mcm,
-                           &#39;AffineNoise&#39;:   idata_affine_mag,
-                           &#39;FlexNoise&#39;:     idata_flex_mag})
-print(compare_mag[[&#39;elpd_loo&#39;, &#39;p_loo&#39;, &#39;elpd_diff&#39;, &#39;dse&#39;, &#39;warning&#39;]].to_string())
+compare_mag = az.compare({'MCM (Weber)':   idata_mcm,
+                           'AffineNoise':   idata_affine_mag,
+                           'FlexNoise':     idata_flex_mag})
+print(compare_mag[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())
 </pre></div>
 </div>
 </div>
@@ -561,7 +561,7 @@ print(compare_mag[[&#39;elpd_loo&#39;, &#39;p_loo&#39;, &#39;elpd_diff&#39;, &#3
 </pre></div>
 </div>
 <div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>ax = az.plot_compare(compare_mag, figsize=(7, 3.5))
-ax.set_title(&#39;ELPD comparison — dot-array magnitude comparison (higher = better prediction)&#39;)
+ax.set_title('ELPD comparison — dot-array magnitude comparison (higher = better prediction)')
 plt.tight_layout()
 </pre></div>
 </div>
@@ -571,36 +571,36 @@ plt.tight_layout()
 </pre></div>
 </div>
 <div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ── Interpret the dot-array ELPD result (3-way) ─────────────────────────────
-print(&quot;ELPD ranking (dot arrays):&quot;)
-print(compare_mag[[&#39;elpd_loo&#39;, &#39;p_loo&#39;, &#39;elpd_diff&#39;, &#39;dse&#39;, &#39;warning&#39;]].to_string())
+print("ELPD ranking (dot arrays):")
+print(compare_mag[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())
 print()
 
 # Pairwise interpretation
 for i in range(1, len(compare_mag)):
     name = compare_mag.index[i]
-    diff = compare_mag[&#39;elpd_diff&#39;].iloc[i]
-    dse  = compare_mag[&#39;dse&#39;].iloc[i]
-    ratio = abs(diff) / dse if dse &gt; 0 else float(&#39;inf&#39;)
+    diff = compare_mag['elpd_diff'].iloc[i]
+    dse  = compare_mag['dse'].iloc[i]
+    ratio = abs(diff) / dse if dse &gt; 0 else float('inf')
     winner = compare_mag.index[0]
-    verdict = &quot;distinguishable&quot; if ratio &gt; 2 else &quot;NOT distinguishable&quot;
-    print(f&quot;  {winner} vs {name}:  DELTA_ELPD = {diff:.1f},  SE = {dse:.1f},  &quot;
-          f&quot;|ratio| = {ratio:.1f}  -&gt;  {verdict}&quot;)
+    verdict = "distinguishable" if ratio &gt; 2 else "NOT distinguishable"
+    print(f"  {winner} vs {name}:  DELTA_ELPD = {diff:.1f},  SE = {dse:.1f},  "
+          f"|ratio| = {ratio:.1f}  -&gt;  {verdict}")
 
 # Key question: does AffineNoise capture the FlexNoise advantage?
-if &#39;AffineNoise&#39; in compare_mag.index and &#39;FlexNoise&#39; in compare_mag.index:
-    aff_rank = list(compare_mag.index).index(&#39;AffineNoise&#39;)
-    flex_rank = list(compare_mag.index).index(&#39;FlexNoise&#39;)
+if 'AffineNoise' in compare_mag.index and 'FlexNoise' in compare_mag.index:
+    aff_rank = list(compare_mag.index).index('AffineNoise')
+    flex_rank = list(compare_mag.index).index('FlexNoise')
     print()
     if abs(aff_rank - flex_rank) &lt;= 1:
-        aff_elpd = compare_mag.loc[&#39;AffineNoise&#39;, &#39;elpd_loo&#39;]
-        flex_elpd = compare_mag.loc[&#39;FlexNoise&#39;, &#39;elpd_loo&#39;]
-        print(f&quot;AffineNoise ELPD: {aff_elpd:.1f},  FlexNoise ELPD: {flex_elpd:.1f}&quot;)
+        aff_elpd = compare_mag.loc['AffineNoise', 'elpd_loo']
+        flex_elpd = compare_mag.loc['FlexNoise', 'elpd_loo']
+        print(f"AffineNoise ELPD: {aff_elpd:.1f},  FlexNoise ELPD: {flex_elpd:.1f}")
         if abs(aff_elpd - flex_elpd) &lt; 10:
-            print(&quot;-&gt; Affine noise captures most of the FlexNoise advantage.&quot;)
-            print(&quot;   The deviation from Weber&#39;s law is well-described by a noise floor (a + b*n).&quot;)
+            print("-&gt; Affine noise captures most of the FlexNoise advantage.")
+            print("   The deviation from Weber's law is well-described by a noise floor (a + b*n).")
         else:
-            print(&quot;-&gt; Affine noise does NOT fully capture the flexible curve&#39;s advantage.&quot;)
-            print(&quot;   Genuine nonlinearity in the noise function is needed.&quot;)
+            print("-&gt; Affine noise does NOT fully capture the flexible curve's advantage.")
+            print("   Genuine nonlinearity in the noise function is needed.")
 </pre></div>
 </div>
 </div>
@@ -616,18 +616,18 @@ if &#39;AffineNoise&#39; in compare_mag.index and &#39;FlexNoise&#39; in compare
 </div>
 <div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>def prep_df(df):
     df = df.reset_index()
-    risky_first = df[&#39;p1&#39;] == 0.55
-    df[&#39;log_ratio&#39;]     = np.log(
-        np.where(risky_first, df[&#39;n1&#39;], df[&#39;n2&#39;]) /
-        np.where(risky_first, df[&#39;n2&#39;], df[&#39;n1&#39;]))
-    df[&#39;chose_risky&#39;]   = np.where(risky_first, ~df[&#39;choice&#39;], df[&#39;choice&#39;])
-    df[&#39;n_safe&#39;]        = np.where(risky_first, df[&#39;n2&#39;], df[&#39;n1&#39;])
-    df[&#39;risky_first&#39;]   = risky_first
-    df[&#39;order&#39;]         = np.where(risky_first, &#39;Risky first&#39;, &#39;Safe first&#39;)
-    df[&#39;log_ratio_bin&#39;] = (pd.cut(df[&#39;log_ratio&#39;], bins=10)
+    risky_first = df['p1'] == 0.55
+    df['log_ratio']     = np.log(
+        np.where(risky_first, df['n1'], df['n2']) /
+        np.where(risky_first, df['n2'], df['n1']))
+    df['chose_risky']   = np.where(risky_first, ~df['choice'], df['choice'])
+    df['n_safe']        = np.where(risky_first, df['n2'], df['n1'])
+    df['risky_first']   = risky_first
+    df['order']         = np.where(risky_first, 'Risky first', 'Safe first')
+    df['log_ratio_bin'] = (pd.cut(df['log_ratio'], bins=10)
                              .map(lambda x: x.mid).astype(float))
-    df[&#39;n_safe_bin&#39;]    = pd.qcut(df[&#39;n_safe&#39;], q=3,
-                                   labels=[&#39;Low stakes&#39;, &#39;Mid stakes&#39;, &#39;High stakes&#39;])
+    df['n_safe_bin']    = pd.qcut(df['n_safe'], q=3,
+                                   labels=['Low stakes', 'Mid stakes', 'High stakes'])
     return df
 
 df_sym_p = prep_df(df_sym)
@@ -639,11 +639,11 @@ df_sym_p = prep_df(df_sym)
 </pre></div>
 </div>
 <div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># PMCM (fixed log-space noise) — log_likelihood stored for ELPD comparison
-model_pmcm = RiskModel(paradigm=df_sym, prior_estimate=&#39;full&#39;,
+model_pmcm = RiskModel(paradigm=df_sym, prior_estimate='full',
                         fit_separate_evidence_sd=True)
 model_pmcm.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
 idata_pmcm = model_pmcm.sample(draws=200, tune=200, chains=4, progressbar=False,
-                                idata_kwargs={&#39;log_likelihood&#39;: True})
+                                idata_kwargs={'log_likelihood': True})
 </pre></div>
 </div>
 </div>
@@ -652,11 +652,11 @@ idata_pmcm = model_pmcm.sample(draws=200, tune=200, chains=4, progressbar=False,
 </pre></div>
 </div>
 <div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># FlexibleNoiseRiskModel — free noise curve on Arabic-numeral data
-model_flex = FlexibleNoiseRiskModel(paradigm=df_sym, prior_estimate=&#39;full&#39;,
+model_flex = FlexibleNoiseRiskModel(paradigm=df_sym, prior_estimate='full',
                                      fit_separate_evidence_sd=True, spline_order=5)
 model_flex.build_estimation_model(paradigm=df_sym, hierarchical=True, save_p_choice=True)
 idata_flex = model_flex.sample(draws=200, tune=200, chains=4, progressbar=False,
-                                idata_kwargs={&#39;log_likelihood&#39;: True})
+                                idata_kwargs={'log_likelihood': True})
 </pre></div>
 </div>
 </div>
@@ -665,11 +665,11 @@ idata_flex = model_flex.sample(draws=200, tune=200, chains=4, progressbar=False,
 </pre></div>
 </div>
 <div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># AffineNoiseRiskModel — intercept + linear noise for Arabic-numeral gambles
-model_affine = AffineNoiseRiskModel(paradigm=df_sym, prior_estimate=&#39;full&#39;,
+model_affine = AffineNoiseRiskModel(paradigm=df_sym, prior_estimate='full',
                                      fit_separate_evidence_sd=True)
 model_affine.build_estimation_model(paradigm=df_sym, hierarchical=True, save_p_choice=True)
 idata_affine = model_affine.sample(draws=200, tune=200, chains=4, progressbar=False,
-                                    idata_kwargs={&#39;log_likelihood&#39;: True})
+                                    idata_kwargs={'log_likelihood': True})
 </pre></div>
 </div>
 </div>
@@ -680,45 +680,45 @@ idata_affine = model_affine.sample(draws=200, tune=200, chains=4, progressbar=Fa
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>sd_curves = model_flex.get_sd_curve(idata=idata_flex, variable=&#39;both&#39;,
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>sd_curves = model_flex.get_sd_curve(idata=idata_flex, variable='both',
                                      group=True, data=df_sym.reset_index())
-sd_curves_aff_sym = model_affine.get_sd_curve(idata=idata_affine, variable=&#39;both&#39;,
+sd_curves_aff_sym = model_affine.get_sd_curve(idata=idata_affine, variable='both',
                                                 group=True, data=df_sym.reset_index())
-nu1_pmcm = idata_pmcm.posterior[&#39;n1_evidence_sd_mu&#39;].values.ravel()
-nu2_pmcm = idata_pmcm.posterior[&#39;n2_evidence_sd_mu&#39;].values.ravel()
+nu1_pmcm = idata_pmcm.posterior['n1_evidence_sd_mu'].values.ravel()
+nu2_pmcm = idata_pmcm.posterior['n2_evidence_sd_mu'].values.ravel()
 
 fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
-colors = {&#39;flex&#39;: &#39;#d73027&#39;, &#39;affine&#39;: &#39;#1a9850&#39;, &#39;pmcm&#39;: &#39;#4393c3&#39;}
+colors = {'flex': '#d73027', 'affine': '#1a9850', 'pmcm': '#4393c3'}
 
 for ax, (var_col, nu_pmcm_samp, title) in zip(
         axes,
-        [(&#39;n1_evidence_sd&#39;, nu1_pmcm, &#39;First option  σ₁(n)&#39;),
-         (&#39;n2_evidence_sd&#39;, nu2_pmcm, &#39;Second option  σ₂(n)&#39;)]):
+        [('n1_evidence_sd', nu1_pmcm, 'First option  σ₁(n)'),
+         ('n2_evidence_sd', nu2_pmcm, 'Second option  σ₂(n)')]):
     # FlexNoise
-    grp = sd_curves.groupby(level=&#39;x&#39;)[var_col]
+    grp = sd_curves.groupby(level='x')[var_col]
     x_vals = grp.mean().index.values
     ax.fill_between(x_vals, grp.quantile(0.025).values, grp.quantile(0.975).values,
-                    alpha=.18, color=colors[&#39;flex&#39;])
-    ax.plot(x_vals, grp.mean().values, lw=2.5, color=colors[&#39;flex&#39;], label=&#39;FlexNoise (B-spline)&#39;)
+                    alpha=.18, color=colors['flex'])
+    ax.plot(x_vals, grp.mean().values, lw=2.5, color=colors['flex'], label='FlexNoise (B-spline)')
     # AffineNoise
-    grp_a = sd_curves_aff_sym.groupby(level=&#39;x&#39;)[var_col]
+    grp_a = sd_curves_aff_sym.groupby(level='x')[var_col]
     x_a = grp_a.mean().index.values
     ax.fill_between(x_a, grp_a.quantile(0.025).values, grp_a.quantile(0.975).values,
-                    alpha=.18, color=colors[&#39;affine&#39;])
-    ax.plot(x_a, grp_a.mean().values, lw=2.5, color=colors[&#39;affine&#39;], label=&#39;AffineNoise (a + b·n)&#39;)
+                    alpha=.18, color=colors['affine'])
+    ax.plot(x_a, grp_a.mean().values, lw=2.5, color=colors['affine'], label='AffineNoise (a + b·n)')
     # PMCM reference
     nu0 = nu_pmcm_samp.mean()
-    ax.plot(x_vals, nu0 * x_vals, ls=&#39;--&#39;, lw=2, color=colors[&#39;pmcm&#39;],
-            label=f&#39;PMCM (Weber)  ν₀={nu0:.2f}&#39;)
+    ax.plot(x_vals, nu0 * x_vals, ls='--', lw=2, color=colors['pmcm'],
+            label=f'PMCM (Weber)  ν₀={nu0:.2f}')
     ax.fill_between(x_vals,
                     np.percentile(nu_pmcm_samp, 2.5) * x_vals,
                     np.percentile(nu_pmcm_samp, 97.5) * x_vals,
-                    alpha=.10, color=colors[&#39;pmcm&#39;])
-    ax.set_xlabel(&#39;Payoff magnitude  n&#39;)
-    ax.set_ylabel(&#39;Natural-space noise  σ(n)&#39;)
+                    alpha=.10, color=colors['pmcm'])
+    ax.set_xlabel('Payoff magnitude  n')
+    ax.set_ylabel('Natural-space noise  σ(n)')
     ax.set_title(title); ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
-plt.suptitle(&#39;Arabic numerals: PMCM vs AffineNoise vs FlexNoise (95 % posterior interval)&#39;,
+plt.suptitle('Arabic numerals: PMCM vs AffineNoise vs FlexNoise (95 % posterior interval)',
              fontsize=12, y=1.02)
 plt.tight_layout()
 </pre></div>
@@ -734,82 +734,82 @@ plt.tight_layout()
 </pre></div>
 </div>
 <div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>from bauer.utils import summarize_ppc_group
-stake_pal = dict(zip([&#39;Low stakes&#39;, &#39;Mid stakes&#39;, &#39;High stakes&#39;], sns.color_palette(&#39;YlOrRd&#39;, 3)))
+stake_pal = dict(zip(['Low stakes', 'Mid stakes', 'High stakes'], sns.color_palette('YlOrRd', 3)))
 
 def add_model_ppc(df_orig, df_prepped, model, idata, model_name):
-    &quot;&quot;&quot;Two-step PPC via summarize_ppc_group.
+    """Two-step PPC via summarize_ppc_group.
 
     bauer 0.3.0 unified PPC: model.ppc(data, idata) returns a long frame indexed
-    by (paradigm index..., ppc_sample) with one &#39;simulated_choice&#39; column.
+    by (paradigm index..., ppc_sample) with one 'simulated_choice' column.
     Unstack ppc_sample to wide layout and join the paradigm columns we need.
-    &quot;&quot;&quot;
+    """
     ppc_df  = model.ppc(df_orig, idata)
-    ppc_ll  = ppc_df[&#39;simulated_choice&#39;].unstack(&#39;ppc_sample&#39;)
-    ppc_ll  = ppc_ll.join(df_orig[[&#39;p1&#39;, &#39;n1&#39;, &#39;n2&#39;]])
-    sample_cols = [c for c in ppc_ll.columns if c not in (&#39;p1&#39;, &#39;n1&#39;, &#39;n2&#39;)]
+    ppc_ll  = ppc_df['simulated_choice'].unstack('ppc_sample')
+    ppc_ll  = ppc_ll.join(df_orig[['p1', 'n1', 'n2']])
+    sample_cols = [c for c in ppc_ll.columns if c not in ('p1', 'n1', 'n2')]
 
     ppc_flat = ppc_ll.reset_index()
-    risky_first = (ppc_flat[&#39;p1&#39;] == 0.55)
+    risky_first = (ppc_flat['p1'] == 0.55)
     ppc_flat[sample_cols] = np.where(
         risky_first.values[:, None],
         1 - ppc_flat[sample_cols].values,
         ppc_flat[sample_cols].values
     )
-    ppc_flat[&#39;order&#39;] = np.where(risky_first, &#39;Risky first&#39;, &#39;Safe first&#39;)
+    ppc_flat['order'] = np.where(risky_first, 'Risky first', 'Safe first')
     log_ratio = np.log(
-        np.where(risky_first, ppc_flat[&#39;n1&#39;], ppc_flat[&#39;n2&#39;]) /
-        np.where(risky_first, ppc_flat[&#39;n2&#39;], ppc_flat[&#39;n1&#39;]))
-    ppc_flat[&#39;log_ratio_bin&#39;] = (pd.cut(pd.Series(log_ratio), bins=10)
+        np.where(risky_first, ppc_flat['n1'], ppc_flat['n2']) /
+        np.where(risky_first, ppc_flat['n2'], ppc_flat['n1']))
+    ppc_flat['log_ratio_bin'] = (pd.cut(pd.Series(log_ratio), bins=10)
                                    .map(lambda x: x.mid).astype(float).values)
-    n_safe = np.where(risky_first, ppc_flat[&#39;n2&#39;], ppc_flat[&#39;n1&#39;])
-    ppc_flat[&#39;n_safe_bin&#39;] = pd.qcut(n_safe, q=3,
-                                      labels=[&#39;Low stakes&#39;, &#39;Mid stakes&#39;, &#39;High stakes&#39;])
+    n_safe = np.where(risky_first, ppc_flat['n2'], ppc_flat['n1'])
+    ppc_flat['n_safe_bin'] = pd.qcut(n_safe, q=3,
+                                      labels=['Low stakes', 'Mid stakes', 'High stakes'])
 
     result = summarize_ppc_group(ppc_flat,
-                                  condition_cols=[&#39;order&#39;, &#39;n_safe_bin&#39;, &#39;log_ratio_bin&#39;])
-    return result.rename(columns={&#39;p_predicted&#39;: &#39;p_mean&#39;,
-                                   &#39;hdi025&#39;: &#39;p_lo&#39;, &#39;hdi975&#39;: &#39;p_hi&#39;}).reset_index()
+                                  condition_cols=['order', 'n_safe_bin', 'log_ratio_bin'])
+    return result.rename(columns={'p_predicted': 'p_mean',
+                                   'hdi025': 'p_lo', 'hdi975': 'p_hi'}).reset_index()
 
 
 def plot_ppc_row(df_pred, df_obs, model_name, axes_row):
-    hue_order = [&#39;Low stakes&#39;, &#39;Mid stakes&#39;, &#39;High stakes&#39;]
-    for ax, order_val in zip(axes_row, [&#39;Risky first&#39;, &#39;Safe first&#39;]):
-        pred = df_pred[df_pred[&#39;order&#39;] == order_val]
-        obs  = df_obs[df_obs[&#39;order&#39;]   == order_val]
+    hue_order = ['Low stakes', 'Mid stakes', 'High stakes']
+    for ax, order_val in zip(axes_row, ['Risky first', 'Safe first']):
+        pred = df_pred[df_pred['order'] == order_val]
+        obs  = df_obs[df_obs['order']   == order_val]
         for sbin in hue_order:
-            p = pred[pred[&#39;n_safe_bin&#39;] == sbin]
-            o = obs[obs[&#39;n_safe_bin&#39;]   == sbin]
+            p = pred[pred['n_safe_bin'] == sbin]
+            o = obs[obs['n_safe_bin']   == sbin]
             if len(o) == 0:
                 continue
             c = stake_pal[sbin]
-            ax.fill_between(p[&#39;log_ratio_bin&#39;], p[&#39;p_lo&#39;], p[&#39;p_hi&#39;], color=c, alpha=.2)
-            ax.plot(p[&#39;log_ratio_bin&#39;], p[&#39;p_mean&#39;], color=c, lw=2, label=sbin)
-            ax.scatter(o[&#39;log_ratio_bin&#39;], o[&#39;chose_risky&#39;],
+            ax.fill_between(p['log_ratio_bin'], p['p_lo'], p['p_hi'], color=c, alpha=.2)
+            ax.plot(p['log_ratio_bin'], p['p_mean'], color=c, lw=2, label=sbin)
+            ax.scatter(o['log_ratio_bin'], o['chose_risky'],
                        color=c, s=25, zorder=5, alpha=.85)
-        ax.axhline(.5, ls=&#39;--&#39;, c=&#39;gray&#39;, lw=1)
-        ax.axvline(np.log(1/.55), ls=&#39;--&#39;, c=&#39;#333333&#39;, lw=1.5)
+        ax.axhline(.5, ls='--', c='gray', lw=1)
+        ax.axvline(np.log(1/.55), ls='--', c='#333333', lw=1.5)
         ax.set_ylim(-.05, 1.05)
-        ax.set_title(f&#39;{model_name} — {order_val}&#39;, fontsize=9)
-        ax.set_xlabel(&#39;log(risky / safe)&#39;); ax.set_ylabel(&#39;P(chose risky)&#39;)
-        ax.legend(title=&#39;Safe stake&#39;, fontsize=7, loc=&#39;upper left&#39;)
+        ax.set_title(f'{model_name} — {order_val}', fontsize=9)
+        ax.set_xlabel('log(risky / safe)'); ax.set_ylabel('P(chose risky)')
+        ax.legend(title='Safe stake', fontsize=7, loc='upper left')
         sns.despine(ax=ax)
 
 
 obs_sym_l4 = (df_sym_p
-              .groupby([&#39;subject&#39;, &#39;order&#39;, &#39;n_safe_bin&#39;, &#39;log_ratio_bin&#39;])[&#39;chose_risky&#39;]
+              .groupby(['subject', 'order', 'n_safe_bin', 'log_ratio_bin'])['chose_risky']
               .mean()
-              .groupby([&#39;order&#39;, &#39;n_safe_bin&#39;, &#39;log_ratio_bin&#39;]).mean()
+              .groupby(['order', 'n_safe_bin', 'log_ratio_bin']).mean()
               .reset_index())
 
 fig, axes = plt.subplots(2, 2, figsize=(12, 9), sharey=True)
 for (mdl, idat, name), row in zip(
-        [(model_pmcm, idata_pmcm, &#39;PMCM (fixed noise)&#39;),
-         (model_flex, idata_flex, &#39;Flexible Noise&#39;)],
+        [(model_pmcm, idata_pmcm, 'PMCM (fixed noise)'),
+         (model_flex, idata_flex, 'Flexible Noise')],
         axes):
     df_pred = add_model_ppc(df_sym, df_sym_p, mdl, idat, name)
     plot_ppc_row(df_pred, obs_sym_l4, name, row)
 
-plt.suptitle(&#39;Posterior predictive comparison: PMCM vs Flexible Noise (Arabic numerals)&#39;,
+plt.suptitle('Posterior predictive comparison: PMCM vs Flexible Noise (Arabic numerals)',
              fontsize=12, y=1.01)
 plt.tight_layout()
 </pre></div>
@@ -823,10 +823,10 @@ plt.tight_layout()
 </pre></div>
 </div>
 <div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ELPD comparison — Arabic numerals risky choice (3-way)
-compare_sym = az.compare({&#39;PMCM (Weber)&#39;:   idata_pmcm,
-                           &#39;AffineNoise&#39;:    idata_affine,
-                           &#39;FlexNoise&#39;:      idata_flex})
-print(compare_sym[[&#39;elpd_loo&#39;, &#39;p_loo&#39;, &#39;elpd_diff&#39;, &#39;dse&#39;, &#39;warning&#39;]].to_string())
+compare_sym = az.compare({'PMCM (Weber)':   idata_pmcm,
+                           'AffineNoise':    idata_affine,
+                           'FlexNoise':      idata_flex})
+print(compare_sym[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())
 </pre></div>
 </div>
 </div>
@@ -835,7 +835,7 @@ print(compare_sym[[&#39;elpd_loo&#39;, &#39;p_loo&#39;, &#39;elpd_diff&#39;, &#3
 </pre></div>
 </div>
 <div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>ax = az.plot_compare(compare_sym, figsize=(7, 3.5))
-ax.set_title(&#39;ELPD comparison — Arabic-numeral risky choice (higher = better prediction)&#39;)
+ax.set_title('ELPD comparison — Arabic-numeral risky choice (higher = better prediction)')
 plt.tight_layout()
 </pre></div>
 </div>
@@ -845,28 +845,28 @@ plt.tight_layout()
 </pre></div>
 </div>
 <div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># ── Interpret the Arabic-numeral ELPD result (3-way) ─────────────────────────
-print(&quot;ELPD ranking (Arabic numerals):&quot;)
-print(compare_sym[[&#39;elpd_loo&#39;, &#39;p_loo&#39;, &#39;elpd_diff&#39;, &#39;dse&#39;, &#39;warning&#39;]].to_string())
+print("ELPD ranking (Arabic numerals):")
+print(compare_sym[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())
 print()
 
 for i in range(1, len(compare_sym)):
     name = compare_sym.index[i]
-    diff = compare_sym[&#39;elpd_diff&#39;].iloc[i]
-    dse  = compare_sym[&#39;dse&#39;].iloc[i]
-    ratio = abs(diff) / dse if dse &gt; 0 else float(&#39;inf&#39;)
+    diff = compare_sym['elpd_diff'].iloc[i]
+    dse  = compare_sym['dse'].iloc[i]
+    ratio = abs(diff) / dse if dse &gt; 0 else float('inf')
     winner = compare_sym.index[0]
-    verdict = &quot;distinguishable&quot; if ratio &gt; 2 else &quot;NOT distinguishable&quot;
-    print(f&quot;  {winner} vs {name}:  DELTA_ELPD = {diff:.1f},  SE = {dse:.1f},  &quot;
-          f&quot;|ratio| = {ratio:.1f}  -&gt;  {verdict}&quot;)
+    verdict = "distinguishable" if ratio &gt; 2 else "NOT distinguishable"
+    print(f"  {winner} vs {name}:  DELTA_ELPD = {diff:.1f},  SE = {dse:.1f},  "
+          f"|ratio| = {ratio:.1f}  -&gt;  {verdict}")
 
-if &#39;AffineNoise&#39; in compare_sym.index and &#39;FlexNoise&#39; in compare_sym.index:
-    aff_elpd = compare_sym.loc[&#39;AffineNoise&#39;, &#39;elpd_loo&#39;]
-    flex_elpd = compare_sym.loc[&#39;FlexNoise&#39;, &#39;elpd_loo&#39;]
-    print(f&quot;\nAffineNoise ELPD: {aff_elpd:.1f},  FlexNoise ELPD: {flex_elpd:.1f}&quot;)
+if 'AffineNoise' in compare_sym.index and 'FlexNoise' in compare_sym.index:
+    aff_elpd = compare_sym.loc['AffineNoise', 'elpd_loo']
+    flex_elpd = compare_sym.loc['FlexNoise', 'elpd_loo']
+    print(f"\nAffineNoise ELPD: {aff_elpd:.1f},  FlexNoise ELPD: {flex_elpd:.1f}")
     if abs(aff_elpd - flex_elpd) &lt; 10:
-        print(&quot;-&gt; Affine noise captures most of the FlexNoise advantage (if any).&quot;)
+        print("-&gt; Affine noise captures most of the FlexNoise advantage (if any).")
     else:
-        print(&quot;-&gt; Genuine nonlinearity in the noise function may be needed.&quot;)
+        print("-&gt; Genuine nonlinearity in the noise function may be needed.")
 </pre></div>
 </div>
 </div>
@@ -971,7 +971,7 @@ if &#39;AffineNoise&#39; in compare_sym.index and &#39;FlexNoise&#39; in compare
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=e259d695"></script>
+</div><script src="../_static/documentation_options.js?v=1dd76d02"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>

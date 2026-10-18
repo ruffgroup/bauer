@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>bauer.utils.plotting - bauer 0.3.0 documentation</title>
+        <title>bauer.utils.plotting - bauer 0.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -160,7 +160,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../../index.html"><div class="brand">bauer 0.3.0 documentation</div></a>
+      <a href="../../../index.html"><div class="brand">bauer 0.5.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -181,7 +181,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.3.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.5.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -257,78 +257,78 @@
 
 <div class="viewcode-block" id="cluster_offers">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.plotting.cluster_offers">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">cluster_offers</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">&#39;log(risky/safe)&#39;</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">qcut</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="n">n</span><span class="p">,</span> <span class="n">duplicates</span><span class="o">=</span><span class="s1">&#39;drop&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">mid</span><span class="p">)</span></div>
+<span class="k">def</span><span class="w"> </span><span class="nf">cluster_offers</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s1">'log(risky/safe)'</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">qcut</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="n">n</span><span class="p">,</span> <span class="n">duplicates</span><span class="o">=</span><span class="s1">'drop'</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">mid</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="get_hdi">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.plotting.get_hdi">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">get_hdi</span><span class="p">(</span><span class="n">d</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">az</span><span class="o">.</span><span class="n">hdi</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">hdi_prob</span><span class="o">=</span><span class="mf">0.95</span><span class="p">),</span> <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;hdi_low&#39;</span><span class="p">,</span> <span class="s1">&#39;hdi_high&#39;</span><span class="p">])</span></div>
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">az</span><span class="o">.</span><span class="n">hdi</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">hdi_prob</span><span class="o">=</span><span class="mf">0.95</span><span class="p">),</span> <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="s1">'hdi_low'</span><span class="p">,</span> <span class="s1">'hdi_high'</span><span class="p">])</span></div>
 
 
 
 <div class="viewcode-block" id="plot_ppc">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.plotting.plot_ppc">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">plot_ppc</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">ppc</span><span class="p">,</span> <span class="n">exp_type</span><span class="o">=</span><span class="s1">&#39;magnitude&#39;</span><span class="p">,</span> <span class="n">plot_type</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">var_name</span><span class="o">=</span><span class="s1">&#39;p&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="n">col_wrap</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">n_clusters</span><span class="o">=</span><span class="mi">13</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">plot_ppc</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">ppc</span><span class="p">,</span> <span class="n">exp_type</span><span class="o">=</span><span class="s1">'magnitude'</span><span class="p">,</span> <span class="n">plot_type</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">var_name</span><span class="o">=</span><span class="s1">'p'</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s1">'subject'</span><span class="p">,</span> <span class="n">col_wrap</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">n_clusters</span><span class="o">=</span><span class="mi">13</span><span class="p">):</span>
 
-    <span class="k">if</span> <span class="n">exp_type</span> <span class="o">==</span> <span class="s1">&#39;magnitude&#39;</span><span class="p">:</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="s1">&#39;log(n2/n1)&#39;</span>
+    <span class="k">if</span> <span class="n">exp_type</span> <span class="o">==</span> <span class="s1">'magnitude'</span><span class="p">:</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="s1">'log(n2/n1)'</span>
 
-        <span class="k">if</span> <span class="s1">&#39;log(n2/n1)&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ppc</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">:</span>
-            <span class="k">if</span> <span class="s1">&#39;frac&#39;</span> <span class="ow">in</span> <span class="n">ppc</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">:</span>
-                <span class="n">ppc</span><span class="p">[</span><span class="s1">&#39;log(n2/n1)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">ppc</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;frac&#39;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="s1">'log(n2/n1)'</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ppc</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">'frac'</span> <span class="ow">in</span> <span class="n">ppc</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">:</span>
+                <span class="n">ppc</span><span class="p">[</span><span class="s1">'log(n2/n1)'</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">ppc</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">'frac'</span><span class="p">))</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">ppc</span><span class="p">[</span><span class="s1">&#39;log(n2/n1)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">ppc</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;n2&#39;</span><span class="p">))</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">ppc</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">&#39;n1&#39;</span><span class="p">))</span>
+                <span class="n">ppc</span><span class="p">[</span><span class="s1">'log(n2/n1)'</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">ppc</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">'n2'</span><span class="p">))</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">ppc</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s1">'n1'</span><span class="p">))</span>
 
-            <span class="n">ppc</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;log(n2/n1)&#39;</span><span class="p">,</span> <span class="n">append</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">ppc</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">'log(n2/n1)'</span><span class="p">,</span> <span class="n">append</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-    <span class="k">assert</span> <span class="p">(</span><span class="n">var_name</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;p&#39;</span><span class="p">,</span> <span class="s1">&#39;ll_bernoulli&#39;</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="p">(</span><span class="n">var_name</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">'p'</span><span class="p">,</span> <span class="s1">'ll_bernoulli'</span><span class="p">])</span>
 
-    <span class="n">ppc</span> <span class="o">=</span> <span class="n">ppc</span><span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="n">var_name</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;variable&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">ppc</span> <span class="o">=</span> <span class="n">ppc</span><span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="n">var_name</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">'variable'</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
     <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
     <span class="c1"># Make sure that we group data from (Roughly) same fractions</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="n">x</span><span class="p">])</span><span class="o">.</span><span class="n">size</span><span class="p">()</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">size</span><span class="p">()</span> <span class="o">&lt;</span> <span class="p">(</span><span class="n">n_clusters</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
-        <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;subject&#39;</span><span class="p">:</span>
-            <span class="n">df</span><span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">&#39;subject&#39;</span><span class="p">],</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">'subject'</span><span class="p">,</span> <span class="n">x</span><span class="p">])</span><span class="o">.</span><span class="n">size</span><span class="p">()</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s1">'subject'</span><span class="p">)</span><span class="o">.</span><span class="n">size</span><span class="p">()</span> <span class="o">&lt;</span> <span class="p">(</span><span class="n">n_clusters</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">'subject'</span><span class="p">:</span>
+            <span class="n">df</span><span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">'subject'</span><span class="p">],</span>
                                <span class="n">group_keys</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">d</span><span class="p">:</span> <span class="n">cluster_offers</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">n_clusters</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">df</span><span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="o">=</span> <span class="n">cluster_offers</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">n_clusters</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">plot_type</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="n">groupby</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="s1">&#39;n1&#39;</span><span class="p">]</span>
+        <span class="n">groupby</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="s1">'n1'</span><span class="p">]</span>
     <span class="k">elif</span> <span class="n">plot_type</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-        <span class="n">groupby</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;n1&#39;</span><span class="p">]</span>
+        <span class="n">groupby</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'n1'</span><span class="p">]</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span>
 
-    <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;group&#39;</span><span class="p">:</span>
-        <span class="n">ppc</span> <span class="o">=</span> <span class="n">ppc</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">&#39;subject&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">groupby</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">'group'</span><span class="p">:</span>
+        <span class="n">ppc</span> <span class="o">=</span> <span class="n">ppc</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="s1">'subject'</span><span class="p">]</span> <span class="o">+</span> <span class="n">groupby</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
 
-    <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;subject&#39;</span><span class="p">:</span>
-        <span class="n">groupby</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;subject&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">groupby</span>
+    <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">'subject'</span><span class="p">:</span>
+        <span class="n">groupby</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'subject'</span><span class="p">]</span> <span class="o">+</span> <span class="n">groupby</span>
 
     <span class="n">ppc_summary</span> <span class="o">=</span> <span class="n">summarize_ppc</span><span class="p">(</span><span class="n">ppc</span><span class="p">,</span> <span class="n">groupby</span><span class="o">=</span><span class="n">groupby</span><span class="p">)</span>
-    <span class="n">p</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">groupby</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()[[</span><span class="s1">&#39;choice&#39;</span><span class="p">]]</span>
-    <span class="n">ppc_summary</span> <span class="o">=</span> <span class="n">ppc_summary</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s1">&#39;outer&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">groupby</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()[[</span><span class="s1">'choice'</span><span class="p">]]</span>
+    <span class="n">ppc_summary</span> <span class="o">=</span> <span class="n">ppc_summary</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s1">'outer'</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
 
     <span class="k">if</span> <span class="n">plot_type</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
         <span class="n">fac</span> <span class="o">=</span> <span class="n">sns</span><span class="o">.</span><span class="n">FacetGrid</span><span class="p">(</span><span class="n">ppc_summary</span><span class="p">,</span>
-                            <span class="n">hue</span><span class="o">=</span><span class="s1">&#39;n1&#39;</span><span class="p">,</span>
-                            <span class="n">col</span><span class="o">=</span><span class="s1">&#39;subject&#39;</span> <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;subject&#39;</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
-                            <span class="n">col_wrap</span><span class="o">=</span><span class="n">col_wrap</span> <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;subject&#39;</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+                            <span class="n">hue</span><span class="o">=</span><span class="s1">'n1'</span><span class="p">,</span>
+                            <span class="n">col</span><span class="o">=</span><span class="s1">'subject'</span> <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">'subject'</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                            <span class="n">col_wrap</span><span class="o">=</span><span class="n">col_wrap</span> <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">'subject'</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">fac</span><span class="o">.</span><span class="n">map_dataframe</span><span class="p">(</span><span class="n">plot_prediction</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">)</span>
-        <span class="n">fac</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="s1">&#39;choice&#39;</span><span class="p">)</span>
+        <span class="n">fac</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="s1">'choice'</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">plot_type</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">2</span><span class="p">]:</span>
         <span class="n">fac</span> <span class="o">=</span> <span class="n">sns</span><span class="o">.</span><span class="n">FacetGrid</span><span class="p">(</span><span class="n">ppc_summary</span><span class="p">,</span>
-                            <span class="n">col</span><span class="o">=</span><span class="s1">&#39;subject&#39;</span> <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;subject&#39;</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
-                            <span class="n">col_wrap</span><span class="o">=</span><span class="n">col_wrap</span> <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">&#39;subject&#39;</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
-        <span class="n">fac</span><span class="o">.</span><span class="n">map_dataframe</span><span class="p">(</span><span class="n">plot_prediction</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s1">&#39;n1&#39;</span><span class="p">)</span>
-        <span class="n">fac</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">,</span> <span class="s1">&#39;n1&#39;</span><span class="p">,</span> <span class="s1">&#39;choice&#39;</span><span class="p">)</span>
+                            <span class="n">col</span><span class="o">=</span><span class="s1">'subject'</span> <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">'subject'</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                            <span class="n">col_wrap</span><span class="o">=</span><span class="n">col_wrap</span> <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s1">'subject'</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">fac</span><span class="o">.</span><span class="n">map_dataframe</span><span class="p">(</span><span class="n">plot_prediction</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s1">'n1'</span><span class="p">)</span>
+        <span class="n">fac</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">,</span> <span class="s1">'n1'</span><span class="p">,</span> <span class="s1">'choice'</span><span class="p">)</span>
 
     <span class="n">fac</span><span class="o">.</span><span class="n">add_legend</span><span class="p">()</span>
 
@@ -338,11 +338,11 @@
 
 <div class="viewcode-block" id="plot_prediction">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.plotting.plot_prediction">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">plot_prediction</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">color</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s1">&#39;p_predicted&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.25</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="o">~</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;hdi025&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isnull</span><span class="p">()]</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">plot_prediction</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">color</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s1">'p_predicted'</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">.25</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="o">~</span><span class="n">data</span><span class="p">[</span><span class="s1">'hdi025'</span><span class="p">]</span><span class="o">.</span><span class="n">isnull</span><span class="p">()]</span>
 
-    <span class="n">plt</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">x</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;hdi025&#39;</span><span class="p">],</span>
-                     <span class="n">data</span><span class="p">[</span><span class="s1">&#39;hdi975&#39;</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">x</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s1">'hdi025'</span><span class="p">],</span>
+                     <span class="n">data</span><span class="p">[</span><span class="s1">'hdi975'</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">x</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="n">y</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">)</span></div>
 
 
@@ -350,19 +350,19 @@
 <div class="viewcode-block" id="plot_subjectwise_parameters">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.plotting.plot_subjectwise_parameters">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">plot_subjectwise_parameters</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">parameter</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sort_subjects</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                                <span class="n">plot_group_mean</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">hdi_prob</span><span class="o">=</span><span class="mf">0.94</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;steelblue&#39;</span><span class="p">,</span>
+                                <span class="n">plot_group_mean</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">hdi_prob</span><span class="o">=</span><span class="mf">0.94</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">'steelblue'</span><span class="p">,</span>
                                 <span class="n">ax</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Plot subject-level posterior estimates as a sorted point-plot with HDI error bars.</span>
+<span class="w">    </span><span class="sd">"""Plot subject-level posterior estimates as a sorted point-plot with HDI error bars.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
 <span class="sd">    idata : arviz.InferenceData</span>
 <span class="sd">        Posterior samples from a fitted bauer model.</span>
 <span class="sd">    parameter : str</span>
-<span class="sd">        Name of the subject-level parameter (e.g. ``&#39;n1_evidence_sd&#39;``).</span>
+<span class="sd">        Name of the subject-level parameter (e.g. ``'n1_evidence_sd'``).</span>
 <span class="sd">    transform : str or None</span>
 <span class="sd">        Optional transform applied to samples before plotting.</span>
-<span class="sd">        One of ``&#39;softplus&#39;``, ``&#39;logistic&#39;``, or ``None``.</span>
+<span class="sd">        One of ``'softplus'``, ``'logistic'``, or ``None``.</span>
 <span class="sd">    sort_subjects : bool</span>
 <span class="sd">        If True (default) subjects are sorted by their posterior mean on the x-axis.</span>
 <span class="sd">        If False, subjects appear in their original order.</span>
@@ -381,7 +381,7 @@
 <span class="sd">    Returns</span>
 <span class="sd">    -------</span>
 <span class="sd">    matplotlib.axes.Axes</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">ax</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">gca</span><span class="p">()</span>
 
@@ -389,12 +389,12 @@
     <span class="n">samples_flat</span> <span class="o">=</span> <span class="n">samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>  <span class="c1"># (samples, subject)</span>
 
     <span class="k">if</span> <span class="n">transform</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;softplus&#39;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">'softplus'</span><span class="p">:</span>
             <span class="n">samples_flat</span> <span class="o">=</span> <span class="n">softplus_np</span><span class="p">(</span><span class="n">samples_flat</span><span class="p">)</span>
-        <span class="k">elif</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">&#39;logistic&#39;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">transform</span> <span class="o">==</span> <span class="s1">'logistic'</span><span class="p">:</span>
             <span class="n">samples_flat</span> <span class="o">=</span> <span class="n">logistic_np</span><span class="p">(</span><span class="n">samples_flat</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">transform</span><span class="si">}</span><span class="s1"> is not a valid transformation&#39;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">transform</span><span class="si">}</span><span class="s1"> is not a valid transformation'</span><span class="p">)</span>
 
     <span class="n">means</span> <span class="o">=</span> <span class="n">samples_flat</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
     <span class="n">lo_prob</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">hdi_prob</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">*</span> <span class="mi">100</span>
@@ -409,34 +409,34 @@
         <span class="n">x_vals</span><span class="p">,</span>
         <span class="n">means</span><span class="p">[</span><span class="n">sort_idx</span><span class="p">],</span>
         <span class="n">yerr</span><span class="o">=</span><span class="p">[</span><span class="n">means</span><span class="p">[</span><span class="n">sort_idx</span><span class="p">]</span> <span class="o">-</span> <span class="n">lows</span><span class="p">[</span><span class="n">sort_idx</span><span class="p">],</span> <span class="n">highs</span><span class="p">[</span><span class="n">sort_idx</span><span class="p">]</span> <span class="o">-</span> <span class="n">means</span><span class="p">[</span><span class="n">sort_idx</span><span class="p">]],</span>
-        <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;o&#39;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">elinewidth</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">capsize</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.75</span><span class="p">,</span>
+        <span class="n">fmt</span><span class="o">=</span><span class="s1">'o'</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">elinewidth</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">capsize</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.75</span><span class="p">,</span>
         <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">ecolor</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Subject (sorted by posterior mean)&#39;</span> <span class="k">if</span> <span class="n">sort_subjects</span> <span class="k">else</span> <span class="s1">&#39;Subject&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">'Subject (sorted by posterior mean)'</span> <span class="k">if</span> <span class="n">sort_subjects</span> <span class="k">else</span> <span class="s1">'Subject'</span><span class="p">)</span>
     <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="n">parameter</span><span class="p">)</span>
     <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">plot_group_mean</span><span class="p">:</span>
-        <span class="n">mu_key</span> <span class="o">=</span> <span class="n">parameter</span> <span class="o">+</span> <span class="s1">&#39;_mu&#39;</span>
+        <span class="n">mu_key</span> <span class="o">=</span> <span class="n">parameter</span> <span class="o">+</span> <span class="s1">'_mu'</span>
         <span class="k">if</span> <span class="n">mu_key</span> <span class="ow">in</span> <span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">:</span>
             <span class="n">group_mean_val</span> <span class="o">=</span> <span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="n">mu_key</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
-            <span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">group_mean_val</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span>
-                       <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;Group mean (</span><span class="si">{</span><span class="n">mu_key</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">group_mean_val</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">'--'</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span>
+                       <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">'Group mean (</span><span class="si">{</span><span class="n">mu_key</span><span class="si">}</span><span class="s1">)'</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">ax</span></div>
 
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">get_subject_posterior_df</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">parameters</span><span class="p">,</span> <span class="n">hdi_prob</span><span class="o">=</span><span class="mf">0.94</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract a tidy subject-level posterior summary DataFrame from an InferenceData.</span>
+<span class="w">    </span><span class="sd">"""Extract a tidy subject-level posterior summary DataFrame from an InferenceData.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
 <span class="sd">    idata : arviz.InferenceData</span>
 <span class="sd">        Posterior from a fitted bauer model.</span>
 <span class="sd">    parameters : list of str</span>
-<span class="sd">        Parameter names to extract (e.g. ``[&#39;n1_evidence_sd&#39;, &#39;n2_evidence_sd&#39;]``).</span>
+<span class="sd">        Parameter names to extract (e.g. ``['n1_evidence_sd', 'n2_evidence_sd']``).</span>
 <span class="sd">    hdi_prob : float</span>
 <span class="sd">        Posterior mass for the HDI interval (default 0.94).</span>
 
@@ -449,10 +449,10 @@
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
 <span class="sd">    &gt;&gt;&gt; df = get_subject_posterior_df(idata_mag,</span>
-<span class="sd">    ...                               [&#39;n1_evidence_sd&#39;, &#39;n2_evidence_sd&#39;])</span>
-<span class="sd">    &gt;&gt;&gt; g = sns.FacetGrid(df, col=&#39;parameter&#39;, sharey=True)</span>
-<span class="sd">    &gt;&gt;&gt; g.map_dataframe(plot_subjectwise_pointplot, &#39;mean&#39;, &#39;lo&#39;, &#39;hi&#39;)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    ...                               ['n1_evidence_sd', 'n2_evidence_sd'])</span>
+<span class="sd">    &gt;&gt;&gt; g = sns.FacetGrid(df, col='parameter', sharey=True)</span>
+<span class="sd">    &gt;&gt;&gt; g.map_dataframe(plot_subjectwise_pointplot, 'mean', 'lo', 'hi')</span>
+<span class="sd">    """</span>
     <span class="n">lo_p</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">hdi_prob</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">*</span> <span class="mi">100</span>
     <span class="n">hi_p</span> <span class="o">=</span> <span class="mi">100</span> <span class="o">-</span> <span class="n">lo_p</span>
     <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
@@ -463,18 +463,18 @@
         <span class="n">samp_flat</span> <span class="o">=</span> <span class="n">samp</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">samp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>  <span class="c1"># (samples, subjects)</span>
         <span class="k">for</span> <span class="n">si</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">samp_flat</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
             <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
-                <span class="s1">&#39;parameter&#39;</span><span class="p">:</span> <span class="n">param</span><span class="p">,</span>
-                <span class="s1">&#39;subject&#39;</span><span class="p">:</span> <span class="n">si</span><span class="p">,</span>
-                <span class="s1">&#39;mean&#39;</span><span class="p">:</span> <span class="n">samp_flat</span><span class="p">[:,</span> <span class="n">si</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span>
-                <span class="s1">&#39;lo&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">samp_flat</span><span class="p">[:,</span> <span class="n">si</span><span class="p">],</span> <span class="n">lo_p</span><span class="p">),</span>
-                <span class="s1">&#39;hi&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">samp_flat</span><span class="p">[:,</span> <span class="n">si</span><span class="p">],</span> <span class="n">hi_p</span><span class="p">),</span>
+                <span class="s1">'parameter'</span><span class="p">:</span> <span class="n">param</span><span class="p">,</span>
+                <span class="s1">'subject'</span><span class="p">:</span> <span class="n">si</span><span class="p">,</span>
+                <span class="s1">'mean'</span><span class="p">:</span> <span class="n">samp_flat</span><span class="p">[:,</span> <span class="n">si</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span>
+                <span class="s1">'lo'</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">samp_flat</span><span class="p">[:,</span> <span class="n">si</span><span class="p">],</span> <span class="n">lo_p</span><span class="p">),</span>
+                <span class="s1">'hi'</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">samp_flat</span><span class="p">[:,</span> <span class="n">si</span><span class="p">],</span> <span class="n">hi_p</span><span class="p">),</span>
             <span class="p">})</span>
     <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">plot_subjectwise_pointplot</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">mean_col</span><span class="o">=</span><span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="n">lo_col</span><span class="o">=</span><span class="s1">&#39;lo&#39;</span><span class="p">,</span> <span class="n">hi_col</span><span class="o">=</span><span class="s1">&#39;hi&#39;</span><span class="p">,</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">plot_subjectwise_pointplot</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">mean_col</span><span class="o">=</span><span class="s1">'mean'</span><span class="p">,</span> <span class="n">lo_col</span><span class="o">=</span><span class="s1">'lo'</span><span class="p">,</span> <span class="n">hi_col</span><span class="o">=</span><span class="s1">'hi'</span><span class="p">,</span>
                                <span class="n">sort_subjects</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;FacetGrid-compatible sorted point-plot with HDI error bars.</span>
+<span class="w">    </span><span class="sd">"""FacetGrid-compatible sorted point-plot with HDI error bars.</span>
 
 <span class="sd">    Designed for use with ``sns.FacetGrid.map_dataframe``.  Each row in *data*</span>
 <span class="sd">    represents one subject; *mean_col*, *lo_col*, *hi_col* are the column names</span>
@@ -494,15 +494,15 @@
 <span class="sd">    Examples</span>
 <span class="sd">    --------</span>
 <span class="sd">    &gt;&gt;&gt; df = get_subject_posterior_df(idata_mag,</span>
-<span class="sd">    ...                               [&#39;n1_evidence_sd&#39;, &#39;n2_evidence_sd&#39;])</span>
-<span class="sd">    &gt;&gt;&gt; g = sns.FacetGrid(df, col=&#39;parameter&#39;, sharey=True)</span>
-<span class="sd">    &gt;&gt;&gt; g.map_dataframe(plot_subjectwise_pointplot, &#39;mean&#39;, &#39;lo&#39;, &#39;hi&#39;)</span>
-<span class="sd">    &gt;&gt;&gt; g.set_axis_labels(&#39;Subject (sorted)&#39;, &#39;Noise parameter&#39;)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    ...                               ['n1_evidence_sd', 'n2_evidence_sd'])</span>
+<span class="sd">    &gt;&gt;&gt; g = sns.FacetGrid(df, col='parameter', sharey=True)</span>
+<span class="sd">    &gt;&gt;&gt; g.map_dataframe(plot_subjectwise_pointplot, 'mean', 'lo', 'hi')</span>
+<span class="sd">    &gt;&gt;&gt; g.set_axis_labels('Subject (sorted)', 'Noise parameter')</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">ax</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">gca</span><span class="p">()</span>
-    <span class="n">color</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;color&#39;</span><span class="p">,</span> <span class="s1">&#39;steelblue&#39;</span><span class="p">)</span>
-    <span class="n">label</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;label&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">color</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">'color'</span><span class="p">,</span> <span class="s1">'steelblue'</span><span class="p">)</span>
+    <span class="n">label</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">'label'</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
 
     <span class="n">means</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">mean_col</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
     <span class="n">los</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">lo_col</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
@@ -515,13 +515,13 @@
         <span class="n">x_vals</span><span class="p">,</span>
         <span class="n">means</span><span class="p">[</span><span class="n">sort_idx</span><span class="p">],</span>
         <span class="n">yerr</span><span class="o">=</span><span class="p">[</span><span class="n">means</span><span class="p">[</span><span class="n">sort_idx</span><span class="p">]</span> <span class="o">-</span> <span class="n">los</span><span class="p">[</span><span class="n">sort_idx</span><span class="p">],</span> <span class="n">his</span><span class="p">[</span><span class="n">sort_idx</span><span class="p">]</span> <span class="o">-</span> <span class="n">means</span><span class="p">[</span><span class="n">sort_idx</span><span class="p">]],</span>
-        <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;o&#39;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">elinewidth</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">capsize</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.75</span><span class="p">,</span>
+        <span class="n">fmt</span><span class="o">=</span><span class="s1">'o'</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">elinewidth</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">capsize</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.75</span><span class="p">,</span>
         <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">ecolor</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="k">if</span> <span class="n">sort_subjects</span><span class="p">:</span>
-        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Subject (sorted by posterior mean)&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">'Subject (sorted by posterior mean)'</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Subject&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">'Subject'</span><span class="p">)</span>
     <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">ax</span>
 </pre></div>
@@ -556,7 +556,7 @@
       
     </aside>
   </div>
-</div><script src="../../../_static/documentation_options.js?v=e259d695"></script>
+</div><script src="../../../_static/documentation_options.js?v=1dd76d02"></script>
     <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../../_static/scripts/furo.js?v=46bd48cc"></script>

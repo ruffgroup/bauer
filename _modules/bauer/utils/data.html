@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>bauer.utils.data - bauer 0.3.0 documentation</title>
+        <title>bauer.utils.data - bauer 0.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -160,7 +160,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../../index.html"><div class="brand">bauer 0.3.0 documentation</div></a>
+      <a href="../../../index.html"><div class="brand">bauer 0.5.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -181,7 +181,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.3.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.5.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -246,43 +246,43 @@
         </div>
         <article role="main" id="furo-main-content">
           <h1>Source code for bauer.utils.data</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Data loaders for bauer&#39;s bundled experiment CSVs.</span>
+<span></span><span class="sd">"""Data loaders for bauer's bundled experiment CSVs.</span>
 
 <span class="sd">All loaders share the same RT/choice cleaning convention: drop trials with</span>
 <span class="sd">missing rt/choice and trials with rt outside ``[min_rt, max_rt]``, then cast</span>
 <span class="sd">``choice`` to bool. Pass ``remove_non_responses=False`` to skip cleaning.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">importlib.resources</span><span class="w"> </span><span class="kn">import</span> <span class="n">files</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_read</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="o">**</span><span class="n">read_kwargs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Open a bundled CSV under ``bauer/data/``.&quot;&quot;&quot;</span>
-    <span class="k">with</span> <span class="p">(</span><span class="n">files</span><span class="p">(</span><span class="n">__package__</span><span class="p">)</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">&#39;../data/</span><span class="si">{</span><span class="n">fn</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Open a bundled CSV under ``bauer/data/``."""</span>
+    <span class="k">with</span> <span class="p">(</span><span class="n">files</span><span class="p">(</span><span class="n">__package__</span><span class="p">)</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">'../data/</span><span class="si">{</span><span class="n">fn</span><span class="si">}</span><span class="s1">'</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s1">'rb'</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="o">**</span><span class="n">read_kwargs</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_clean_rt_choice</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">remove_non_responses</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">min_rt</span><span class="o">=</span><span class="mf">0.15</span><span class="p">,</span> <span class="n">max_rt</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Apply the canonical RT/choice cleaning to ``df`` in place.</span>
+<span class="w">    </span><span class="sd">"""Apply the canonical RT/choice cleaning to ``df`` in place.</span>
 
 <span class="sd">    - Drop rows with NaN rt or choice</span>
 <span class="sd">    - Apply ``[min_rt, max_rt]`` window</span>
 <span class="sd">    - Cast ``choice`` to bool</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">remove_non_responses</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">df</span>
-    <span class="n">cols_present</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;rt&#39;</span><span class="p">,</span> <span class="s1">&#39;choice&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
+    <span class="n">cols_present</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">'rt'</span><span class="p">,</span> <span class="s1">'choice'</span><span class="p">)</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
     <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="n">cols_present</span><span class="p">)</span>
-    <span class="k">if</span> <span class="s1">&#39;rt&#39;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="n">min_rt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">min_rt</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">min_rt</span><span class="p">]</span>
-    <span class="k">if</span> <span class="s1">&#39;rt&#39;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="n">max_rt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">max_rt</span><span class="p">]</span>
-    <span class="k">if</span> <span class="s1">&#39;choice&#39;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">if</span> <span class="s1">'rt'</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="n">min_rt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">min_rt</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">'rt'</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">min_rt</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s1">'rt'</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="n">max_rt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">'rt'</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">max_rt</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s1">'choice'</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="n">df</span><span class="p">[</span><span class="s1">'choice'</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="c1"># 1.0/2.0 numeric coding → True if option 2 chosen</span>
-        <span class="k">if</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">kind</span> <span class="ow">in</span> <span class="s1">&#39;fi&#39;</span><span class="p">:</span>
-            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">choice</span><span class="o">=</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="mf">2.0</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">df</span><span class="p">[</span><span class="s1">'choice'</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">kind</span> <span class="ow">in</span> <span class="s1">'fi'</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">choice</span><span class="o">=</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">'choice'</span><span class="p">]</span> <span class="o">==</span> <span class="mf">2.0</span><span class="p">))</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">choice</span><span class="o">=</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;choice&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">))</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">choice</span><span class="o">=</span><span class="n">df</span><span class="p">[</span><span class="s1">'choice'</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">))</span>
     <span class="k">return</span> <span class="n">df</span>
 
 
@@ -292,9 +292,9 @@
 
 <div class="viewcode-block" id="load_garcia2022">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.data.load_garcia2022">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">load_garcia2022</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s1">&#39;magnitude&#39;</span><span class="p">,</span> <span class="n">remove_non_responses</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">min_rt</span><span class="o">=</span><span class="mf">0.15</span><span class="p">,</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_garcia2022</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s1">'magnitude'</span><span class="p">,</span> <span class="n">remove_non_responses</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">min_rt</span><span class="o">=</span><span class="mf">0.15</span><span class="p">,</span>
                     <span class="n">max_rt</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Behavioural data from Barreto-Garcia et al. (2022).</span>
+<span class="w">    </span><span class="sd">"""Behavioural data from Barreto-Garcia et al. (2022).</span>
 
 <span class="sd">    For the magnitude task, the raw CSV stores rt in milliseconds; this loader</span>
 <span class="sd">    converts to seconds. Implausibly fast trials (rt &lt; 150 ms) are dropped by</span>
@@ -309,17 +309,17 @@
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
-<span class="sd">    task : {&#39;magnitude&#39;, &#39;risk&#39;}</span>
+<span class="sd">    task : {'magnitude', 'risk'}</span>
 <span class="sd">    remove_non_responses : bool</span>
 <span class="sd">    min_rt, max_rt : float</span>
 <span class="sd">        RT cutoffs in seconds (post-conversion). Set ``min_rt=0`` to disable.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">fn</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;garcia2022_</span><span class="si">{</span><span class="n">task</span><span class="si">}</span><span class="s1">.csv&#39;</span>
+<span class="sd">    """</span>
+    <span class="n">fn</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">'garcia2022_</span><span class="si">{</span><span class="n">task</span><span class="si">}</span><span class="s1">.csv'</span>
     <span class="n">df</span> <span class="o">=</span> <span class="n">_read</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
-    <span class="k">if</span> <span class="s1">&#39;rt&#39;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+    <span class="k">if</span> <span class="s1">'rt'</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">remove_non_responses</span><span class="p">:</span>
-            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">]</span>   <span class="c1"># raw -1 sentinel</span>
-        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">rt</span><span class="o">=</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;rt&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="mf">1000.0</span><span class="p">)</span>  <span class="c1"># ms → s</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">'rt'</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">]</span>   <span class="c1"># raw -1 sentinel</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">rt</span><span class="o">=</span><span class="n">df</span><span class="p">[</span><span class="s1">'rt'</span><span class="p">]</span> <span class="o">/</span> <span class="mf">1000.0</span><span class="p">)</span>  <span class="c1"># ms → s</span>
     <span class="k">return</span> <span class="n">_clean_rt_choice</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">remove_non_responses</span><span class="p">,</span> <span class="n">min_rt</span><span class="p">,</span> <span class="n">max_rt</span><span class="p">)</span></div>
 
 
@@ -332,19 +332,19 @@
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.data.load_dehollander2024_risk">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">load_dehollander2024_risk</span><span class="p">(</span><span class="n">sessions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">remove_non_responses</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
                               <span class="n">min_rt</span><span class="o">=</span><span class="mf">0.15</span><span class="p">,</span> <span class="n">max_rt</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;De Hollander et al. (2024, bioRxiv preprint) dotcloud risky-choice</span>
+<span class="w">    </span><span class="sd">"""De Hollander et al. (2024, bioRxiv preprint) dotcloud risky-choice</span>
 <span class="sd">    task — N=30 subjects across 3T and 7T sessions, ~256 trials/subject.</span>
 
-<span class="sd">    ``choice = True`` means option 2 chosen (bauer&#39;s risk convention).</span>
+<span class="sd">    ``choice = True`` means option 2 chosen (bauer's risk convention).</span>
 <span class="sd">    The risky lottery is at p=0.55, the safe at p=1. Derived columns</span>
 <span class="sd">    (``risky_first``, ``chose_risky``, etc.) are not bundled — compute on</span>
 <span class="sd">    the fly from ``p1, p2``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">df</span> <span class="o">=</span> <span class="n">_read</span><span class="p">(</span><span class="s1">&#39;dehollander2024_risk.csv&#39;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;subject&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">})</span>
+<span class="sd">    """</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">_read</span><span class="p">(</span><span class="s1">'dehollander2024_risk.csv'</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="p">{</span><span class="s1">'subject'</span><span class="p">:</span> <span class="nb">str</span><span class="p">})</span>
     <span class="k">if</span> <span class="n">sessions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;session&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">sessions</span><span class="p">)]</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">'session'</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">sessions</span><span class="p">)]</span>
     <span class="n">df</span> <span class="o">=</span> <span class="n">_clean_rt_choice</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">remove_non_responses</span><span class="p">,</span> <span class="n">min_rt</span><span class="p">,</span> <span class="n">max_rt</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">([</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="s1">&#39;session&#39;</span><span class="p">,</span> <span class="s1">&#39;run&#39;</span><span class="p">,</span> <span class="s1">&#39;trial_nr&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span></div>
+    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">([</span><span class="s1">'subject'</span><span class="p">,</span> <span class="s1">'session'</span><span class="p">,</span> <span class="s1">'run'</span><span class="p">,</span> <span class="s1">'trial_nr'</span><span class="p">])</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span></div>
 
 
 
@@ -356,14 +356,14 @@
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.data.load_dehollander2024_symbolic">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">load_dehollander2024_symbolic</span><span class="p">(</span><span class="n">remove_non_responses</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">min_rt</span><span class="o">=</span><span class="mf">0.15</span><span class="p">,</span>
                                   <span class="n">max_rt</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;De Hollander 2024 *symbolic* (Arabic-numeral) risky-choice task —</span>
+<span class="w">    </span><span class="sd">"""De Hollander 2024 *symbolic* (Arabic-numeral) risky-choice task —</span>
 <span class="sd">    N=58 subjects, ~256 trials each. Unlike the dotcloud task, n1/n2 are</span>
 <span class="sd">    continuous (range ~5–100), making this a stronger test of stimulus-</span>
 <span class="sd">    dependent encoding-noise (flex) models.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">df</span> <span class="o">=</span> <span class="n">_read</span><span class="p">(</span><span class="s1">&#39;dehollander2024_symbolic.csv&#39;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;subject&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">})</span>
+<span class="sd">    """</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">_read</span><span class="p">(</span><span class="s1">'dehollander2024_symbolic.csv'</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="p">{</span><span class="s1">'subject'</span><span class="p">:</span> <span class="nb">str</span><span class="p">})</span>
     <span class="n">df</span> <span class="o">=</span> <span class="n">_clean_rt_choice</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">remove_non_responses</span><span class="p">,</span> <span class="n">min_rt</span><span class="p">,</span> <span class="n">max_rt</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">([</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="s1">&#39;run&#39;</span><span class="p">,</span> <span class="s1">&#39;trial_nr&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span></div>
+    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">([</span><span class="s1">'subject'</span><span class="p">,</span> <span class="s1">'run'</span><span class="p">,</span> <span class="s1">'trial_nr'</span><span class="p">])</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span></div>
 
 
 
@@ -374,10 +374,10 @@
 <div class="viewcode-block" id="load_bedi2026">
 <a class="viewcode-back" href="../../../api_reference.html#bauer.utils.data.load_bedi2026">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">load_bedi2026</span><span class="p">(</span><span class="n">remove_non_responses</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Bedi 2026 abstract-value estimation pilot — orientation→value mapping.</span>
+<span class="w">    </span><span class="sd">"""Bedi 2026 abstract-value estimation pilot — orientation→value mapping.</span>
 
-<span class="sd">    13 subjects across 2 sessions × 2 mapping conditions (&#39;cdf&#39; /</span>
-<span class="sd">    &#39;inverse_cdf&#39;) × 8 runs. On each trial the participant sees an oriented</span>
+<span class="sd">    13 subjects across 2 sessions × 2 mapping conditions ('cdf' /</span>
+<span class="sd">    'inverse_cdf') × 8 runs. On each trial the participant sees an oriented</span>
 <span class="sd">    Gabor and estimates its associated value (CHF) on a continuous scale; a</span>
 <span class="sd">    BDM-auction-derived ``value`` is the ground truth and ``reward`` is what</span>
 <span class="sd">    they actually earn.</span>
@@ -388,11 +388,11 @@
 <span class="sd">    Bundled CSV: ``bauer/data/bedi2026.csv`` with columns subject, session,</span>
 <span class="sd">    mapping, run, trial_nr, orientation, value, reward, response,</span>
 <span class="sd">    response_time.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">df</span> <span class="o">=</span> <span class="n">_read</span><span class="p">(</span><span class="s1">&#39;bedi2026.csv&#39;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;subject&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">})</span>
+<span class="sd">    """</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">_read</span><span class="p">(</span><span class="s1">'bedi2026.csv'</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="p">{</span><span class="s1">'subject'</span><span class="p">:</span> <span class="nb">int</span><span class="p">})</span>
     <span class="k">if</span> <span class="n">remove_non_responses</span><span class="p">:</span>
-        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;response&#39;</span><span class="p">])</span>
-    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">([</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="s1">&#39;session&#39;</span><span class="p">,</span> <span class="s1">&#39;mapping&#39;</span><span class="p">,</span> <span class="s1">&#39;run&#39;</span><span class="p">,</span> <span class="s1">&#39;trial_nr&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="s1">'response'</span><span class="p">])</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">([</span><span class="s1">'subject'</span><span class="p">,</span> <span class="s1">'session'</span><span class="p">,</span> <span class="s1">'mapping'</span><span class="p">,</span> <span class="s1">'run'</span><span class="p">,</span> <span class="s1">'trial_nr'</span><span class="p">])</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span>
     <span class="k">return</span> <span class="n">df</span></div>
 
 
@@ -402,37 +402,37 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">load_dehollander_tms_risk</span><span class="p">(</span><span class="n">stimulation_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sessions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
                               <span class="n">tms_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">remove_non_responses</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
                               <span class="n">min_rt</span><span class="o">=</span><span class="mf">0.15</span><span class="p">,</span> <span class="n">max_rt</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;De Hollander TMS-risk experiment — 73 subjects total but only 35 of</span>
+<span class="w">    </span><span class="sd">"""De Hollander TMS-risk experiment — 73 subjects total but only 35 of</span>
 <span class="sd">    them completed the TMS sessions (sessions 2 and 3); the remaining 38</span>
 <span class="sd">    only did the baseline session.</span>
 
 <span class="sd">    For TMS analyses you usually want only the 35 TMS subjects (sessions 2/3)</span>
-<span class="sd">    — that&#39;s the ``tms_only=True`` default. Set ``tms_only=False`` to get all</span>
+<span class="sd">    — that's the ``tms_only=True`` default. Set ``tms_only=False`` to get all</span>
 <span class="sd">    73 subjects across all sessions.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
 <span class="sd">    stimulation_conditions : list of str or None</span>
-<span class="sd">        Subset of {&#39;baseline&#39;, &#39;vertex&#39;, &#39;ips&#39;} to keep. Default: all.</span>
+<span class="sd">        Subset of {'baseline', 'vertex', 'ips'} to keep. Default: all.</span>
 <span class="sd">    sessions : list of int or None</span>
 <span class="sd">        Subset of {1, 2, 3}. Default: ``[2, 3]`` if ``tms_only=True``,</span>
 <span class="sd">        else all.</span>
 <span class="sd">    tms_only : bool</span>
 <span class="sd">        If True, keep only the 35 TMS-completing subjects in sessions 2/3.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">df</span> <span class="o">=</span> <span class="n">_read</span><span class="p">(</span><span class="s1">&#39;dehollander_tms_risk.csv&#39;</span><span class="p">)</span>
+<span class="sd">    """</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">_read</span><span class="p">(</span><span class="s1">'dehollander_tms_risk.csv'</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">tms_only</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">sessions</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">sessions</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
-        <span class="n">tms_subjects</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;session&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])][</span><span class="s1">&#39;subject&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
-        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;subject&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">tms_subjects</span><span class="p">)]</span>
+        <span class="n">tms_subjects</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">'session'</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])][</span><span class="s1">'subject'</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">'subject'</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">tms_subjects</span><span class="p">)]</span>
     <span class="k">if</span> <span class="n">stimulation_conditions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;stimulation_condition&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">stimulation_conditions</span><span class="p">)]</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">'stimulation_condition'</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">stimulation_conditions</span><span class="p">)]</span>
     <span class="k">if</span> <span class="n">sessions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;session&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">sessions</span><span class="p">)]</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">'session'</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">sessions</span><span class="p">)]</span>
     <span class="n">df</span> <span class="o">=</span> <span class="n">_clean_rt_choice</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">remove_non_responses</span><span class="p">,</span> <span class="n">min_rt</span><span class="p">,</span> <span class="n">max_rt</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">([</span><span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="s1">&#39;session&#39;</span><span class="p">,</span> <span class="s1">&#39;stimulation_condition&#39;</span><span class="p">,</span>
-                         <span class="s1">&#39;run&#39;</span><span class="p">,</span> <span class="s1">&#39;trial_nr&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span></div>
+    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">([</span><span class="s1">'subject'</span><span class="p">,</span> <span class="s1">'session'</span><span class="p">,</span> <span class="s1">'stimulation_condition'</span><span class="p">,</span>
+                         <span class="s1">'run'</span><span class="p">,</span> <span class="s1">'trial_nr'</span><span class="p">])</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span></div>
 
 </pre></div>
         </article>
@@ -466,7 +466,7 @@
       
     </aside>
   </div>
-</div><script src="../../../_static/documentation_options.js?v=e259d695"></script>
+</div><script src="../../../_static/documentation_options.js?v=1dd76d02"></script>
     <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../../_static/scripts/furo.js?v=46bd48cc"></script>
