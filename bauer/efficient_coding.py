@@ -243,7 +243,7 @@ def _seam_mask(encoded_positions, rep_grid, step):
 
 
 def _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori, q_per=Q_PER,
-                          n_cand=None, cand_mask=None):
+                          n_cand=None, cand_mask=None, return_index=False):
     """Map a perceptual posterior to a value estimate, per paper Eqs. 4 and 7.
 
     theta_hat = argmin_t E_post[(1 - cos(theta - t))^(q_per/2)].  For q_per = 2
@@ -323,7 +323,10 @@ def _value_from_theta_hat(posterior, ori_grid, G_ext, d_ori, q_per=Q_PER,
     i0 = pt.cast(i0, 'int64')
     v_hat = G_ext[:, i0] * (1.0 - w)[None, :] + G_ext[:, i0 + 1] * w[None, :]  # (C, S*M)
     v_hat = pt.reshape(v_hat, (G_ext.shape[0], S, M))
-    return pt.clip(v_hat, V_MIN, V_MAX)                              # (C, S, M)
+    v_hat = pt.clip(v_hat, V_MIN, V_MAX)                             # (C, S, M)
+    if return_index:
+        return v_hat, f                                              # f: (S*M,)
+    return v_hat
 
 
 def cardinal_category_masks(ori_grid, grid_resolution):
@@ -449,6 +452,23 @@ MAPPING_SHRINKAGE_PRIOR = {'mu_intercept': -1.5, 'sigma_intercept': 1.0,
                            'cauchy_sigma_intercept': 0.75, 'transform': 'logistic'}
 
 
+# Per-subject lapse rate (uniform guess over the response range), logistic.
+# Logit -5.3 puts the prior median at 0.5%: the bids show ~0.9% of responses
+# >= 8 CHF from their cell median, and the model itself makes part of those.
+LAPSE_PRIOR = {'mu_intercept': -5.3, 'sigma_intercept': 1.0,
+               'cauchy_sigma_intercept': 1.0, 'transform': 'logistic'}
+
+# Idiosyncratic mapping offsets: one additive offset (CHF) per subject x
+# mapping x stimulus orientation on the INTERNAL mapping, i.e. a learned
+# look-up table with persistent errors.  offset = tau * z, z ~ N(0, 1)
+# (non-centred), tau ~ HalfNormal(MAPPING_OFFSET_TAU_SD): deliberately tight,
+# so the offsets are shrunk to 0 unless the data insist.  Motivation
+# (abstract_values, 2026-10): residual cell-mean bias correlates r = 0.53
+# between odd and even trials of the same subject x orientation, i.e. a
+# persistent ~1.1 CHF component no smooth mapping can produce.
+MAPPING_OFFSET_TAU_SD = 0.5
+
+
 def linear_value_np(orientation_deg):
     """The straight line from V_MIN at 0 deg to V_MAX at 180 deg."""
     return V_MIN + (V_MAX - V_MIN) * np.asarray(orientation_deg, dtype=float) / 180.0
@@ -521,7 +541,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
                  fit_prior_weight=False, prior_fourier_order=0,
                  no_seam_crossing=False, cardinal_truncation=False,
                  fit_motor_noise=False, value_kernel='cell',
-                 cardinal_peak_width=0.0, fit_mapping_shrinkage=False, **kwargs):
+                 cardinal_peak_width=0.0, fit_mapping_shrinkage=False,
+                 fit_mapping_offsets=False, fit_lapse=False, **kwargs):
         """
         Parameters
         ----------
@@ -553,7 +574,14 @@ class EfficientPerceptionModel(EstimationBaseModel):
         self.cardinal_peak_width = float(cardinal_peak_width)
         # Free per-subject shrinkage of the internal mapping toward a line.
         self.fit_mapping_shrinkage = bool(fit_mapping_shrinkage)
+        # Free per-subject x mapping x stimulus offsets on the internal mapping.
+        self.fit_mapping_offsets = bool(fit_mapping_offsets)
+        # Free per-subject lapse rate.  The lapse is then mixed into the trial
+        # distribution itself, so the fixed base-class lapse is switched off.
+        self.fit_lapse = bool(fit_lapse)
         super().__init__(paradigm, grid_resolution=grid_resolution, **kwargs)
+        if self.fit_lapse:
+            self.lapse_rate = 0.0
 
     @property
     def prior_is_fitted(self):
@@ -606,6 +634,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
             pars['sigma_motor'] = SIGMA_MOTOR_PRIOR
         if self.fit_mapping_shrinkage:
             pars['mapping_shrinkage'] = MAPPING_SHRINKAGE_PRIOR
+        if self.fit_lapse:
+            pars['lapse'] = LAPSE_PRIOR
         return pars
 
     def get_model_inputs(self, parameters):
@@ -622,6 +652,9 @@ class EfficientPerceptionModel(EstimationBaseModel):
                if self.fit_motor_noise else {}),
             **({'mapping_shrinkage': self.subjectwise('mapping_shrinkage')}
                if self.fit_mapping_shrinkage else {}),
+            **({'lapse': self.subjectwise('lapse')} if self.fit_lapse else {}),
+            **({'mapping_offset': self._mapping_offsets(model)}
+               if self.fit_mapping_offsets else {}),
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -674,6 +707,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
         # Reference line for the mapping shrinkage (same 180 deg endpoint).
         self.linear_on_ori_grid_ext = linear_value_np(
             np.append(self.ori_grid / (2 * np.pi) * 180, 180.0))
+        self._setup_offset_basis(paradigm)
 
         # Unique stimulus orientations (in degrees) from paradigm
         self.unique_orientations_deg = np.sort(paradigm['orientation'].unique())
@@ -786,7 +820,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
         # Truncation at the cardinals, when on, happens inside.
         p_response = self._category_pushforward(posterior, p_ms, ori_grid, G_ext,
                                                 val_grid, d_ori, d_rep, d_val,
-                                                self._shrinkage(model_inputs, model))
+                                                self._shrinkage(model_inputs, model),
+                                                self._offset_table(model_inputs, model))
         p_response = p_response / (pt.sum(p_response, axis=-1, keepdims=True) * d_val + 1e-30)
 
         # Gate, then motor noise, then gather per-trial distributions
@@ -795,8 +830,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
                                             ).dimshuffle(1, 0, 2, 3)
         p_response = self._apply_motor_noise(p_response, model_inputs, val_grid,
                                              d_val, n_sub, 'CSKV')
-        return self._pad_to_response_grid(
-            p_response[mapping_ix, subject_ix, stimulus_ix, :])
+        return self._mix_lapse(self._pad_to_response_grid(
+            p_response[mapping_ix, subject_ix, stimulus_ix, :]), model_inputs)
 
     @staticmethod
     def _n_subjects(model):
@@ -852,6 +887,63 @@ class EfficientPerceptionModel(EstimationBaseModel):
         out = pt.reshape(flat, (n_sub, C, K, V))
         return out.dimshuffle(1, 0, 2, 3) if layout == 'CSKV' else out
 
+    def _setup_offset_basis(self, paradigm):
+        """(O + 1, K) linear-interpolation weights from the K stimulus
+        orientations onto the extended orientation grid (held constant beyond
+        the outermost stimuli), for the mapping offsets.  The 90 deg stimulus
+        is excluded from the free offsets: the cardinal gate pins it to 22 CHF.
+        """
+        stim = np.sort(paradigm['orientation'].unique()).astype(float)
+        free = np.abs(stim - 90.0) > 1e-6
+        self.offset_stimuli_deg = stim[free]
+        grid_deg = np.append(self.ori_grid / (2 * np.pi) * 180, 180.0)
+        eye = np.eye(len(stim))
+        W = np.stack([np.interp(grid_deg, stim, eye[k]) for k in range(len(stim))], axis=1)
+        self.offset_basis = W[:, free]                                   # (O+1, K_free)
+
+    def _mapping_offsets(self, model):
+        """(S, C, K_free) offsets: the fitted RV in estimation, the pm.Data of
+        the same name in predict/simulate.  Created here (not in build_priors)
+        so it works under any parameterisation mixin."""
+        if 'mapping_offset' in model.named_vars:
+            return model['mapping_offset']
+        n_sub = self._n_subjects(model)
+        C = len(self.value_on_ori_grid)
+        K = len(self.offset_stimuli_deg)
+        dims = None
+        if 'subject' in model.coords:
+            # Named axes, so the trace carries which mapping / stimulus each
+            # offset belongs to (and PPC code can align subjects by coordinate).
+            if 'offset_mapping' not in model.coords:
+                model.add_coord('offset_mapping', list(self.value_on_ori_grid.keys()))
+            if 'offset_stimulus' not in model.coords:
+                model.add_coord('offset_stimulus', list(self.offset_stimuli_deg))
+            dims = ('subject', 'offset_mapping', 'offset_stimulus')
+        tau = pm.HalfNormal('mapping_offset_sd', sigma=MAPPING_OFFSET_TAU_SD)
+        z = pm.Normal('mapping_offset_z', 0.0, 1.0, shape=(n_sub, C, K), dims=dims)
+        return pm.Deterministic('mapping_offset', tau * z, dims=dims)
+
+    def _offset_table(self, model_inputs, model):
+        """(C, S, O + 1) offset on the internal mapping, or None."""
+        if not self.fit_mapping_offsets:
+            return None
+        n_sub = self._n_subjects(model)
+        C = len(self.value_on_ori_grid)
+        K = len(self.offset_stimuli_deg)
+        off = pt.specify_shape(model_inputs['mapping_offset'], (n_sub, C, K))
+        W = pt.as_tensor_variable(self.offset_basis)                     # (O+1, K)
+        return pt.dot(off, W.T).dimshuffle(1, 0, 2)                      # (C, S, O+1)
+
+    def _mix_lapse(self, trial_dist, model_inputs):
+        """Mix a per-subject uniform lapse into the (T, R) trial distribution."""
+        if not self.fit_lapse:
+            return trial_dist
+        grid = self._get_response_grid()
+        dv = float(grid[1] - grid[0])
+        lam = model_inputs['lapse'][model_inputs['subject_ix']][:, None]
+        p = trial_dist / (pt.sum(trial_dist, axis=1, keepdims=True) * dv + 1e-30)
+        return (1.0 - lam) * p + lam / float(grid[-1] - grid[0])
+
     def _shrinkage(self, model_inputs, model):
         """(S,) mapping shrinkage, or None when it is not fitted."""
         if not self.fit_mapping_shrinkage:
@@ -860,25 +952,41 @@ class EfficientPerceptionModel(EstimationBaseModel):
                                 (self._n_subjects(model),))
 
     def _theta_hat_to_value(self, post, ori_grid, G_ext, d_ori, N, shrink,
-                            cand_mask=None):
+                            cand_mask=None, offsets=None):
         """(C, S, M) value of the perceptual estimate under the INTERNAL mapping.
 
         Without shrinkage that is G(theta_hat).  With it, (1 - lambda) G + lambda L;
         both are linear in the table, so theta_hat is computed once and the
         reference line is simply interpolated as one more 'condition' row.
         """
-        if shrink is None:
-            return _value_from_theta_hat(post, ori_grid, G_ext, d_ori,
-                                         q_per=self.q_per, n_cand=N, cand_mask=cand_mask)
         C = len(self.value_on_ori_grid)
-        L = pt.as_tensor_variable(self.linear_on_ori_grid_ext)[None, :]
-        v = _value_from_theta_hat(post, ori_grid, pt.concatenate([G_ext, L], axis=0),
-                                  d_ori, q_per=self.q_per, n_cand=N, cand_mask=cand_mask)
-        lam = shrink[None, :, None]
-        return (1.0 - lam) * v[:C] + lam * v[C:]
+        table = G_ext
+        if shrink is not None:
+            L = pt.as_tensor_variable(self.linear_on_ori_grid_ext)[None, :]
+            table = pt.concatenate([G_ext, L], axis=0)
+        v, f = _value_from_theta_hat(post, ori_grid, table, d_ori, q_per=self.q_per,
+                                     n_cand=N, cand_mask=cand_mask, return_index=True)
+        if shrink is not None:
+            lam = shrink[None, :, None]
+            v = (1.0 - lam) * v[:C] + lam * v[C:]
+        if offsets is not None:
+            # Per-subject table, gathered with a flat (subject, grid) index whose
+            # subject part is a numpy constant (static S and M), so JAX can JIT it.
+            n_sub = int(offsets.type.shape[1])
+            n_ext = N + 1
+            M = int(self.rep_grid_resolution)
+            s_idx = np.repeat(np.arange(n_sub), M) * n_ext                # (S*M,)
+            flat = pt.reshape(offsets, (C, n_sub * n_ext))
+            i0 = pt.clip(pt.floor(f), 0, np.float64(N) - 1.0)
+            w = f - i0
+            i0 = pt.cast(i0, 'int64') + s_idx
+            o = flat[:, i0] * (1.0 - w)[None, :] + flat[:, i0 + 1] * w[None, :]
+            v = pt.clip(v + pt.reshape(o, (C, n_sub, M)), V_MIN, V_MAX)
+        return v
 
     def _category_pushforward(self, posterior_ori, p_ms, ori_grid, G_ext,
-                              val_grid, d_ori, d_rep, d_val, shrink=None):
+                              val_grid, d_ori, d_rep, d_val, shrink=None,
+                              offsets=None):
         """(C, S, K, V): p(v_per | stimulus), with cardinal truncation if on.
 
         With truncation the perceptual posterior -- and the candidate set the
@@ -896,7 +1004,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
             return w / (pt.sum(w, axis=-1, keepdims=True) + 1e-30)
 
         if not self.cardinal_truncation:
-            v = self._theta_hat_to_value(posterior_ori, ori_grid, G_ext, d_ori, N, shrink)
+            v = self._theta_hat_to_value(posterior_ori, ori_grid, G_ext, d_ori, N, shrink,
+                                         offsets=offsets)
             return pt.matmul(p_ms[None], pushforward(v)) * d_rep
 
         masks, _ = cardinal_category_masks(self.ori_grid, N)
@@ -909,7 +1018,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
             post = posterior_ori * mask[None, :, None]
             post = post / (pt.sum(post, axis=1, keepdims=True) * d_ori + 1e-30)
             v = self._theta_hat_to_value(post, ori_grid, G_ext, d_ori, N, shrink,
-                                         cand_mask=mask)
+                                         cand_mask=mask, offsets=offsets)
             part = pt.matmul(p_ms[None], pushforward(v)) * d_rep      # (C, S, K, V)
             # Select the stimuli of this category with a constant indicator
             # rather than by slicing and re-concatenating: advanced indexing on
@@ -1193,7 +1302,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                  fit_prior_weight=False, prior_fourier_order=0,
                  no_seam_crossing=False, cardinal_truncation=False,
                  fit_motor_noise=False, value_kernel='cell',
-                 cardinal_peak_width=0.0, fit_mapping_shrinkage=False, **kwargs):
+                 cardinal_peak_width=0.0, fit_mapping_shrinkage=False,
+                 fit_mapping_offsets=False, fit_lapse=False, **kwargs):
         super().__init__(paradigm, perceptual_prior=perceptual_prior,
                          grid_resolution=grid_resolution,
                          rep_grid_resolution=rep_grid_resolution,
@@ -1204,7 +1314,9 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                          fit_motor_noise=fit_motor_noise,
                          value_kernel=value_kernel,
                          cardinal_peak_width=cardinal_peak_width,
-                         fit_mapping_shrinkage=fit_mapping_shrinkage, **kwargs)
+                         fit_mapping_shrinkage=fit_mapping_shrinkage,
+                         fit_mapping_offsets=fit_mapping_offsets,
+                         fit_lapse=fit_lapse, **kwargs)
 
     def get_free_parameters(self):
         pars = {'kappa_r': kappa_r_prior(self.grid_resolution),
@@ -1218,6 +1330,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
             pars['sigma_motor'] = SIGMA_MOTOR_PRIOR
         if self.fit_mapping_shrinkage:
             pars['mapping_shrinkage'] = MAPPING_SHRINKAGE_PRIOR
+        if self.fit_lapse:
+            pars['lapse'] = LAPSE_PRIOR
         return pars
 
     def get_model_inputs(self, parameters):
@@ -1235,6 +1349,9 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                if self.fit_motor_noise else {}),
             **({'mapping_shrinkage': self.subjectwise('mapping_shrinkage')}
                if self.fit_mapping_shrinkage else {}),
+            **({'lapse': self.subjectwise('lapse')} if self.fit_lapse else {}),
+            **({'mapping_offset': self._mapping_offsets(model)}
+               if self.fit_mapping_offsets else {}),
             'orientation': model['orientation'],
             'response': model['response'],
             'subject_ix': model['subject_ix'],
@@ -1352,7 +1469,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         # truncation applied inside when it is switched on.
         p_v_per = self._category_pushforward(posterior_ori, p_ms, ori_grid, G_ext,
                                              val_grid, d_ori, d_rep, d_val,
-                                             self._shrinkage(model_inputs, model))
+                                             self._shrinkage(model_inputs, model),
+                                             self._offset_table(model_inputs, model))
         p_v_per = p_v_per / (pt.sum(p_v_per, axis=-1, keepdims=True) * d_val + 1e-30)
 
         # ==== STAGE 2: Value encoding + decoding ====
@@ -1420,8 +1538,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         p_response = self._gate_value_table(p_response)
         p_response = self._apply_motor_noise(p_response, model_inputs, val_grid,
                                              d_val, n_sub, 'SCKV')
-        return self._pad_to_response_grid(
-            p_response[subject_ix, mapping_ix, stimulus_ix, :])
+        return self._mix_lapse(self._pad_to_response_grid(
+            p_response[subject_ix, mapping_ix, stimulus_ix, :]), model_inputs)
 
 
 class CategoricalSequentialModel(SequentialEfficientCodingModel):
