@@ -458,6 +458,32 @@ MAPPING_SHRINKAGE_PRIOR = {'mu_intercept': -1.5, 'sigma_intercept': 1.0,
 LAPSE_PRIOR = {'mu_intercept': -5.3, 'sigma_intercept': 1.0,
                'cauchy_sigma_intercept': 1.0, 'transform': 'logistic'}
 
+# Heavy-tailed noise kernels (perceptual and/or motor), tail weight eta in (0, 1):
+#     perceptual  k(d) ~ (1 + 2 kappa eta (1 - cos d)) ** (-1 / (2 eta))
+#     motor       k(d) ~ (1 + eta d**2 / sigma**2)       ** (-1 / (2 eta))
+# eta -> 0 is exactly the von Mises / Gaussian kernel with the same kappa / sigma;
+# the tails decay as |d| ** (-1 / eta), so eta = 0.5 is Cauchy-like and eta = 1/(nu+1)
+# matches a Student-t with nu degrees of freedom.  Motivation (abstract_values,
+# 2026-10): bid residuals have excess kurtosis 27 (MAD-SD 0.74 vs SD 1.91 CHF), and
+# the rate of >3 CHF misses per cell scales with mapping slope / orientation-prior
+# density (cross-mapping r = 0.89) -- the signature of heavy-tailed PERCEPTUAL noise
+# pushed through the mapping, not of a uniform lapse.  Logit -1.5: prior median
+# eta 0.18 (~ t with nu 4.5), 95% range ~0.03-0.6.
+TAIL_PRIOR = {'mu_intercept': -1.5, 'sigma_intercept': 1.0,
+              'cauchy_sigma_intercept': 1.0, 'transform': 'logistic'}
+
+
+def perceptual_kernel(kappa, cos_diff, tail=None):
+    """Unnormalised p(m | encoded location) in doubled-angle space.
+
+    ``cos_diff`` is cos(m - mu); ``kappa`` and ``tail`` broadcast against it.
+    ``tail=None`` is the von Mises exp(kappa (cos - 1)).
+    """
+    if tail is None:
+        return pt.exp(kappa * (cos_diff - 1.0))
+    return pt.exp(-pt.log1p(2.0 * kappa * tail * (1.0 - cos_diff)) / (2.0 * tail))
+
+
 # Idiosyncratic mapping offsets: one additive offset (CHF) per subject x
 # mapping x stimulus orientation on the INTERNAL mapping, i.e. a learned
 # look-up table with persistent errors.  offset = tau * z, z ~ N(0, 1)
@@ -550,7 +576,8 @@ class EfficientPerceptionModel(EstimationBaseModel):
                  fit_motor_noise=False, value_kernel='cell',
                  cardinal_peak_width=0.0, fit_mapping_shrinkage=False,
                  fit_mapping_offsets=False, fit_lapse=False,
-                 offset_group_mean=False, **kwargs):
+                 offset_group_mean=False, perceptual_tail=False, motor_tail=False,
+                 **kwargs):
         """
         Parameters
         ----------
@@ -597,6 +624,12 @@ class EfficientPerceptionModel(EstimationBaseModel):
         # Free per-subject lapse rate.  The lapse is then mixed into the trial
         # distribution itself, so the fixed base-class lapse is switched off.
         self.fit_lapse = bool(fit_lapse)
+        # Heavy-tailed perceptual / motor noise (TAIL_PRIOR); the observer's
+        # decoding likelihood uses the same kernel as the encoding.
+        self.perceptual_tail = bool(perceptual_tail)
+        self.motor_tail = bool(motor_tail)
+        if self.motor_tail and not fit_motor_noise:
+            raise ValueError("motor_tail needs fit_motor_noise")
         super().__init__(paradigm, grid_resolution=grid_resolution, **kwargs)
         if self.fit_lapse:
             self.lapse_rate = 0.0
@@ -654,6 +687,10 @@ class EfficientPerceptionModel(EstimationBaseModel):
             pars['mapping_shrinkage'] = MAPPING_SHRINKAGE_PRIOR
         if self.fit_lapse:
             pars['lapse'] = LAPSE_PRIOR
+        if self.perceptual_tail:
+            pars['perceptual_tail'] = TAIL_PRIOR
+        if self.motor_tail:
+            pars['motor_tail'] = TAIL_PRIOR
         return pars
 
     def get_model_inputs(self, parameters):
@@ -671,6 +708,10 @@ class EfficientPerceptionModel(EstimationBaseModel):
             **({'mapping_shrinkage': self.subjectwise('mapping_shrinkage')}
                if self.fit_mapping_shrinkage else {}),
             **({'lapse': self.subjectwise('lapse')} if self.fit_lapse else {}),
+            **({'perceptual_tail': self.subjectwise('perceptual_tail')}
+               if self.perceptual_tail else {}),
+            **({'motor_tail': self.subjectwise('motor_tail')}
+               if self.motor_tail else {}),
             **({'mapping_offset': self._mapping_offsets(model)}
                if self.fit_mapping_offsets else {}),
             'orientation': model['orientation'],
@@ -820,14 +861,15 @@ class EfficientPerceptionModel(EstimationBaseModel):
         # constant over every axis that is renormalised downstream, so it cancels
         # exactly, while exp(k*cos) reaches 1.1e36 at the paper's top fitted
         # kappa of 83 and overflows outright in float32 above kappa ~ 89.
-        p_ms = pt.exp(
-            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - encoded_locs[:, :, None]) - 1.0)
-        )  # (S, K, M), unnormalised
+        tail = self._perceptual_tail(model_inputs)
+        p_ms = perceptual_kernel(
+            kappa_r[:, None, None],
+            ptm.cos(rep_grid[None, None, :] - encoded_locs[:, :, None]), tail)  # (S, K, M), unnormalised
 
         # Step 2: Bayesian decoding
-        likelihood = pt.exp(
-            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - ori_cdf[:, :, None]) - 1.0)
-        )  # (S, O, M), unnormalised
+        likelihood = perceptual_kernel(
+            kappa_r[:, None, None],
+            ptm.cos(rep_grid[None, None, :] - ori_cdf[:, :, None]), tail)  # (S, O, M), unnormalised
         posterior = likelihood * ori_prior[:, :, None]
         if self.no_seam_crossing:
             posterior = posterior * _seam_mask(ori_cdf, rep_grid, self.d_ori)
@@ -892,7 +934,12 @@ class EfficientPerceptionModel(EstimationBaseModel):
             return p_response
         sm = pt.specify_shape(model_inputs['sigma_motor'], (n_sub,))
         diff = val_grid[None, :, None] - val_grid[None, None, :]      # (1, V, V)
-        kern = pt.exp(-0.5 * (diff / sm[:, None, None]) ** 2)         # (S, V, V)
+        z2 = (diff / sm[:, None, None]) ** 2
+        if self.motor_tail:
+            eta = pt.specify_shape(model_inputs['motor_tail'], (n_sub,))[:, None, None]
+            kern = pt.exp(-pt.log1p(eta * z2) / (2.0 * eta))          # (S, V, V)
+        else:
+            kern = pt.exp(-0.5 * z2)                                   # (S, V, V)
         kern = kern / (pt.sum(kern, axis=-1, keepdims=True) * d_val + 1e-30)
 
         C = len(self.value_on_ori_grid)
@@ -970,6 +1017,12 @@ class EfficientPerceptionModel(EstimationBaseModel):
         off = pt.specify_shape(model_inputs['mapping_offset'], (n_sub, C, K))
         W = pt.as_tensor_variable(self.offset_basis)                     # (O+1, K)
         return pt.dot(off, W.T).dimshuffle(1, 0, 2)                      # (C, S, O+1)
+
+    def _perceptual_tail(self, model_inputs):
+        """(S, 1, 1) perceptual tail weight, or None (von Mises)."""
+        if not self.perceptual_tail:
+            return None
+        return model_inputs['perceptual_tail'][:, None, None]
 
     def _mix_lapse(self, trial_dist, model_inputs):
         """Mix a per-subject uniform lapse into the (T, R) trial distribution."""
@@ -1341,7 +1394,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                  fit_motor_noise=False, value_kernel='cell',
                  cardinal_peak_width=0.0, fit_mapping_shrinkage=False,
                  fit_mapping_offsets=False, fit_lapse=False,
-                 offset_group_mean=False, **kwargs):
+                 offset_group_mean=False, perceptual_tail=False, motor_tail=False,
+                 **kwargs):
         super().__init__(paradigm, perceptual_prior=perceptual_prior,
                          grid_resolution=grid_resolution,
                          rep_grid_resolution=rep_grid_resolution,
@@ -1355,6 +1409,7 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                          fit_mapping_shrinkage=fit_mapping_shrinkage,
                          fit_mapping_offsets=fit_mapping_offsets,
                          fit_lapse=fit_lapse, offset_group_mean=offset_group_mean,
+                         perceptual_tail=perceptual_tail, motor_tail=motor_tail,
                          **kwargs)
 
     def get_free_parameters(self):
@@ -1371,6 +1426,10 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
             pars['mapping_shrinkage'] = MAPPING_SHRINKAGE_PRIOR
         if self.fit_lapse:
             pars['lapse'] = LAPSE_PRIOR
+        if self.perceptual_tail:
+            pars['perceptual_tail'] = TAIL_PRIOR
+        if self.motor_tail:
+            pars['motor_tail'] = TAIL_PRIOR
         return pars
 
     def get_model_inputs(self, parameters):
@@ -1389,6 +1448,10 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
             **({'mapping_shrinkage': self.subjectwise('mapping_shrinkage')}
                if self.fit_mapping_shrinkage else {}),
             **({'lapse': self.subjectwise('lapse')} if self.fit_lapse else {}),
+            **({'perceptual_tail': self.subjectwise('perceptual_tail')}
+               if self.perceptual_tail else {}),
+            **({'motor_tail': self.subjectwise('motor_tail')}
+               if self.motor_tail else {}),
             **({'mapping_offset': self._mapping_offsets(model)}
                if self.fit_mapping_offsets else {}),
             'orientation': model['orientation'],
@@ -1490,14 +1553,15 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         # (Same as EfficientPerceptionModel steps 1-4)
 
         # p(m_s | theta_0) for each subject and unique stimulus
-        p_ms = pt.exp(
-            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - encoded_locs[:, :, None]) - 1.0)
-        )  # (S, K, M), unnormalised
+        tail = self._perceptual_tail(model_inputs)
+        p_ms = perceptual_kernel(
+            kappa_r[:, None, None],
+            ptm.cos(rep_grid[None, None, :] - encoded_locs[:, :, None]), tail)  # (S, K, M), unnormalised
 
         # Bayesian decoding
-        likelihood_ori = pt.exp(
-            kappa_r[:, None, None] * (ptm.cos(rep_grid[None, None, :] - ori_cdf[:, :, None]) - 1.0)
-        )  # (S, O, M), unnormalised
+        likelihood_ori = perceptual_kernel(
+            kappa_r[:, None, None],
+            ptm.cos(rep_grid[None, None, :] - ori_cdf[:, :, None]), tail)  # (S, O, M), unnormalised
         posterior_ori = likelihood_ori * ori_prior[:, :, None]
         if self.no_seam_crossing:
             posterior_ori = posterior_ori * _seam_mask(ori_cdf, rep_grid, self.d_ori)
