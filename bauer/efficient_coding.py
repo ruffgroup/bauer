@@ -932,8 +932,14 @@ class EfficientPerceptionModel(EstimationBaseModel):
         """
         if not self.fit_motor_noise:
             return p_response
+        # The kernel maps the value grid onto the full RESPONSE grid (down to
+        # RESPONSE_MIN), so motor noise -- not only a lapse -- can produce the
+        # sub-V_MIN bids; without it those bins are empty and a lapse-free
+        # model would put a hard 1e-12 floor under every such bid.
+        resp = pt.as_tensor_variable(self._get_response_grid())
+        self._motor_on_response_grid = True
         sm = pt.specify_shape(model_inputs['sigma_motor'], (n_sub,))
-        diff = val_grid[None, :, None] - val_grid[None, None, :]      # (1, V, V)
+        diff = val_grid[None, :, None] - resp[None, None, :]          # (1, V, R)
         z2 = (diff / sm[:, None, None]) ** 2
         if self.motor_tail:
             eta = pt.specify_shape(model_inputs['motor_tail'], (n_sub,))[:, None, None]
@@ -947,9 +953,10 @@ class EfficientPerceptionModel(EstimationBaseModel):
         V = int(self.grid_resolution)
         if layout == 'CSKV':
             p_response = p_response.dimshuffle(1, 0, 2, 3)            # -> (S,C,K,V)
+        R = len(self._get_response_grid())
         flat = pt.reshape(p_response, (n_sub, C * K, V))
         flat = pt.matmul(flat, kern) * d_val
-        out = pt.reshape(flat, (n_sub, C, K, V))
+        out = pt.reshape(flat, (n_sub, C, K, R))
         return out.dimshuffle(1, 0, 2, 3) if layout == 'CSKV' else out
 
     def _setup_offset_basis(self, paradigm):
@@ -1137,7 +1144,7 @@ class EfficientPerceptionModel(EstimationBaseModel):
         the lapse component somewhere to live and stop bin_probability from
         clipping a sub-2 CHF bid into the bottom bin."""
         n = getattr(self, '_n_response_pad', 0)
-        if not n:
+        if not n or getattr(self, '_motor_on_response_grid', False):
             return trial_dist
         return pt.concatenate(
             [pt.zeros((trial_dist.shape[0], n)), trial_dist], axis=1)
@@ -1367,7 +1374,7 @@ class EfficientValuationModel(EstimationBaseModel):
         the lapse component somewhere to live and stop bin_probability from
         clipping a sub-2 CHF bid into the bottom bin."""
         n = getattr(self, '_n_response_pad', 0)
-        if not n:
+        if not n or getattr(self, '_motor_on_response_grid', False):
             return trial_dist
         return pt.concatenate(
             [pt.zeros((trial_dist.shape[0], n)), trial_dist], axis=1)
