@@ -115,8 +115,27 @@ def max_resolvable_kappa(grid_resolution):
 VALUE_KERNELS = ('cell', 'point')
 
 
-def value_noise_kernel(x, mu, sigma, d, kind='cell'):
+# Variable-precision (heavy-tailed) value noise: the precision of the value
+# representation fluctuates from trial to trial, lambda = 1 / sigma_trial**2 ~
+# sigma**-2 * LogNormal(-s**2 / 2, s**2) (mean precision 1 / sigma**2). The
+# trial kernel is the Gaussian kernel averaged over lambda, by Gauss-Hermite
+# quadrature on fixed nodes so the tail weight stays differentiable. s is set
+# from a tail weight eta in (0, 1) (TAIL_PRIOR, as for the other kernels) via
+# the precision's squared coefficient of variation,
+#     CV**2 = exp(s**2) - 1 = 2 eta / (1 - eta).
+# For small eta that is CV**2 ~ 2 eta, the same as the perceptual kernel (von
+# Mises averaged over Gamma-distributed kappa, CV**2 = 2 eta), so the two tail
+# weights are comparable where they are small; the 1 / (1 - eta) lets the
+# value stage reach heavier tails than a log-normal with CV**2 <= 2 could.
+# eta -> 0 is the Gaussian kernel.
+VALUE_TAIL_NODES = 20
+
+
+def value_noise_kernel(x, mu, sigma, d, kind='cell', tail=None):
     """Unnormalised Gaussian value noise p(x | mu, sigma) on a grid of spacing d.
+
+    ``tail`` (eta, broadcasting against sigma) makes it the variable-precision
+    mixture described at VALUE_TAIL_NODES; None is the plain Gaussian.
 
     'cell' integrates the Gaussian over each grid cell [x - d/2, x + d/2]
     (a difference of erfs); 'point' evaluates the density at the grid points.
@@ -133,6 +152,18 @@ def value_noise_kernel(x, mu, sigma, d, kind='cell'):
     The upper tail uses erfc so that cells far above mu keep their (small)
     mass instead of cancelling to 0 in erf(a) - erf(b) with both near 1.
     """
+    if tail is not None:
+        nodes, weights = np.polynomial.hermite.hermgauss(VALUE_TAIL_NODES)
+        s = pt.sqrt(pt.log1p(2.0 * tail / (1.0 - tail)))
+        out = 0.0
+        for xk, wk in zip(nodes, weights):
+            # sigma_k = sigma / sqrt(lambda_k), log lambda_k = sqrt(2) s x_k - s^2 / 2
+            sig_k = sigma * pt.exp(-(np.sqrt(2.0) * s * xk - 0.5 * s ** 2) / 2.0)
+            k = value_noise_kernel(x, mu, sig_k, d, kind)
+            # 'cell' rows are probability masses already; 'point' needs the
+            # Gaussian normaliser for the components to mix in the right ratio.
+            out = out + (wk / np.sqrt(np.pi)) * (k if kind == 'cell' else k / sig_k)
+        return out
     if kind == 'point':
         return pt.exp(-0.5 * ((x - mu) / sigma) ** 2)
     if kind != 'cell':
@@ -1402,7 +1433,10 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
                  cardinal_peak_width=0.0, fit_mapping_shrinkage=False,
                  fit_mapping_offsets=False, fit_lapse=False,
                  offset_group_mean=False, perceptual_tail=False, motor_tail=False,
-                 **kwargs):
+                 value_tail=False, **kwargs):
+        # Heavy-tailed (variable-precision) value-representation noise; the
+        # observer decodes with the same kernel it encodes with.
+        self.value_tail = bool(value_tail)
         super().__init__(paradigm, perceptual_prior=perceptual_prior,
                          grid_resolution=grid_resolution,
                          rep_grid_resolution=rep_grid_resolution,
@@ -1437,6 +1471,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
             pars['perceptual_tail'] = TAIL_PRIOR
         if self.motor_tail:
             pars['motor_tail'] = TAIL_PRIOR
+        if self.value_tail:
+            pars['value_tail'] = TAIL_PRIOR
         return pars
 
     def get_model_inputs(self, parameters):
@@ -1444,6 +1480,8 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         return {
             'kappa_r': self.subjectwise('kappa_r'),
             'sigma_rep': self.subjectwise('sigma_rep'),
+            **({'value_tail': self.subjectwise('value_tail')}
+               if self.value_tail else {}),
             **({'prior_weight': self.subjectwise('prior_weight')}
                if self.fit_prior_weight else {}),
             **({'cardinal_peak': self.subjectwise('cardinal_peak')}
@@ -1593,10 +1631,12 @@ class SequentialEfficientCodingModel(EfficientPerceptionModel):
         # val_cdfs: (C, N_v), val_grid: (N_rep) — same grid for both
         # Shape: (S, C, N_source_v, N_rep)
         rep_diffs = val_grid[None, None, None, :] - val_cdfs[None, :, :, None]  # (1, C, N, N)
+        v_tail = (model_inputs['value_tail'][:, None, None, None]
+                  if self.value_tail else None)
         p_mv_given_v = value_noise_kernel(val_grid[None, None, None, :],
                                           val_cdfs[None, :, :, None],
                                           sigma_rep[:, None, None, None], d_val,
-                                          self.value_kernel)
+                                          self.value_kernel, tail=v_tail)
         p_mv_given_v = p_mv_given_v / (pt.sum(p_mv_given_v, axis=-1, keepdims=True) * d_val + 1e-30)
 
         # Bayesian decoding in value space
