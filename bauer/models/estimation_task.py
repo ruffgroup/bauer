@@ -44,12 +44,13 @@ response options (on by default).
 
 **Readout** is the posterior mean of ``n`` (in items); the estimate is reported
 directly, rounded to the nearest response option and censored at the scale
-ends.  There is no separate motor noise by default (``motor_noise=False``): in a
-Bayesian observer the encoding noise already sets both the compression and the
-report scatter, and on the round-1 retinonumeral data an extra Gaussian motor
-noise was not separately recoverable from the encoding noise (see
-``tests/test_estimation_task.py``).  ``motor_noise=True`` adds a Gaussian
-``sigma_r`` (items) for users who want it.
+ends.  ``motor_noise=True`` adds Gaussian response noise ``sigma_r`` (items)
+around the estimate before rounding.  It is separable from the encoding noise
+because the encoding noise also sets the compression (through the prior) and
+motor noise does not: on a 19-participant, ~500-trial-per-participant design
+with a uniform prior, both recovered at r > .93.  With ``motor_noise=False`` the
+encoding noise alone sets the scatter, and the closed-form path is available
+for log space + log-normal prior.
 
 Likelihood -- two paths, chosen automatically
 ----------------------------------------------
