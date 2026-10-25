@@ -6,21 +6,28 @@ follows [Keep a Changelog](https://keepachangelog.com/) and semantic versioning.
 ## Unreleased (branch `estimation-model`)
 
 ### Added
-- `bauer.magnitude_estimation.MagnitudeEstimationModel`: hierarchical Bayesian
-  observer for magnitude estimation on a bounded, discrete (integer) response
-  scale. Options: Weber (log-normal), constant or power-law (`flexible`)
-  encoding noise; true (uniform), fitted (Gaussian / log-normal) or per-subject
-  empirical prior; posterior-mean or posterior-median readout; motor noise
-  discretised and censored at the scale ends; free per-subject lapse rate; and
-  optional leakage of a second, uncued magnitude (`mixture` = swap,
-  `average` = weighted report). The likelihood is an observed
-  `pm.Categorical`, so `pm.compute_log_likelihood` (LOO) and
-  `pm.sample_posterior_predictive` (simulated datasets) work directly.
-  `predict`, `predict_response_distribution`, `simulate` and `ppc` return
-  integer responses with lapses, censoring and leakage included.
-- `tests/test_magnitude_estimation.py`: build/gradient tests for every option,
-  analytic checks, single-subject MAP recovery and a hierarchical NUTS
-  recovery test (`slow`).
+- `bauer.models.EstimationTaskModel`: hierarchical Bayesian observer for
+  magnitude estimation on a bounded, discrete (integer) response scale, built
+  from a few components:
+  - encoding space `PowerSpace(alpha)` (Box-Cox; `alpha=None` = free,
+    hierarchical), with `LogSpace()` (Weber) and `LinearSpace()` (constant
+    noise) as fixed ends; efficient coding for a power-law prior is the same
+    family (documented);
+  - prior `UniformPrior(lo, hi)` (e.g. the task range) or `GaussianPrior()`
+    (Gaussian in the encoding space; log-normal for log space);
+  - posterior-mean readout, rounded and censored to the response scale;
+    uniform lapse (default on); optional Gaussian motor noise;
+  - optional subject-level covariates on a parameter's group mean
+    (`covariates={'nu': column}`).
+  Closed-form likelihood for log space + log-normal prior, otherwise an exact
+  grid path (n_hat(m) inverted at the response-option edges). Observed
+  `pm.Categorical` likelihood: LOO and posterior-predictive draws come from
+  PyMC directly. `simulate`, `predict`, `posterior_predictive`,
+  `parameter_recovery`.
+- `tests/test_estimation_task.py`: every component combination builds with
+  finite gradients, closed form = grid, alpha -> 0 = log, uniform-prior
+  compression, flat s.d. for linear + Gaussian, MAP and hierarchical NUTS
+  recovery (incl. free alpha), covariates.
 
 ## 0.5.0 (2026-10-18)
 

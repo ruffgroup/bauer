@@ -203,7 +203,8 @@ class EstimationTaskModel(EstimationBaseModel):
     def __init__(self, paradigm=None, encoding_space=None, prior=None, lapse=True,
                  motor_noise=False, response_range=(5, 25), n_ref=12.0,
                  n_measurement_grid=200, n_hypothesis_grid=246,
-                 hypothesis_range=(1.0, 50.0), **kwargs):
+                 hypothesis_range=(1.0, 50.0), covariates=None, **kwargs):
+        self.covariates = dict(covariates or {})
         self.encoding_space = encoding_space if encoding_space is not None else LogSpace()
         self.prior = prior if prior is not None else UniformPrior(4.5, 24.5)
         self.lapse = lapse
@@ -243,6 +244,42 @@ class EstimationTaskModel(EstimationBaseModel):
 
     def get_model_inputs(self, parameters):
         return {key: self.subjectwise(key) for key in self.free_parameters}
+
+    def build_hierarchical_nodes(self, name, mu_intercept=None, sigma_intercept=None,
+                                 cauchy_sigma_intercept=None, transform='identity', **kwargs):
+        """Hierarchical node, optionally with a subject-level covariate.
+
+        With ``covariates={name: column}`` the participant values of ``name``
+        (on the untransformed scale) are ``mu + beta * z_s + sd * offset_s``,
+        where ``z_s`` is the (standardised) column, constant within subject.
+        The slope is ``{name}_{column}``, prior N(0, sigma_intercept).
+        """
+        if name not in self.covariates:
+            return super().build_hierarchical_nodes(
+                name, mu_intercept=mu_intercept, sigma_intercept=sigma_intercept,
+                cauchy_sigma_intercept=cauchy_sigma_intercept, transform=transform, **kwargs)
+        if transform not in ('identity', 'softplus'):
+            raise NotImplementedError('covariates only for identity / softplus parameters')
+        from ..core import _group_sd_rv
+        col = self.covariates[name]
+        data = self.paradigm
+        z = pd.Series(data[col].values, index=data.index.get_level_values('subject'))
+        z = z.groupby(level=0, sort=False).first()
+        model = pm.Model.get_context()
+        z = z.loc[list(model.coords['subject'])].values.astype(float)
+        mu_name = f'{name}_mu' if transform == 'identity' else f'{name}_mu_untransformed'
+        group_mu = pm.Normal(mu_name, mu=mu_intercept, sigma=sigma_intercept)
+        if transform == 'softplus':
+            pm.Deterministic(f'{name}_mu', pt.softplus(group_mu))
+        beta = pm.Normal(f'{name}_{col}', mu=0.0, sigma=sigma_intercept)
+        group_sd = _group_sd_rv(f'{name}_sd', cauchy_sigma_intercept,
+                                getattr(self, 'group_sd_dist', 'halfnormal'))
+        offset = pm.Normal(f'{name}_offset', 0.0, 1.0, dims=('subject',))
+        x = group_mu + beta * z + group_sd * offset
+        if transform == 'identity':
+            return pm.Deterministic(name, x, dims=('subject',))
+        pm.Deterministic(f'{name}_untransformed', x, dims=('subject',))
+        return pm.Deterministic(name, pt.softplus(x), dims=('subject',))
 
     # ------------------------------------------------------------------
     def _setup_grids(self, paradigm=None):

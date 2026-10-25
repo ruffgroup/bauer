@@ -144,3 +144,14 @@ def test_hierarchical_nuts_recovery_free_alpha():
                                         random_seed=1)
     assert np.corrcoef(table['true']['nu'], table['recovered']['nu'])[0, 1] > 0.8
     assert np.corrcoef(table['true']['alpha'], table['recovered']['alpha'])[0, 1] > 0.6
+
+
+def test_subject_covariate_on_noise():
+    par = make_paradigm()
+    z = {1: -1.0, 2: 0.0, 3: 1.0}
+    par['z'] = [z[s] for s in par.index.get_level_values('subject')]
+    m = EstimationTaskModel(par, covariates={'nu': 'z'})
+    m.build_estimation_model(par, hierarchical=True)
+    assert 'nu_z' in m.estimation_model.named_vars
+    ip = m.estimation_model.initial_point()
+    assert np.all(np.isfinite(m.estimation_model.compile_dlogp()(ip)))
