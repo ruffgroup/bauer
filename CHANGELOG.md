@@ -3,6 +3,25 @@
 All notable changes to **bauer** are documented here. This project loosely
 follows [Keep a Changelog](https://keepachangelog.com/) and semantic versioning.
 
+## Unreleased (branch `estimation-model`)
+
+### Added
+- `bauer.magnitude_estimation.MagnitudeEstimationModel`: hierarchical Bayesian
+  observer for magnitude estimation on a bounded, discrete (integer) response
+  scale. Options: Weber (log-normal), constant or power-law (`flexible`)
+  encoding noise; true (uniform), fitted (Gaussian / log-normal) or per-subject
+  empirical prior; posterior-mean or posterior-median readout; motor noise
+  discretised and censored at the scale ends; free per-subject lapse rate; and
+  optional leakage of a second, uncued magnitude (`mixture` = swap,
+  `average` = weighted report). The likelihood is an observed
+  `pm.Categorical`, so `pm.compute_log_likelihood` (LOO) and
+  `pm.sample_posterior_predictive` (simulated datasets) work directly.
+  `predict`, `predict_response_distribution`, `simulate` and `ppc` return
+  integer responses with lapses, censoring and leakage included.
+- `tests/test_magnitude_estimation.py`: build/gradient tests for every option,
+  analytic checks, single-subject MAP recovery and a hierarchical NUTS
+  recovery test (`slow`).
+
 ## 0.5.0 (2026-10-18)
 
 The headline of this release is a much-extended `bauer.efficient_coding`
