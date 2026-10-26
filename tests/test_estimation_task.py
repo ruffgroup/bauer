@@ -330,3 +330,30 @@ def test_trial_covariates_reduce_to_plain_model_and_bin_finely():
     fine.build_estimation_model(par, hierarchical=True)
     l7, l50 = _resp_logp_at(both, eff), _resp_logp_at(fine, eff)
     assert abs(l7 - l50) / len(par) < 0.01            # < .01 nats per trial
+
+
+def test_prior_gaussian_in_items():
+    """space='n': a very wide prior equals the discrete uniform prior, and the prior (hence
+    predictions at fixed noise) does not depend on alpha through the prior."""
+    par = grid_paradigm()
+    pars = dict(nu=0.3, alpha=0.3, prior_mu=14.0, prior_sd=500.0, p_lapse=0.0)
+    m = EstimationTaskModel(par, encoding_space=PowerSpace(),
+                            prior=TruncatedGaussianPrior(5, 24, space='n'), lapse=False)
+    u = EstimationTaskModel(par, encoding_space=PowerSpace(),
+                            prior=UniformPrior(5, 24, discrete=True), lapse=False)
+    np.testing.assert_allclose(m.predict_response_distribution(par, pars).values,
+                               u.predict_response_distribution(par, pars).values, atol=1e-4)
+    # prior mass independent of alpha: evaluate the log-prior term directly
+    import pytensor.tensor as pt
+    for a in (-1.0, 0.0, 1.0):
+        inp = {'nu': pt.as_tensor([.3]), 'alpha': pt.as_tensor([a]),
+               'prior_mu': pt.as_tensor([12.0]), 'prior_sd': pt.as_tensor([4.0])}
+        m2 = EstimationTaskModel(par, encoding_space=PowerSpace(),
+                                 prior=TruncatedGaussianPrior(5, 24, space='n'), lapse=False)
+        mg, nh, _, _ = [x.eval() for x in m2.estimate_on_grid(inp, 1)]
+        # with very large noise the estimate is the prior mean, whatever alpha
+        inp['nu'] = pt.as_tensor([50.0])
+        mg, nh, _, _ = [x.eval() for x in m2.estimate_on_grid(inp, 1)]
+        k = np.arange(5, 25)
+        w = np.exp(-.5 * ((k - 12.0) / 4.0) ** 2)
+        np.testing.assert_allclose(nh[0, len(nh[0]) // 2], (w * k).sum() / w.sum(), atol=1e-2)

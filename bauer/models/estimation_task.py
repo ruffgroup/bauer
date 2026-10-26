@@ -198,7 +198,9 @@ class TruncatedGaussianPrior(GaussianPrior):
     ``discrete=True`` (default): mass only on the integers lo..hi, with weights
     proportional to the prior's density in n at each integer,
     ``N(f(k); mu_f, sd_f) * f'(k)`` (the same density-in-n convention as the
-    continuous prior, evaluated at the integers).  ``discrete=False``: the
+    continuous prior, evaluated at the integers).  ``space='n'``: Gaussian in
+    numerosity itself, mass on k proportional to N(k; prior_mu, prior_sd) with both
+    in ITEMS, so the prior does not depend on alpha.  ``discrete=False``: the
     continuous density with the mass outside [lo, hi] zeroed (e.g. lo = 4.5,
     hi = 24.5).  A narrow prior centred mid-range reproduces ``GaussianPrior``.
     A very wide one becomes uniform in the encoding space: ``UniformPrior``
@@ -206,11 +208,14 @@ class TruncatedGaussianPrior(GaussianPrior):
     """
     truncated = True
 
-    def __init__(self, lo, hi, discrete=True):
-        self.lo, self.hi, self.discrete = float(lo), float(hi), bool(discrete)
+    def __init__(self, lo, hi, discrete=True, space='internal'):
+        if space not in ('internal', 'n'):
+            raise ValueError("space must be 'internal' or 'n'")
+        self.lo, self.hi, self.discrete, self.space = float(lo), float(hi), bool(discrete), space
 
     def __repr__(self):
-        return f'TruncatedGaussianPrior({self.lo}, {self.hi}, discrete={self.discrete})'
+        return (f'TruncatedGaussianPrior({self.lo}, {self.hi}, discrete={self.discrete}, '
+                f'space={self.space!r})')
 
 
 # Alias in the spirit of the docs (log-normal when the space is log)
@@ -306,7 +311,12 @@ class EstimationTaskModel(EstimationBaseModel):
         if self.encoding_space.free:
             pars['alpha'] = dict(mu_intercept=0.5, sigma_intercept=0.5,
                                  cauchy_sigma_intercept=0.3, transform='identity')
-        if isinstance(self.prior, GaussianPrior):
+        if isinstance(self.prior, GaussianPrior) and getattr(self.prior, 'space', 'internal') == 'n':
+            pars['prior_mu'] = dict(mu_intercept=14.5, sigma_intercept=4.0,
+                                    cauchy_sigma_intercept=2.0, transform='softplus')
+            pars['prior_sd'] = dict(mu_intercept=6.0, sigma_intercept=3.0,
+                                    cauchy_sigma_intercept=1.5, transform='softplus')
+        elif isinstance(self.prior, GaussianPrior):
             pars['prior_mu'] = dict(mu_intercept=12.0, sigma_intercept=4.0,
                                     cauchy_sigma_intercept=2.0, transform='softplus')
             pars['prior_sd'] = dict(mu_intercept=-0.5, sigma_intercept=0.75,
@@ -496,6 +506,10 @@ class EstimationTaskModel(EstimationBaseModel):
         logmask = pt.log(pt.as_tensor_variable(self.prior_mask) + 1e-300)[None, :]
         if isinstance(self.prior, UniformPrior):
             logprior = logmask
+        elif getattr(self.prior, 'space', 'internal') == 'n':
+            # Gaussian in items, independent of alpha
+            logprior = (-0.5 * ((h[None, :] - inputs['prior_mu'][:, None])
+                                / inputs['prior_sd'][:, None]) ** 2 + logmask)
         else:
             mu_f = self.encoding_space.transform(inputs['prior_mu'], alpha)          # (S,)
             sd_f = inputs['prior_sd'] * inputs['prior_mu'] ** alpha
