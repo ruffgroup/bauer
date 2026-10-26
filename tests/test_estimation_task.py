@@ -269,3 +269,28 @@ def test_measurement_grid_accuracy(motor):
     pc = cur.predict_response_distribution(par, pars).values
     pr = ref.predict_response_distribution(par, pars).values
     assert np.abs(pc - pr).max() < 1e-3
+
+
+def test_condition_offsets():
+    """Two-level condition offsets: builds, finite gradient, and with zero offsets the
+    response likelihood equals the model without them."""
+    par = make_paradigm(n_subjects=3, n_trials=80)
+    par['side'] = np.where(np.arange(len(par)) % 2, 'right', 'left')
+    kw = dict(encoding_space=PowerSpace(), prior=TruncatedGaussianPrior(5, 24), motor_noise=True)
+    a = EstimationTaskModel(par, **kw)
+    a.build_estimation_model(par, hierarchical=True)
+    b = EstimationTaskModel(par, condition='side',
+                            condition_parameters=('alpha', 'nu', 'prior_mu', 'prior_sd', 'sigma_r'),
+                            **kw)
+    b.build_estimation_model(par, hierarchical=True)
+    assert 'nu_cond_mu' in b.estimation_model.named_vars
+    ipb = b.estimation_model.initial_point()
+    assert np.all(np.isfinite(b.estimation_model.compile_dlogp()(ipb)))
+    ipa = a.estimation_model.initial_point()
+
+    def resp_logp(m, ip):
+        mod = m.estimation_model
+        return mod.compile_fn(mod.logp(vars=[mod['response']]), inputs=mod.value_vars,
+                              on_unused_input='ignore')(ip)
+    la, lb = resp_logp(a, ipa), resp_logp(b, ipb)
+    np.testing.assert_allclose(la, lb, rtol=1e-10)

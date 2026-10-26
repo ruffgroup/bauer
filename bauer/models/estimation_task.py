@@ -266,8 +266,11 @@ class EstimationTaskModel(EstimationBaseModel):
     def __init__(self, paradigm=None, encoding_space=None, prior=None, lapse=True,
                  motor_noise=False, response_range=(5, 25), n_ref=12.0,
                  n_measurement_grid=None, n_hypothesis_grid=246,
-                 hypothesis_range=(1.0, 50.0), covariates=None, **kwargs):
+                 hypothesis_range=(1.0, 50.0), covariates=None, condition=None,
+                 condition_parameters=(), **kwargs):
         self.covariates = dict(covariates or {})
+        self.condition = condition
+        self.condition_parameters = tuple(condition_parameters)
         self.encoding_space = encoding_space if encoding_space is not None else LogSpace()
         self.prior = prior if prior is not None else UniformPrior(4.5, 24.5)
         self.lapse = lapse
@@ -389,6 +392,13 @@ class EstimationTaskModel(EstimationBaseModel):
         else:
             paradigm_['subject_ix'] = np.zeros(len(paradigm), dtype=int)
         paradigm_['n'] = paradigm['n'].values.astype(float)
+        if self.condition is not None:
+            vals = (paradigm.index.get_level_values(self.condition)
+                    if self.condition in paradigm.index.names else paradigm[self.condition].values)
+            self.condition_levels = sorted(pd.unique(vals))
+            if len(self.condition_levels) != 2:
+                raise ValueError('condition must have exactly two levels')
+            paradigm_['cond_ix'] = (np.asarray(vals) == self.condition_levels[1]).astype(int)
         # grid path works per unique magnitude (the graph captures n_unique at build)
         self.n_unique, paradigm_['n_ix'] = np.unique(paradigm_['n'], return_inverse=True)
         if 'response' in paradigm.columns:
@@ -544,11 +554,47 @@ class EstimationTaskModel(EstimationBaseModel):
             self.build_priors(hierarchical=hierarchical, flat_prior=flat_prior)
             self.build_likelihood(None, save_p_choice=save_p_choice)
 
+    def _condition_inputs(self, inputs, S):
+        """Per (participant, condition) parameters, 2S long (row 2s + c).
+
+        For each parameter in ``condition_parameters`` (on its untransformed scale):
+        x[s, c] = x_s + (1/2 - c) * (delta + delta_s), delta_s ~ N(0, sd) non-centred,
+        so ``{p}_cond_mu`` = delta is level 0 minus level 1 (condition_levels).
+        """
+        model = pm.Model.get_context()
+        sign = pt.as_tensor_variable(np.array([.5, -.5]))
+        out = {}
+        for k, v in inputs.items():
+            if k not in self.condition_parameters:
+                out[k] = pt.repeat(v, 2)
+                continue
+            spec = self.free_parameters[k]
+            tr = spec.get('transform', 'identity')
+            if tr not in ('identity', 'softplus'):
+                raise NotImplementedError(f'condition offsets for {tr} parameters')
+            base = v if tr == 'identity' else model[f'{k}_untransformed']
+            scale = spec.get('sigma_intercept', 1.0) / 2
+            d_mu = pm.Normal(f'{k}_cond_mu', 0.0, scale)
+            d_sd = pm.HalfNormal(f'{k}_cond_sd', spec.get('cauchy_sigma_intercept', .5) / 2)
+            d_off = pm.Normal(f'{k}_cond_offset', 0.0, 1.0, dims=('subject',))
+            delta = d_mu + d_sd * d_off                                     # (S,)
+            x = base[:, None] + sign[None, :] * delta[:, None]               # (S, 2)
+            x = x if tr == 'identity' else pt.softplus(x)
+            pm.Deterministic(f'{k}_by_condition', x, dims=('subject', 'condition'))
+            out[k] = x.reshape((2 * S,))
+        return out
+
     def build_likelihood(self, parameters, save_p_choice=False):
         model = pm.Model.get_context()
         inputs = self.get_model_inputs(parameters)
         S = len(model.coords['subject']) if 'subject' in model.coords else 1
-        p = self.trial_probabilities(inputs, model['n'], model['subject_ix'], S,
+        sub_ix = model['subject_ix']
+        if self.condition is not None:
+            model.add_coord('condition', [str(x) for x in self.condition_levels])
+            inputs = self._condition_inputs(inputs, S)
+            sub_ix = 2 * sub_ix + model['cond_ix']
+            S = 2 * S
+        p = self.trial_probabilities(inputs, model['n'], sub_ix, S,
                                      n_ix=model['n_ix'], n_unique=self.n_unique)
         if save_p_choice:
             p = pm.Deterministic('p_response', p)
