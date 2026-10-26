@@ -3,7 +3,7 @@
 All notable changes to **bauer** are documented here. This project loosely
 follows [Keep a Changelog](https://keepachangelog.com/) and semantic versioning.
 
-## Unreleased
+## 0.5.1 (2026-10-26)
 
 ### Fixed
 
