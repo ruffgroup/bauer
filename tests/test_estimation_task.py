@@ -251,3 +251,21 @@ def test_censoring_recovers_parameters_from_unfinished_movements():
         est[name] = fit.fit_map(progressbar=False)
     assert est['censored']['nu'] == pytest.approx(truth['nu'], rel=0.12)
     assert abs(est['ignored']['nu'] - truth['nu']) > abs(est['censored']['nu'] - truth['nu'])
+
+
+@pytest.mark.parametrize('motor', [True, False])
+def test_measurement_grid_accuracy(motor):
+    """Default grids against a fine, wide reference at strongly compressive, noisy
+    parameters (where mass near the grid ends matters most)."""
+    par = grid_paradigm()
+    pars = dict(nu=0.5, alpha=-1.2, prior_mu=17.0, prior_sd=0.5, p_lapse=0.0)
+    if motor:
+        pars['sigma_r'] = 1.8
+    kw = dict(encoding_space=PowerSpace(), prior=TruncatedGaussianPrior(5, 24), lapse=False,
+              motor_noise=motor)
+    cur = EstimationTaskModel(par, **kw)
+    ref = EstimationTaskModel(par, n_measurement_grid=4000, **kw)
+    ref.meas_t = np.linspace(-3, 4, 4000)
+    pc = cur.predict_response_distribution(par, pars).values
+    pr = ref.predict_response_distribution(par, pars).values
+    assert np.abs(pc - pr).max() < 1e-3

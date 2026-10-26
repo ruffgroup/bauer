@@ -265,7 +265,7 @@ class EstimationTaskModel(EstimationBaseModel):
 
     def __init__(self, paradigm=None, encoding_space=None, prior=None, lapse=True,
                  motor_noise=False, response_range=(5, 25), n_ref=12.0,
-                 n_measurement_grid=200, n_hypothesis_grid=246,
+                 n_measurement_grid=None, n_hypothesis_grid=246,
                  hypothesis_range=(1.0, 50.0), covariates=None, **kwargs):
         self.covariates = dict(covariates or {})
         self.encoding_space = encoding_space if encoding_space is not None else LogSpace()
@@ -274,6 +274,11 @@ class EstimationTaskModel(EstimationBaseModel):
         self.motor_noise = motor_noise
         self.response_range = tuple(int(x) for x in response_range)
         self.n_ref = float(n_ref)
+        # Accuracy (checked against M = 4000 over a 3.5x wider range, at fitted
+        # parameters): with motor noise 200 points give |dP| < 1e-4; without it the
+        # inversion of n_hat(m) needs ~600 for |dP| < 1e-3.
+        if n_measurement_grid is None:
+            n_measurement_grid = 200 if motor_noise else 600
         self.n_measurement_grid = int(n_measurement_grid)
         self.n_hypothesis_grid = int(n_hypothesis_grid)
         self.hypothesis_range = tuple(float(x) for x in hypothesis_range)
