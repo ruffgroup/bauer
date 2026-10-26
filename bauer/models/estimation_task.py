@@ -554,7 +554,7 @@ class EstimationTaskModel(EstimationBaseModel):
         # final position (still moving up when time ran out), -1 at most, 0 observed.
         R = len(self.response_options)
         pm.CustomDist('response', p, model['censor'], logp=_censored_logp(R),
-                      random=_censored_random, signature='(r),()->()',
+                      random=_censored_random, signature='(r),()->()', dtype='int64',
                       observed=model['response_ix'])
 
     # ------------------------------------------------------------------
@@ -635,7 +635,7 @@ class EstimationTaskModel(EstimationBaseModel):
             pp = pm.sample_posterior_predictive(az.InferenceData(posterior=thin),
                                                 var_names=['response'],
                                                 random_seed=random_seed, progressbar=False)
-        arr = pp.posterior_predictive['response'].values[0]
+        arr = pp.posterior_predictive['response'].values[0].astype(int)
         sim = self.response_options[arr].T
         out = pd.DataFrame(sim, index=self.paradigm.index,
                            columns=pd.Index(np.arange(len(sel)), name='ppc_sample'))
