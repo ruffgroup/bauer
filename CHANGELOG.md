@@ -3,6 +3,44 @@
 All notable changes to **bauer** are documented here. This project loosely
 follows [Keep a Changelog](https://keepachangelog.com/) and semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- **`EstimationBaseModel.ppc` was not a posterior predictive check.** It
+  returned, per posterior draw, the per-trial *mean and s.d. of the model's
+  response distribution* (`predicted_mean` / `predicted_sd` via
+  `pm.sample_posterior_predictive`), as raw InferenceData. A band built from
+  those means carries parameter uncertainty only -- no response noise, no
+  lapses, no discreteness -- so it is far too narrow for any statistic of
+  data (in the new test, ~8x too narrow for a binned group mean; true-model
+  replicates fall inside it ~15% of the time instead of 95%). `ppc` now
+  simulates one full replicate dataset per posterior draw on the paradigm's
+  trials (draws sampled jointly over chain x draw with a seed, subjects
+  aligned by the posterior coordinate, lapse included, optional
+  `response_step` rounding) and returns a long DataFrame indexed by
+  `('ppc_draw', *paradigm.index.names)` with `simulated_response`. Compute
+  the statistic per draw, then take quantiles over draws. **Signature
+  changed**: `ppc(paradigm, idata, n_draws=200, seed=0, parameters=None,
+  response_step=None, progressbar=False)`.
+- `EstimationBaseModel.simulate`: the inverse-CDF sampler normalises the CDF
+  to end at exactly 1, so a uniform draw can no longer fall above it and be
+  mapped to the bottom of the response range.
+
+### Added
+
+- `EstimationBaseModel.posterior_predicted_moments`: the per-trial expected
+  response and s.d. per posterior draw (what the old `ppc` computed), as a
+  tidy DataFrame. Documented as NOT a PPC -- for plotting the predicted curve
+  or scoring held-out means, never for bands on data statistics.
+- `bauer.estimation.posterior_subject_draws`: per-subject parameters for a
+  random subset of posterior draws, aligned by coordinate (raises on a
+  mismatch). `ppc_extra_parameters` class hook for posterior Deterministics
+  the trial density needs; `ppc` raises if rebuilding the model would draw
+  any quantity from its prior instead of the posterior.
+- `ppc` / `posterior_predicted_moments` compile the trial density once and
+  swap parameter values per draw (~0.1 s per draw instead of ~2 s).
+
 ## 0.5.0 (2026-10-18)
 
 The headline of this release is a much-extended `bauer.efficient_coding`

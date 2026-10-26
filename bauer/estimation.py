@@ -293,19 +293,22 @@ class EstimationBaseModel(BaseModel):
         }, index=paradigm.index)
         return result.join(paradigm)
 
-    def simulate(self, paradigm, parameters, n_samples=1):
-        """Draw simulated responses from the predicted distribution.
+    def _trial_distribution_function(self, paradigm, parameters, strict=False):
+        """Compile the per-trial response density once for this paradigm.
 
-        Parameters
-        ----------
-        paradigm : pd.DataFrame
-        parameters : dict or pd.DataFrame
-        n_samples : int
+        Returns ``(fn, set_parameters)``: ``fn()`` evaluates the
+        ``(n_trials, n_response_grid)`` density at the current parameter
+        values, and ``set_parameters(parameters)`` swaps in new values of the
+        same shapes without recompiling (used by :meth:`ppc`, where compiling
+        a graph per posterior draw would dominate the run time).
 
-        Returns
-        -------
-        pd.DataFrame with 'simulated_response' column, stacked over samples.
+        With ``strict=True`` it raises if rebuilding the model created any
+        random variable: a quantity the trial density needs that was not among
+        ``parameters`` would otherwise be drawn from its prior on every call,
+        silently replacing the posterior value.
         """
+        import pytensor
+
         if isinstance(parameters, pd.DataFrame):
             parameters = parameters.to_dict(orient='list')
 
@@ -318,34 +321,83 @@ class EstimationBaseModel(BaseModel):
             params = self.get_parameter_values()
             model_inputs = self.get_model_inputs(params)
             trial_dist = self._compute_trial_distributions(model_inputs)
-            pm.Deterministic('trial_dist', trial_dist)
 
-        trial_dist_np = pred_model['trial_dist'].eval()
+        if strict and pred_model.basic_RVs:
+            raise ValueError(
+                f"Rebuilding the model from {sorted(parameters)} created random "
+                f"variables {[v.name for v in pred_model.basic_RVs]}; the "
+                f"posterior must supply the quantities they feed (pass them in "
+                f"`parameters`, or list them in `ppc_extra_parameters`).")
+
+        fn = pytensor.function([], trial_dist)
+        keys = list(parameters)
+
+        def set_parameters(new):
+            if isinstance(new, pd.DataFrame):
+                new = new.to_dict(orient='list')
+            if set(new) != set(keys):
+                raise ValueError(f"parameters {sorted(new)} != compiled {sorted(keys)}")
+            for key in keys:
+                shared = pred_model[key]
+                shared.set_value(np.asarray(new[key], dtype=shared.dtype))
+
+        return fn, set_parameters
+
+    def _sample_responses(self, trial_dist_np, n_samples=1):
+        """Inverse-CDF draws from per-trial densities on the response grid.
+
+        Returns an ``(n_trials, n_samples)`` array.  Uses the global numpy RNG.
+        """
         response_grid = self._get_response_grid()
         dv = response_grid[1] - response_grid[0]
 
-        # Inverse CDF sampling.  The lapse is mixed in here, not only in
-        # bin_probability: without it simulated datasets are the no-lapse
-        # model, and any PPC built on them is checking a model the likelihood
-        # never fitted -- visible wherever the fitted distribution is sharp
-        # (e.g. under a hard category gate, where it is a spike).
+        # The lapse is mixed in here, not only in bin_probability: without it
+        # simulated datasets are the no-lapse model, and any PPC built on them
+        # is checking a model the likelihood never fitted -- visible wherever
+        # the fitted distribution is sharp (e.g. under a hard category gate,
+        # where it is a spike).
         pdf = trial_dist_np / (np.sum(trial_dist_np * dv, axis=-1, keepdims=True) + 1e-30)
         lapse_rate = getattr(self, 'lapse_rate', 0.0) or 0.0
         if lapse_rate:
             uniform = np.full_like(pdf, 1.0 / (response_grid[-1] - response_grid[0]))
             pdf = (1.0 - lapse_rate) * pdf + lapse_rate * uniform
 
+        cdf = np.cumsum(pdf * dv, axis=-1)
+        # Normalise so the last bin is exactly 1: otherwise a uniform draw
+        # above a CDF that tops out at 1 - eps finds no bin, and argmax
+        # silently returns bin 0 (the bottom of the response range).
+        cdf = cdf / cdf[:, -1:]
+
         all_samples = []
         for _ in range(n_samples):
             u = np.random.uniform(size=trial_dist_np.shape[0])
-            cdf = np.cumsum(pdf * dv, axis=-1)
             indices = np.argmax(cdf >= u[:, np.newaxis], axis=-1)
             # Add uniform jitter within the bin
             samples = response_grid[indices] + np.random.uniform(-dv / 2, dv / 2,
                                                                  size=len(indices))
             all_samples.append(samples)
 
-        all_samples = np.column_stack(all_samples)
+        return np.column_stack(all_samples)
+
+    def simulate(self, paradigm, parameters, n_samples=1):
+        """Draw simulated responses from the predicted distribution.
+
+        Responses are sampled from the full trial distribution mixed with the
+        lapse (``lapse_rate``), i.e. the same distribution the likelihood
+        scores.
+
+        Parameters
+        ----------
+        paradigm : pd.DataFrame
+        parameters : dict or pd.DataFrame
+        n_samples : int
+
+        Returns
+        -------
+        pd.DataFrame with 'simulated_response' column, stacked over samples.
+        """
+        fn, _ = self._trial_distribution_function(paradigm, parameters)
+        all_samples = self._sample_responses(fn(), n_samples)
 
         if not paradigm.index.name:
             paradigm.index.name = 'trial'
@@ -356,47 +408,193 @@ class EstimationBaseModel(BaseModel):
         data = data.join(paradigm)
         return data
 
-    def ppc(self, paradigm, idata, n_ppc_samples=1, var_names=None, progressbar=True):
-        """Posterior predictive check.
+    # Free parameters the posterior must supply for ``simulate`` / ``predict``.
+    # Subclasses whose trial distribution also reads a posterior Deterministic
+    # (e.g. a subject x condition x stimulus offset array) list its name here,
+    # otherwise rebuilding the model would silently replace it.
+    ppc_extra_parameters = ()
 
-        For each posterior draw, computes the predicted mean response per trial.
-        Optionally simulates responses.
+    def _ppc_parameter_names(self, parameters=None):
+        if parameters is not None:
+            return list(parameters)
+        return list(self.free_parameters) + list(self.ppc_extra_parameters)
+
+    def ppc(self, paradigm, idata, n_draws=200, seed=0, parameters=None,
+            response_step=None, progressbar=False):
+        """Posterior predictive check: simulated replicate datasets.
+
+        For each of ``n_draws`` posterior draws (sampled jointly over
+        ``(chain, draw)`` without replacement, with ``seed``), every
+        participant's parameters for that draw are taken -- aligned to the
+        paradigm's subjects by the posterior ``subject`` coordinate -- and ONE
+        full replicate dataset is simulated with :meth:`simulate` on exactly the
+        paradigm's trials.  ``simulate`` samples from the model's full response
+        distribution, including the lapse mixture, so each replicate carries
+        response noise, lapses and (with ``response_step``) the response
+        discretisation, as the observed data do.
+
+        Any statistic of the data (a binned mean, an s.d., a slope) must be
+        computed *per draw*, exactly as on the observed data; the predictive
+        band is a quantile of that statistic over draws.  Do NOT band the
+        per-trial predicted means (see :meth:`posterior_predicted_moments`):
+        that band ignores trial-level noise and is far too narrow.
 
         Parameters
         ----------
         paradigm : pd.DataFrame
-            Same trial-level data used for fitting.
+            Trial-level data with the paradigm columns (the ``response``
+            column, if present, is dropped from the output).  With several
+            subjects it needs a ``subject`` index level or column.
         idata : arviz.InferenceData
-            Posterior samples from MCMC.
-        n_ppc_samples : int
-            Number of simulated responses per posterior draw per trial.
+            Posterior samples (``idata.posterior``).
+        n_draws : int
+            Number of replicate datasets (capped at chains x draws).
+        seed : int
+            Seed for picking posterior draws AND for the simulation.  The
+            global numpy RNG state is restored afterwards.
+        parameters : list of str, optional
+            Posterior variables handed to ``simulate``.  Default: the model's
+            free parameters plus ``ppc_extra_parameters``.
+        response_step : float, optional
+            If the responses are discretised (e.g. integer estimates, bids in
+            steps of 0.5), round simulated responses to this step, then clip
+            to the response grid, so replicates match the data's resolution.
+            ``None`` (default) leaves them continuous.
         progressbar : bool
+            Print progress every 10 draws.
 
         Returns
         -------
-        pd.DataFrame with predicted_mean (and optionally simulated responses)
-            per trial, per (chain, draw).
+        pd.DataFrame
+            Index ``('ppc_draw', *paradigm.index.names)``; columns
+            ``simulated_response``, ``chain`` and ``draw`` (the posterior
+            sample the replicate came from), plus the paradigm columns.
+
+        Examples
+        --------
+        Group mean response per stimulus, observed vs 95% predictive band:
+
+        >>> sim = model.ppc(data, idata, n_draws=200, seed=1)
+        >>> # one group curve per replicate: subject means first, then the group
+        >>> curves = (sim.groupby(['ppc_draw', 'subject', 'n'])['simulated_response']
+        ...              .mean().groupby(['ppc_draw', 'n']).mean()
+        ...              .unstack('n'))                     # (n_draws, n_bins)
+        >>> lo, hi = curves.quantile(.025), curves.quantile(.975)
+        >>> obs = data.groupby(['subject', 'n'])['response'].mean().groupby('n').mean()
+        >>> coverage = ((obs >= lo) & (obs <= hi)).mean()   # should be ~.95
         """
-        # Rebuild the model with save_predictions=True
-        self._setup_grids(paradigm)
-        with pm.Model(coords={'subject': idata.posterior.coords.get('subject',
-                              paradigm.index.unique(level='subject') if 'subject' in paradigm.index.names else [0])}) as ppc_model:
-            paradigm_ = self._get_paradigm(paradigm=paradigm)
-            self.set_paradigm(paradigm_)
-            self.build_priors(hierarchical='subject' in paradigm.index.names)
-            parameters = self.get_parameter_values()
-            self.build_likelihood(parameters, save_p_choice=True)
+        names = self._ppc_parameter_names(parameters)
+        subjects = _paradigm_subjects(paradigm)
+        draws = posterior_subject_draws(idata, subjects, names, n_draws, seed=seed)
 
-        with ppc_model:
-            ppc_data = pm.sample_posterior_predictive(
-                idata, var_names=['predicted_mean', 'predicted_sd'],
-                progressbar=progressbar)
+        paradigm = paradigm.copy()
+        if paradigm.index.nlevels == 1 and paradigm.index.name is None:
+            paradigm.index.name = 'trial'
+        index_names = list(paradigm.index.names)
 
-        # Extract into a DataFrame
-        pred_mean = ppc_data.posterior_predictive['predicted_mean']  # (chain, draw, trial)
-        pred_sd = ppc_data.posterior_predictive['predicted_sd']
+        # A subclass that overrides ``simulate`` gets it called per draw.
+        # Otherwise the trial density is compiled once and only the parameter
+        # values are swapped per draw -- the same density and the same sampler
+        # as ``simulate``, without a graph compile per draw.
+        fast = type(self).simulate is EstimationBaseModel.simulate
+        if fast and draws:
+            fn, set_parameters = self._trial_distribution_function(
+                paradigm, draws[0][2], strict=True)
 
-        return ppc_data
+        state = np.random.get_state()
+        np.random.seed(seed)
+        try:
+            reps = []
+            for i, (chain, draw, pars) in enumerate(draws):
+                if fast:
+                    set_parameters(pars)
+                    sim = pd.DataFrame(
+                        {'simulated_response': self._sample_responses(fn(), 1)[:, 0]},
+                        index=paradigm.index)
+                else:
+                    sim = self.simulate(paradigm, pars, n_samples=1)
+                    sim = sim.droplevel('sample')[['simulated_response']]
+                sim['chain'] = chain
+                sim['draw'] = draw
+                reps.append(sim)
+                if progressbar and (i + 1) % 10 == 0:
+                    print(f'  ppc draw {i + 1}/{len(draws)}', flush=True)
+        finally:
+            np.random.set_state(state)
+
+        out = pd.concat(reps, keys=np.arange(len(reps)), names=['ppc_draw'])
+        out.index.names = ['ppc_draw'] + index_names
+
+        if response_step is not None:
+            grid = self._get_response_grid()
+            out['simulated_response'] = np.clip(
+                np.round(out['simulated_response'] / response_step) * response_step,
+                grid[0], grid[-1])
+
+        context = paradigm.drop(columns=['response'], errors='ignore')
+        context = context.drop(columns=[c for c in out.columns if c in context.columns])
+        return out.join(context)
+
+    def posterior_predicted_moments(self, paradigm, idata, n_draws=200, seed=0,
+                                    parameters=None):
+        """Per-trial mean and s.d. of the model's response distribution, per draw.
+
+        This is NOT a posterior predictive check.  ``predicted_mean`` is the
+        expectation of the response distribution on each trial; averaging it
+        over trials and taking quantiles over draws gives a band for the
+        *expected* statistic, which reflects parameter uncertainty only.  It
+        ignores response noise, lapses (the lapse mixture is not included in
+        these moments) and discreteness, so it is far too narrow to judge any
+        statistic of observed data (a binned mean, an s.d.) against.  Use
+        :meth:`ppc` for that.
+
+        It is useful for plotting the model's predicted curve (e.g. a posterior
+        median of the expected response per stimulus) or for scoring held-out
+        means.
+
+        Returns
+        -------
+        pd.DataFrame
+            Index ``('ppc_draw', *paradigm.index.names)``; columns
+            ``predicted_mean``, ``predicted_sd``, ``chain``, ``draw`` plus the
+            paradigm columns.
+        """
+        names = self._ppc_parameter_names(parameters)
+        subjects = _paradigm_subjects(paradigm)
+        paradigm = paradigm.copy()
+        if paradigm.index.nlevels == 1 and paradigm.index.name is None:
+            paradigm.index.name = 'trial'
+        index_names = list(paradigm.index.names)
+
+        draws = posterior_subject_draws(idata, subjects, names, n_draws, seed=seed)
+        fast = type(self).predict is EstimationBaseModel.predict
+        if fast and draws:
+            fn, set_parameters = self._trial_distribution_function(
+                paradigm, draws[0][2], strict=True)
+            response_grid = self._get_response_grid()
+            dv = float(response_grid[1] - response_grid[0])
+
+        reps = []
+        for chain, draw, pars in draws:
+            if fast:
+                # Same moments as ``predict``, from a density compiled once.
+                set_parameters(pars)
+                dist = fn()
+                dist = dist / (np.sum(dist * dv, axis=1, keepdims=True) + 1e-30)
+                mean = np.sum(dist * response_grid[None, :] * dv, axis=1)
+                var = np.sum(dist * (response_grid[None, :] - mean[:, None]) ** 2 * dv, axis=1)
+                pred = pd.DataFrame({'predicted_mean': mean,
+                                     'predicted_sd': np.sqrt(var + 1e-30)},
+                                    index=paradigm.index)
+            else:
+                pred = self.predict(paradigm, pars)[['predicted_mean', 'predicted_sd']]
+            pred['chain'] = chain
+            pred['draw'] = draw
+            reps.append(pred)
+        out = pd.concat(reps, keys=np.arange(len(reps)), names=['ppc_draw'])
+        out.index.names = ['ppc_draw'] + index_names
+        context = paradigm.drop(columns=['response'], errors='ignore')
+        return out.join(context)
 
     # ---- Grid-search MLE ----
 
@@ -476,3 +674,97 @@ class EstimationBaseModel(BaseModel):
         )
 
         return pd.DataFrame(results).set_index('subject')
+
+
+def _paradigm_subjects(paradigm):
+    """Subjects in the order ``_get_paradigm`` assigns ``subject_ix`` (first
+    appearance), or ``None`` for a paradigm without a subject level/column."""
+    if 'subject' in paradigm.index.names:
+        return list(pd.unique(paradigm.index.get_level_values('subject')))
+    if 'subject' in paradigm.columns:
+        return list(pd.unique(paradigm['subject']))
+    return None
+
+
+def posterior_subject_draws(idata, subjects, parameters, n_draws, seed=0):
+    """Per-subject parameters for a random subset of posterior draws.
+
+    Draws are picked jointly over ``(chain, draw)`` without replacement.  Each
+    posterior variable's subject axis is aligned to ``subjects`` through the
+    InferenceData coordinate; a subject the posterior has no parameters for
+    raises, and so does a subject axis without a coordinate whose length does
+    not match.  Matching is on ``str(subject)`` so ``1`` and ``'1'`` align.
+    Scalar (non-hierarchical) parameters are broadcast to every subject.
+
+    Parameters
+    ----------
+    idata : arviz.InferenceData or xarray.Dataset
+    subjects : list or None
+        Paradigm subjects, in ``subject_ix`` order.  ``None`` means a
+        single-subject paradigm without a subject level.
+    parameters : list of str
+    n_draws : int
+    seed : int
+
+    Returns
+    -------
+    list of (chain, draw, pars)
+        ``pars`` is a DataFrame indexed by subject when every parameter is one
+        number per subject, else a dict of arrays (parameters with extra axes
+        beyond the subject, e.g. subject x condition x stimulus), which
+        ``simulate`` / ``predict`` accept as well.
+    """
+    post = getattr(idata, 'posterior', idata)
+    single = subjects is None
+    n_sub = 1 if single else len(subjects)
+
+    n_chain, n_draw = post.sizes['chain'], post.sizes['draw']
+    rng = np.random.default_rng(seed)
+    picks = rng.choice(n_chain * n_draw, size=min(n_draws, n_chain * n_draw),
+                       replace=False)
+
+    aligned = {}
+    for par in parameters:
+        if par not in post:
+            raise KeyError(f"{par!r} not in posterior (have: {list(post.data_vars)})")
+        v = post[par]
+        sub_dims = [d for d in v.dims if d not in ('chain', 'draw')]
+        values = v.transpose('chain', 'draw', *sub_dims).values
+        if not sub_dims:
+            aligned[par] = np.repeat(values[:, :, None], n_sub, axis=2)
+            continue
+        dim = sub_dims[0]
+        coord = list(v.coords[dim].values) if dim in v.coords else None
+        if single:
+            if v.sizes[dim] != 1:
+                raise ValueError(
+                    f"{par}: posterior has {v.sizes[dim]} entries along {dim!r} "
+                    f"but the paradigm has no subject level; select one subject.")
+            aligned[par] = values
+        elif coord is not None:
+            # Positional fallback here would silently hand subject A's
+            # parameters to subject B's trials, which no plot would reveal.
+            lookup = {str(c): i for i, c in enumerate(coord)}
+            missing = [s for s in subjects if str(s) not in lookup]
+            if missing:
+                raise ValueError(
+                    f"{par}: posterior {dim!r} coordinate {coord[:6]} has no "
+                    f"parameters for paradigm subjects {missing[:6]}")
+            aligned[par] = values[:, :, [lookup[str(s)] for s in subjects]]
+        else:
+            if v.sizes[dim] != n_sub:
+                raise ValueError(f"{par} has {v.sizes[dim]} entries along {dim!r} "
+                                 f"for {n_sub} subjects")
+            aligned[par] = values
+
+    out = []
+    for flat in picks:
+        c, d = divmod(int(flat), n_draw)
+        per_sub = {p: aligned[p][c, d] for p in parameters}
+        if all(a.ndim == 1 for a in per_sub.values()):
+            pars = pd.DataFrame(per_sub, index=pd.Index(
+                [0] if single else subjects, name='subject'))
+        else:
+            pars = per_sub
+        out.append((int(post['chain'].values[c]), int(post['draw'].values[d]), pars))
+    return out
