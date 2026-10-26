@@ -16,7 +16,7 @@ import pytest
 warnings.filterwarnings('ignore')
 
 from bauer.models import (EstimationTaskModel, PowerSpace, LogSpace, LinearSpace,  # noqa: E402
-                          UniformPrior, GaussianPrior)
+                          UniformPrior, GaussianPrior, TruncatedGaussianPrior)
 
 
 def make_paradigm(n_subjects=3, n_trials=120, seed=0):
@@ -32,7 +32,8 @@ def grid_paradigm():
 
 
 SPACES = {'log': LogSpace, 'linear': LinearSpace, 'free': PowerSpace}
-PRIORS = {'uniform': lambda: UniformPrior(4.5, 24.5), 'gaussian': GaussianPrior}
+PRIORS = {'uniform': lambda: UniformPrior(4.5, 24.5), 'gaussian': GaussianPrior,
+          'truncated': lambda: TruncatedGaussianPrior(5, 24)}
 
 
 @pytest.mark.parametrize('space,prior,motor', itertools.product(SPACES, PRIORS, (False, True)))
@@ -47,7 +48,7 @@ def test_builds_and_finite_gradient(space, prior, motor):
     expected = {'nu', 'p_lapse'}
     if space == 'free':
         expected.add('alpha')
-    if prior == 'gaussian':
+    if prior in ('gaussian', 'truncated'):
         expected |= {'prior_mu', 'prior_sd'}
     if motor:
         expected.add('sigma_r')
@@ -155,3 +156,28 @@ def test_subject_covariate_on_noise():
     assert 'nu_z' in m.estimation_model.named_vars
     ip = m.estimation_model.initial_point()
     assert np.all(np.isfinite(m.estimation_model.compile_dlogp()(ip)))
+
+
+@pytest.mark.parametrize('space', ['log', 'linear'])
+def test_truncated_prior_limits(space):
+    """Narrow and mid-range = the untruncated Gaussian (both spaces). Very wide =
+    uniform in f_alpha space, which is uniform in n only for the linear space
+    (in log space it tends to a 1/n prior), so that limit is checked for linear."""
+    par = grid_paradigm()
+    sp = SPACES[space]
+    base = dict(nu=0.3, p_lapse=0.0)
+    wide = dict(base, prior_mu=14.0, prior_sd=50.0)
+    for discrete, uni in (((True, UniformPrior(5, 24, discrete=True)),
+                           (False, UniformPrior(4.5, 24.5))) if space == 'linear' else ()):
+        lo, hi = (5, 24) if discrete else (4.5, 24.5)
+        p_tr = EstimationTaskModel(par, encoding_space=sp(), prior=TruncatedGaussianPrior(
+            lo, hi, discrete=discrete), lapse=False).predict_response_distribution(par, wide).values
+        p_un = EstimationTaskModel(par, encoding_space=sp(), prior=uni,
+                                   lapse=False).predict_response_distribution(par, base).values
+        np.testing.assert_allclose(p_tr, p_un, atol=2e-3)
+    narrow = dict(base, prior_mu=14.0, prior_sd=0.08)
+    p_tr = EstimationTaskModel(par, encoding_space=sp(), prior=TruncatedGaussianPrior(
+        4.5, 24.5, discrete=False), lapse=False).predict_response_distribution(par, narrow).values
+    p_g = EstimationTaskModel(par, encoding_space=sp(), prior=GaussianPrior(),
+                              lapse=False).predict_response_distribution(par, narrow).values
+    np.testing.assert_allclose(p_tr, p_g, atol=2e-3)

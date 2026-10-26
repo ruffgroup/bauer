@@ -150,26 +150,57 @@ def LinearSpace():
 
 
 class UniformPrior:
-    """Uniform prior on [lo, hi] (items); no free parameters."""
-    free_parameters = ()
+    """Uniform prior on [lo, hi] (items); no free parameters.
 
-    def __init__(self, lo, hi):
-        self.lo, self.hi = float(lo), float(hi)
+    ``discrete=True``: equal mass on the integers lo, lo + 1, ..., hi (the
+    observer believes only in the magnitudes that can occur, e.g.
+    ``UniformPrior(5, 24, discrete=True)``).  Otherwise a continuous uniform
+    density on [lo, hi] (for integers 5..24 use ``UniformPrior(4.5, 24.5)``).
+    """
+    free_parameters = ()
+    truncated = True
+
+    def __init__(self, lo, hi, discrete=False):
+        self.lo, self.hi, self.discrete = float(lo), float(hi), bool(discrete)
 
     def __repr__(self):
-        return f'UniformPrior({self.lo}, {self.hi})'
+        return f'UniformPrior({self.lo}, {self.hi}, discrete={self.discrete})'
 
 
 class GaussianPrior:
     """Gaussian prior in the encoding space (log-normal for log space).
 
     Free parameters: ``prior_mu`` (centre, items) and ``prior_sd`` (width in
-    log units at the centre).
+    log units at the centre).  Its support is the whole hypothesis grid
+    (``hypothesis_range``), so it does not know the task's bounds.
     """
     free_parameters = ('prior_mu', 'prior_sd')
+    truncated = False
+    discrete = False
 
     def __repr__(self):
         return 'GaussianPrior()'
+
+
+class TruncatedGaussianPrior(GaussianPrior):
+    """``GaussianPrior`` restricted to [lo, hi] (the bounds participants know).
+
+    ``discrete=True`` (default): mass only on the integers lo..hi, with weights
+    proportional to the prior's density in n at each integer,
+    ``N(f(k); mu_f, sd_f) * f'(k)`` (the same density-in-n convention as the
+    continuous prior, evaluated at the integers).  ``discrete=False``: the
+    continuous density with the mass outside [lo, hi] zeroed (e.g. lo = 4.5,
+    hi = 24.5).  A narrow prior centred mid-range reproduces ``GaussianPrior``.
+    A very wide one becomes uniform in the encoding space: ``UniformPrior``
+    with the same support for the linear space, a 1/n prior for the log space.
+    """
+    truncated = True
+
+    def __init__(self, lo, hi, discrete=True):
+        self.lo, self.hi, self.discrete = float(lo), float(hi), bool(discrete)
+
+    def __repr__(self):
+        return f'TruncatedGaussianPrior({self.lo}, {self.hi}, discrete={self.discrete})'
 
 
 # Alias in the spirit of the docs (log-normal when the space is log)
@@ -221,7 +252,7 @@ class EstimationTaskModel(EstimationBaseModel):
     @property
     def closed_form(self):
         """True when the likelihood is computed analytically (no grid)."""
-        return (self.encoding_space.is_log and isinstance(self.prior, GaussianPrior)
+        return (self.encoding_space.is_log and type(self.prior) is GaussianPrior
                 and not self.motor_noise)
 
     # ------------------------------------------------------------------
@@ -290,16 +321,25 @@ class EstimationTaskModel(EstimationBaseModel):
         self.response_edges = np.concatenate(
             [[1e-3], self.response_options[:-1] + 0.5, [1e4]])
         h0, h1 = self.hypothesis_range
-        self.hyp_grid = np.linspace(h0, h1, self.n_hypothesis_grid)
-        self.d_hyp = self.hyp_grid[1] - self.hyp_grid[0]
-        # measurement grid in units of the hypothesis range in f-space
+        self.meas_range = (h0, h1)        # the measurement grid always spans f(h0)..f(h1)
+        if getattr(self.prior, 'discrete', False):
+            # the observer believes only in the integers lo..hi
+            self.hyp_grid = np.arange(self.prior.lo, self.prior.hi + 1, dtype=float)
+            self.d_hyp = 1.0
+            self.prior_mask = np.ones_like(self.hyp_grid)
+        else:
+            self.hyp_grid = np.linspace(h0, h1, self.n_hypothesis_grid)
+            self.d_hyp = self.hyp_grid[1] - self.hyp_grid[0]
+            if getattr(self.prior, 'truncated', False):
+                a, b = self.prior.lo, self.prior.hi
+                left = np.clip(self.hyp_grid - self.d_hyp / 2, a, b)
+                right = np.clip(self.hyp_grid + self.d_hyp / 2, a, b)
+                self.prior_mask = (right - left) / self.d_hyp      # fraction of each cell inside
+            else:
+                self.prior_mask = np.ones_like(self.hyp_grid)
+        self.prior_mask = self.prior_mask / self.prior_mask.sum()
+        # measurement grid in units of f(h1) - f(h0)
         self.meas_t = np.linspace(-0.5, 1.5, self.n_measurement_grid)
-        if isinstance(self.prior, UniformPrior):
-            a, b = self.prior.lo, self.prior.hi
-            left = np.clip(self.hyp_grid - self.d_hyp / 2, a, b)
-            right = np.clip(self.hyp_grid + self.d_hyp / 2, a, b)
-            w = right - left
-            self.uniform_prior_mass = w / w.sum()
 
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
         if paradigm is None:
@@ -359,18 +399,20 @@ class EstimationTaskModel(EstimationBaseModel):
         nu_f = self._nu_f(inputs, alpha)
         h = pt.as_tensor_variable(self.hyp_grid)
         fh = self._f(h, alpha)                                           # (S, H)
-        lo = fh[:, 0][:, None]
-        hi = fh[:, -1][:, None]
+        f_ends = self._f(pt.as_tensor_variable(np.array(self.meas_range)), alpha)   # (S, 2)
+        lo = f_ends[:, :1]
+        hi = f_ends[:, 1:]
         m = lo + pt.as_tensor_variable(self.meas_t)[None, :] * (hi - lo)  # (S, M)
         loglik = -0.5 * ((m[:, :, None] - fh[:, None, :]) / nu_f[:, None, None]) ** 2
+        logmask = pt.log(pt.as_tensor_variable(self.prior_mask) + 1e-300)[None, :]
         if isinstance(self.prior, UniformPrior):
-            logprior = pt.log(pt.as_tensor_variable(self.uniform_prior_mass) + 1e-300)[None, :]
+            logprior = logmask
         else:
             mu_f = self.encoding_space.transform(inputs['prior_mu'], alpha)          # (S,)
             sd_f = inputs['prior_sd'] * inputs['prior_mu'] ** alpha
             # density in n: N(f(h); mu_f, sd_f) * f'(h),  f'(h) = h^(alpha - 1)
             logprior = (-0.5 * ((fh - mu_f[:, None]) / sd_f[:, None]) ** 2
-                        + (alpha[:, None] - 1) * pt.log(h)[None, :])
+                        + (alpha[:, None] - 1) * pt.log(h)[None, :]) + logmask
         logpost = loglik + logprior[:, None, :]
         logpost = logpost - pt.max(logpost, axis=2, keepdims=True)
         post = pt.exp(logpost)

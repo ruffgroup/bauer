@@ -68,5 +68,5 @@ from .race import (
 from .estimation_task import (
     EstimationTaskModel,
     PowerSpace, LogSpace, LinearSpace,
-    UniformPrior, GaussianPrior, LogNormalPrior,
+    UniformPrior, GaussianPrior, LogNormalPrior, TruncatedGaussianPrior,
 )
