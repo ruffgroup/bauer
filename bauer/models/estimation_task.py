@@ -313,6 +313,8 @@ class EstimationTaskModel(EstimationBaseModel):
         else:
             paradigm_['subject_ix'] = np.zeros(len(paradigm), dtype=int)
         paradigm_['n'] = paradigm['n'].values.astype(float)
+        # grid path works per unique magnitude (the graph captures n_unique at build)
+        self.n_unique, paradigm_['n_ix'] = np.unique(paradigm_['n'], return_inverse=True)
         if 'response' in paradigm.columns:
             r = paradigm['response'].values.astype(float)
             if np.any(np.isnan(r)):
@@ -400,29 +402,42 @@ class EstimationTaskModel(EstimationBaseModel):
         out = pt.switch(pt.eq(below, M), m[:, -1:] + 1e3, out)
         return out                                                           # (S, V)
 
-    def _option_probs_grid(self, inputs, n, subject_ix, S):
+    def _option_table_grid(self, inputs, n_unique, S):
+        """(S, K, R) option probabilities for every participant x unique magnitude.
+
+        Computed per unique presented magnitude (K values), not per trial, and
+        gathered afterwards: the motor-noise integral over the measurement grid is
+        then an (S, K, M) x (S, M, R) batched matmul instead of a per-trial
+        (T, M, R) tensor (which made the motor-noise fits ~50x slower).
+        """
         m, n_hat, alpha, nu_f = self.estimate_on_grid(inputs, S)
-        fn = self.encoding_space.transform(n, alpha[subject_ix])            # (T,)
-        nu_t = nu_f[subject_ix]
+        nk = pt.as_tensor_variable(np.asarray(n_unique, dtype=float))
+        fn = self._f(nk, alpha)                                             # (S, K)
         if not self.motor_noise:
             m_edges = self._invert(m, n_hat, self.response_edges)          # (S, R+1)
-            z = (m_edges[subject_ix] - fn[:, None]) / nu_t[:, None]
+            z = (m_edges[:, None, :] - fn[:, :, None]) / nu_f[:, None, None]
             cdf = _norm_cdf(z)
-            return cdf[:, 1:] - cdf[:, :-1]
+            return cdf[:, :, 1:] - cdf[:, :, :-1]
         # motor noise: integrate the measurement density over the grid
-        dens = pt.exp(-0.5 * ((m[subject_ix] - fn[:, None]) / nu_t[:, None]) ** 2)
-        dens = dens / pt.sum(dens, axis=1, keepdims=True)                   # (T, M)
+        dens = pt.exp(-0.5 * ((m[:, None, :] - fn[:, :, None]) / nu_f[:, None, None]) ** 2)
+        dens = dens / pt.sum(dens, axis=2, keepdims=True)                   # (S, K, M)
         edges = pt.as_tensor_variable(self.response_edges)
         sig = inputs['sigma_r'][:, None, None]
         cdf = _norm_cdf((edges[None, None, :] - n_hat[:, :, None]) / sig)   # (S, M, R+1)
         kern = cdf[:, :, 1:] - cdf[:, :, :-1]                               # (S, M, R)
-        return pt.sum(dens[:, :, None] * kern[subject_ix], axis=1)
+        return pt.batched_dot(dens, kern)                                   # (S, K, R)
 
-    def trial_probabilities(self, inputs, n, subject_ix, S):
+    def trial_probabilities(self, inputs, n, subject_ix, S, n_ix=None, n_unique=None):
+        """Per-trial option probabilities (T, R).
+
+        Grid path: pass ``n_ix`` (index of each trial's magnitude into
+        ``n_unique``); the table is computed per unique magnitude.
+        """
         if self.closed_form:
             p = self._option_probs_closed(inputs, n, subject_ix)
         else:
-            p = self._option_probs_grid(inputs, n, subject_ix, S)
+            table = self._option_table_grid(inputs, n_unique, S)
+            p = table[subject_ix, n_ix]
         if self.lapse:
             lam = inputs['p_lapse'][subject_ix][:, None]
             p = (1 - lam) * p + lam / len(self.response_options)
@@ -449,7 +464,8 @@ class EstimationTaskModel(EstimationBaseModel):
         model = pm.Model.get_context()
         inputs = self.get_model_inputs(parameters)
         S = len(model.coords['subject']) if 'subject' in model.coords else 1
-        p = self.trial_probabilities(inputs, model['n'], model['subject_ix'], S)
+        p = self.trial_probabilities(inputs, model['n'], model['subject_ix'], S,
+                                     n_ix=model['n_ix'], n_unique=self.n_unique)
         if save_p_choice:
             p = pm.Deterministic('p_response', p)
         pm.Categorical('response', p=p, observed=model['response_ix'])
@@ -479,8 +495,11 @@ class EstimationTaskModel(EstimationBaseModel):
             arrs = {k: np.broadcast_to(np.atleast_1d(np.asarray(parameters[k], float)),
                                        (len(uniques),)).copy() for k in self.free_parameters}
         inputs = {k: pt.as_tensor_variable(v) for k, v in arrs.items()}
-        p = self.trial_probabilities(inputs, pt.as_tensor_variable(paradigm['n'].values.astype(float)),
-                                     pt.as_tensor_variable(codes), len(uniques)).eval()
+        n = paradigm['n'].values.astype(float)
+        n_unique, n_ix = np.unique(n, return_inverse=True)
+        p = self.trial_probabilities(inputs, pt.as_tensor_variable(n), pt.as_tensor_variable(codes),
+                                     len(uniques), n_ix=pt.as_tensor_variable(n_ix),
+                                     n_unique=n_unique).eval()
         return pd.DataFrame(p, index=paradigm.index,
                             columns=pd.Index(self.response_options.astype(int), name='response'))
 
