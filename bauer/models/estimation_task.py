@@ -69,8 +69,18 @@ Likelihood -- two paths, chosen automatically
   moves with alpha.  The two paths agree to < 1e-3 per option probability on
   the cases where both apply (tested).
 
-The per-trial likelihood is an observed ``pm.Categorical`` over the response
-options, so ``pm.compute_log_likelihood`` (LOO / ``az.compare``) and
+Censored (unfinished) responses
+-------------------------------
+A ``censor`` column (-1 / 0 / +1) marks reports that were cut short, e.g. a slider
+still moving away from its start when the response window closed: +1 means the
+intended report is at least the final position, -1 at most. Such a trial's
+likelihood is the summed probability of the response options beyond (and
+including) the final one, under the same model; no extra parameters. Without the
+column (or with all zeros) the likelihood is unchanged. Posterior-predictive
+draws are the intended (uncensored) reports.
+
+The per-trial likelihood is an observed ``pm.Categorical`` (``pm.CustomDist``
+with censoring) over the response options, so ``pm.compute_log_likelihood`` (LOO / ``az.compare``) and
 posterior-predictive sampling work directly.
 
 Example
@@ -205,6 +215,27 @@ class TruncatedGaussianPrior(GaussianPrior):
 
 # Alias in the spirit of the docs (log-normal when the space is log)
 LogNormalPrior = GaussianPrior
+
+
+def _censored_logp(R):
+    """Per-trial log-likelihood with optional censoring (see build_likelihood)."""
+    def logp(value, p, censor):
+        value = pt.cast(value, 'int64')
+        oh = pt.eq(pt.arange(R)[None, :], value[:, None])                  # (T, R)
+        p_obs = pt.sum(p * oh, axis=1)
+        cum = pt.cumsum(p, axis=1)
+        p_le = pt.sum(cum * oh, axis=1)                                     # P(option <= final)
+        p_ge = 1.0 - p_le + p_obs                                           # P(option >= final)
+        lik = pt.switch(pt.eq(censor, 0), p_obs, pt.switch(pt.gt(censor, 0), p_ge, p_le))
+        return pt.log(pt.clip(lik, 1e-12, 1.0))
+    return logp
+
+
+def _censored_random(p, censor, rng=None, size=None):
+    """Uncensored draws (the report the observer intended)."""
+    p = np.asarray(p)
+    u = rng.random(p.shape[:-1])[..., None]
+    return np.minimum((u > np.cumsum(p, axis=-1)).sum(-1), p.shape[-1] - 1)
 
 
 # ============================================================================
@@ -363,6 +394,12 @@ class EstimationTaskModel(EstimationBaseModel):
             paradigm_['response_ix'] = (r - rlo).astype(int)
         else:
             paradigm_['response_ix'] = np.zeros(len(paradigm), dtype=int)
+        self.censored = 'censor' in paradigm.columns
+        if self.censored:
+            c = paradigm['censor'].fillna(0).values.astype(int)
+            if not np.isin(c, (-1, 0, 1)).all():
+                raise ValueError('censor must be -1, 0 or +1')
+            paradigm_['censor'] = c
         return paradigm_
 
     # ------------------------------------------------------------------
@@ -510,7 +547,15 @@ class EstimationTaskModel(EstimationBaseModel):
                                      n_ix=model['n_ix'], n_unique=self.n_unique)
         if save_p_choice:
             p = pm.Deterministic('p_response', p)
-        pm.Categorical('response', p=p, observed=model['response_ix'])
+        if not getattr(self, 'censored', False):
+            pm.Categorical('response', p=p, observed=model['response_ix'])
+            return
+        # Censored responses: censor = +1 means the intended report is at least the
+        # final position (still moving up when time ran out), -1 at most, 0 observed.
+        R = len(self.response_options)
+        pm.CustomDist('response', p, model['censor'], logp=_censored_logp(R),
+                      random=_censored_random, signature='(r),()->()',
+                      observed=model['response_ix'])
 
     # ------------------------------------------------------------------
     # Prediction / simulation / PPC / recovery

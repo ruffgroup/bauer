@@ -181,3 +181,73 @@ def test_truncated_prior_limits(space):
     p_g = EstimationTaskModel(par, encoding_space=sp(), prior=GaussianPrior(),
                               lapse=False).predict_response_distribution(par, narrow).values
     np.testing.assert_allclose(p_tr, p_g, atol=2e-3)
+
+
+# ---------------------------------------------------------------------------
+# Censored (unfinished) responses
+# ---------------------------------------------------------------------------
+
+def _pointwise(m):
+    model = m.estimation_model
+    ip = model.initial_point()
+    # the Deterministic is a graph of RVs: replace them by their value variables,
+    # otherwise compile_fn evaluates p at random draws
+    p_val = model.replace_rvs_by_values([model['p_response']])[0]
+    fn = model.compile_fn([p_val, model.logp(vars=[model['response']], sum=False)[0]],
+                          inputs=model.value_vars, on_unused_input='ignore')
+    return fn(ip)
+
+
+def test_censor_zero_equals_categorical():
+    par = make_paradigm(n_subjects=2, n_trials=60)
+    a = EstimationTaskModel(par, prior=TruncatedGaussianPrior(5, 24), motor_noise=True)
+    a.build_estimation_model(par, hierarchical=True)
+    par_c = par.assign(censor=0)
+    b = EstimationTaskModel(par_c, prior=TruncatedGaussianPrior(5, 24), motor_noise=True)
+    b.build_estimation_model(par_c, hierarchical=True)
+    ip = a.estimation_model.initial_point()
+    np.testing.assert_allclose(a.estimation_model.compile_logp()(ip),
+                               b.estimation_model.compile_logp()(ip), rtol=1e-10)
+    np.testing.assert_allclose(a.estimation_model.compile_dlogp()(ip),
+                               b.estimation_model.compile_dlogp()(ip), rtol=1e-8)
+
+
+def test_censored_trial_probability_is_tail_sum():
+    par = make_paradigm(n_subjects=1, n_trials=30, seed=2).droplevel('subject')
+    par['censor'] = 0
+    par.iloc[0, par.columns.get_loc('censor')] = 1
+    par.iloc[1, par.columns.get_loc('censor')] = -1
+    m = EstimationTaskModel(par, motor_noise=True)
+    m.build_estimation_model(par, hierarchical=False, save_p_choice=True)
+    p, ll = _pointwise(m)
+    r = (par['response'].values - 5).astype(int)
+    np.testing.assert_allclose(np.exp(ll[0]), p[0, r[0]:].sum(), rtol=1e-8)
+    np.testing.assert_allclose(np.exp(ll[1]), p[1, :r[1] + 1].sum(), rtol=1e-8)
+    np.testing.assert_allclose(np.exp(ll[2:]), p[np.arange(2, len(r)), r[2:]], rtol=1e-8)
+
+
+def test_censoring_recovers_parameters_from_unfinished_movements():
+    """Simulate reports, then cut a third of them short (a slider moving from a random
+    start towards the report stops early). Fitting with censoring recovers nu; treating
+    the cut reports as observed does not."""
+    par = make_paradigm(n_subjects=1, n_trials=1500, seed=8).droplevel('subject')
+    truth = dict(nu=0.3, sigma_r=1.5, p_lapse=0.02)
+    gen = EstimationTaskModel(par, motor_noise=True)
+    data = gen.simulate(par, truth, rng=9).droplevel('sample').rename(
+        columns={'simulated_response': 'response'})
+    rng = np.random.default_rng(10)
+    start = rng.integers(5, 26, len(data))
+    dist = data['response'].values - start
+    cut = (rng.random(len(data)) < .33) & (np.abs(dist) >= 2)
+    frac = rng.uniform(.2, .8, len(data))
+    final = np.round(start + frac * dist).astype(int)
+    data['censor'] = 0
+    data.loc[cut, 'censor'] = np.sign(dist[cut]).astype(int)
+    data.loc[cut, 'response'] = final[cut]
+    est = {}
+    for name, d in (('censored', data), ('ignored', data.drop(columns='censor'))):
+        fit = EstimationTaskModel(d, motor_noise=True)
+        fit.build_estimation_model(d, hierarchical=False)
+        est[name] = fit.fit_map(progressbar=False)
+    assert est['censored']['nu'] == pytest.approx(truth['nu'], rel=0.12)
+    assert abs(est['ignored']['nu'] - truth['nu']) > abs(est['censored']['nu'] - truth['nu'])
