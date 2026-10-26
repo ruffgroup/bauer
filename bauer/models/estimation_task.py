@@ -267,8 +267,12 @@ class EstimationTaskModel(EstimationBaseModel):
                  motor_noise=False, response_range=(5, 25), n_ref=12.0,
                  n_measurement_grid=None, n_hypothesis_grid=246,
                  hypothesis_range=(1.0, 50.0), covariates=None, condition=None,
-                 condition_parameters=(), **kwargs):
+                 condition_parameters=(), measurement_shift=None, noise_modulator=None,
+                 n_covariate_bins=7, **kwargs):
         self.covariates = dict(covariates or {})
+        self.measurement_shift = measurement_shift
+        self.noise_modulator = noise_modulator
+        self.n_covariate_bins = int(n_covariate_bins)
         self.condition = condition
         self.condition_parameters = tuple(condition_parameters)
         self.encoding_space = encoding_space if encoding_space is not None else LogSpace()
@@ -292,7 +296,8 @@ class EstimationTaskModel(EstimationBaseModel):
     def closed_form(self):
         """True when the likelihood is computed analytically (no grid)."""
         return (self.encoding_space.is_log and type(self.prior) is GaussianPrior
-                and not self.motor_noise)
+                and not self.motor_noise and not getattr(self, 'measurement_shift', None)
+                and not getattr(self, 'noise_modulator', None))
 
     # ------------------------------------------------------------------
     def get_free_parameters(self):
@@ -309,6 +314,12 @@ class EstimationTaskModel(EstimationBaseModel):
         if self.motor_noise:
             pars['sigma_r'] = dict(mu_intercept=1.0, sigma_intercept=1.0,
                                    cauchy_sigma_intercept=0.75, transform='softplus')
+        if getattr(self, 'measurement_shift', None):
+            pars['shift_beta'] = dict(mu_intercept=0.0, sigma_intercept=0.5,
+                                      cauchy_sigma_intercept=0.25, transform='identity')
+        if getattr(self, 'noise_modulator', None):
+            pars['noise_gamma'] = dict(mu_intercept=0.0, sigma_intercept=0.5,
+                                       cauchy_sigma_intercept=0.25, transform='identity')
         if self.lapse:
             pars['p_lapse'] = dict(transform='beta', beta_mu_mean=0.05, beta_mu_kappa=8.0)
         return pars
@@ -392,6 +403,14 @@ class EstimationTaskModel(EstimationBaseModel):
         else:
             paradigm_['subject_ix'] = np.zeros(len(paradigm), dtype=int)
         paradigm_['n'] = paradigm['n'].values.astype(float)
+        for col, key in ((getattr(self, 'measurement_shift', None), 'shift'),
+                         (getattr(self, 'noise_modulator', None), 'noise')):
+            if col is None:
+                continue
+            ix, centres = self._bin_covariate(paradigm[col].values.astype(float),
+                                              np.asarray(paradigm_['subject_ix']))
+            paradigm_[f'{key}_bin'] = ix
+            setattr(self, f'{key}_centres', centres)
         if self.condition is not None:
             vals = (paradigm.index.get_level_values(self.condition)
                     if self.condition in paradigm.index.names else paradigm[self.condition].values)
@@ -416,6 +435,24 @@ class EstimationTaskModel(EstimationBaseModel):
                 raise ValueError('censor must be -1, 0 or +1')
             paradigm_['censor'] = c
         return paradigm_
+
+    def _bin_covariate(self, x, subject_ix):
+        """Within-participant quantile bins of a trial covariate.
+
+        Returns per-trial bin index and the (S, B) bin means (the value used for all
+        trials of a bin). Ties are broken by rank, so bins are equally filled.
+        """
+        B = self.n_covariate_bins
+        S = int(subject_ix.max()) + 1
+        ix = np.zeros(len(x), dtype=int)
+        centres = np.zeros((S, B))
+        for s_ in range(S):
+            m = subject_ix == s_
+            r = pd.Series(x[m]).rank(method='first').values
+            b = np.minimum((B * (r - 1) / m.sum()).astype(int), B - 1)
+            ix[m] = b
+            centres[s_] = [x[m][b == k].mean() for k in range(B)]
+        return ix, centres
 
     # ------------------------------------------------------------------
     # Observer
@@ -496,7 +533,7 @@ class EstimationTaskModel(EstimationBaseModel):
         out = pt.switch(pt.eq(below, M), m[:, -1:] + 1e3, out)
         return out                                                           # (S, V)
 
-    def _option_table_grid(self, inputs, n_unique, S):
+    def _option_table_grid(self, inputs, n_unique, S, shift_nu=None):
         """(S, K, R) option probabilities for every participant x unique magnitude.
 
         Computed per unique presented magnitude (K values), not per trial, and
@@ -507,6 +544,11 @@ class EstimationTaskModel(EstimationBaseModel):
         m, n_hat, alpha, nu_f = self.estimate_on_grid(inputs, S)
         nk = pt.as_tensor_variable(np.asarray(n_unique, dtype=float))
         fn = self._f(nk, alpha)                                             # (S, K)
+        if shift_nu is not None:
+            # measurement centres shifted by shift_nu (in units of nu_f): (S, K * Z)
+            Z = shift_nu.shape[1]
+            fn = (fn[:, :, None] + (nu_f[:, None] * shift_nu)[:, None, :]).reshape(
+                (fn.shape[0], fn.shape[1] * Z))
         if not self.motor_noise:
             m_edges = self._invert(m, n_hat, self.response_edges)          # (S, R+1)
             z = (m_edges[:, None, :] - fn[:, :, None]) / nu_f[:, None, None]
@@ -521,7 +563,8 @@ class EstimationTaskModel(EstimationBaseModel):
         kern = cdf[:, :, 1:] - cdf[:, :, :-1]                               # (S, M, R)
         return pt.batched_dot(dens, kern)                                   # (S, K, R)
 
-    def trial_probabilities(self, inputs, n, subject_ix, S, n_ix=None, n_unique=None):
+    def trial_probabilities(self, inputs, n, subject_ix, S, n_ix=None, n_unique=None,
+                            shift_nu=None):
         """Per-trial option probabilities (T, R).
 
         Grid path: pass ``n_ix`` (index of each trial's magnitude into
@@ -530,7 +573,7 @@ class EstimationTaskModel(EstimationBaseModel):
         if self.closed_form:
             p = self._option_probs_closed(inputs, n, subject_ix)
         else:
-            table = self._option_table_grid(inputs, n_unique, S)
+            table = self._option_table_grid(inputs, n_unique, S, shift_nu)
             p = table[subject_ix, n_ix]
         if self.lapse:
             lam = inputs['p_lapse'][subject_ix][:, None]
@@ -589,13 +632,37 @@ class EstimationTaskModel(EstimationBaseModel):
         inputs = self.get_model_inputs(parameters)
         S = len(model.coords['subject']) if 'subject' in model.coords else 1
         sub_ix = model['subject_ix']
+        n_ix = model['n_ix']
+        shift_nu = None
         if self.condition is not None:
+            if self.measurement_shift or self.noise_modulator:
+                raise NotImplementedError('condition offsets with trial covariates')
             model.add_coord('condition', [str(x) for x in self.condition_levels])
             inputs = self._condition_inputs(inputs, S)
             sub_ix = 2 * sub_ix + model['cond_ix']
             S = 2 * S
-        p = self.trial_probabilities(inputs, model['n'], sub_ix, S,
-                                     n_ix=model['n_ix'], n_unique=self.n_unique)
+        if self.noise_modulator:
+            # nu_t = nu * exp(gamma * u): one pseudo-participant per (participant, u bin);
+            # the observer decodes with its own trial noise
+            U = self.n_covariate_bins
+            uc = pt.as_tensor_variable(self.noise_centres)                 # (S, U)
+            scale = pt.exp(inputs['noise_gamma'][:, None] * uc).reshape((S * U,))
+            inputs = {k: pt.repeat(v, U) for k, v in inputs.items()}
+            inputs['nu'] = inputs['nu'] * scale
+            sub_ix = U * sub_ix + model['noise_bin']
+            shift_rows = pt.repeat(inputs['shift_beta'][::U], U) if self.measurement_shift else None
+            zc_rows = pt.repeat(pt.as_tensor_variable(self.shift_centres), U, axis=0) \
+                if self.measurement_shift else None
+            S = S * U
+        elif self.measurement_shift:
+            shift_rows = inputs['shift_beta']
+            zc_rows = pt.as_tensor_variable(self.shift_centres)
+        if self.measurement_shift:
+            # m ~ N(f(n) + beta * nu_f * z, nu_f^2): one stimulus position per (n, z bin)
+            shift_nu = shift_rows[:, None] * zc_rows                            # (S, Z)
+            n_ix = n_ix * self.n_covariate_bins + model['shift_bin']
+        p = self.trial_probabilities(inputs, model['n'], sub_ix, S, n_ix=n_ix,
+                                     n_unique=self.n_unique, shift_nu=shift_nu)
         if save_p_choice:
             p = pm.Deterministic('p_response', p)
         if not getattr(self, 'censored', False):

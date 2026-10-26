@@ -294,3 +294,39 @@ def test_condition_offsets():
                               on_unused_input='ignore')(ip)
     la, lb = resp_logp(a, ipa), resp_logp(b, ipb)
     np.testing.assert_allclose(la, lb, rtol=1e-10)
+
+
+def _resp_logp_at(m, values):
+    """Response log-likelihood with the given parameter values (by RV name)."""
+    mod = m.estimation_model
+    ip = mod.initial_point()
+    for k, v in values.items():
+        ip[k] = np.asarray(v, dtype=float)
+    return mod.compile_fn(mod.logp(vars=[mod['response']]), inputs=mod.value_vars,
+                          on_unused_input='ignore')(ip)
+
+
+def test_trial_covariates_reduce_to_plain_model_and_bin_finely():
+    par = make_paradigm(n_subjects=2, n_trials=150, seed=4)
+    rng = np.random.default_rng(5)
+    par['z'] = rng.normal(size=len(par))
+    par['u'] = rng.normal(size=len(par))
+    kw = dict(encoding_space=PowerSpace(), prior=TruncatedGaussianPrior(5, 24), motor_noise=True)
+    base = EstimationTaskModel(par, **kw)
+    base.build_estimation_model(par, hierarchical=False if False else True)
+    both = EstimationTaskModel(par, measurement_shift='z', noise_modulator='u', **kw)
+    both.build_estimation_model(par, hierarchical=True)
+    # zero effects: identical likelihood
+    zero = {'shift_beta_mu': 0.0, 'shift_beta_offset': np.zeros(2),
+            'noise_gamma_mu': 0.0, 'noise_gamma_offset': np.zeros(2)}
+    np.testing.assert_allclose(_resp_logp_at(base, {}), _resp_logp_at(both, zero), rtol=1e-10)
+    assert np.all(np.isfinite(both.estimation_model.compile_dlogp()(
+        both.estimation_model.initial_point())))
+    # 7 bins vs (nearly) per-trial evaluation, at sizeable effects
+    eff = {'shift_beta_mu': 0.4, 'shift_beta_offset': np.zeros(2),
+           'noise_gamma_mu': 0.3, 'noise_gamma_offset': np.zeros(2)}
+    fine = EstimationTaskModel(par, measurement_shift='z', noise_modulator='u',
+                               n_covariate_bins=50, **kw)
+    fine.build_estimation_model(par, hierarchical=True)
+    l7, l50 = _resp_logp_at(both, eff), _resp_logp_at(fine, eff)
+    assert abs(l7 - l50) / len(par) < 0.01            # < .01 nats per trial
