@@ -273,11 +273,17 @@ class EstimationTaskModel(EstimationBaseModel):
                  n_measurement_grid=None, n_hypothesis_grid=246,
                  hypothesis_range=(1.0, 50.0), covariates=None, condition=None,
                  condition_parameters=(), measurement_shift=None, noise_modulator=None,
-                 n_covariate_bins=7, leak=None, **kwargs):
+                 n_covariate_bins=7, leak=None, prior_leak=None, **kwargs):
         self.covariates = dict(covariates or {})
         # leak: column with a second (uncued) magnitude n_u; the measurement is centred on
         # (1 - w) f(n) + w f(n_u), the observer decodes it as if it came from n alone
         self.leak = leak
+        # prior_leak: column with n_u; the prior centre on that trial is mu + k (n_u - mu)
+        # (parameter prior_leak_k) and the observer decodes with that prior. With leak
+        # as well (same column), both act.
+        if leak and prior_leak and leak != prior_leak:
+            raise ValueError('leak and prior_leak must name the same column')
+        self.prior_leak = prior_leak
         self.measurement_shift = measurement_shift
         self.noise_modulator = noise_modulator
         self.n_covariate_bins = int(n_covariate_bins)
@@ -306,7 +312,8 @@ class EstimationTaskModel(EstimationBaseModel):
         return (self.encoding_space.is_log and type(self.prior) is GaussianPrior
                 and not self.motor_noise and not getattr(self, 'measurement_shift', None)
                 and not getattr(self, 'noise_modulator', None)
-                and not getattr(self, 'leak', None))
+                and not getattr(self, 'leak', None)
+                and not getattr(self, 'prior_leak', None))
 
     # ------------------------------------------------------------------
     def get_free_parameters(self):
@@ -337,6 +344,12 @@ class EstimationTaskModel(EstimationBaseModel):
         if getattr(self, 'leak', None):
             pars['leak_w'] = dict(mu_intercept=0.0, sigma_intercept=0.25,
                                   cauchy_sigma_intercept=0.1, transform='identity')
+        if getattr(self, 'prior_leak', None):
+            if not (isinstance(self.prior, GaussianPrior)
+                    and getattr(self.prior, 'space', 'internal') == 'n'):
+                raise NotImplementedError('prior_leak needs a Gaussian prior in items')
+            pars['prior_leak_k'] = dict(mu_intercept=0.0, sigma_intercept=0.25,
+                                        cauchy_sigma_intercept=0.1, transform='identity')
         if self.lapse:
             pars['p_lapse'] = dict(transform='beta', beta_mu_mean=0.05, beta_mu_kappa=8.0)
         return pars
@@ -437,11 +450,9 @@ class EstimationTaskModel(EstimationBaseModel):
             paradigm_['cond_ix'] = (np.asarray(vals) == self.condition_levels[1]).astype(int)
         # grid path works per unique magnitude (the graph captures n_unique at build)
         self.n_unique, paradigm_['n_ix'] = np.unique(paradigm_['n'], return_inverse=True)
-        if getattr(self, 'leak', None):
-            # per unique (n, n_u) pair instead
-            pairs = np.column_stack([paradigm_['n'], paradigm[self.leak].values.astype(float)])
-            self.n_unique, ix = np.unique(pairs, axis=0, return_inverse=True)
-            paradigm_['n_ix'] = np.asarray(ix).ravel()
+        if getattr(self, 'leak', None) or getattr(self, 'prior_leak', None):
+            self.n_unique, paradigm_['n_ix'] = self._pair_index(
+                paradigm_['n'], paradigm[self.leak or self.prior_leak].values)
         if 'response' in paradigm.columns:
             r = paradigm['response'].values.astype(float)
             if np.any(np.isnan(r)):
@@ -457,6 +468,21 @@ class EstimationTaskModel(EstimationBaseModel):
                 raise ValueError('censor must be -1, 0 or +1')
             paradigm_['censor'] = c
         return paradigm_
+
+    def _pair_index(self, n, u):
+        """(K, 2) table of (n, n_u) and each trial's row in it.
+
+        leak only: the unique pairs. With prior_leak: the full grid, n_u-major
+        (row = u_ix * N + n_ix), so the table can be computed per (participant, n_u).
+        """
+        n, u = np.asarray(n, float), np.asarray(u, float)
+        if not getattr(self, 'prior_leak', None):
+            pairs, ix = np.unique(np.column_stack([n, u]), axis=0, return_inverse=True)
+            return pairs, np.asarray(ix).ravel()
+        nv, n_ix = np.unique(n, return_inverse=True)
+        uv, u_ix = np.unique(u, return_inverse=True)
+        pairs = np.column_stack([np.tile(nv, len(uv)), np.repeat(uv, len(nv))])
+        return pairs, np.asarray(u_ix).ravel() * len(nv) + np.asarray(n_ix).ravel()
 
     def _bin_covariate(self, x, subject_ix):
         """Within-participant quantile bins of a trial covariate.
@@ -567,6 +593,8 @@ class EstimationTaskModel(EstimationBaseModel):
         then an (S, K, M) x (S, M, R) batched matmul instead of a per-trial
         (T, M, R) tensor (which made the motor-noise fits ~50x slower).
         """
+        if getattr(self, 'prior_leak', None):
+            return self._option_table_prior_leak(inputs, n_unique, S)
         m, n_hat, alpha, nu_f = self.estimate_on_grid(inputs, S)
         nk = np.asarray(n_unique, dtype=float)
         if getattr(self, 'leak', None):
@@ -594,6 +622,41 @@ class EstimationTaskModel(EstimationBaseModel):
         cdf = _norm_cdf((edges[None, None, :] - n_hat[:, :, None]) / sig)   # (S, M, R+1)
         kern = cdf[:, :, 1:] - cdf[:, :, :-1]                               # (S, M, R)
         return pt.batched_dot(dens, kern)                                   # (S, K, R)
+
+    def _option_table_prior_leak(self, inputs, n_unique, S):
+        """(S, U * N, R) option probabilities with the prior centre shifted by n_u.
+
+        ``n_unique`` is the full (n, n_u) grid from ``_pair_index`` (n_u-major). One
+        pseudo-participant per (participant, n_u): prior centre mu + k (n_u - mu), its
+        own estimate n_hat(m); the measurement is centred on f(n), or with ``leak`` on
+        (1 - w) f(n) + w f(n_u).
+        """
+        nk = np.asarray(n_unique, dtype=float)
+        nv, uv = np.unique(nk[:, 0]), np.unique(nk[:, 1])
+        N, U = len(nv), len(uv)
+        rows = {k: pt.repeat(v, U) for k, v in inputs.items()}               # row s * U + u
+        u_row = pt.as_tensor_variable(np.tile(uv, S))
+        mu = rows['prior_mu']
+        rows['prior_mu'] = mu + rows['prior_leak_k'] * (u_row - mu)
+        m, n_hat, alpha, nu_f = self.estimate_on_grid(rows, S * U)          # (SU, M)
+        fn = self._f(pt.as_tensor_variable(nv), alpha)                      # (SU, N)
+        if getattr(self, 'leak', None):
+            pick = pt.as_tensor_variable(np.tile(np.eye(U), (S, 1)))        # (SU, U)
+            fu = pt.sum(self._f(pt.as_tensor_variable(uv), alpha) * pick, axis=1)
+            w = rows['leak_w'][:, None]
+            fn = (1 - w) * fn + w * fu[:, None]
+        if not self.motor_noise:
+            m_edges = self._invert(m, n_hat, self.response_edges)          # (SU, R+1)
+            cdf = _norm_cdf((m_edges[:, None, :] - fn[:, :, None]) / nu_f[:, None, None])
+            p = cdf[:, :, 1:] - cdf[:, :, :-1]
+        else:
+            dens = pt.exp(-0.5 * ((m[:, None, :] - fn[:, :, None]) / nu_f[:, None, None]) ** 2)
+            dens = dens / pt.sum(dens, axis=2, keepdims=True)               # (SU, N, M)
+            edges = pt.as_tensor_variable(self.response_edges)
+            sig = rows['sigma_r'][:, None, None]
+            cdf = _norm_cdf((edges[None, None, :] - n_hat[:, :, None]) / sig)
+            p = pt.batched_dot(dens, cdf[:, :, 1:] - cdf[:, :, :-1])        # (SU, N, R)
+        return p.reshape((S, U * N, p.shape[-1]))
 
     def trial_probabilities(self, inputs, n, subject_ix, S, n_ix=None, n_unique=None,
                             shift_nu=None):
@@ -666,7 +729,7 @@ class EstimationTaskModel(EstimationBaseModel):
         sub_ix = model['subject_ix']
         n_ix = model['n_ix']
         shift_nu = None
-        if self.leak and (self.measurement_shift or self.noise_modulator):
+        if (self.leak or self.prior_leak) and (self.measurement_shift or self.noise_modulator):
             raise NotImplementedError('leak with trial covariates')
         if self.condition is not None:
             if self.measurement_shift or self.noise_modulator:
@@ -736,10 +799,8 @@ class EstimationTaskModel(EstimationBaseModel):
         inputs = {k: pt.as_tensor_variable(v) for k, v in arrs.items()}
         n = paradigm['n'].values.astype(float)
         n_unique, n_ix = np.unique(n, return_inverse=True)
-        if getattr(self, 'leak', None):
-            n_unique, n_ix = np.unique(np.column_stack([n, paradigm[self.leak].values.astype(float)]),
-                                       axis=0, return_inverse=True)
-            n_ix = np.asarray(n_ix).ravel()
+        if getattr(self, 'leak', None) or getattr(self, 'prior_leak', None):
+            n_unique, n_ix = self._pair_index(n, paradigm[self.leak or self.prior_leak].values)
         p = self.trial_probabilities(inputs, pt.as_tensor_variable(n), pt.as_tensor_variable(codes),
                                      len(uniques), n_ix=pt.as_tensor_variable(n_ix),
                                      n_unique=n_unique).eval()
