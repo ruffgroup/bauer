@@ -257,7 +257,10 @@ class EstimationTaskModel(EstimationBaseModel):
         index level for hierarchical fits.
     encoding_space : PowerSpace
     prior : UniformPrior or GaussianPrior
-    lapse : bool
+    lapse : bool or 'pooled'
+        True: per-subject lapse rate with a hierarchical Beta group prior; 'pooled': one
+        rate shared by all subjects (use when lapses are ~0 and the hierarchical
+        concentration is unidentified -- it funnels and saturates the NUTS tree depth).
     motor_noise : bool
     response_range : (int, int)
         Smallest and largest response option (inclusive integers, step 1).
@@ -375,7 +378,8 @@ class EstimationTaskModel(EstimationBaseModel):
             pars['swap_b'] = dict(mu_intercept=0.0, sigma_intercept=1.0,
                                   cauchy_sigma_intercept=0.5, transform='identity')
         if self.lapse:
-            pars['p_lapse'] = dict(transform='beta', beta_mu_mean=0.05, beta_mu_kappa=8.0)
+            pars['p_lapse'] = dict(transform='beta_pooled' if self.lapse == 'pooled' else 'beta',
+                                   beta_mu_mean=0.05, beta_mu_kappa=8.0)
         return pars
 
     def get_model_inputs(self, parameters):
