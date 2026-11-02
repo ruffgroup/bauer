@@ -135,16 +135,18 @@ def test_single_subject_map_recovery(space):
 
 @pytest.mark.slow
 def test_hierarchical_nuts_recovery_free_alpha():
-    par = make_paradigm(n_subjects=6, n_trials=400, seed=5)
+    # kept small so it runs in ~1.5 min (60 x 80 grid, 2 x 50 numpyro draws); 400 trials,
+    # a 120 x 150 grid and 2 x 300 pymc draws took about an hour on CI for the same answer
+    par = make_paradigm(n_subjects=6, n_trials=250, seed=5)
     rng = np.random.default_rng(6)
     truth = pd.DataFrame({'nu': rng.uniform(0.2, 0.5, 6), 'alpha': rng.uniform(-0.2, 1.0, 6),
                           'p_lapse': rng.uniform(0.01, 0.05, 6)},
                          index=pd.Index(np.arange(1, 7), name='subject'))
-    m = EstimationTaskModel(par, encoding_space=PowerSpace(), n_measurement_grid=120,
-                            n_hypothesis_grid=150)
-    table, idata = m.parameter_recovery(par, truth, rng=7, draws=300, tune=300, chains=2,
-                                        cores=1, target_accept=0.9, progressbar=False,
-                                        random_seed=1)
+    m = EstimationTaskModel(par, encoding_space=PowerSpace(), n_measurement_grid=60,
+                            n_hypothesis_grid=80)
+    table, idata = m.parameter_recovery(par, truth, rng=7, draws=50, tune=50, chains=2,
+                                        backend='numpyro', target_accept=0.8,
+                                        progressbar=False, random_seed=1)
     assert np.corrcoef(table['true']['nu'], table['recovered']['nu'])[0, 1] > 0.8
     assert np.corrcoef(table['true']['alpha'], table['recovered']['alpha'])[0, 1] > 0.6
 
