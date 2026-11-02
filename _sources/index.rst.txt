@@ -42,6 +42,7 @@ Quick start
 
    installation
    concepts
+   estimation_task
 
 .. toctree::
    :maxdepth: 2

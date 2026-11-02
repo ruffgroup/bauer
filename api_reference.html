@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Usage" href="usage.html"><link rel="prev" title="Lesson 10: Fixed vs random effects (fixed_regressors / random_regressors)" href="tutorial/lesson10_fixed_vs_random_effects.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>API Reference - bauer 0.5.1 documentation</title>
+        <title>API Reference - bauer 0.5.2 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">bauer 0.5.1 documentation</div></a>
+      <a href="index.html"><div class="brand">bauer 0.5.2 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">bauer 0.5.1 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.5.2 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -194,6 +194,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="concepts.html">Architecture &amp; Concepts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="estimation_task.html">Estimation tasks (continuous reports)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
@@ -264,7 +265,7 @@
 <dt class="sig sig-object py" id="bauer.core.BaseModel.build_hierarchical_nodes">
 <span class="sig-name descname"><span class="pre">build_hierarchical_nodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mu_intercept</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma_intercept</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cauchy_sigma_intercept</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transform</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'identity'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_value</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta_mu_mean</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta_mu_kappa</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta_kappa_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3.0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/core.html#BaseModel.build_hierarchical_nodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.core.BaseModel.build_hierarchical_nodes" title="Link to this definition">¶</a></dt>
 <dd><p>Build a hierarchical (group_mu, group_sd, per-subject offset) node.</p>
-<p><code class="docutils literal notranslate"><span class="pre">transform</span></code> ∈ {‘identity’, ‘softplus’, ‘logistic’, ‘beta’}. When
+<p><code class="docutils literal notranslate"><span class="pre">transform</span></code> ∈ {‘identity’, ‘softplus’, ‘logistic’, ‘beta’, ‘beta_pooled’}. When
 <code class="docutils literal notranslate"><span class="pre">transform</span></code> is ‘softplus’ and <code class="docutils literal notranslate"><span class="pre">min_value</span> <span class="pre">&gt;</span> <span class="pre">0</span></code>, the transformed
 parameter has a hard lower bound: <code class="docutils literal notranslate"><span class="pre">param</span> <span class="pre">=</span> <span class="pre">min_value</span> <span class="pre">+</span> <span class="pre">softplus(x)</span></code>.
 Used to keep e.g. the DDM/RDM threshold <code class="docutils literal notranslate"><span class="pre">a</span></code> away from the a→0 collapse
@@ -436,7 +437,7 @@ when most subjects lapse ≈ 0 (it avoids the logit funnel).</p>
 <dt class="sig sig-object py" id="bauer.core.RegressionModel.build_hierarchical_nodes">
 <span class="sig-name descname"><span class="pre">build_hierarchical_nodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mu_intercept</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma_intercept</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cauchy_sigma_intercept</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma_regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cauchy_sigma_regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.25</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transform</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'identity'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_value</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/core.html#RegressionModel.build_hierarchical_nodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.core.RegressionModel.build_hierarchical_nodes" title="Link to this definition">¶</a></dt>
 <dd><p>Build a hierarchical (group_mu, group_sd, per-subject offset) node.</p>
-<p><code class="docutils literal notranslate"><span class="pre">transform</span></code> ∈ {‘identity’, ‘softplus’, ‘logistic’, ‘beta’}. When
+<p><code class="docutils literal notranslate"><span class="pre">transform</span></code> ∈ {‘identity’, ‘softplus’, ‘logistic’, ‘beta’, ‘beta_pooled’}. When
 <code class="docutils literal notranslate"><span class="pre">transform</span></code> is ‘softplus’ and <code class="docutils literal notranslate"><span class="pre">min_value</span> <span class="pre">&gt;</span> <span class="pre">0</span></code>, the transformed
 parameter has a hard lower bound: <code class="docutils literal notranslate"><span class="pre">param</span> <span class="pre">=</span> <span class="pre">min_value</span> <span class="pre">+</span> <span class="pre">softplus(x)</span></code>.
 Used to keep e.g. the DDM/RDM threshold <code class="docutils literal notranslate"><span class="pre">a</span></code> away from the a→0 collapse
@@ -1068,7 +1069,7 @@ draw a dashed horizontal line at the group-mean posterior mean.</p></li>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=b9afe91b"></script>
+</div><script src="_static/documentation_options.js?v=8e576371"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
