@@ -265,13 +265,13 @@ class BaseModel(object):
                 pm.Flat(name)
             elif transform == 'softplus':
                 pm.HalfFlat(name)
-            elif transform in ('logistic', 'beta'):
+            elif transform in ('logistic', 'beta', 'beta_pooled'):
                 pm.Uniform(name, lower=0, upper=1)
             else:
                 raise NotImplementedError
             return
 
-        if transform == 'beta':
+        if transform in ('beta', 'beta_pooled'):
             # Single-subject Beta prior with the same small-mean / heavy-tail
             # shape used by the hierarchical 'beta' group prior (see
             # build_hierarchical_nodes). Concentration = beta_mu_kappa.
@@ -819,7 +819,7 @@ class BaseModel(object):
                                  beta_kappa_sd=3.0, **kwargs):
         """Build a hierarchical (group_mu, group_sd, per-subject offset) node.
 
-        ``transform`` ∈ {'identity', 'softplus', 'logistic', 'beta'}. When
+        ``transform`` ∈ {'identity', 'softplus', 'logistic', 'beta', 'beta_pooled'}. When
         ``transform`` is 'softplus' and ``min_value > 0``, the transformed
         parameter has a hard lower bound: ``param = min_value + softplus(x)``.
         Used to keep e.g. the DDM/RDM threshold ``a`` away from the a→0 collapse
@@ -855,6 +855,15 @@ class BaseModel(object):
         ``{name}_mu`` and ``{name}_kappa`` are exposed for reporting (so
         ``get_groupwise_parameter_estimates`` keeps working via ``{name}_mu``).
         """
+
+        if transform == 'beta_pooled':
+            # one rate shared by all subjects (prior as the 'beta' group mean); for rates
+            # ~ 0 with little information per subject, where the hierarchical Beta's
+            # concentration (kappa) is unidentified and the centred p[s] | kappa funnels
+            group_mu = pm.Beta(f'{name}_mu', alpha=beta_mu_mean * beta_mu_kappa,
+                               beta=(1.0 - beta_mu_mean) * beta_mu_kappa)
+            n_sub = len(pm.modelcontext(None).coords['subject'])
+            return pm.Deterministic(name, group_mu * pt.ones(n_sub), dims=('subject',))
 
         if transform == 'beta':
             a0 = beta_mu_mean * beta_mu_kappa
@@ -939,7 +948,9 @@ class BaseModel(object):
             def _spread(par):
                 if par + '_sd' in idata.posterior:
                     return idata.posterior[par + '_sd'].to_dataframe()
-                return idata.posterior[par + '_kappa'].to_dataframe()
+                if par + '_kappa' in idata.posterior:
+                    return idata.posterior[par + '_kappa'].to_dataframe()
+                return (0 * idata.posterior[par + '_mu']).to_dataframe()   # pooled: no spread
             sd_pars = pd.concat([_spread(par) for par in self.free_parameters], axis=1, keys=self.free_parameters, names=['parameter']).droplevel(1, axis=1)
             pars = pd.concat((mu_pars, sd_pars), keys=['mu', 'sd'], names=['type'], axis=1)
 
@@ -973,7 +984,7 @@ class BaseModel(object):
             if 'transform' not in pars.keys():
                 pars['transform'] = 'identity'
 
-            if pars['transform'] == 'beta':
+            if pars['transform'] in ('beta', 'beta_pooled'):
                 mean = pars.get('beta_mu_mean', 0.05)
                 kappa = pars.get('beta_mu_kappa', 8.0)
                 samples_pars[key] = np.random.beta(mean * kappa,
@@ -997,7 +1008,7 @@ class BaseModel(object):
     def forward_transform(self, data, parameter):
         transform = self.free_parameters[parameter]['transform']
 
-        if transform in ('identity', 'beta'):
+        if transform in ('identity', 'beta', 'beta_pooled'):
             # 'beta' rates already live in (0, 1) — natural == sampling scale.
             return data
         elif transform == 'softplus':
@@ -1008,7 +1019,7 @@ class BaseModel(object):
     def backward_transform(self, data, parameter):
         transform = self.free_parameters[parameter]['transform']
 
-        if transform in ('identity', 'beta'):
+        if transform in ('identity', 'beta', 'beta_pooled'):
             return data
         elif transform == 'softplus':
             return inverse_softplus_np(data)

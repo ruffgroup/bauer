@@ -3,6 +3,66 @@
 All notable changes to **bauer** are documented here. This project loosely
 follows [Keep a Changelog](https://keepachangelog.com/) and semantic versioning.
 
+## 0.5.2 (2026-11-02)
+
+A new observer model for magnitude *estimation* (a slider / integer response
+scale), `bauer.models.EstimationTaskModel`, developed for the retinonumeral
+paper (two simultaneous numerosities, one cued for report). No changes to
+existing models; the only change to shared code is a new `beta_pooled`
+transform in `bauer.core.build_hierarchical_nodes`.
+
+### Added
+- `bauer.models.EstimationTaskModel`: hierarchical Bayesian observer for
+  magnitude estimation on a bounded, discrete (integer) response scale, built
+  from a few components:
+  - encoding space `PowerSpace(alpha)` (Box-Cox; `alpha=None` = free,
+    hierarchical), with `LogSpace()` (Weber) and `LinearSpace()` (constant
+    noise) as fixed ends; efficient coding for a power-law prior is the same
+    family (documented);
+  - prior `UniformPrior(lo, hi)` (e.g. the task range) or `GaussianPrior()`
+    (Gaussian in the encoding space; log-normal for log space);
+  - posterior-mean readout, rounded and censored to the response scale;
+    uniform lapse (default on); optional Gaussian motor noise;
+  - optional subject-level covariates on a parameter's group mean
+    (`covariates={'nu': column}`).
+  Closed-form likelihood for log space + log-normal prior, otherwise an exact
+  grid path (n_hat(m) inverted at the response-option edges). Observed
+  `pm.Categorical` likelihood: LOO and posterior-predictive draws come from
+  PyMC directly. `simulate`, `predict`, `posterior_predictive`,
+  `parameter_recovery`.
+- `tests/test_estimation_task.py`: every component combination builds with
+  finite gradients, closed form = grid, alpha -> 0 = log, uniform-prior
+  compression, flat s.d. for linear + Gaussian, MAP and hierarchical NUTS
+  recovery (incl. free alpha), covariates.
+- `EstimationTaskModel` extensions:
+  - `TruncatedGaussianPrior(lo, hi, discrete=True, space='internal'|'n')`
+    (prior restricted to the known task bounds; `space='n'` = Gaussian in
+    items, independent of alpha) and a discrete `UniformPrior`;
+  - censored responses (per-trial `censor` column, -1 / 0 / +1, e.g.
+    time-outs at the slider ends);
+  - `condition=<column>, condition_parameters=(...)`: two-level condition
+    offsets (e.g. cued side) on chosen parameters;
+  - single-trial covariates: `measurement_shift` (shifts the measurement
+    mean) and `noise_modulator` (scales the encoding noise per trial; the
+    observer decodes with its trial noise);
+  - the influence of a second, uncued magnitude (`n_u`, a column):
+    `leak` (measurement centred on (1 - w) f(n) + w f(n_u)), `prior_leak`
+    (prior centre shifted towards n_u), `response_pull` (report centre pulled
+    towards n_u, weight growing with the encoding noise) and `swap`
+    (occasionally reporting the other magnitude, rate may depend on n).
+    Each reduces exactly to the plain model when its parameter is 0;
+  - `lapse='pooled'`: one lapse rate shared by all subjects (new
+    `beta_pooled` transform). Use it when lapses are near zero: the
+    hierarchical Beta concentration is then unidentified and NUTS funnels
+    (in one dataset 26 min -> >24 h with raised `target_accept`; pooled:
+    21-45 min, 0 divergences, identical other parameters);
+  - grid likelihood computed per unique magnitude (or magnitude pair) and
+    gathered per trial; 600-point measurement grid by default without
+    motor noise.
+- `tests/test_estimation_task.py` covers the extensions (each reduces to the
+  plain model, swap probability 1 = exchanged roles, pooled lapse = the
+  hierarchical model at equal rates).
+
 ## 0.5.1 (2026-10-26)
 
 ### Fixed
@@ -41,6 +101,7 @@ follows [Keep a Changelog](https://keepachangelog.com/) and semantic versioning.
 - `ppc` / `posterior_predicted_moments` compile the trial density once and
   swap parameter values per draw (~0.1 s per draw instead of ~2 s).
 
+||||||| d338120
 ## 0.5.0 (2026-10-18)
 
 The headline of this release is a much-extended `bauer.efficient_coding`

@@ -64,3 +64,9 @@ from .race import (
     RaceDiffusionPowerLawNoiseRiskRegressionModel,
     logp_race_diffusion_2,
 )
+
+from .estimation_task import (
+    EstimationTaskModel,
+    PowerSpace, LogSpace, LinearSpace,
+    UniformPrior, GaussianPrior, LogNormalPrior, TruncatedGaussianPrior,
+)
