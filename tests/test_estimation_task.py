@@ -4,7 +4,9 @@
 * the closed-form path (log space + log-normal prior) agrees with the grid path;
 * a uniform prior compresses, more so with more noise;
 * alpha -> 0 of the power space reproduces the log space;
-* simulate -> fit -> recover (single-subject MAP; hierarchical NUTS, ``slow``).
+* simulate -> fit -> recover (single-subject MAP; hierarchical NUTS, ``slow``);
+* the uncued-magnitude terms (leak, prior_leak, response_pull, swap) and the pooled lapse
+  reduce exactly to the plain model.
 """
 import itertools
 import warnings
@@ -357,3 +359,60 @@ def test_prior_gaussian_in_items():
         k = np.arange(5, 25)
         w = np.exp(-.5 * ((k - 12.0) / 4.0) ** 2)
         np.testing.assert_allclose(nh[0, len(nh[0]) // 2], (w * k).sum() / w.sum(), atol=1e-2)
+
+
+def _uncued_paradigm(seed=6):
+    par = make_paradigm(n_subjects=2, n_trials=100, seed=seed)
+    par['n_u'] = np.random.default_rng(seed + 1).integers(5, 25, len(par))
+    return par
+
+
+UNCUED_KW = dict(encoding_space=PowerSpace(), prior=TruncatedGaussianPrior(5, 24, space='n'),
+                 motor_noise=True)
+
+
+@pytest.mark.parametrize('term,zero', [
+    ('leak', {'leak_w_mu': 0.0, 'leak_w_offset': np.zeros(2)}),
+    ('prior_leak', {'prior_leak_k_mu': 0.0, 'prior_leak_k_offset': np.zeros(2)}),
+    ('response_pull', {'pull_k_mu': 0.0, 'pull_k_offset': np.zeros(2)}),
+    ('swap', {'swap_a_mu': -60.0, 'swap_a_offset': np.zeros(2),
+              'swap_b_mu': 0.0, 'swap_b_offset': np.zeros(2)}),
+])
+def test_uncued_terms_reduce_to_plain_model(term, zero):
+    """leak / prior_leak / response_pull / swap at zero effect = the model without them."""
+    par = _uncued_paradigm()
+    base = EstimationTaskModel(par, **UNCUED_KW)
+    base.build_estimation_model(par, hierarchical=True)
+    m = EstimationTaskModel(par, **{term: 'n_u'}, **UNCUED_KW)
+    m.build_estimation_model(par, hierarchical=True)
+    assert np.all(np.isfinite(m.estimation_model.compile_dlogp()(
+        m.estimation_model.initial_point())))
+    np.testing.assert_allclose(_resp_logp_at(base, {}), _resp_logp_at(m, zero), rtol=1e-8)
+
+
+def test_swap_probability_one_exchanges_roles():
+    par = _uncued_paradigm(seed=8)
+    m = EstimationTaskModel(par, swap='n_u', **UNCUED_KW)
+    m.build_estimation_model(par, hierarchical=True)
+    swapped = par.copy()
+    swapped['n'], swapped['n_u'] = par['n_u'].values, par['n'].values
+    base = EstimationTaskModel(swapped, **UNCUED_KW)
+    base.build_estimation_model(swapped, hierarchical=True)
+    one = {'swap_a_mu': 60.0, 'swap_a_offset': np.zeros(2),
+           'swap_b_mu': 0.0, 'swap_b_offset': np.zeros(2)}
+    np.testing.assert_allclose(_resp_logp_at(base, {}), _resp_logp_at(m, one), rtol=1e-8)
+
+
+def test_pooled_lapse_equals_hierarchical_at_equal_rates():
+    par = make_paradigm(n_subjects=3, n_trials=80, seed=9)
+    kw = dict(encoding_space=PowerSpace(), prior=TruncatedGaussianPrior(5, 24), motor_noise=True)
+    hier = EstimationTaskModel(par, **kw)
+    hier.build_estimation_model(par, hierarchical=True)
+    pooled = EstimationTaskModel(par, lapse='pooled', **kw)
+    pooled.build_estimation_model(par, hierarchical=True)
+    mod = pooled.estimation_model
+    assert 'p_lapse_kappa' not in mod.named_vars and 'p_lapse_log_kappa' not in mod.named_vars
+    assert np.all(np.isfinite(mod.compile_dlogp()(mod.initial_point())))
+    x = np.log(.03 / .97)
+    np.testing.assert_allclose(_resp_logp_at(hier, {'p_lapse_logodds__': np.full(3, x)}),
+                               _resp_logp_at(pooled, {'p_lapse_mu_logodds__': x}), rtol=1e-10)
