@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>bauer.models.psychophysics - bauer 0.5.2 documentation</title>
+        <title>bauer.models.psychophysics - bauer 0.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -160,7 +160,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../../index.html"><div class="brand">bauer 0.5.2 documentation</div></a>
+      <a href="../../../index.html"><div class="brand">bauer 0.6.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -181,7 +181,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.5.2 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.6.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -297,8 +297,10 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">PsychophysicalRegressionModel</span><span class="p">(</span><span class="n">RegressionModel</span><span class="p">,</span> <span class="n">PsychophysicalModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""PsychophysicalModel with patsy formula regression on nu and/or bias."""</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">regressors</span><span class="p">,</span> <span class="n">save_trialwise_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-        <span class="n">RegressionModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">regressors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">save_trialwise_estimates</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                 <span class="n">fixed_regressors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">random_regressors</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">RegressionModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regressors</span><span class="p">,</span> <span class="n">fixed_regressors</span><span class="o">=</span><span class="n">fixed_regressors</span><span class="p">,</span>
+                                 <span class="n">random_regressors</span><span class="o">=</span><span class="n">random_regressors</span><span class="p">)</span>
         <span class="n">PsychophysicalModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">)</span></div>
 
 
@@ -371,7 +373,7 @@
       
     </aside>
   </div>
-</div><script src="../../../_static/documentation_options.js?v=8e576371"></script>
+</div><script src="../../../_static/documentation_options.js?v=8fa8b3e9"></script>
     <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../../_static/scripts/furo.js?v=46bd48cc"></script>

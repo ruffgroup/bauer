@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Usage" href="usage.html"><link rel="prev" title="Lesson 10: Fixed vs random effects (fixed_regressors / random_regressors)" href="tutorial/lesson10_fixed_vs_random_effects.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>API Reference - bauer 0.5.2 documentation</title>
+        <title>API Reference - bauer 0.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">bauer 0.5.2 documentation</div></a>
+      <a href="index.html"><div class="brand">bauer 0.6.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">bauer 0.5.2 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.6.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -473,6 +473,30 @@ geometry without the logit funnel (the per-subject scale is set by the
 </section>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="bauer.core.RegressionModel.conditionwise_draws">
+<span class="sig-name descname"><span class="pre">conditionwise_draws</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conditions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/core.html#RegressionModel.conditionwise_draws"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.core.RegressionModel.conditionwise_draws" title="Link to this definition">¶</a></dt>
+<dd><p>Posterior draws of each parameter per condition, natural scale, long format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>conditions</strong> (<em>pd.DataFrame</em>) – One row per condition, with every column the regression formulas use
+(e.g. <code class="docutils literal notranslate"><span class="pre">condition</span></code> and <code class="docutils literal notranslate"><span class="pre">session_c=0</span></code> for “an average session”).</p></li>
+<li><p><strong>parameters</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><em>list</em></a><em> of </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>, </em><em>optional</em>) – Subset of free parameters (default: all).</p></li>
+<li><p><strong>group</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><em>bool</em></a>) – True: group-level (<code class="docutils literal notranslate"><span class="pre">{par}_mu</span></code>) values. False: every subject.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>pd.DataFrame with columns <code class="docutils literal notranslate"><span class="pre">parameter,</span> <span class="pre">chain,</span> <span class="pre">draw,</span> <span class="pre">[subject,]</span></code> the</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">conditions</span></code> columns, and <code class="docutils literal notranslate"><span class="pre">value</span></code>. Feed it to</p></li>
+<li><p><code class="xref py py-func docutils literal notranslate"><span class="pre">bauer.utils.summarize_posterior()</span></code> and the forest plots.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
 </dd></dl>
 
 </section>
@@ -497,14 +521,14 @@ Paradigm requires columns <code class="docutils literal notranslate"><span class
 
 <dl class="py class">
 <dt class="sig sig-object py" id="bauer.models.PsychophysicalRegressionModel">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychophysicalRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/psychophysics.html#PsychophysicalRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.PsychophysicalRegressionModel" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychophysicalRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fixed_regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/psychophysics.html#PsychophysicalRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.PsychophysicalRegressionModel" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#bauer.core.RegressionModel" title="bauer.core.RegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RegressionModel</span></code></a>, <a class="reference internal" href="#bauer.models.PsychophysicalModel" title="bauer.models.psychophysics.PsychophysicalModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">PsychophysicalModel</span></code></a></p>
 <p>PsychophysicalModel with patsy formula regression on nu and/or bias.</p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="bauer.models.PsychophysicalLapseRegressionModel">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychophysicalLapseRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/psychophysics.html#PsychophysicalLapseRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.PsychophysicalLapseRegressionModel" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">PsychophysicalLapseRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_trialwise_estimates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fixed_regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/psychophysics.html#PsychophysicalLapseRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.PsychophysicalLapseRegressionModel" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#bauer.core.LapseModel" title="bauer.core.LapseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">LapseModel</span></code></a>, <a class="reference internal" href="#bauer.models.PsychophysicalRegressionModel" title="bauer.models.psychophysics.PsychophysicalRegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">PsychophysicalRegressionModel</span></code></a></p>
 <p>PsychophysicalModel with both a lapse rate and patsy formula regression.</p>
 </dd></dl>
@@ -720,6 +744,264 @@ Paradigm requires columns <code class="docutils literal notranslate"><span class
 </dd></dl>
 
 </section>
+<section id="reproduction-models">
+<h2>Reproduction models<a class="headerlink" href="#reproduction-models" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.ReproductionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">ReproductionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">response_range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior_mu</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_prior_mu</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_prior_sd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_bias</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_lapse</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_motor_noise</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stimulus_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'stimulus'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">response_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'response'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/reproduction.html#ReproductionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.ReproductionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.BaseModel" title="bauer.core.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a></p>
+<p>Log-space Bayesian observer for reproduction tasks.</p>
+<p>Data columns: <code class="docutils literal notranslate"><span class="pre">stimulus</span></code> (positive, e.g. seconds), <code class="docutils literal notranslate"><span class="pre">response</span></code> (same
+units), and <code class="docutils literal notranslate"><span class="pre">subject</span></code> in the index for hierarchical fits.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>paradigm</strong> (<em>pd.DataFrame</em>)</p></li>
+<li><p><strong>response_range</strong> (<em>(</em><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><em>float</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><em>float</em></a><em>)</em><em>, </em><em>optional</em>) – Range of possible responses (natural units), used for the uniform
+lapse density. Default: observed range ± 20%.</p></li>
+<li><p><strong>prior_mu</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><em>float</em></a><em>, </em><em>optional</em>) – Observer prior on log stimulus. Default: mean and SD of
+<code class="docutils literal notranslate"><span class="pre">log(stimulus)</span></code> in <code class="docutils literal notranslate"><span class="pre">paradigm</span></code> (the presented distribution). When
+fitted, these are the starting points (prior centres) instead.</p></li>
+<li><p><strong>prior_sd</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><em>float</em></a><em>, </em><em>optional</em>) – Observer prior on log stimulus. Default: mean and SD of
+<code class="docutils literal notranslate"><span class="pre">log(stimulus)</span></code> in <code class="docutils literal notranslate"><span class="pre">paradigm</span></code> (the presented distribution). When
+fitted, these are the starting points (prior centres) instead.</p></li>
+<li><p><strong>fit_prior_mu</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><em>bool</em></a>) – Fit the prior mean <code class="docutils literal notranslate"><span class="pre">prior_mu</span></code> per subject (default True). Its group
+prior is centred on the presented mean.</p></li>
+<li><p><strong>fit_prior_sd</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><em>bool</em></a>) – Fit the prior width <code class="docutils literal notranslate"><span class="pre">prior_sd</span></code> per subject (default False: fixed at
+the presented SD). Identified from slope + spread when
+<code class="docutils literal notranslate"><span class="pre">fit_motor_noise</span></code> is False.</p></li>
+<li><p><strong>fit_bias</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><em>bool</em></a>) – Fit an additive measurement bias in log space (default False).
+Mutually exclusive with <code class="docutils literal notranslate"><span class="pre">fit_prior_mu</span></code> (same intercept).</p></li>
+<li><p><strong>fit_lapse</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><em>bool</em></a>) – Include the uniform lapse component (default True).</p></li>
+<li><p><strong>fit_motor_noise</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><em>bool</em></a>) – Add log-space motor noise <code class="docutils literal notranslate"><span class="pre">sigma_motor</span></code> (default False).</p></li>
+<li><p><strong>stimulus_col</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>) – Column names (defaults <code class="docutils literal notranslate"><span class="pre">'stimulus'</span></code> / <code class="docutils literal notranslate"><span class="pre">'response'</span></code>).</p></li>
+<li><p><strong>response_col</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>) – Column names (defaults <code class="docutils literal notranslate"><span class="pre">'stimulus'</span></code> / <code class="docutils literal notranslate"><span class="pre">'response'</span></code>).</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="bauer.models.ReproductionModel.ppc">
+<span class="sig-name descname"><span class="pre">ppc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_posterior_samples</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">200</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">progressbar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/reproduction.html#ReproductionModel.ppc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.ReproductionModel.ppc" title="Link to this definition">¶</a></dt>
+<dd><p>Posterior-predictive reproductions for the fitted data.</p>
+<p>Returns a DataFrame indexed by <code class="docutils literal notranslate"><span class="pre">paradigm.index</span></code> + <code class="docutils literal notranslate"><span class="pre">ppc_sample</span></code> with
+column <code class="docutils literal notranslate"><span class="pre">simulated_response</span></code> (natural units), like the choice models’
+<code class="docutils literal notranslate"><span class="pre">ppc</span></code>. Uses <code class="docutils literal notranslate"><span class="pre">n_posterior_samples</span></code> evenly thinned posterior draws.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="bauer.models.ReproductionModel.predicted_log_response">
+<span class="sig-name descname"><span class="pre">predicted_log_response</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">log_stimulus</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/reproduction.html#ReproductionModel.predicted_log_response"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.ReproductionModel.predicted_log_response" title="Link to this definition">¶</a></dt>
+<dd><p>Mean and SD of log reproductions (excluding lapses).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bauer.models.ReproductionRegressionModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">bauer.models.</span></span><span class="sig-name descname"><span class="pre">ReproductionRegressionModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paradigm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fixed_regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_regressors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/models/reproduction.html#ReproductionRegressionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.models.ReproductionRegressionModel" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#bauer.core.RegressionModel" title="bauer.core.RegressionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">RegressionModel</span></code></a>, <a class="reference internal" href="#bauer.models.ReproductionModel" title="bauer.models.reproduction.ReproductionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">ReproductionModel</span></code></a></p>
+<p><a class="reference internal" href="#bauer.models.ReproductionModel" title="bauer.models.ReproductionModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">ReproductionModel</span></code></a> with patsy formulas on any parameter.</p>
+<p><code class="docutils literal notranslate"><span class="pre">fixed_regressors</span></code>: population design per parameter;
+<code class="docutils literal notranslate"><span class="pre">random_regressors</span></code>: which terms also vary per subject (default:
+random intercept only). E.g. for a within-subject drug design:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">f</span> <span class="o">=</span> <span class="s2">"C(condition, Treatment('placebo')) + session_c"</span>
+<span class="n">ReproductionRegressionModel</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">fixed_regressors</span><span class="o">=</span><span class="p">{</span><span class="s1">'nu'</span><span class="p">:</span> <span class="n">f</span><span class="p">,</span> <span class="s1">'bias'</span><span class="p">:</span> <span class="n">f</span><span class="p">},</span>
+                            <span class="n">random_regressors</span><span class="o">=</span><span class="p">{</span><span class="s1">'nu'</span><span class="p">:</span> <span class="n">f</span><span class="p">,</span> <span class="s1">'bias'</span><span class="p">:</span> <span class="n">f</span><span class="p">})</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="posterior-summaries-and-plots">
+<h2>Posterior summaries and plots<a class="headerlink" href="#posterior-summaries-and-plots" title="Link to this heading">¶</a></h2>
+<p>See <a class="reference internal" href="usage.html#summarising-posteriors"><span class="std std-ref">Summarising and plotting posteriors</span></a> for how these fit together.</p>
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">RegressionModel.</span></span><span class="sig-name descname"><span class="pre">conditionwise_draws</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conditions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/core.html#RegressionModel.conditionwise_draws"><span class="viewcode-link"><span class="pre">[source]</span></span></a></dt>
+<dd><p>Posterior draws of each parameter per condition, natural scale, long format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>conditions</strong> (<em>pd.DataFrame</em>) – One row per condition, with every column the regression formulas use
+(e.g. <code class="docutils literal notranslate"><span class="pre">condition</span></code> and <code class="docutils literal notranslate"><span class="pre">session_c=0</span></code> for “an average session”).</p></li>
+<li><p><strong>parameters</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><em>list</em></a><em> of </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>, </em><em>optional</em>) – Subset of free parameters (default: all).</p></li>
+<li><p><strong>group</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><em>bool</em></a>) – True: group-level (<code class="docutils literal notranslate"><span class="pre">{par}_mu</span></code>) values. False: every subject.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>pd.DataFrame with columns <code class="docutils literal notranslate"><span class="pre">parameter,</span> <span class="pre">chain,</span> <span class="pre">draw,</span> <span class="pre">[subject,]</span></code> the</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">conditions</span></code> columns, and <code class="docutils literal notranslate"><span class="pre">value</span></code>. Feed it to</p></li>
+<li><p><code class="xref py py-func docutils literal notranslate"><span class="pre">bauer.utils.summarize_posterior()</span></code> and the forest plots.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.summaries.summarize_posterior">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.summaries.</span></span><span class="sig-name descname"><span class="pre">summarize_posterior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">draws</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'value'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hdi_prob</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.95</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_draws</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/summaries.html#summarize_posterior"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.summaries.summarize_posterior" title="Link to this definition">¶</a></dt>
+<dd><p>Posterior mean, 95% HDI and P(&gt; 0) per group of a long draws DataFrame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>draws</strong> (<em>DataFrame with one row per posterior draw</em><em> (</em><em>e.g. from</em>) – <code class="docutils literal notranslate"><span class="pre">model.conditionwise_draws</span></code>, <a class="reference internal" href="#bauer.utils.summaries.contrast_draws" title="bauer.utils.summaries.contrast_draws"><code class="xref py py-func docutils literal notranslate"><span class="pre">contrast_draws()</span></code></a> or
+<a class="reference internal" href="#bauer.utils.summaries.posterior_draws" title="bauer.utils.summaries.posterior_draws"><code class="xref py py-func docutils literal notranslate"><span class="pre">posterior_draws()</span></code></a>).</p></li>
+<li><p><strong>by</strong> (column name(s) to summarise per, e.g. <code class="docutils literal notranslate"><span class="pre">['parameter',</span> <span class="pre">'condition']</span></code>.) – Every column that distinguishes rows <em>within</em> a draw must be listed,
+otherwise different quantities are pooled into one summary.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>DataFrame with the <code class="docutils literal notranslate"><span class="pre">by</span></code> columns plus <code class="docutils literal notranslate"><span class="pre">mean</span></code>, <code class="docutils literal notranslate"><span class="pre">lo</span></code>, <code class="docutils literal notranslate"><span class="pre">hi</span></code> (HDI</p></li>
+<li><p>bounds) and <code class="docutils literal notranslate"><span class="pre">p_positive</span></code> (posterior probability that the value is above</p></li>
+<li><p><em>zero; meaningful for contrasts).</em></p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.summaries.contrast_draws">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.summaries.</span></span><span class="sig-name descname"><span class="pre">contrast_draws</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">draws</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">column</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'value'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/summaries.html#contrast_draws"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.summaries.contrast_draws" title="Link to this definition">¶</a></dt>
+<dd><p>Per-draw differences from a reference level of <code class="docutils literal notranslate"><span class="pre">column</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">contrast_draws(draws,</span> <span class="pre">'condition',</span> <span class="pre">'placebo')</span></code> gives, for every draw
+(and every parameter / subject), each condition minus placebo. The
+reference level itself is dropped. Level order is preserved.</p>
+<p>Rows are matched on <code class="docutils literal notranslate"><span class="pre">keys</span></code> (default: whichever of <code class="docutils literal notranslate"><span class="pre">parameter</span></code>,
+<code class="docutils literal notranslate"><span class="pre">subject</span></code>, <code class="docutils literal notranslate"><span class="pre">chain</span></code>, <code class="docutils literal notranslate"><span class="pre">draw</span></code> are present). Any other column must be
+constant (it is dropped) or listed in <code class="docutils literal notranslate"><span class="pre">keys</span></code>; a column that varies, such
+as <code class="docutils literal notranslate"><span class="pre">session_c</span></code> with different values per condition, raises.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.summaries.posterior_draws">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.summaries.</span></span><span class="sig-name descname"><span class="pre">posterior_draws</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transform</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/summaries.html#posterior_draws"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.summaries.posterior_draws" title="Link to this definition">¶</a></dt>
+<dd><p>Long draws for plain (non-regression) variables, e.g. <code class="docutils literal notranslate"><span class="pre">'nu'</span></code> with
+dims <code class="docutils literal notranslate"><span class="pre">(chain,</span> <span class="pre">draw,</span> <span class="pre">subject)</span></code> or the group mean <code class="docutils literal notranslate"><span class="pre">'nu_mu'</span></code>.</p>
+<p>For regression parameters (a <code class="docutils literal notranslate"><span class="pre">*_regressors</span></code> dimension) use
+<code class="docutils literal notranslate"><span class="pre">model.conditionwise_draws</span></code> instead: the raw coefficients are on the
+untransformed scale. <code class="docutils literal notranslate"><span class="pre">transform</span></code> is an optional callable applied to the
+values.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.summaries.ppc_summary">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.summaries.</span></span><span class="sig-name descname"><span class="pre">ppc_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ppc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subject_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'subject'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ppc_sample'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subject_level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.95</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/summaries.html#ppc_summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.summaries.ppc_summary" title="Link to this definition">¶</a></dt>
+<dd><p>Summarise simulated data the same way as the observed data.</p>
+<p>For every posterior-predictive sample: average <code class="docutils literal notranslate"><span class="pre">value</span></code> within each
+subject × <code class="docutils literal notranslate"><span class="pre">by</span></code> cell, then (unless <code class="docutils literal notranslate"><span class="pre">subject_level</span></code>) across subjects.
+Returns, per cell, the mean over samples (<code class="docutils literal notranslate"><span class="pre">pred</span></code>) and the central
+<code class="docutils literal notranslate"><span class="pre">interval</span></code> over samples (<code class="docutils literal notranslate"><span class="pre">lo</span></code>, <code class="docutils literal notranslate"><span class="pre">hi</span></code>). The band contains parameter
+uncertainty <strong>and</strong> sampling noise, so ~95% of observed cells should fall
+inside it (see <a class="reference internal" href="#bauer.utils.summaries.ppc_coverage" title="bauer.utils.summaries.ppc_coverage"><code class="xref py py-func docutils literal notranslate"><span class="pre">ppc_coverage()</span></code></a>).</p>
+<p><code class="docutils literal notranslate"><span class="pre">ppc</span></code> is long: one row per trial × sample, e.g. <code class="docutils literal notranslate"><span class="pre">model.ppc(...)</span></code> after
+<code class="docutils literal notranslate"><span class="pre">reset_index()</span></code> and joining the condition columns.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.summaries.ppc_observed">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.summaries.</span></span><span class="sig-name descname"><span class="pre">ppc_observed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subject_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'subject'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subject_level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/summaries.html#ppc_observed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.summaries.ppc_observed" title="Link to this definition">¶</a></dt>
+<dd><p>The observed counterpart of <a class="reference internal" href="#bauer.utils.summaries.ppc_summary" title="bauer.utils.summaries.ppc_summary"><code class="xref py py-func docutils literal notranslate"><span class="pre">ppc_summary()</span></code></a> (column <code class="docutils literal notranslate"><span class="pre">obs</span></code>).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.summaries.ppc_coverage">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.summaries.</span></span><span class="sig-name descname"><span class="pre">ppc_coverage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pred</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">obs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/summaries.html#ppc_coverage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.summaries.ppc_coverage" title="Link to this definition">¶</a></dt>
+<dd><p>Fraction of observed cells inside the predictive interval.</p>
+<p><code class="docutils literal notranslate"><span class="pre">by</span></code> must identify cells uniquely in both frames (pass <code class="docutils literal notranslate"><span class="pre">['subject',</span> <span class="pre">...]</span></code>
+for subject-level summaries), and every cell must be in both.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.diagnostics.convergence_report">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.diagnostics.</span></span><span class="sig-name descname"><span class="pre">convergence_report</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rhat_max</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ess_min</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">400</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_divergences</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/diagnostics.html#convergence_report"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.diagnostics.convergence_report" title="Link to this definition">¶</a></dt>
+<dd><p>r̂, bulk ESS and divergences, with a one-line verdict.</p>
+<p>By default checks every group-level variable (<code class="docutils literal notranslate"><span class="pre">*_mu</span></code>, <code class="docutils literal notranslate"><span class="pre">*_mu_untransformed</span></code>
+and <code class="docutils literal notranslate"><span class="pre">*_sd</span></code>): the ones that get interpreted and the group SDs, which are
+often the worst-mixing. Pass <code class="docutils literal notranslate"><span class="pre">var_names</span></code> to check others (e.g. the
+subject-level parameters). A NaN r̂ (a stuck or constant chain) counts as a
+failure.</p>
+<p>Returns the arviz diagnostics table; <code class="docutils literal notranslate"><span class="pre">table.attrs['ok']</span></code> is the verdict.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.diagnostics.trim_stuck_chains">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.diagnostics.</span></span><span class="sig-name descname"><span class="pre">trim_stuck_chains</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isolation_z</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/diagnostics.html#trim_stuck_chains"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.diagnostics.trim_stuck_chains" title="Link to this definition">¶</a></dt>
+<dd><p>Return <code class="docutils literal notranslate"><span class="pre">(trimmed_idata,</span> <span class="pre">report)</span></code> dropping chains isolated from the
+agreeing majority on the group-level <code class="docutils literal notranslate"><span class="pre">*_mu</span></code> parameters.</p>
+<p>A chain is dropped only if its robust z-distance (over standardized
+group-level means) from the chain-median exceeds <code class="docutils literal notranslate"><span class="pre">isolation_z</span></code> AND the
+surviving (non-isolated) chains are a strict majority. Nothing is dropped
+otherwise. <code class="docutils literal notranslate"><span class="pre">lp</span></code> is reported for context but not used as a criterion.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.plotting.set_house_style">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">set_house_style</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/plotting.html#set_house_style"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.plotting.set_house_style" title="Link to this definition">¶</a></dt>
+<dd><p>Publication style: Helvetica 7–8 pt, despined, outward ticks, editable PDF text.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.plotting.plot_forest">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">plot_forest</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">summary</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'condition'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">palette</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xlabels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">true_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/plotting.html#plot_forest"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.plotting.plot_forest" title="Link to this definition">¶</a></dt>
+<dd><p>Group-level forest plot.</p>
+<p>One panel per parameter, one row per level of <code class="docutils literal notranslate"><span class="pre">by</span></code> (e.g. condition or
+contrast). Dot = posterior mean, horizontal line = 95% HDI (<code class="docutils literal notranslate"><span class="pre">lo</span></code>–<code class="docutils literal notranslate"><span class="pre">hi</span></code>),
+dashed vertical line at <code class="docutils literal notranslate"><span class="pre">ref</span></code> (use 0 for contrasts), open circles at
+<code class="docutils literal notranslate"><span class="pre">true_col</span></code> (simulations).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>summary</strong> (DataFrame from <code class="xref py py-func docutils literal notranslate"><span class="pre">bauer.utils.summarize_posterior()</span></code> with) – columns <code class="docutils literal notranslate"><span class="pre">parameter</span></code>, <code class="docutils literal notranslate"><span class="pre">by</span></code>, <code class="docutils literal notranslate"><span class="pre">mean</span></code>, <code class="docutils literal notranslate"><span class="pre">lo</span></code>, <code class="docutils literal notranslate"><span class="pre">hi</span></code>; one row per
+parameter × level.</p></li>
+<li><p><strong>parameters</strong> (<em>parameter name</em><em> or </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><em>list</em></a><em> of </em><em>names</em><em> (</em><em>one panel each</em><em>)</em><em>.</em>)</p></li>
+<li><p><strong>xlabels</strong> (<em>dict parameter -&gt; x-axis label.</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.plotting.plot_sorted_forest">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">plot_sorted_forest</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">subject_summary</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameter</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xlabel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'condition'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sort_by</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">palette</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group_summary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">true_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subject_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'subject'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/plotting.html#plot_sorted_forest"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.plotting.plot_sorted_forest" title="Link to this definition">¶</a></dt>
+<dd><p>Subject-level sorted forest plot (caterpillar), one panel per level of <code class="docutils literal notranslate"><span class="pre">by</span></code>.</p>
+<p>Subjects are sorted by their posterior mean under <code class="docutils literal notranslate"><span class="pre">sort_by</span></code> (default: the
+first level) and keep that row in every panel, so a subject can be followed
+across conditions. Dot = posterior mean, line = 95% HDI, dashed line =
+group mean (<code class="docutils literal notranslate"><span class="pre">group_summary</span></code>, matched on <code class="docutils literal notranslate"><span class="pre">by</span></code>) or <code class="docutils literal notranslate"><span class="pre">ref</span></code>. Use
+<code class="docutils literal notranslate"><span class="pre">by=None</span></code> for a parameter with one value per subject.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.plotting.plot_ppc_panels">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">plot_ppc_panels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pred</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">obs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'condition'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">palette</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xlabel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ylabel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xref</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xticks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yticks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/plotting.html#plot_ppc_panels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.plotting.plot_ppc_panels" title="Link to this definition">¶</a></dt>
+<dd><p>Group-level PPC, one panel per level of <code class="docutils literal notranslate"><span class="pre">by</span></code>: observed data as dots,
+model as line + 95% band (from <code class="xref py py-func docutils literal notranslate"><span class="pre">bauer.utils.ppc_summary()</span></code> and
+<code class="xref py py-func docutils literal notranslate"><span class="pre">bauer.utils.ppc_observed()</span></code>).</p>
+<p><code class="docutils literal notranslate"><span class="pre">ref</span></code> / <code class="docutils literal notranslate"><span class="pre">xref</span></code>: dotted horizontal / vertical reference lines, e.g.
+<code class="docutils literal notranslate"><span class="pre">ref=0.5</span></code> (chance) and <code class="docutils literal notranslate"><span class="pre">xref=0</span></code> (no stimulus difference) for a
+psychometric curve.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.plotting.plot_ppc_overlay">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">plot_ppc_overlay</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pred</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">obs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">by</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'condition'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">palette</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xlabel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ylabel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xref</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(3.4,</span> <span class="pre">2.3)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xticks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yticks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/plotting.html#plot_ppc_overlay"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.plotting.plot_ppc_overlay" title="Link to this definition">¶</a></dt>
+<dd><p>All levels of <code class="docutils literal notranslate"><span class="pre">by</span></code> on one axis (model line + data dots), with a
+coloured text key in the upper left.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.plotting.plot_subject_ppc">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.plotting.</span></span><span class="sig-name descname"><span class="pre">plot_subject_ppc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pred</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">obs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subject_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'subject'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">col_wrap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">palette</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'#3B5BA5'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xlabel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ylabel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xticks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yticks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xref</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.95</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aspect</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/plotting.html#plot_subject_ppc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.plotting.plot_subject_ppc" title="Link to this definition">¶</a></dt>
+<dd><p>Subject-level PPC as small multiples: data dots, model line + 95% band.</p>
+<p><code class="docutils literal notranslate"><span class="pre">pred</span></code> / <code class="docutils literal notranslate"><span class="pre">obs</span></code> from <code class="docutils literal notranslate"><span class="pre">ppc_summary(...,</span> <span class="pre">subject_level=True)</span></code> and
+<code class="docutils literal notranslate"><span class="pre">ppc_observed(...,</span> <span class="pre">subject_level=True)</span></code>. Returns the Figure.</p>
+</dd></dl>
+
+</section>
 <section id="utilities">
 <h2>Utilities<a class="headerlink" href="#utilities" title="Link to this heading">¶</a></h2>
 <dl class="py function">
@@ -833,6 +1115,52 @@ response_time.</p>
 <dt class="sig sig-object py" id="bauer.utils.bayes.summarize_ppc">
 <span class="sig-prename descclassname"><span class="pre">bauer.utils.bayes.</span></span><span class="sig-name descname"><span class="pre">summarize_ppc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ppc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">groupby</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/bayes.html#summarize_ppc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.bayes.summarize_ppc" title="Link to this definition">¶</a></dt>
 <dd><p>Single-step PPC summary (legacy).  Prefer summarize_ppc_group for group-level PPCs.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bauer.utils.bayes.summarize_ppc_group">
+<span class="sig-prename descclassname"><span class="pre">bauer.utils.bayes.</span></span><span class="sig-name descname"><span class="pre">summarize_ppc_group</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ppc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition_cols</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subject_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'subject'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hdi_prob</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.95</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/bauer/utils/bayes.html#summarize_ppc_group"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bauer.utils.bayes.summarize_ppc_group" title="Link to this definition">¶</a></dt>
+<dd><p>Two-step group-mean PPC summary.</p>
+<p>For each posterior sample, first averages simulated choices within each
+(subject, condition) cell, then averages those subject means across subjects.
+The HDI is then computed across the resulting per-sample group means.</p>
+<p>This correctly represents “where 95 % of plausible group-mean observations
+would fall under the model” — including both parameter uncertainty and
+Bernoulli noise — rather than the uncertainty on the per-trial probability.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ppc</strong> (<em>pd.DataFrame</em><em>, </em><em>shape</em><em> (</em><em>trials</em><em>, </em><em>posterior_samples</em><em>)</em>) – Raw PPC samples from <code class="docutils literal notranslate"><span class="pre">model.ppc().xs(var_name,</span> <span class="pre">level='variable')</span></code>.
+Posterior-sample columns can be any column not in <em>condition_cols</em> or
+<em>subject_col</em>.  All grouping keys (including <em>subject_col</em>) must be
+present either as index levels or as regular columns.</p></li>
+<li><p><strong>condition_cols</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><em>list</em></a><em> of </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>) – Condition dimensions to summarise over, e.g.
+<code class="docutils literal notranslate"><span class="pre">['n1',</span> <span class="pre">'log_ratio_bin']</span></code> or
+<code class="docutils literal notranslate"><span class="pre">['order',</span> <span class="pre">'n_safe_bin',</span> <span class="pre">'log_ratio_bin']</span></code>.
+These must be index levels or columns of <em>ppc</em>.</p></li>
+<li><p><strong>subject_col</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>) – Name of the subject dimension (default <code class="docutils literal notranslate"><span class="pre">'subject'</span></code>).</p></li>
+<li><p><strong>hdi_prob</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><em>float</em></a>) – Posterior mass for HDI interval (default 0.95).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Index: <em>condition_cols</em>.
+Columns: <code class="docutils literal notranslate"><span class="pre">p_predicted</span></code> (posterior mean), <code class="docutils literal notranslate"><span class="pre">hdi025</span></code>, <code class="docutils literal notranslate"><span class="pre">hdi975</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ppc_ll</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">ppc</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">idata</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">'ll_bernoulli'</span><span class="p">])</span>
+<span class="gp">... </span>            <span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="s1">'ll_bernoulli'</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s1">'variable'</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># add derived condition columns if needed</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ppc_ll_flat</span> <span class="o">=</span> <span class="n">ppc_ll</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ppc_ll_flat</span><span class="p">[</span><span class="s1">'bin'</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">cut</span><span class="p">(</span><span class="n">ppc_ll_flat</span><span class="p">[</span><span class="s1">'log(n2/n1)'</span><span class="p">],</span> <span class="mi">12</span><span class="p">)</span>     <span class="o">...</span>                        <span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">mid</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">summary</span> <span class="o">=</span> <span class="n">summarize_ppc_group</span><span class="p">(</span><span class="n">ppc_ll_flat</span><span class="p">,</span>
+<span class="gp">... </span>                              <span class="n">condition_cols</span><span class="o">=</span><span class="p">[</span><span class="s1">'n1'</span><span class="p">,</span> <span class="s1">'bin'</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># summary has columns p_predicted, hdi025, hdi975 indexed by (n1, bin)</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="py function">
@@ -993,6 +1321,7 @@ draw a dashed horizontal line at the group-mean posterior mean.</p></li>
 <li><a class="reference internal" href="#bauer.core.LapseModel"><code class="docutils literal notranslate"><span class="pre">LapseModel</span></code></a></li>
 <li><a class="reference internal" href="#bauer.core.RegressionModel"><code class="docutils literal notranslate"><span class="pre">RegressionModel</span></code></a><ul>
 <li><a class="reference internal" href="#bauer.core.RegressionModel.build_hierarchical_nodes"><code class="docutils literal notranslate"><span class="pre">RegressionModel.build_hierarchical_nodes()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.core.RegressionModel.conditionwise_draws"><code class="docutils literal notranslate"><span class="pre">RegressionModel.conditionwise_draws()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -1031,6 +1360,32 @@ draw a dashed horizontal line at the group-mean posterior mean.</p></li>
 <li><a class="reference internal" href="#bauer.models.ExpectedUtilityRiskRegressionModel"><code class="docutils literal notranslate"><span class="pre">ExpectedUtilityRiskRegressionModel</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#reproduction-models">Reproduction models</a><ul>
+<li><a class="reference internal" href="#bauer.models.ReproductionModel"><code class="docutils literal notranslate"><span class="pre">ReproductionModel</span></code></a><ul>
+<li><a class="reference internal" href="#bauer.models.ReproductionModel.ppc"><code class="docutils literal notranslate"><span class="pre">ReproductionModel.ppc()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.models.ReproductionModel.predicted_log_response"><code class="docutils literal notranslate"><span class="pre">ReproductionModel.predicted_log_response()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#bauer.models.ReproductionRegressionModel"><code class="docutils literal notranslate"><span class="pre">ReproductionRegressionModel</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#posterior-summaries-and-plots">Posterior summaries and plots</a><ul>
+<li><a class="reference internal" href="#bauer.utils.summaries.summarize_posterior"><code class="docutils literal notranslate"><span class="pre">summarize_posterior()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.summaries.contrast_draws"><code class="docutils literal notranslate"><span class="pre">contrast_draws()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.summaries.posterior_draws"><code class="docutils literal notranslate"><span class="pre">posterior_draws()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.summaries.ppc_summary"><code class="docutils literal notranslate"><span class="pre">ppc_summary()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.summaries.ppc_observed"><code class="docutils literal notranslate"><span class="pre">ppc_observed()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.summaries.ppc_coverage"><code class="docutils literal notranslate"><span class="pre">ppc_coverage()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.diagnostics.convergence_report"><code class="docutils literal notranslate"><span class="pre">convergence_report()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.diagnostics.trim_stuck_chains"><code class="docutils literal notranslate"><span class="pre">trim_stuck_chains()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.plotting.set_house_style"><code class="docutils literal notranslate"><span class="pre">set_house_style()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.plotting.plot_forest"><code class="docutils literal notranslate"><span class="pre">plot_forest()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.plotting.plot_sorted_forest"><code class="docutils literal notranslate"><span class="pre">plot_sorted_forest()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.plotting.plot_ppc_panels"><code class="docutils literal notranslate"><span class="pre">plot_ppc_panels()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.plotting.plot_ppc_overlay"><code class="docutils literal notranslate"><span class="pre">plot_ppc_overlay()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.plotting.plot_subject_ppc"><code class="docutils literal notranslate"><span class="pre">plot_subject_ppc()</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#utilities">Utilities</a><ul>
 <li><a class="reference internal" href="#bauer.utils.data.load_garcia2022"><code class="docutils literal notranslate"><span class="pre">load_garcia2022()</span></code></a></li>
 <li><a class="reference internal" href="#bauer.utils.data.load_dehollander2024_risk"><code class="docutils literal notranslate"><span class="pre">load_dehollander2024_risk()</span></code></a></li>
@@ -1043,6 +1398,7 @@ draw a dashed horizontal line at the group-mean posterior mean.</p></li>
 <li><a class="reference internal" href="#bauer.utils.bayes.get_diff_dist_np"><code class="docutils literal notranslate"><span class="pre">get_diff_dist_np()</span></code></a></li>
 <li><a class="reference internal" href="#bauer.utils.bayes.cumulative_normal"><code class="docutils literal notranslate"><span class="pre">cumulative_normal()</span></code></a></li>
 <li><a class="reference internal" href="#bauer.utils.bayes.summarize_ppc"><code class="docutils literal notranslate"><span class="pre">summarize_ppc()</span></code></a></li>
+<li><a class="reference internal" href="#bauer.utils.bayes.summarize_ppc_group"><code class="docutils literal notranslate"><span class="pre">summarize_ppc_group()</span></code></a></li>
 <li><a class="reference internal" href="#bauer.utils.math.logistic"><code class="docutils literal notranslate"><span class="pre">logistic()</span></code></a></li>
 <li><a class="reference internal" href="#bauer.utils.math.logistic_np"><code class="docutils literal notranslate"><span class="pre">logistic_np()</span></code></a></li>
 <li><a class="reference internal" href="#bauer.utils.math.softplus_np"><code class="docutils literal notranslate"><span class="pre">softplus_np()</span></code></a></li>
@@ -1069,7 +1425,7 @@ draw a dashed horizontal line at the group-mean posterior mean.</p></li>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=8e576371"></script>
+</div><script src="_static/documentation_options.js?v=8fa8b3e9"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv)" href="lesson3.html"><link rel="prev" title="Lesson 1: An Introduction to Psychophysical Modelling" href="lesson1.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Lesson 2: Risky Choice — Psychometric Functions and the Noise–Risk Link - bauer 0.5.2 documentation</title>
+        <title>Lesson 2: Risky Choice — Psychometric Functions and the Noise–Risk Link - bauer 0.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -162,7 +162,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">bauer 0.5.2 documentation</div></a>
+      <a href="../index.html"><div class="brand">bauer 0.6.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.5.2 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.6.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -508,7 +508,7 @@ Non-symbolic:  15150 trials, 64 subjects
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 4 jobs)
 NUTS: [nu_mu_untransformed, nu_sd, nu_offset, bias_mu, bias_sd, bias_offset]
-Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 49 seconds.
+Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 87 seconds.
 The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
 The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
 </pre></div></div>
@@ -529,7 +529,7 @@ Symbolic fit done
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 4 jobs)
 NUTS: [nu_mu_untransformed, nu_sd, nu_offset, bias_mu, bias_sd, bias_offset]
-Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 47 seconds.
+Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 77 seconds.
 The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
 The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
 </pre></div></div>
@@ -657,8 +657,8 @@ Non-symbolic fit done
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Symbolic         noise-bias ρ = -0.400 (p = 0.0011)
-Non-symbolic     noise-bias ρ = -0.380 (p = 0.0019)
+Symbolic         noise-bias ρ = -0.398 (p = 0.0011)
+Non-symbolic     noise-bias ρ = -0.383 (p = 0.0018)
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
@@ -820,25 +820,10 @@ Non-symbolic     noise-bias ρ = -0.380 (p = 0.0019)
 <span class="p">)</span>
 <span class="n">model_reg</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data_reg</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">idata_reg</span> <span class="o">=</span> <span class="n">model_reg</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-
-<span class="c1"># Posterior of evidence_sd at each format condition</span>
-<span class="n">conditions</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">'format'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'symbolic'</span><span class="p">,</span> <span class="s1">'non-symbolic'</span><span class="p">]})</span>
-<span class="n">pars_cond</span>  <span class="o">=</span> <span class="n">model_reg</span><span class="o">.</span><span class="n">get_conditionwise_parameters</span><span class="p">(</span><span class="n">idata_reg</span><span class="p">,</span> <span class="n">conditions</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-
-<span class="n">sd_sym</span>    <span class="o">=</span> <span class="n">pars_cond</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">'evidence_sd'</span><span class="p">][</span><span class="s1">'symbolic'</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
-<span class="n">sd_nonsym</span> <span class="o">=</span> <span class="n">pars_cond</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">'evidence_sd'</span><span class="p">][</span><span class="s1">'non-symbolic'</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
-
-<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
-<span class="n">az</span><span class="o">.</span><span class="n">plot_kde</span><span class="p">(</span><span class="n">sd_sym</span><span class="p">,</span>    <span class="n">label</span><span class="o">=</span><span class="s1">'Symbolic'</span><span class="p">,</span>     <span class="n">plot_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">'color'</span><span class="p">:</span> <span class="s1">'#1f78b4'</span><span class="p">,</span> <span class="s1">'lw'</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
-<span class="n">az</span><span class="o">.</span><span class="n">plot_kde</span><span class="p">(</span><span class="n">sd_nonsym</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">'Non-symbolic'</span><span class="p">,</span>  <span class="n">plot_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">'color'</span><span class="p">:</span> <span class="s1">'#d95f02'</span><span class="p">,</span> <span class="s1">'lw'</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">'evidence_sd  (group level)'</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">'Posterior density'</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">'RiskRegressionModel: format effect on noise'</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">();</span> <span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">();</span> <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
-<div class="nboutput docutils container">
+<div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area stderr docutils container">
@@ -846,16 +831,149 @@ Non-symbolic     noise-bias ρ = -0.380 (p = 0.0019)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 4 jobs)
 NUTS: [evidence_sd_mu, evidence_sd_sd, evidence_sd_offset, prior_sd_mu, prior_sd_sd, prior_sd_offset]
-Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 704 seconds.
+Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 714 seconds.
 The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
 The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
 </pre></div></div>
+</div>
+<p>The regression coefficients live on the model’s internal (pre-softplus) scale, so don’t read them directly. <code class="docutils literal notranslate"><span class="pre">conditionwise_draws</span></code> evaluates the formula at each condition you pass, applies the transform per posterior draw, and returns long-format draws of the natural-scale parameter. <code class="docutils literal notranslate"><span class="pre">summarize_posterior</span></code> turns those into a posterior mean and 95 % HDI per condition, and <code class="docutils literal notranslate"><span class="pre">contrast_draws</span></code> computes the format difference <em>per draw</em> (so its HDI is the HDI of the difference, not a difference of
+HDIs).</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">bauer.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">summarize_posterior</span><span class="p">,</span> <span class="n">contrast_draws</span><span class="p">,</span> <span class="n">plot_forest</span>
+
+<span class="n">FORMAT_PALETTE</span> <span class="o">=</span> <span class="p">{</span><span class="s1">'symbolic'</span><span class="p">:</span> <span class="s1">'#1f78b4'</span><span class="p">,</span> <span class="s1">'non-symbolic'</span><span class="p">:</span> <span class="s1">'#d95f02'</span><span class="p">}</span>
+
+<span class="c1"># Group-level evidence_sd per format, natural scale (long draws)</span>
+<span class="n">conditions</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">'format'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'symbolic'</span><span class="p">,</span> <span class="s1">'non-symbolic'</span><span class="p">]})</span>
+<span class="n">sd_draws</span> <span class="o">=</span> <span class="n">model_reg</span><span class="o">.</span><span class="n">conditionwise_draws</span><span class="p">(</span><span class="n">idata_reg</span><span class="p">,</span> <span class="n">conditions</span><span class="p">,</span> <span class="n">parameters</span><span class="o">=</span><span class="p">[</span><span class="s1">'evidence_sd'</span><span class="p">])</span>
+
+<span class="n">sd_summary</span> <span class="o">=</span> <span class="n">summarize_posterior</span><span class="p">(</span><span class="n">sd_draws</span><span class="p">,</span> <span class="p">[</span><span class="s1">'parameter'</span><span class="p">,</span> <span class="s1">'format'</span><span class="p">])</span>
+<span class="c1"># Non-symbolic minus symbolic, computed per posterior draw</span>
+<span class="n">format_effect</span> <span class="o">=</span> <span class="n">summarize_posterior</span><span class="p">(</span><span class="n">contrast_draws</span><span class="p">(</span><span class="n">sd_draws</span><span class="p">,</span> <span class="s1">'format'</span><span class="p">,</span> <span class="s1">'symbolic'</span><span class="p">),</span>
+                                    <span class="p">[</span><span class="s1">'parameter'</span><span class="p">,</span> <span class="s1">'format'</span><span class="p">])</span>
+<span class="n">display</span><span class="p">(</span><span class="n">sd_summary</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">format_effect</span><span class="p">)</span>
+
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plot_forest</span><span class="p">(</span><span class="n">sd_summary</span><span class="p">,</span> <span class="s1">'evidence_sd'</span><span class="p">,</span> <span class="n">by</span><span class="o">=</span><span class="s1">'format'</span><span class="p">,</span> <span class="n">palette</span><span class="o">=</span><span class="n">FORMAT_PALETTE</span><span class="p">,</span>
+                  <span class="n">xlabels</span><span class="o">=</span><span class="p">{</span><span class="s1">'evidence_sd'</span><span class="p">:</span> <span class="s1">'Noise  ν  (group mean)'</span><span class="p">},</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">))</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plot_forest</span><span class="p">(</span><span class="n">format_effect</span><span class="p">,</span> <span class="s1">'evidence_sd'</span><span class="p">,</span> <span class="n">by</span><span class="o">=</span><span class="s1">'format'</span><span class="p">,</span> <span class="n">palette</span><span class="o">=</span><span class="n">FORMAT_PALETTE</span><span class="p">,</span> <span class="n">ref</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                  <span class="n">level_labels</span><span class="o">=</span><span class="p">{</span><span class="s1">'non-symbolic'</span><span class="p">:</span> <span class="s1">'Non-symbolic − symbolic'</span><span class="p">},</span>
+                  <span class="n">xlabels</span><span class="o">=</span><span class="p">{</span><span class="s1">'evidence_sd'</span><span class="p">:</span> <span class="s1">'Δν  (95% HDI)'</span><span class="p">},</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mf">1.2</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>parameter</th>
+      <th>format</th>
+      <th>mean</th>
+      <th>lo</th>
+      <th>hi</th>
+      <th>p_positive</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>evidence_sd</td>
+      <td>symbolic</td>
+      <td>0.154911</td>
+      <td>0.138127</td>
+      <td>0.176210</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>evidence_sd</td>
+      <td>non-symbolic</td>
+      <td>0.189351</td>
+      <td>0.170841</td>
+      <td>0.209756</td>
+      <td>1.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>parameter</th>
+      <th>format</th>
+      <th>mean</th>
+      <th>lo</th>
+      <th>hi</th>
+      <th>p_positive</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>evidence_sd</td>
+      <td>non-symbolic</td>
+      <td>0.03444</td>
+      <td>0.021966</td>
+      <td>0.045736</td>
+      <td>1.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_lesson2_21_2.png" src="../_images/tutorial_lesson2_21_2.png" />
+</div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/tutorial_lesson2_19_1.png" src="../_images/tutorial_lesson2_19_1.png" />
+<img alt="../_images/tutorial_lesson2_21_3.png" src="../_images/tutorial_lesson2_21_3.png" />
 </div>
 </div>
 </section>
@@ -973,7 +1091,7 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=8e576371"></script>
+</div><script src="../_static/documentation_options.js?v=8fa8b3e9"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>

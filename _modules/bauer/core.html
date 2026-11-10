@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>bauer.core - bauer 0.5.2 documentation</title>
+        <title>bauer.core - bauer 0.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -160,7 +160,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../index.html"><div class="brand">bauer 0.5.2 documentation</div></a>
+      <a href="../../index.html"><div class="brand">bauer 0.6.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -181,7 +181,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.5.2 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.6.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -1319,7 +1319,22 @@
 <span class="n">BaseModel</span><span class="o">.</span><span class="fm">__init__</span> <span class="o">=</span> <span class="n">_translate_deprecated_kwargs</span><span class="p">(</span><span class="n">BaseModel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">)</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">_lapse_param_spec</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="n">mu_mean</span><span class="p">,</span> <span class="n">mu_kappa</span><span class="p">,</span> <span class="n">kappa_sd</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_effective_lapse_group</span><span class="p">(</span><span class="n">model</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""The lapse group prior actually used for ``model``.</span>
+
+<span class="sd">    The hierarchical-Beta prior is built by ``BaseModel.build_hierarchical_nodes``;</span>
+<span class="sd">    ``RegressionModel`` builds every parameter through a design matrix on the</span>
+<span class="sd">    untransformed scale and has no Beta branch. Before this guard, a</span>
+<span class="sd">    ``*LapseRegressionModel`` with the (default) Beta group silently got an</span>
+<span class="sd">    untransformed ``Normal(0, 0.5)`` lapse rate that could leave (0, 1).</span>
+<span class="sd">    Regression models therefore always use the logit-Normal group prior.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">RegressionModel</span><span class="p">)</span> <span class="ow">and</span> <span class="n">model</span><span class="o">.</span><span class="n">lapse_group</span> <span class="o">==</span> <span class="s1">'beta'</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s1">'logit_normal'</span>
+    <span class="k">return</span> <span class="n">model</span><span class="o">.</span><span class="n">lapse_group</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_lapse_param_spec</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="n">mu_mean</span><span class="p">,</span> <span class="n">mu_kappa</span><span class="p">,</span> <span class="n">kappa_sd</span><span class="p">,</span> <span class="n">regression</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Free-parameter spec dict for a lapse / outlier rate in (0, 1).</span>
 
 <span class="sd">    ``group='logit_normal'`` (default) reproduces the historical logit-Normal</span>
@@ -1335,7 +1350,15 @@
                 <span class="s1">'beta_mu_kappa'</span><span class="p">:</span> <span class="n">mu_kappa</span><span class="p">,</span>
                 <span class="s1">'beta_kappa_sd'</span><span class="p">:</span> <span class="n">kappa_sd</span><span class="p">}</span>
     <span class="k">elif</span> <span class="n">group</span> <span class="o">==</span> <span class="s1">'logit_normal'</span><span class="p">:</span>
-        <span class="k">return</span> <span class="p">{</span><span class="s1">'mu_intercept'</span><span class="p">:</span> <span class="n">logit_np</span><span class="p">(</span><span class="n">mu_mean</span><span class="p">),</span> <span class="s1">'transform'</span><span class="p">:</span> <span class="s1">'logistic'</span><span class="p">}</span>
+        <span class="n">spec</span> <span class="o">=</span> <span class="p">{</span><span class="s1">'mu_intercept'</span><span class="p">:</span> <span class="n">logit_np</span><span class="p">(</span><span class="n">mu_mean</span><span class="p">),</span> <span class="s1">'transform'</span><span class="p">:</span> <span class="s1">'logistic'</span><span class="p">}</span>
+        <span class="k">if</span> <span class="n">regression</span><span class="p">:</span>
+            <span class="c1"># Lapse rates differ a lot between people (2% vs 15% is common).</span>
+            <span class="c1"># The regression path's default between-subject SD prior on the</span>
+            <span class="c1"># logit (HalfNormal(0.25)) shrinks a 15% lapser towards the group</span>
+            <span class="c1"># mean, and the model then explains their random answers with</span>
+            <span class="c1"># extra noise (inflated nu / evidence_sd). Widen it.</span>
+            <span class="n">spec</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">sigma_intercept</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">cauchy_sigma_intercept</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">spec</span>
     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
         <span class="sa">f</span><span class="s2">"lapse_group must be 'logit_normal' or 'beta', got </span><span class="si">{</span><span class="n">group</span><span class="si">!r}</span><span class="s2">."</span><span class="p">)</span>
 
@@ -1360,10 +1383,11 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">get_free_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">pars</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">get_free_parameters</span><span class="p">()</span>
 
-        <span class="n">pars</span><span class="p">[</span><span class="s1">'p_lapse'</span><span class="p">]</span> <span class="o">=</span> <span class="n">_lapse_param_spec</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lapse_group</span><span class="p">,</span>
+        <span class="n">pars</span><span class="p">[</span><span class="s1">'p_lapse'</span><span class="p">]</span> <span class="o">=</span> <span class="n">_lapse_param_spec</span><span class="p">(</span><span class="n">_effective_lapse_group</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span>
                                             <span class="bp">self</span><span class="o">.</span><span class="n">lapse_mu_mean</span><span class="p">,</span>
                                             <span class="bp">self</span><span class="o">.</span><span class="n">lapse_mu_kappa</span><span class="p">,</span>
-                                            <span class="bp">self</span><span class="o">.</span><span class="n">lapse_kappa_sd</span><span class="p">)</span>
+                                            <span class="bp">self</span><span class="o">.</span><span class="n">lapse_kappa_sd</span><span class="p">,</span>
+                                            <span class="n">regression</span><span class="o">=</span><span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">RegressionModel</span><span class="p">))</span>
         <span class="k">return</span> <span class="n">pars</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_choice_predictions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_inputs</span><span class="p">):</span>
@@ -1480,10 +1504,11 @@
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">p_outlier</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">)):</span>
             <span class="c1"># Fixed contaminant rate (HSSM default): not a free parameter.</span>
             <span class="k">return</span> <span class="n">pars</span>
-        <span class="n">spec</span> <span class="o">=</span> <span class="n">_lapse_param_spec</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lapse_group</span><span class="p">,</span>
+        <span class="n">spec</span> <span class="o">=</span> <span class="n">_lapse_param_spec</span><span class="p">(</span><span class="n">_effective_lapse_group</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span>
                                  <span class="bp">self</span><span class="o">.</span><span class="n">lapse_mu_mean</span><span class="p">,</span>
                                  <span class="bp">self</span><span class="o">.</span><span class="n">lapse_mu_kappa</span><span class="p">,</span>
-                                 <span class="bp">self</span><span class="o">.</span><span class="n">lapse_kappa_sd</span><span class="p">)</span>
+                                 <span class="bp">self</span><span class="o">.</span><span class="n">lapse_kappa_sd</span><span class="p">,</span>
+                                 <span class="n">regression</span><span class="o">=</span><span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">RegressionModel</span><span class="p">))</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">lapse_group</span> <span class="o">==</span> <span class="s1">'logit_normal'</span><span class="p">:</span>
             <span class="c1"># Preserve the historical sigma_intercept=0.5 on the logit prior.</span>
             <span class="n">spec</span><span class="p">[</span><span class="s1">'sigma_intercept'</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.5</span>
@@ -1519,6 +1544,24 @@
         <span class="n">mixed</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">logaddexp</span><span class="p">(</span><span class="n">log_keep</span><span class="p">,</span> <span class="n">log_lapse</span><span class="p">)</span>
         <span class="c1"># Match HSSM's +1e-29 guard against log(0) when both terms underflow.</span>
         <span class="k">return</span> <span class="n">pt</span><span class="o">.</span><span class="n">logaddexp</span><span class="p">(</span><span class="n">mixed</span><span class="p">,</span> <span class="n">pt</span><span class="o">.</span><span class="n">constant</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mf">1e-29</span><span class="p">)))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_check_full_rank</span><span class="p">(</span><span class="n">dm</span><span class="p">,</span> <span class="n">parameter</span><span class="p">,</span> <span class="n">formula</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Raise if a parameter's design matrix is rank-deficient.</span>
+
+<span class="sd">    A rank-deficient design (e.g. ``C(condition) + C(session)`` when baseline</span>
+<span class="sd">    is always session 1) is not identified: the sampler wanders along a flat</span>
+<span class="sd">    ridge and never converges. Better to fail before sampling.</span>
+<span class="sd">    """</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dm</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">rank</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">matrix_rank</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">rank</span> <span class="o">&lt;</span> <span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Design matrix for </span><span class="si">{</span><span class="n">parameter</span><span class="si">!r}</span><span class="s2"> (formula </span><span class="si">{</span><span class="n">formula</span><span class="si">!r}</span><span class="s2">) is rank-deficient: "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2"> columns </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">dm</span><span class="o">.</span><span class="n">design_info</span><span class="o">.</span><span class="n">column_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> but rank </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">. "</span>
+            <span class="s2">"Some terms are perfectly confounded (e.g. a condition that only ever "</span>
+            <span class="s2">"occurs in one session). Drop or recode a term, e.g. a linear session "</span>
+            <span class="s2">"trend instead of C(session)."</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="RegressionModel">
@@ -1574,6 +1617,7 @@
 
         <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">free_parameters</span><span class="p">:</span>
             <span class="n">dm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">build_design_matrix</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+            <span class="n">_check_full_rank</span><span class="p">(</span><span class="n">dm</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">regressors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="s1">'1'</span><span class="p">))</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">design_matrices</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">dm</span>
             <span class="n">paradigm_</span><span class="p">[</span><span class="sa">f</span><span class="s1">'_dm_</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s1">'</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dm</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_compute_random_cols</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">dm</span><span class="p">)</span>
@@ -1625,6 +1669,20 @@
                         <span class="s2">"between-subject variance heteroscedastic. Put it only "</span>
                         <span class="s2">"in fixed_regressors unless this is intended."</span><span class="p">,</span>
                         <span class="ne">UserWarning</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+            <span class="c1"># Within-subject identifiability of the random effects: if no</span>
+            <span class="c1"># subject's own rows span the random columns, the per-subject</span>
+            <span class="c1"># coefficients are separated only by the prior.</span>
+            <span class="n">arr_r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">fixed_dm</span><span class="p">)[:,</span> <span class="n">cols</span><span class="p">]</span>
+            <span class="n">ranks</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">matrix_rank</span><span class="p">(</span><span class="n">arr_r</span><span class="p">[</span><span class="n">subj</span> <span class="o">==</span> <span class="n">s</span><span class="p">])</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">subj</span><span class="p">)]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">max</span><span class="p">(</span><span class="n">ranks</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">):</span>
+                <span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="n">fixed_names</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">cols</span><span class="p">]</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"Random effects on </span><span class="si">{</span><span class="n">names</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="n">parameter</span><span class="si">!r}</span><span class="s2"> are not identified within "</span>
+                    <span class="sa">f</span><span class="s2">"any subject (per-subject rank </span><span class="si">{</span><span class="nb">max</span><span class="p">(</span><span class="n">ranks</span><span class="p">)</span><span class="si">}</span><span class="s2"> &lt; </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span><span class="si">}</span><span class="s2">): each subject's "</span>
+                    <span class="s2">"data cannot separate them, only the prior does. Typical cause: a "</span>
+                    <span class="s2">"condition and a session trend that are fully crossed within subject "</span>
+                    <span class="s2">"(one condition per session). Keep the confounded term (e.g. session_c) "</span>
+                    <span class="s2">"in fixed_regressors only."</span><span class="p">,</span> <span class="ne">UserWarning</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_random_cols</span><span class="p">[</span><span class="n">parameter</span><span class="p">]</span> <span class="o">=</span> <span class="n">cols</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">rebuild_design_matrix</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paradigm</span><span class="p">,</span> <span class="n">parameter</span><span class="p">):</span>
@@ -1883,6 +1941,54 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">samples_pars</span>
 
+<div class="viewcode-block" id="RegressionModel.conditionwise_draws">
+<a class="viewcode-back" href="../../api_reference.html#bauer.core.RegressionModel.conditionwise_draws">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">conditionwise_draws</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idata</span><span class="p">,</span> <span class="n">conditions</span><span class="p">,</span> <span class="n">parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Posterior draws of each parameter per condition, natural scale, long format.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        conditions : pd.DataFrame</span>
+<span class="sd">            One row per condition, with every column the regression formulas use</span>
+<span class="sd">            (e.g. ``condition`` and ``session_c=0`` for "an average session").</span>
+<span class="sd">        parameters : list of str, optional</span>
+<span class="sd">            Subset of free parameters (default: all).</span>
+<span class="sd">        group : bool</span>
+<span class="sd">            True: group-level (``{par}_mu``) values. False: every subject.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pd.DataFrame with columns ``parameter, chain, draw, [subject,]`` the</span>
+<span class="sd">        ``conditions`` columns, and ``value``. Feed it to</span>
+<span class="sd">        :func:`bauer.utils.summarize_posterior` and the forest plots.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">parameters</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">parameters</span> <span class="o">=</span> <span class="p">[</span><span class="n">parameters</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">parameters</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">unknown</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_free_parameters</span><span class="p">()))</span>
+            <span class="k">if</span> <span class="n">unknown</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">'Unknown parameter(s) </span><span class="si">{</span><span class="n">unknown</span><span class="si">}</span><span class="s1">; free parameters are '</span>
+                                 <span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_free_parameters</span><span class="p">())</span><span class="si">}</span><span class="s1">'</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">conditions</span><span class="o">.</span><span class="n">duplicated</span><span class="p">()</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">'`conditions` has duplicate rows; every row should be a different '</span>
+                             <span class="s1">'condition.'</span><span class="p">)</span>
+        <span class="n">est</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_conditionwise_parameters</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">conditions</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">group</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">parameters</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">est</span> <span class="o">=</span> <span class="n">est</span><span class="o">.</span><span class="n">loc</span><span class="p">[[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">est</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="s1">'parameter'</span><span class="p">)</span> <span class="k">if</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">parameters</span><span class="p">]]</span>
+        <span class="c1"># Columns are the condition rows (one level per conditions column).</span>
+        <span class="c1"># Build the long frame explicitly: rows x condition-columns.</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="n">est</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">to_frame</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">n_rows</span><span class="p">,</span> <span class="n">n_cols</span> <span class="o">=</span> <span class="n">est</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">long</span> <span class="o">=</span> <span class="n">rows</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_rows</span><span class="p">),</span> <span class="n">n_cols</span><span class="p">)]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">cond</span> <span class="o">=</span> <span class="n">conditions</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">cond_rep</span> <span class="o">=</span> <span class="n">cond</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_cols</span><span class="p">),</span> <span class="n">n_rows</span><span class="p">)]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">long</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">long</span><span class="p">,</span> <span class="n">cond_rep</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">long</span><span class="p">[</span><span class="s1">'value'</span><span class="p">]</span> <span class="o">=</span> <span class="n">est</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">parameters</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">long</span> <span class="o">=</span> <span class="n">long</span><span class="p">[</span><span class="n">long</span><span class="p">[</span><span class="s1">'parameter'</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">parameters</span><span class="p">)]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">long</span></div>
+
+
     <span class="k">def</span><span class="w"> </span><span class="nf">get_conditionwise_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idata</span><span class="p">,</span> <span class="n">conditions</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
 
         <span class="n">parameter_values</span> <span class="o">=</span> <span class="p">[]</span>
@@ -1950,7 +2056,7 @@
       
     </aside>
   </div>
-</div><script src="../../_static/documentation_options.js?v=8e576371"></script>
+</div><script src="../../_static/documentation_options.js?v=8fa8b3e9"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>

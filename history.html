@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="prev" title="Usage" href="usage.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>History - bauer 0.5.2 documentation</title>
+        <title>History - bauer 0.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">bauer 0.5.2 documentation</div></a>
+      <a href="index.html"><div class="brand">bauer 0.6.0 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">bauer 0.5.2 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.6.0 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -255,6 +255,30 @@
         <article role="main" id="furo-main-content">
           <section id="history">
 <h1>History<a class="headerlink" href="#history" title="Link to this heading">¶</a></h1>
+<section id="unreleased">
+<h2>0.6.0 (unreleased)<a class="headerlink" href="#unreleased" title="Link to this heading">¶</a></h2>
+<p>Tools for repeated-measures designs (conditions, drugs, sessions) and for reading
+out any fit:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">bauer.models.ReproductionModel</span></code> / <code class="docutils literal notranslate"><span class="pre">ReproductionRegressionModel</span></code>: log-space
+Bayesian observer for magnitude reproduction (e.g. interval timing); the response
+SD is the SD of the posterior mean, <code class="docutils literal notranslate"><span class="pre">w</span> <span class="pre">*</span> <span class="pre">nu</span></code>.</p></li>
+<li><p>Posterior summaries in long format (<code class="docutils literal notranslate"><span class="pre">bauer.utils</span></code>): <code class="docutils literal notranslate"><span class="pre">summarize_posterior</span></code>
+(posterior mean, 95% HDI, P(&gt; 0)), <code class="docutils literal notranslate"><span class="pre">contrast_draws</span></code> (per-draw differences from a
+reference level), <code class="docutils literal notranslate"><span class="pre">posterior_draws</span></code>, and <code class="docutils literal notranslate"><span class="pre">RegressionModel.conditionwise_draws</span></code>
+(natural-scale draws per condition).</p></li>
+<li><p>Posterior predictive summaries: <code class="docutils literal notranslate"><span class="pre">ppc_summary</span></code> / <code class="docutils literal notranslate"><span class="pre">ppc_observed</span></code> (within subject,
+then across subjects, per sample) and <code class="docutils literal notranslate"><span class="pre">ppc_coverage</span></code>.</p></li>
+<li><p>Plots: <code class="docutils literal notranslate"><span class="pre">plot_forest</span></code> (group level), <code class="docutils literal notranslate"><span class="pre">plot_sorted_forest</span></code> (subject level),
+<code class="docutils literal notranslate"><span class="pre">plot_ppc_panels</span></code>, <code class="docutils literal notranslate"><span class="pre">plot_ppc_overlay</span></code>, <code class="docutils literal notranslate"><span class="pre">plot_subject_ppc</span></code>,
+<code class="docutils literal notranslate"><span class="pre">set_house_style</span></code>; and <code class="docutils literal notranslate"><span class="pre">convergence_report</span></code> (r-hat, ESS, divergences, verdict).</p></li>
+<li><p>Fixes: <code class="docutils literal notranslate"><span class="pre">*LapseRegressionModel</span></code> built <code class="docutils literal notranslate"><span class="pre">p_lapse</span></code> as an untransformed Normal that
+could leave (0, 1) (since 0.3.0); it now uses a logit-normal group prior. Re-fit
+lapse-regression fits made with 0.3.0-0.5.x. Rank-deficient regression designs
+now raise instead of fitting silently.</p></li>
+</ul>
+<p>See <a class="reference internal" href="usage.html#summarising-posteriors"><span class="std std-ref">Summarising and plotting posteriors</span></a> in the usage page, and tutorial lesson 1.</p>
+</section>
 <section id="id1">
 <h2>0.5.0 (2026-10-18)<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h2>
 <p>Extended <code class="docutils literal notranslate"><span class="pre">bauer.efficient_coding</span></code> (Bedi et al. 2026 models, hierarchical and
@@ -436,6 +460,7 @@ risky choice with the KLW model, and de Hollander et al. (2024) stake effects.</
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">History</a><ul>
+<li><a class="reference internal" href="#unreleased">0.6.0 (unreleased)</a></li>
 <li><a class="reference internal" href="#id1">0.5.0 (2026-10-18)</a></li>
 <li><a class="reference internal" href="#id2">0.3.0 (2026-06-10)</a></li>
 <li><a class="reference internal" href="#id3">0.2.0 (2026-04-03)</a></li>
@@ -451,7 +476,7 @@ risky choice with the KLW model, and de Hollander et al. (2024) stake effects.</
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=8e576371"></script>
+</div><script src="_static/documentation_options.js?v=8fa8b3e9"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
