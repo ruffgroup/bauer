@@ -100,6 +100,41 @@ Risky choice models
 .. autoclass:: bauer.models.ExpectedUtilityRiskRegressionModel
    :show-inheritance:
 
+Reproduction models
+-------------------
+
+.. autoclass:: bauer.models.ReproductionModel
+   :members:
+   :show-inheritance:
+
+.. autoclass:: bauer.models.ReproductionRegressionModel
+   :show-inheritance:
+
+Posterior summaries and plots
+-----------------------------
+
+See :ref:`summarising-posteriors` for how these fit together.
+
+.. automethod:: bauer.core.RegressionModel.conditionwise_draws
+   :noindex:
+
+.. autofunction:: bauer.utils.summaries.summarize_posterior
+.. autofunction:: bauer.utils.summaries.contrast_draws
+.. autofunction:: bauer.utils.summaries.posterior_draws
+.. autofunction:: bauer.utils.summaries.ppc_summary
+.. autofunction:: bauer.utils.summaries.ppc_observed
+.. autofunction:: bauer.utils.summaries.ppc_coverage
+
+.. autofunction:: bauer.utils.diagnostics.convergence_report
+.. autofunction:: bauer.utils.diagnostics.trim_stuck_chains
+
+.. autofunction:: bauer.utils.plotting.set_house_style
+.. autofunction:: bauer.utils.plotting.plot_forest
+.. autofunction:: bauer.utils.plotting.plot_sorted_forest
+.. autofunction:: bauer.utils.plotting.plot_ppc_panels
+.. autofunction:: bauer.utils.plotting.plot_ppc_overlay
+.. autofunction:: bauer.utils.plotting.plot_subject_ppc
+
 Utilities
 ---------
 
@@ -119,6 +154,7 @@ Utilities
 .. autofunction:: bauer.utils.bayes.get_diff_dist_np
 .. autofunction:: bauer.utils.bayes.cumulative_normal
 .. autofunction:: bauer.utils.bayes.summarize_ppc
+.. autofunction:: bauer.utils.bayes.summarize_ppc_group
 
 .. autofunction:: bauer.utils.math.logistic
 .. autofunction:: bauer.utils.math.logistic_np

@@ -125,15 +125,21 @@ Typical workflow
     idata = model.sample(draws=1000, tune=1000, backend='numpyro')
 
     # ALWAYS check convergence before interpreting anything:
-    import arviz as az
-    print(az.summary(idata, kind='diagnostics'))    # want r̂ ≤ 1.01, ESS ≥ ~400
+    from bauer.utils import convergence_report
+    convergence_report(idata)       # r̂ ≤ 1.01, bulk ESS ≥ 400, no divergences → OK
 
-    # Parameter summaries
-    subj_pars = model.get_subjectwise_parameter_estimates(idata)
-    group_pars = model.get_groupwise_parameter_estimates(idata)
+    # Parameter summaries: posterior mean + 95% HDI from long-format draws
+    from bauer.utils import posterior_draws, summarize_posterior
+    group = summarize_posterior(posterior_draws(idata, ['n1_evidence_sd_mu', 'n2_evidence_sd_mu']),
+                                'parameter')
+    subjects = summarize_posterior(posterior_draws(idata, ['n1_evidence_sd', 'n2_evidence_sd']),
+                                   ['parameter', 'subject'])
 
-    # Posterior predictive check
+    # Posterior predictive check: one row per trial x posterior sample
     ppc = model.ppc(data, idata)
+
+See :ref:`summarising-posteriors` for regression models, contrasts, forest plots and
+group- and subject-level posterior predictive checks.
 
 Sampler backends and speed
 --------------------------
