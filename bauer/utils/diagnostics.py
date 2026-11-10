@@ -84,7 +84,8 @@ def trim_stuck_chains(idata, isolation_z=3.0, verbose=True):
                      "majority_ok": bool(majority_ok)}
 
 
-def convergence_report(idata, var_names=None, rhat_max=1.01, ess_min=400, verbose=True):
+def convergence_report(idata, var_names=None, rhat_max=1.01, ess_min=400, max_divergences=0,
+                       verbose=True):
     """r̂, bulk ESS and divergences, with a one-line verdict.
 
     By default checks every group-level variable (``*_mu``, ``*_mu_untransformed``
@@ -112,12 +113,12 @@ def convergence_report(idata, var_names=None, rhat_max=1.01, ess_min=400, verbos
     rhat_nan = summ['r_hat'].isna()
     worst = summ['r_hat'].fillna(np.inf).idxmax()
     ok = (not rhat_nan.any() and summ['r_hat'].max() <= rhat_max
-          and summ['ess_bulk'].min() >= ess_min and n_div == 0)
+          and summ['ess_bulk'].min() >= ess_min and n_div <= max_divergences)
     summ.attrs['ok'] = bool(ok)
     if verbose:
         msg = (f"Max r̂ = {summ['r_hat'].max():.3f} (want ≤ {rhat_max}; worst: {worst}), "
                f"min bulk ESS = {summ['ess_bulk'].min():.0f} (want ≥ {ess_min}), "
-               f"divergences = {n_div} (want 0)")
+               f"divergences = {n_div} (want ≤ {max_divergences})")
         if rhat_nan.any():
             msg += f", r̂ is NaN for {int(rhat_nan.sum())} variable(s) (stuck chain?)"
         print(msg + f"  →  {'OK' if ok else 'CHECK BEFORE USING'}")

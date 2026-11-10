@@ -412,8 +412,32 @@ def plot_forest(summary, parameters, by='condition', order=None, palette=None,
         ax.set_yticklabels([])
     if true_col is not None:
         _true_key(axes[len(parameters) - 1])
-    sns.despine(fig=fig, offset=4, trim=True, left=True)
+    sns.despine(fig=fig, offset=4, left=True)
+    for ax in axes[:len(parameters)]:
+        _extend_ticks_to_data(ax)
     return fig
+
+
+def _extend_ticks_to_data(ax):
+    """Put the outer x ticks at or beyond the data, so a trimmed spine never
+    ends inside an interval."""
+    import matplotlib.ticker as mticker
+    lo, hi = ax.get_xlim()
+    ticks = [t for t in ax.get_xticks() if lo <= t <= hi]
+    if len(ticks) < 2:
+        return
+    step = ticks[1] - ticks[0]
+    data = [ln.get_xdata() for ln in ax.lines if len(ln.get_xdata())]
+    data = np.concatenate([np.atleast_1d(d).astype(float) for d in data]) if data else np.array([])
+    data = data[np.isfinite(data)]
+    if data.size:
+        while ticks[0] > data.min() + 1e-12:
+            ticks.insert(0, ticks[0] - step)
+        while ticks[-1] < data.max() - 1e-12:
+            ticks.append(ticks[-1] + step)
+    ax.xaxis.set_major_locator(mticker.FixedLocator(ticks))
+    ax.set_xlim(min(lo, ticks[0]), max(hi, ticks[-1]))
+    ax.spines['bottom'].set_bounds(ticks[0], ticks[-1])
 
 
 def plot_sorted_forest(subject_summary, parameter, xlabel=None, by='condition', order=None,
