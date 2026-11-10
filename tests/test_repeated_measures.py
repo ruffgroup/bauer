@@ -93,14 +93,14 @@ def test_conditionwise_draws_long_format():
     assert fig is not None and fig2 is not None
 
 
-def _reproduction(n_sub=6, nu=0.25, bias=0.08, seed=0, reps=30):
+def _reproduction(n_sub=6, nu=0.25, prior_shift=0.15, seed=0, reps=30):
     rng = np.random.default_rng(seed)
     x = np.repeat(np.geomspace(0.5, 2.0, 7), reps)
     rows = []
     for s in range(1, n_sub + 1):
         log_x = np.log(x)
-        mu_p, sd_p = log_x.mean(), log_x.std()
-        m = log_x + bias + nu * rng.standard_normal(len(x))
+        mu_p, sd_p = log_x.mean() + prior_shift, log_x.std()
+        m = log_x + nu * rng.standard_normal(len(x))
         w = sd_p ** 2 / (sd_p ** 2 + nu ** 2)
         rows.append(pd.DataFrame({'subject': s, 'stimulus': x,
                                   'response': np.exp(w * m + (1 - w) * mu_p)}))
@@ -109,13 +109,19 @@ def _reproduction(n_sub=6, nu=0.25, bias=0.08, seed=0, reps=30):
     return d.set_index(['subject', 'trial'])
 
 
-def test_reproduction_map_recovers_nu_and_bias():
+def test_reproduction_map_recovers_nu_and_prior_mu():
     df = _reproduction()
     m = ReproductionModel(df, fit_lapse=False)
     m.build_estimation_model(df, hierarchical=True)
     pars = m.fit_map(progressbar=False)
+    presented = np.log(np.geomspace(0.5, 2.0, 7)).mean()
     assert abs(pars['nu'].mean() - 0.25) < 0.04
-    assert abs(pars['bias'].mean() - 0.08) < 0.03
+    assert abs(pars['prior_mu'].mean() - (presented + 0.15)) < 0.06
+
+
+def test_reproduction_bias_and_prior_mu_exclusive():
+    with pytest.raises(ValueError, match='intercept'):
+        ReproductionModel(_reproduction(n_sub=1, reps=2), fit_bias=True, fit_prior_mu=True)
 
 
 def test_reproduction_regression_ppc_and_plots():

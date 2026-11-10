@@ -2,9 +2,10 @@
 
 The observer works in log space, where Weber's law makes the noise constant:
 
-1. Measurement  ``m ~ N(log x + bias, nu^2)``
-2. Prior        ``log x ~ N(mu_p, sigma_p^2)`` (by default the presented
-                distribution: mean and SD of the log stimuli)
+1. Measurement  ``m ~ N(log x, nu^2)`` (optionally ``+ bias``)
+2. Prior        ``log x ~ N(mu_p, sigma_p^2)``; ``prior_mu`` (mu_p) is fitted
+                by default, ``prior_sd`` (sigma_p) optionally; otherwise both
+                are the mean and SD of the presented log stimuli
 3. Posterior mean ``m_hat = w m + (1 - w) mu_p``, ``w = sigma_p^2 / (sigma_p^2 + nu^2)``
 4. Response     ``log r = m_hat``
 5. Lapses       with probability ``p_lapse`` a response uniform over the
@@ -19,15 +20,24 @@ variable (and biases ``nu`` down to compensate).
 
 Likelihood::
 
-    log r ~ (1 - p_lapse) N(w (log x + bias) + (1 - w) mu_p, (w nu)^2)
+    log r ~ (1 - p_lapse) N(w log x + (1 - w) mu_p, (w nu)^2)
             + p_lapse Uniform(log r_min, log r_max)
 
 What the data identify: the slope of mean log reproduction against log
-stimulus is ``w``; the spread around it is ``w * nu``. So with the prior width
-fixed, ``nu`` is over-determined (a strong posterior predictive check), and
-with ``fit_prior_sd=True`` both ``nu`` (= spread / slope) and ``sigma_p`` (from
-w and nu) are identified. ``bias`` and a free prior mean would both only shift
-the intercept (``w * bias + (1 - w) * mu_p``), so only ``bias`` is fitted.
+stimulus is ``w``, the intercept is ``(1 - w) mu_p``, and the spread around the
+line is ``w * nu``. So ``mu_p`` is identified (as long as w < 1, i.e. there is
+some central tendency), and with ``fit_prior_sd=True`` both ``nu`` (= spread /
+slope) and ``sigma_p`` (from w and nu) are identified too. A measurement bias
+(``fit_bias=True``, "clock speed") only shifts the intercept as well
+(``w * bias + (1 - w) * mu_p``), so fit either ``prior_mu`` or ``bias``, not
+both.
+
+In natural units the reproductions of a fixed stimulus are log-normal with
+log-SD ``w * nu``: their SD grows in proportion to the stimulus (constant
+coefficient of variation, the scalar property) and their skewness,
+``(e^{s^2} + 2) sqrt(e^{s^2} - 1)`` with ``s = w nu``, is the same at every
+magnitude. Skew changing with magnitude is evidence for a noise source that
+is not constant in log space (e.g. additive motor noise).
 Optional ``fit_motor_noise=True`` adds log-space motor noise in quadrature,
 ``SD = sqrt((w nu)^2 + sigma_motor^2)``; that uses up the spread, so it should
 not be combined with ``fit_prior_sd=True`` (nu, sigma_p and sigma_motor would
@@ -56,12 +66,18 @@ class ReproductionModel(BaseModel):
         lapse density. Default: observed range ± 20%.
     prior_mu, prior_sd : float, optional
         Observer prior on log stimulus. Default: mean and SD of
-        ``log(stimulus)`` in ``paradigm`` (the presented distribution). The
-        prior mean is never fitted (it would duplicate ``bias``).
+        ``log(stimulus)`` in ``paradigm`` (the presented distribution). When
+        fitted, these are the starting points (prior centres) instead.
+    fit_prior_mu : bool
+        Fit the prior mean ``prior_mu`` per subject (default True). Its group
+        prior is centred on the presented mean.
     fit_prior_sd : bool
         Fit the prior width ``prior_sd`` per subject (default False: fixed at
         the presented SD). Identified from slope + spread when
         ``fit_motor_noise`` is False.
+    fit_bias : bool
+        Fit an additive measurement bias in log space (default False).
+        Mutually exclusive with ``fit_prior_mu`` (same intercept).
     fit_lapse : bool
         Include the uniform lapse component (default True).
     fit_motor_noise : bool
@@ -71,7 +87,8 @@ class ReproductionModel(BaseModel):
     """
 
     def __init__(self, paradigm, response_range=None, prior_mu=None, prior_sd=None,
-                 fit_lapse=True, fit_motor_noise=False, fit_prior_sd=False,
+                 fit_prior_mu=True, fit_prior_sd=False, fit_bias=False,
+                 fit_lapse=True, fit_motor_noise=False,
                  stimulus_col='stimulus', response_col='response'):
         self.stimulus_col = stimulus_col
         self.response_col = response_col
@@ -86,6 +103,11 @@ class ReproductionModel(BaseModel):
         self.fit_lapse = fit_lapse
         self.fit_motor_noise = fit_motor_noise
         self.fit_prior_sd = fit_prior_sd
+        self.fit_prior_mu = fit_prior_mu
+        self.fit_bias = fit_bias
+        if fit_prior_mu and fit_bias:
+            raise ValueError('fit_prior_mu and fit_bias both only shift the intercept '
+                             '(w*bias + (1-w)*prior_mu): fit one of them.')
         if fit_prior_sd and fit_motor_noise:
             import warnings
             warnings.warn('fit_prior_sd together with fit_motor_noise is weakly identified: '
@@ -96,8 +118,12 @@ class ReproductionModel(BaseModel):
         pars = {
             'nu': {'mu_intercept': inverse_softplus_np(0.3), 'sigma_intercept': 0.5,
                    'transform': 'softplus'},
-            'bias': {'mu_intercept': 0.0, 'sigma_intercept': 0.3, 'transform': 'identity'},
         }
+        if self.fit_prior_mu:
+            pars['prior_mu'] = {'mu_intercept': self.prior_mu, 'sigma_intercept': 0.5,
+                                'transform': 'identity'}
+        if self.fit_bias:
+            pars['bias'] = {'mu_intercept': 0.0, 'sigma_intercept': 0.3, 'transform': 'identity'}
         if self.fit_prior_sd:
             pars['prior_sd'] = {'mu_intercept': inverse_softplus_np(self.prior_sd),
                                 'sigma_intercept': 0.5, 'transform': 'softplus'}
@@ -122,10 +148,12 @@ class ReproductionModel(BaseModel):
 
     def predicted_log_response(self, log_stimulus, parameters):
         """Mean and SD of log reproductions (excluding lapses)."""
-        nu, bias = parameters['nu'], parameters['bias']
+        nu = parameters['nu']
+        bias = parameters['bias'] if self.fit_bias else 0.0
+        prior_mu = parameters['prior_mu'] if self.fit_prior_mu else self.prior_mu
         prior_sd = parameters['prior_sd'] if self.fit_prior_sd else self.prior_sd
         w = prior_sd ** 2 / (prior_sd ** 2 + nu ** 2)
-        mean = w * (log_stimulus + bias) + (1 - w) * self.prior_mu
+        mean = w * (log_stimulus + bias) + (1 - w) * prior_mu
         sd = w * nu                                   # SD of the posterior MEAN
         if self.fit_motor_noise:
             sd = pt.sqrt(sd ** 2 + parameters['sigma_motor'] ** 2)
