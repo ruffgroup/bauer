@@ -1336,7 +1336,7 @@ write_if_changed(nb2, 'lesson2.ipynb')
 nb3 = nbf.v4.new_notebook()
 nb3.cells = [
 
-md(r"""# Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv)
+md(r'''# Lesson 3: Stake effects and presentation order — de Hollander et al. (2024, bioRxiv)
 
 ## Background
 
@@ -1365,36 +1365,36 @@ Standard models (EU, KLW with a shared noise) **cannot** capture this asymmetry.
 
 We fit all three on both the **dot-cloud** (fMRI sessions 3T+7T) and the **symbolic**
 (Arabic numerals) datasets, then compare posterior predictives against the interaction
-pattern.
-"""),
+pattern.'''),
 
-code("""\
-import warnings; warnings.filterwarnings('ignore')
+code(r'''import warnings; warnings.filterwarnings('ignore')
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import arviz as az
-from bauer.utils.data import load_dehollander2024
+from bauer.utils.data import load_dehollander2024_risk, load_dehollander2024_symbolic
 from bauer.models import ExpectedUtilityRiskModel, RiskModel
 
-# Load both fMRI sessions and combine
-df_dot = load_dehollander2024(task='dotcloud', sessions=['3t2', '7t2'])
-df_sym = load_dehollander2024(task='symbolic')
+# Load both fMRI sessions and combine. In bauer 0.3.0 the de Hollander (2024)
+# loaders are split by stimulus format: load_dehollander2024_risk is the
+# dot-cloud risk task (sessions 3t2 + 7t2), load_dehollander2024_symbolic is the
+# Arabic-numeral task. (The old single load_dehollander2024(task=...) wrapper was
+# removed.)
+df_dot = load_dehollander2024_risk(sessions=['3t2', '7t2'])
+df_sym = load_dehollander2024_symbolic()
 
 print(f"Dot clouds  — subjects: {df_dot.index.get_level_values('subject').nunique()}, "
       f"trials: {len(df_dot)}")
 print(f"Symbolic    — subjects: {df_sym.index.get_level_values('subject').nunique()}, "
       f"trials: {len(df_sym)}")
-df_dot.head()
-"""),
+df_dot.head()'''),
 
-code("""\
-def prep_df(df):
-    \"\"\"Add log_ratio, chose_risky, n_safe, order flag, and binned columns.
+code(r'''def prep_df(df):
+    """Add log_ratio, chose_risky, n_safe, order flag, and binned columns.
     Returns (df, stake_labels) where stake_labels lists the three stake-bin names
     with concrete magnitude ranges, e.g. ['Low (5–12)', 'Mid (12–24)', 'High (24–48)'].
-    \"\"\"
+    """
     df = df.reset_index()
     risky_first = df['p1'] == 0.55
     df['log_ratio']   = np.log(
@@ -1419,7 +1419,7 @@ def prep_df(df):
 df_dot_p, dot_stake_labels = prep_df(df_dot)
 df_sym_p, sym_stake_labels = prep_df(df_sym)
 
-# Sequential (light→dark) palette for stake sizes — hue in existing order\u00d7stake plots
+# Sequential (light→dark) palette for stake sizes — hue in existing order×stake plots
 def make_stake_pal(labels):
     cols = sns.color_palette('YlOrRd', len(labels))   # yellow → orange → red
     return dict(zip(labels, cols))
@@ -1429,21 +1429,18 @@ sym_stake_pal = make_stake_pal(sym_stake_labels)
 
 # Order palette: standard seaborn blue/orange
 order_pal = {'Safe first': sns.color_palette()[0],    # blue
-             'Risky first': sns.color_palette()[1]}   # orange
-"""),
+             'Risky first': sns.color_palette()[1]}   # orange'''),
 
-md(r"""## Presentation-order x stake-size interaction
+md(r'''## Presentation-order x stake-size interaction
 
 Each panel shows P(chose risky) as a function of the log risky/safe magnitude ratio,
 split by safe-option stake tertile.  The left column shows trials where the risky option
 came first; the right column shows trials where the safe option came first.
 
-The dashed vertical line marks the risk-neutral indifference point log(1/0.55).
-"""),
+The dashed vertical line marks the risk-neutral indifference point log(1/0.55).'''),
 
-code("""\
-def plot_interaction(df_p, axes_row, task_label, stake_labels, stake_pal):
-    \"\"\"Columns = order condition, hue = safe-stake tertile.\"\"\"
+code(r'''def plot_interaction(df_p, axes_row, task_label, stake_labels, stake_pal):
+    """Columns = order condition, hue = safe-stake tertile."""
     for ax, order_val in zip(axes_row, ['Risky first', 'Safe first']):
         sub  = df_p[df_p['order'] == order_val]
         subj = (sub.groupby(['subject', 'log_ratio_bin', 'n_safe_bin'])['chose_risky']
@@ -1466,7 +1463,7 @@ def plot_interaction(df_p, axes_row, task_label, stake_labels, stake_pal):
 
 
 def plot_interaction_by_stake(df_p, axes_row, task_label, stake_labels):
-    \"\"\"Columns = safe-stake tertile, hue = order condition (orange/blue).\"\"\"
+    """Columns = safe-stake tertile, hue = order condition (orange/blue)."""
     for ax, sbin in zip(axes_row, stake_labels):
         sub  = df_p[df_p['n_safe_bin'] == sbin]
         subj = (sub.groupby(['subject', 'log_ratio_bin', 'order'])['chose_risky']
@@ -1491,69 +1488,63 @@ def plot_interaction_by_stake(df_p, axes_row, task_label, stake_labels):
 fig, axes = plt.subplots(2, 2, figsize=(12, 9), sharey=True)
 plot_interaction(df_dot_p, axes[0], 'Dot clouds (3T + 7T)', dot_stake_labels, dot_stake_pal)
 plot_interaction(df_sym_p, axes[1], 'Symbolic (Arabic numerals)', sym_stake_labels, sym_stake_pal)
-plt.suptitle('Presentation-order \u00d7 safe-stake interaction  (hue = stake size)', fontsize=13, y=1.01)
-plt.tight_layout()
-"""),
+plt.suptitle('Presentation-order × safe-stake interaction  (hue = stake size)', fontsize=13, y=1.01)
+plt.tight_layout()'''),
 
-md("""### Alternative view: stake size × order (hue = order)
+md(r'''### Alternative view: stake size × order (hue = order)
 
 The same data shown with columns = stake tertile and hue = presentation order.
-Orange = risky option presented first; blue = safe option presented first.
-"""),
+Orange = risky option presented first; blue = safe option presented first.'''),
 
-code("""\
-fig, axes = plt.subplots(2, 3, figsize=(15, 9), sharey=True)
+code(r'''fig, axes = plt.subplots(2, 3, figsize=(15, 9), sharey=True)
 plot_interaction_by_stake(df_dot_p, axes[0], 'Dot clouds (3T + 7T)', dot_stake_labels)
 plot_interaction_by_stake(df_sym_p, axes[1], 'Symbolic (Arabic numerals)', sym_stake_labels)
-plt.suptitle('Stake-size \u00d7 order interaction  (hue = order)', fontsize=13, y=1.01)
-plt.tight_layout()
-"""),
+plt.suptitle('Stake-size × order interaction  (hue = order)', fontsize=13, y=1.01)
+plt.tight_layout()'''),
 
-md("""## Fit three models — dot-cloud data
+md(r'''## Fit three models — dot-cloud data
 
 Hierarchical MCMC, 100 draws / 100 tune / 2 chains.  We store log-likelihoods
-(`log_likelihood=True`) for ELPD model comparison later.
-"""),
+(`log_likelihood=True`) for ELPD model comparison later.'''),
 
-code("""\
-# ── 1. Expected Utility ──────────────────────────────────────────────────────
+code(r'''# ── 1. Expected Utility ──────────────────────────────────────────────────────
 model_eu = ExpectedUtilityRiskModel(paradigm=df_dot)
 model_eu.build_estimation_model(data=df_dot, hierarchical=True, save_p_choice=True)
 idata_eu = model_eu.sample(draws=100, tune=100, chains=2, progressbar=False,
-                            idata_kwargs={'log_likelihood': True})
-"""),
+                            idata_kwargs={'log_likelihood': True})'''),
 
-code("""\
-# ── 2. KLW (shared noise, shared prior) ─────────────────────────────────────
+code(r'''# ── 2. KLW (shared noise, shared prior) ─────────────────────────────────────
 model_klw = RiskModel(paradigm=df_dot, prior_estimate='klw',
                       fit_separate_evidence_sd=False)
 model_klw.build_estimation_model(data=df_dot, hierarchical=True, save_p_choice=True)
 idata_klw = model_klw.sample(draws=100, tune=100, chains=2, progressbar=False,
-                              idata_kwargs={'log_likelihood': True})
-"""),
+                              idata_kwargs={'log_likelihood': True})'''),
 
-code("""\
-# ── 3. PMCM (separate noise + separate priors) ────────────────────
+code(r'''# ── 3. PMCM (separate noise + separate priors) ────────────────────
 model_full = RiskModel(paradigm=df_dot, prior_estimate='full',
                        fit_separate_evidence_sd=True)
 model_full.build_estimation_model(data=df_dot, hierarchical=True, save_p_choice=True)
 idata_full = model_full.sample(draws=100, tune=100, chains=2, progressbar=False,
-                                idata_kwargs={'log_likelihood': True})
-"""),
+                                idata_kwargs={'log_likelihood': True})'''),
 
-md("""## Posterior predictives — dot-cloud data
+md(r'''## Posterior predictives — dot-cloud data
 
-Dots = observed group average; line + shading = model mean and 95 % posterior interval.
-"""),
+Dots = observed group average; line + shading = model mean and 95 % posterior interval.'''),
 
-code("""\
-from bauer.utils import summarize_ppc_group
+code(r'''from bauer.utils import summarize_ppc_group
 
 def add_model_ppc(df_orig, df_prepped, model, idata, model_name, stake_labels):
-    \"\"\"Condition-level PPC via summarize_ppc_group (two-step subject averaging).\"\"\"
-    ppc_df  = model.ppc(df_orig, idata, var_names=['ll_bernoulli'])
-    ppc_ll  = ppc_df.xs('ll_bernoulli', level='variable')
-    sample_cols = ppc_ll.columns.tolist()
+    """Condition-level PPC via summarize_ppc_group (two-step subject averaging).
+
+    bauer 0.3.0 PPC API: model.ppc(data, idata) returns a long frame indexed by
+    (paradigm index..., ppc_sample) with a single 'simulated_choice' column.
+    Unstack ppc_sample to get one column per posterior sample, then join the
+    paradigm columns (p1, n1, n2) we need to recompute order / log-ratio / stake.
+    """
+    ppc_df  = model.ppc(df_orig, idata)
+    ppc_ll  = ppc_df['simulated_choice'].unstack('ppc_sample')
+    ppc_ll  = ppc_ll.join(df_orig[['p1', 'n1', 'n2']])
+    sample_cols = [c for c in ppc_ll.columns if c not in ('p1', 'n1', 'n2')]
 
     ppc_flat = ppc_ll.reset_index()
     risky_first = (ppc_flat['p1'] == 0.55)
@@ -1580,7 +1571,7 @@ def add_model_ppc(df_orig, df_prepped, model, idata, model_name, stake_labels):
 
 
 def plot_ppc_interaction(df_pred, df_obs, model_name, axes_row, stake_labels, stake_pal):
-    \"\"\"Columns = order; hue = stake tertile (sequential palette).\"\"\"
+    """Columns = order; hue = stake tertile (sequential palette)."""
     for ax, order_val in zip(axes_row, ['Risky first', 'Safe first']):
         pred = df_pred[df_pred['order'] == order_val]
         obs  = df_obs[df_obs['order']   == order_val]
@@ -1604,7 +1595,7 @@ def plot_ppc_interaction(df_pred, df_obs, model_name, axes_row, stake_labels, st
 
 
 def plot_ppc_by_stake(df_pred, df_obs, model_name, axes_row, stake_labels):
-    \"\"\"Columns = stake tertile; hue = order (orange/blue).\"\"\"
+    """Columns = stake tertile; hue = order (orange/blue)."""
     for ax, sbin in zip(axes_row, stake_labels):
         pred = df_pred[df_pred['n_safe_bin'] == sbin]
         obs  = df_obs[df_obs['n_safe_bin']   == sbin]
@@ -1644,58 +1635,45 @@ for (mdl, idat, name), row in zip(
     ppc_dot[name] = add_model_ppc(df_dot, df_dot_p, mdl, idat, name, dot_stake_labels)
     plot_ppc_interaction(ppc_dot[name], obs_dot, name, row, dot_stake_labels, dot_stake_pal)
 
-plt.suptitle('Posterior predictive checks — dot-cloud data  (dots = observed, shading = 95 % CI)',
+plt.suptitle('Posterior predictive checks — dot-cloud data  (dots = observed, shading = 95 % CI)',
              fontsize=11, y=1.01)
-plt.tight_layout()
-"""),
+plt.tight_layout()'''),
 
-md("""### Alternative PPC view: columns = stake size, hue = order
-"""),
+md(r'''### Alternative PPC view: columns = stake size, hue = order'''),
 
-code("""\
-fig, axes = plt.subplots(3, 3, figsize=(15, 13), sharey=True)
+code(r'''fig, axes = plt.subplots(3, 3, figsize=(15, 13), sharey=True)
 for (name, df_pred), row in zip(ppc_dot.items(), axes):
     plot_ppc_by_stake(df_pred, obs_dot, name, row, dot_stake_labels)
 
 plt.suptitle('PPC — dot-cloud  (columns = stake tertile, hue = order)',
              fontsize=11, y=1.01)
-plt.tight_layout()
-"""),
+plt.tight_layout()'''),
 
-md("""## Fit three models — symbolic data
-"""),
+md(r'''## Fit three models — symbolic data'''),
 
-code("""\
-# ── 1. EU ────────────────────────────────────────────────────────────────────
+code(r'''# ── 1. EU ────────────────────────────────────────────────────────────────────
 model_eu_sym = ExpectedUtilityRiskModel(paradigm=df_sym)
 model_eu_sym.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
 idata_eu_sym = model_eu_sym.sample(draws=100, tune=100, chains=2, progressbar=False,
-                                        idata_kwargs={'log_likelihood': True})
-"""),
+                                        idata_kwargs={'log_likelihood': True})'''),
 
-code("""\
-# ── 2. KLW ───────────────────────────────────────────────────────────────────
+code(r'''# ── 2. KLW ───────────────────────────────────────────────────────────────────
 model_klw_sym = RiskModel(paradigm=df_sym, prior_estimate='klw',
                            fit_separate_evidence_sd=False)
 model_klw_sym.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
 idata_klw_sym = model_klw_sym.sample(draws=100, tune=100, chains=2, progressbar=False,
-                                          idata_kwargs={'log_likelihood': True})
-"""),
+                                          idata_kwargs={'log_likelihood': True})'''),
 
-code("""\
-# ── 3. PMCM ────────────────────────────────────────────────────────
+code(r'''# ── 3. PMCM ────────────────────────────────────────────────────────
 model_full_sym = RiskModel(paradigm=df_sym, prior_estimate='full',
                             fit_separate_evidence_sd=True)
 model_full_sym.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
 idata_full_sym = model_full_sym.sample(draws=100, tune=100, chains=2, progressbar=False,
-                                            idata_kwargs={'log_likelihood': True})
-"""),
+                                            idata_kwargs={'log_likelihood': True})'''),
 
-md("""## Posterior predictives — symbolic data
-"""),
+md(r'''## Posterior predictives — symbolic data'''),
 
-code("""\
-obs_sym = (df_sym_p
+code(r'''obs_sym = (df_sym_p
            .groupby(['subject', 'order', 'n_safe_bin', 'log_ratio_bin'])['chose_risky']
            .mean()
            .groupby(['order', 'n_safe_bin', 'log_ratio_bin']).mean()
@@ -1713,30 +1691,24 @@ for (mdl, idat, name), row in zip(
 
 plt.suptitle('Posterior predictive checks — symbolic data  (dots = observed, shading = 95 % CI)',
              fontsize=11, y=1.01)
-plt.tight_layout()
-"""),
+plt.tight_layout()'''),
 
-md("""### Alternative PPC view: columns = stake size, hue = order (symbolic)
-"""),
+md(r'''### Alternative PPC view: columns = stake size, hue = order (symbolic)'''),
 
-code("""\
-fig, axes = plt.subplots(3, 3, figsize=(15, 13), sharey=True)
+code(r'''fig, axes = plt.subplots(3, 3, figsize=(15, 13), sharey=True)
 for (name, df_pred), row in zip(ppc_sym.items(), axes):
     plot_ppc_by_stake(df_pred, obs_sym, name, row, sym_stake_labels)
 
 plt.suptitle('PPC — symbolic  (columns = stake tertile, hue = order)',
              fontsize=11, y=1.01)
-plt.tight_layout()
-"""),
+plt.tight_layout()'''),
 
-md(r"""## Parameter interpretation: $\nu_1$ vs $\nu_2$
+md(r'''## Parameter interpretation: $\nu_1$ vs $\nu_2$
 
 bauer's `get_subject_posterior_df` creates a tidy summary DataFrame, and
-`plot_subjectwise_pointplot` maps it onto a FacetGrid — one panel per parameter per task.
-"""),
+`plot_subjectwise_pointplot` maps it onto a FacetGrid — one panel per parameter per task.'''),
 
-code("""\
-from bauer.utils import get_subject_posterior_df, plot_subjectwise_pointplot
+code(r'''from bauer.utils import get_subject_posterior_df, plot_subjectwise_pointplot
 
 fig, axes = plt.subplots(2, 3, figsize=(15, 9))
 
@@ -1749,14 +1721,14 @@ for row_axes, (idat, task_label) in zip(axes,
     # Left: ν₁ sorted pointplot (direct call with ax=)
     d1 = df_post[df_post['parameter'] == 'n1_evidence_sd'].reset_index(drop=True)
     plot_subjectwise_pointplot(d1, color='#d73027', ax=row_axes[0])
-    row_axes[0].set_title(f'{task_label}: \u03bd\u2081 (first option)')
-    row_axes[0].set_ylabel('Noise  \u03bd\u2081')
+    row_axes[0].set_title(f'{task_label}: ν₁ (first option)')
+    row_axes[0].set_ylabel('Noise  ν₁')
 
     # Middle: ν₂ sorted pointplot
     d2 = df_post[df_post['parameter'] == 'n2_evidence_sd'].reset_index(drop=True)
     plot_subjectwise_pointplot(d2, color='#2166ac', ax=row_axes[1])
-    row_axes[1].set_title(f'{task_label}: \u03bd\u2082 (second option)')
-    row_axes[1].set_ylabel('Noise  \u03bd\u2082')
+    row_axes[1].set_title(f'{task_label}: ν₂ (second option)')
+    row_axes[1].set_ylabel('Noise  ν₂')
 
     # Right: ν₁ vs ν₂ scatter
     n_subj = idat.posterior['n1_evidence_sd'].shape[-1]
@@ -1771,18 +1743,17 @@ for row_axes, (idat, task_label) in zip(axes,
                 yerr=[nu1_mean - nu1_lo, nu1_hi - nu1_mean],
                 fmt='o', ms=4, alpha=.6, elinewidth=0.6, capsize=2,
                 color='#2166ac', ecolor='#aec7e8', zorder=3)
-    row_axes[2].plot([0, lim], [0, lim], 'k--', lw=1, label='\u03bd\u2081 = \u03bd\u2082')
+    row_axes[2].plot([0, lim], [0, lim], 'k--', lw=1, label='ν₁ = ν₂')
     row_axes[2].set_xlim(0, lim); row_axes[2].set_ylim(0, lim)
-    row_axes[2].set_xlabel('\u03bd\u2082'); row_axes[2].set_ylabel('\u03bd\u2081')
-    row_axes[2].set_title(f'{task_label}: \u03bd\u2081 vs \u03bd\u2082')
+    row_axes[2].set_xlabel('ν₂'); row_axes[2].set_ylabel('ν₁')
+    row_axes[2].set_title(f'{task_label}: ν₁ vs ν₂')
     row_axes[2].legend(fontsize=9); sns.despine(ax=row_axes[2])
 
 plt.suptitle('Subject-level noise estimates from PMCM (error bars = 94 % HDI)',
              fontsize=12, y=1.02)
-plt.tight_layout()
-"""),
+plt.tight_layout()'''),
 
-md(r"""## Individual differences in noise asymmetry
+md(r'''## Individual differences in noise asymmetry
 
 The group average $\nu_1 > \nu_2$ suggests a **memory effect**: the first-presented option
 is noisier because it must be held in working memory.  But this is only part of the story.
@@ -1790,11 +1761,9 @@ is noisier because it must be held in working memory.  But this is only part of 
 In the **symbolic** task, the picture is more nuanced.  Not every participant shows a memory
 effect — some appear to show an **attentional primacy** effect where they focus *more* on
 the first option ($\nu_1 < \nu_2$).  The distribution of $\nu_1 - \nu_2$ across
-participants reveals this heterogeneity.
-"""),
+participants reveals this heterogeneity.'''),
 
-code("""\
-# ── ν₁ − ν₂ difference per subject ──────────────────────────────────────────
+code(r'''# ── ν₁ − ν₂ difference per subject ──────────────────────────────────────────
 from bauer.utils.math import softplus_np
 
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
@@ -1818,23 +1787,22 @@ for ax, (idat, task_label) in zip(axes,
                       diff_hi[sort_idx] - diff_mean[sort_idx]],
                 fmt='o', ms=4, elinewidth=0.7, capsize=1.5, alpha=.7,
                 color='#4393c3', ecolor='#aec7e8')
-    ax.axhline(0, ls='--', c='#d73027', lw=1.5, label='\u03bd\u2081 = \u03bd\u2082')
-    ax.set_xlabel('Subject (sorted by \u03bd\u2081 \u2212 \u03bd\u2082)')
-    ax.set_ylabel('\u03bd\u2081 \u2212 \u03bd\u2082')
+    ax.axhline(0, ls='--', c='#d73027', lw=1.5, label='ν₁ = ν₂')
+    ax.set_xlabel('Subject (sorted by ν₁ − ν₂)')
+    ax.set_ylabel('ν₁ − ν₂')
     ax.set_title(f'{task_label}')
     n_mem = (diff_lo[sort_idx] > 0).sum()
     n_att = (diff_hi[sort_idx] < 0).sum()
-    ax.text(0.02, 0.98, f'Memory effect (\u03bd\u2081>\u03bd\u2082): {n_mem}\\nAttention primacy (\u03bd\u2081<\u03bd\u2082): {n_att}',
+    ax.text(0.02, 0.98, f'Memory effect (ν₁>ν₂): {n_mem}\nAttention primacy (ν₁<ν₂): {n_att}',
             transform=ax.transAxes, va='top', fontsize=9,
             bbox=dict(boxstyle='round', fc='white', alpha=.8))
     ax.legend(fontsize=9); sns.despine(ax=ax)
 
-plt.suptitle('Individual noise asymmetry: \u03bd\u2081 \u2212 \u03bd\u2082 (94\u202f% HDI per subject)',
+plt.suptitle('Individual noise asymmetry: ν₁ − ν₂ (94 % HDI per subject)',
              fontsize=12, y=1.02)
-plt.tight_layout()
-"""),
+plt.tight_layout()'''),
 
-md(r"""### Interpreting the heterogeneity
+md(r'''### Interpreting the heterogeneity
 
 For **dot clouds**, most participants show $\nu_1 > \nu_2$ (memory effect) — consistent with
 the sequential presentation degrading the first option in working memory.
@@ -1846,19 +1814,16 @@ For **symbolic (Arabic numeral)** stimuli, the pattern is more mixed:
 
 This suggests that with symbolic stimuli (which are faster to encode than dot clouds), the
 bottleneck shifts from working memory to **attentional allocation**, and different participants
-adopt different strategies.
-"""),
+adopt different strategies.'''),
 
-md(r"""## Subject-level PPCs: do the models capture individual strategies?
+md(r'''## Subject-level PPCs: do the models capture individual strategies?
 
 Group-level PPCs can look fine while hiding poor fits for individual participants.
 We pick three subjects — one with a strong memory effect ($\nu_1 \gg \nu_2$), one
 balanced, and one with an attentional-primacy effect ($\nu_1 < \nu_2$) — and show
-their individual posterior predictives under the three models.
-"""),
+their individual posterior predictives under the three models.'''),
 
-code("""\
-# Identify 5 most extreme subjects in each direction (symbolic task)
+code(r'''# Identify 5 most extreme subjects in each direction (symbolic task)
 from bauer.utils.math import softplus_np
 n_subj_sym = idata_full_sym.posterior['n1_evidence_sd'].shape[-1]
 s1_sym = softplus_np(idata_full_sym.posterior['n1_evidence_sd'].values.reshape(-1, n_subj_sym))
@@ -1867,21 +1832,22 @@ diff_sym = (s1_sym - s2_sym).mean(0)
 sym_subjects = idata_full_sym.posterior['n1_evidence_sd'].coords['subject'].values
 
 rank = np.argsort(diff_sym)
-top5_memory    = sym_subjects[rank[-5:]]   # highest \u03bd\u2081 - \u03bd\u2082
-top5_attention = sym_subjects[rank[:5]]    # lowest \u03bd\u2081 - \u03bd\u2082
-print(f"Memory-effect subjects:    {top5_memory}  (mean \u0394\u03bd = {diff_sym[rank[-5:]].mean():.3f})")
-print(f"Attention-primacy subjects: {top5_attention}  (mean \u0394\u03bd = {diff_sym[rank[:5]].mean():.3f})")
-"""),
+top5_memory    = sym_subjects[rank[-5:]]   # highest ν₁ - ν₂
+top5_attention = sym_subjects[rank[:5]]    # lowest ν₁ - ν₂
+print(f"Memory-effect subjects:    {top5_memory}  (mean Δν = {diff_sym[rank[-5:]].mean():.3f})")
+print(f"Attention-primacy subjects: {top5_attention}  (mean Δν = {diff_sym[rank[:5]].mean():.3f})")'''),
 
-code("""\
-# Subject-group PPCs using model probability (p), not binary ll_bernoulli
-# Average P(chose risky) over 5 extreme subjects per group
+code(r'''# Subject-group PPCs using simulated choices averaged over posterior samples.
+# (bauer 0.3.0 unified PPC returns binary 'simulated_choice'; its per-sample
+# mean over trials is the predicted P(chose risky), so averaging recovers the
+# same quantity the old continuous-`p` PPC gave.)
 
 def subgroup_ppc(model, idata, df_raw, df_prepped, subject_ids, group_label):
-    # Get model-predicted P(chose option 2) for all subjects
-    ppc_df = model.ppc(df_raw, idata, var_names=['p'])
-    ppc_p = ppc_df.xs('p', level='variable')
-    sample_cols = ppc_p.columns.tolist()
+    # Predicted (simulated) choice for option 2 for all subjects.
+    ppc_df = model.ppc(df_raw, idata)
+    ppc_p = ppc_df['simulated_choice'].unstack('ppc_sample').astype(float)
+    ppc_p = ppc_p.join(df_raw[['p1', 'n1', 'n2']])
+    sample_cols = [c for c in ppc_p.columns if c not in ('p1', 'n1', 'n2')]
 
     rows = []
     for subj in subject_ids:
@@ -1959,7 +1925,7 @@ for col, (group_label, subj_ids) in enumerate(groups):
         ax.set_ylim(0, 1.05)
         ax.axhline(0.5, ls=':', c='gray', lw=1)
         if col == 0: ax.set_ylabel('P(chose risky)')
-        ax.set_title(f'{model_name} \u2014 {group_label}', fontsize=10)
+        ax.set_title(f'{model_name} — {group_label}', fontsize=10)
         sns.despine(ax=ax)
 
 from matplotlib.patches import Patch
@@ -1973,39 +1939,31 @@ fig.legend(handles=legend_elements, loc='lower center', ncol=3, fontsize=10,
            bbox_to_anchor=(0.5, -0.02))
 plt.suptitle('Subgroup PPCs (symbolic): 5 memory-effect vs 5 attention-primacy subjects',
              fontsize=12, y=1.01)
-plt.tight_layout()
-"""),
+plt.tight_layout()'''),
 
-
-
-md(r"""## ELPD model comparison
+md(r'''## ELPD model comparison
 
 ELPD (via PSIS-LOO) formally ranks the three models.  Since we stored log-likelihoods
-during sampling, `az.compare` works directly.
-"""),
+during sampling, `az.compare` works directly.'''),
 
-code("""\
-import arviz as az
+code(r'''import arviz as az
 
 print("=== Dot clouds ===")
 compare_dot = az.compare({'EU': idata_eu, 'KLW': idata_klw, 'PMCM': idata_full})
 print(compare_dot[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())
 
-print("\\n=== Symbolic ===")
+print("\n=== Symbolic ===")
 compare_sym = az.compare({'EU': idata_eu_sym, 'KLW': idata_klw_sym, 'PMCM': idata_full_sym})
-print(compare_sym[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())
-"""),
+print(compare_sym[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())'''),
 
-code("""\
-fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+code(r'''fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 az.plot_compare(compare_dot, ax=axes[0])
 axes[0].set_title('Dot clouds — ELPD comparison')
 az.plot_compare(compare_sym, ax=axes[1])
 axes[1].set_title('Symbolic — ELPD comparison')
-plt.tight_layout()
-"""),
+plt.tight_layout()'''),
 
-md(r"""## Summary
+md(r'''## Summary
 
 1. **Presentation order** creates asymmetric noise ($\nu_1 \neq \nu_2$), but the direction
    and magnitude of the asymmetry varies across participants.
@@ -2021,8 +1979,7 @@ md(r"""## Summary
 
 In [Lesson 4](lesson4.ipynb) we go one step further: instead of assuming a fixed
 log-space noise, we let the noise curve $\nu(n)$ vary freely across magnitudes using
-B-splines — and test whether Weber's law holds statistically via ELPD model comparison.
-"""),
+B-splines — and test whether Weber's law holds statistically via ELPD model comparison.'''),
 
 ]
 
@@ -2036,7 +1993,7 @@ write_if_changed(nb3, 'lesson3.ipynb')
 nb4 = nbf.v4.new_notebook()
 nb4.cells = [
 
-md(r"""# Lesson 4: Flexible Noise Curves — `FlexibleNoiseComparisonModel` and `FlexibleNoiseRiskModel`
+md(r'''# Lesson 4: Flexible Noise Curves — `FlexibleNoiseComparisonModel` and `FlexibleNoiseRiskModel`
 
 ## Motivation: when does Weber's law hold?
 
@@ -2081,17 +2038,15 @@ far fewer parameters.
 - **Linear** $\nu(n) \propto n$ $\Rightarrow$ scale invariance / Weber's law
 - **Flat** $\nu(n)$ $\Rightarrow$ constant absolute noise (sub-Weber at large $n$)
 - **Affine** $\nu(n) = a + bn$ $\Rightarrow$ noise floor + Weber scaling
-- **Super-linear** $\nu(n)$ $\Rightarrow$ worse precision at large $n$ (super-Weber)
-"""),
+- **Super-linear** $\nu(n)$ $\Rightarrow$ worse precision at large $n$ (super-Weber)'''),
 
-code("""\
-import warnings; warnings.filterwarnings('ignore')
+code(r'''import warnings; warnings.filterwarnings('ignore')
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import arviz as az
-from bauer.utils.data import load_garcia2022, load_dehollander2024
+from bauer.utils.data import load_garcia2022, load_dehollander2024_symbolic
 from bauer.models import (MagnitudeComparisonModel, FlexibleNoiseComparisonModel,
                            RiskModel, FlexibleNoiseRiskModel)
 
@@ -2140,24 +2095,23 @@ df_mag = load_garcia2022(task='magnitude')
 print(f"Garcia magnitude  |  subjects: {df_mag.index.get_level_values('subject').nunique()},  "
       f"trials: {len(df_mag)}")
 
-# de Hollander et al. (2024, bioRxiv) — Arabic-numeral gambles
-df_sym = load_dehollander2024(task='symbolic')
+# de Hollander et al. (2024, bioRxiv) — Arabic-numeral gambles. In bauer 0.3.0
+# this is loaded with the dedicated symbolic loader (the old
+# load_dehollander2024(task='symbolic') wrapper was removed).
+df_sym = load_dehollander2024_symbolic()
 print(f"Arabic numerals   |  subjects: {df_sym.index.get_level_values('subject').nunique()},  "
-      f"trials: {len(df_sym)}")
-"""),
+      f"trials: {len(df_sym)}")'''),
 
-md(r"""## Illustrating flexible noise curves
+md(r'''## Illustrating flexible noise curves
 
 The left panel shows the three canonical noise-vs-magnitude shapes.
 The right panel shows the **key signature of Weber's law**: when noise is
 linear ($\nu \propto n$), psychometric curves plotted against the *relative*
 difference $(n_2 - n_1)/n_1$ collapse onto a single curve regardless of the
 reference magnitude $n_1$ — scale invariance.  Flat or super-linear noise
-breaks this collapse.
-"""),
+breaks this collapse.'''),
 
-code("""\
-from scipy.stats import norm as scipy_norm
+code(r'''from scipy.stats import norm as scipy_norm
 
 n_vals   = np.linspace(5, 45, 200)
 nu0      = 0.30          # noise level at mean magnitude
@@ -2168,9 +2122,9 @@ fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
 # Left: noise curves in natural space
 ax = axes[0]
 noise_curves = [
-    ('Linear  \u03bd(n) = \u03bd\u2080\u00b7n  [Weber / scale-invariant]',
+    ('Linear  ν(n) = ν₀·n  [Weber / scale-invariant]',
      nu0 * n_vals / n_vals.mean(),        '#2166ac', '-'),
-    ('Flat  \u03bd(n) = const  [constant absolute noise]',
+    ('Flat  ν(n) = const  [constant absolute noise]',
      np.full_like(n_vals, nu0),           '#d73027', '--'),
     ('Super-linear  [worse precision at large n]',
      nu0 * (n_vals / n_vals.mean())**1.8, '#1a9850', ':'),
@@ -2178,84 +2132,74 @@ noise_curves = [
 for label, nu_n, c, ls in noise_curves:
     ax.plot(n_vals, nu_n, lw=2.5, color=c, ls=ls, label=label)
 ax.set_xlabel('Magnitude  n')
-ax.set_ylabel('Natural-space noise  \u03bd(n)')
+ax.set_ylabel('Natural-space noise  ν(n)')
 ax.set_title('Noise-vs-magnitude curve shapes')
 ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
 # Right: scale-invariance test — plot P(chose n2) vs (n2-n1)/n1
-# With linear noise \u03bd = \u03bd\u2080\u00d7n_ref: P = \u03a6(rel_diff \u00d7 n1 / (\u221a2 \u00d7 \u03bd\u2080 \u00d7 n1))
-#                                    = \u03a6(rel_diff / (\u221a2 \u00d7 \u03bd\u2080))  — same for all n1!
-# With flat noise \u03bd = const: P = \u03a6(rel_diff \u00d7 n1 / (\u221a2 \u00d7 \u03bd_const))  — varies with n1
+# With linear noise ν = ν₀×n_ref: P = Φ(rel_diff × n1 / (√2 × ν₀ × n1))
+#                                    = Φ(rel_diff / (√2 × ν₀))  — same for all n1!
+# With flat noise ν = const: P = Φ(rel_diff × n1 / (√2 × ν_const))  — varies with n1
 ax = axes[1]
 for n_ref, c, ls in [(8, '#4393c3', '-'), (20, '#1a9850', '--'), (36, '#d73027', ':')]:
     nu_lin  = nu0 * n_ref / n_vals.mean()   # linear noise at n_ref
     nu_flat = nu0                            # flat noise (constant)
     p_lin  = scipy_norm.cdf(rel_diffs * n_ref / (np.sqrt(2) * nu_lin))   # collapses!
     p_flat = scipy_norm.cdf(rel_diffs * n_ref / (np.sqrt(2) * nu_flat))  # shifts by n_ref
-    ax.plot(rel_diffs, p_lin,  color=c, lw=2.5, ls=ls, label=f'Linear \u03bd (n\u2081={n_ref})')
+    ax.plot(rel_diffs, p_lin,  color=c, lw=2.5, ls=ls, label=f'Linear ν (n₁={n_ref})')
     ax.plot(rel_diffs, p_flat, color=c, lw=1.2, ls=ls, alpha=.4)
 ax.axhline(.5, ls='--', c='gray', lw=1)
 ax.axvline(0,  ls='--', c='gray', lw=1)
-ax.text(0.97, 0.07, 'Faint: flat \u03bd (curves shift with n\u2081)',
+ax.text(0.97, 0.07, 'Faint: flat ν (curves shift with n₁)',
         transform=ax.transAxes, ha='right', fontsize=8, color='gray')
-ax.set_xlabel('Relative difference  (n\u2082 − n\u2081) / n\u2081')
-ax.set_ylabel('P(chose n\u2082)')
-ax.set_title('Weber\u2019s law = scale invariance: linear \u03bd curves collapse')
+ax.set_xlabel('Relative difference  (n₂ − n₁) / n₁')
+ax.set_ylabel('P(chose n₂)')
+ax.set_title('Weber’s law = scale invariance: linear ν curves collapse')
 ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
-plt.suptitle('Flexible noise: shape determines whether Weber\u2019s law holds',
+plt.suptitle('Flexible noise: shape determines whether Weber’s law holds',
              fontsize=12, y=1.02)
-plt.tight_layout()
-"""),
+plt.tight_layout()'''),
 
-md(r"""## Part A: Dot-array magnitude comparison (Garcia et al. 2022)
+md(r'''## Part A: Dot-array magnitude comparison (Garcia et al. 2022)
 
 Dot arrays are a classic **perceptual** numerosity stimulus where Weber's law is
 well-established.  Fitting the Flexible Noise model here serves as a sanity check:
 the recovered $\nu(n)$ should be approximately **linear**.  The MCM baseline assumes
 log-space noise, which translates to $\sigma_\text{MCM}(n) = \nu_\text{log} \times n$
-(a line through the origin) — the same Weber's-law prediction.
-"""),
+(a line through the origin) — the same Weber's-law prediction.'''),
 
-code("""\
-# MagnitudeComparisonModel (MCM) — fixed log-space noise (Weber's-law null)
+code(r'''# MagnitudeComparisonModel (MCM) — fixed log-space noise (Weber's-law null)
 # idata_kwargs passes extra arguments to pymc.sample_posterior_predictive;
 # log_likelihood=True stores trial-level log-likelihoods needed for ELPD comparison.
 model_mcm = MagnitudeComparisonModel(paradigm=df_mag, fit_separate_evidence_sd=True)
 model_mcm.build_estimation_model(data=df_mag, hierarchical=True)
 idata_mcm = model_mcm.sample(draws=200, tune=200, chains=4, progressbar=False,
-                              idata_kwargs={'log_likelihood': True})
-"""),
+                              idata_kwargs={'log_likelihood': True})'''),
 
-code("""\
-# FlexibleNoiseComparisonModel — free noise curve fitted to dot arrays
+code(r'''# FlexibleNoiseComparisonModel — free noise curve fitted to dot arrays
 model_flex_mag = FlexibleNoiseComparisonModel(paradigm=df_mag,
                                                fit_separate_evidence_sd=True,
                                                spline_order=5)
 model_flex_mag.build_estimation_model(paradigm=df_mag, hierarchical=True)
 idata_flex_mag = model_flex_mag.sample(draws=200, tune=200, chains=4, progressbar=False,
-                                        idata_kwargs={'log_likelihood': True})
-"""),
+                                        idata_kwargs={'log_likelihood': True})'''),
 
-code("""\
-# AffineNoiseComparisonModel — intercept + linear noise (defined above)
+code(r'''# AffineNoiseComparisonModel — intercept + linear noise (defined above)
 model_affine_mag = AffineNoiseComparisonModel(paradigm=df_mag,
                                                fit_separate_evidence_sd=True)
 model_affine_mag.build_estimation_model(paradigm=df_mag, hierarchical=True)
 idata_affine_mag = model_affine_mag.sample(draws=200, tune=200, chains=4, progressbar=False,
-                                            idata_kwargs={'log_likelihood': True})
-"""),
+                                            idata_kwargs={'log_likelihood': True})'''),
 
-md(r"""### Posterior noise curves — dot arrays
+md(r'''### Posterior noise curves — dot arrays
 
 If Weber's law holds, all three curves should overlap: both the FlexNoise (red) and
 AffineNoise (green) should track the MCM reference line $\sigma = \nu_\text{log} \times n$
 (dashed blue).  A non-zero intercept in the AffineNoise curve would indicate baseline
-noise that does not scale with magnitude.
-"""),
+noise that does not scale with magnitude.'''),
 
-code("""\
-sd_curves_mag = model_flex_mag.get_sd_curve(idata=idata_flex_mag, variable='both',
+code(r'''sd_curves_mag = model_flex_mag.get_sd_curve(idata=idata_flex_mag, variable='both',
                                               group=True, data=df_mag.reset_index())
 sd_curves_aff = model_affine_mag.get_sd_curve(idata=idata_affine_mag, variable='both',
                                                 group=True, data=df_mag.reset_index())
@@ -2267,8 +2211,8 @@ colors = {'flex': '#d73027', 'affine': '#1a9850', 'mcm': '#4393c3'}
 
 for ax, (var_col, nu_mcm_samp, title) in zip(
         axes,
-        [('n1_evidence_sd', nu1_mcm, 'First option  \u03c3\u2081(n)'),
-         ('n2_evidence_sd', nu2_mcm, 'Second option  \u03c3\u2082(n)')]):
+        [('n1_evidence_sd', nu1_mcm, 'First option  σ₁(n)'),
+         ('n2_evidence_sd', nu2_mcm, 'Second option  σ₂(n)')]):
     # FlexNoise (B-spline)
     grp = sd_curves_mag.groupby(level='x')[var_col]
     x_vals = grp.mean().index.values
@@ -2280,25 +2224,24 @@ for ax, (var_col, nu_mcm_samp, title) in zip(
     x_a = grp_a.mean().index.values
     ax.fill_between(x_a, grp_a.quantile(0.025).values, grp_a.quantile(0.975).values,
                     alpha=.18, color=colors['affine'])
-    ax.plot(x_a, grp_a.mean().values, lw=2.5, color=colors['affine'], label='AffineNoise (a + b\u00b7n)')
-    # MCM reference (Weber: \u03c3 = \u03bd\u2080 \u00d7 n)
+    ax.plot(x_a, grp_a.mean().values, lw=2.5, color=colors['affine'], label='AffineNoise (a + b·n)')
+    # MCM reference (Weber: σ = ν₀ × n)
     nu0 = nu_mcm_samp.mean()
     ax.plot(x_vals, nu0 * x_vals, ls='--', lw=2, color=colors['mcm'],
-            label=f'MCM (Weber)  \u03bd\u2080={nu0:.2f}')
+            label=f'MCM (Weber)  ν₀={nu0:.2f}')
     ax.fill_between(x_vals,
                     np.percentile(nu_mcm_samp, 2.5) * x_vals,
                     np.percentile(nu_mcm_samp, 97.5) * x_vals,
                     alpha=.10, color=colors['mcm'])
     ax.set_xlabel('Magnitude  n')
-    ax.set_ylabel('Natural-space noise  \u03c3(n)')
+    ax.set_ylabel('Natural-space noise  σ(n)')
     ax.set_title(title); ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
 plt.suptitle('Dot arrays: MCM vs AffineNoise vs FlexNoise (95 % posterior interval)',
              fontsize=12, y=1.02)
-plt.tight_layout()
-"""),
+plt.tight_layout()'''),
 
-md(r"""### Model comparison: MCM vs AffineNoise vs FlexNoise (dot arrays)
+md(r'''### Model comparison: MCM vs AffineNoise vs FlexNoise (dot arrays)
 
 **ELPD** (Expected Log Pointwise Predictive Density, computed via PSIS-LOO) formally
 tests whether the added flexibility is justified.  The three-way comparison lets us
@@ -2309,25 +2252,19 @@ disentangle two questions:
    Compare AffineNoise vs FlexNoise.
 
 If AffineNoise matches FlexNoise on ELPD while beating MCM, the deviation from Weber's
-law is well-described by a noise floor — a simple, interpretable parameter.
-"""),
+law is well-described by a noise floor — a simple, interpretable parameter.'''),
 
-code("""\
-# ELPD model comparison — dot arrays (3-way)
+code(r'''# ELPD model comparison — dot arrays (3-way)
 compare_mag = az.compare({'MCM (Weber)':   idata_mcm,
                            'AffineNoise':   idata_affine_mag,
                            'FlexNoise':     idata_flex_mag})
-print(compare_mag[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())
-"""),
+print(compare_mag[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())'''),
 
-code("""\
-ax = az.plot_compare(compare_mag, figsize=(7, 3.5))
+code(r'''ax = az.plot_compare(compare_mag, figsize=(7, 3.5))
 ax.set_title('ELPD comparison — dot-array magnitude comparison (higher = better prediction)')
-plt.tight_layout()
-"""),
+plt.tight_layout()'''),
 
-code("""\
-# ── Interpret the dot-array ELPD result (3-way) ─────────────────────────────
+code(r'''# ── Interpret the dot-array ELPD result (3-way) ─────────────────────────────
 print("ELPD ranking (dot arrays):")
 print(compare_mag[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())
 print()
@@ -2357,10 +2294,9 @@ if 'AffineNoise' in compare_mag.index and 'FlexNoise' in compare_mag.index:
             print("   The deviation from Weber's law is well-described by a noise floor (a + b*n).")
         else:
             print("-> Affine noise does NOT fully capture the flexible curve's advantage.")
-            print("   Genuine nonlinearity in the noise function is needed.")
-"""),
+            print("   Genuine nonlinearity in the noise function is needed.")'''),
 
-md(r"""## Part B: Arabic-numeral risky choice (de Hollander et al., 2024, bioRxiv)
+md(r'''## Part B: Arabic-numeral risky choice (de Hollander et al., 2024, bioRxiv)
 
 Arabic numerals are **symbolic**: participants read a printed digit rather than
 estimating numerosity from a visual display.  The internal noise on symbolic
@@ -2368,11 +2304,9 @@ number representations need not scale proportionally with magnitude, so we
 expect a potential **deviation from the linear Weber's-law prediction**.
 
 We compare `FlexibleNoiseRiskModel` and `AffineNoiseRiskModel` against the
-standard `RiskModel` (PMCM) on the same data.
-"""),
+standard `RiskModel` (PMCM) on the same data.'''),
 
-code("""\
-def prep_df(df):
+code(r'''def prep_df(df):
     df = df.reset_index()
     risky_first = df['p1'] == 0.55
     df['log_ratio']     = np.log(
@@ -2388,44 +2322,35 @@ def prep_df(df):
                                    labels=['Low stakes', 'Mid stakes', 'High stakes'])
     return df
 
-df_sym_p = prep_df(df_sym)
-"""),
+df_sym_p = prep_df(df_sym)'''),
 
-code("""\
-# PMCM (fixed log-space noise) — log_likelihood stored for ELPD comparison
+code(r'''# PMCM (fixed log-space noise) — log_likelihood stored for ELPD comparison
 model_pmcm = RiskModel(paradigm=df_sym, prior_estimate='full',
                         fit_separate_evidence_sd=True)
 model_pmcm.build_estimation_model(data=df_sym, hierarchical=True, save_p_choice=True)
 idata_pmcm = model_pmcm.sample(draws=200, tune=200, chains=4, progressbar=False,
-                                idata_kwargs={'log_likelihood': True})
-"""),
+                                idata_kwargs={'log_likelihood': True})'''),
 
-code("""\
-# FlexibleNoiseRiskModel — free noise curve on Arabic-numeral data
+code(r'''# FlexibleNoiseRiskModel — free noise curve on Arabic-numeral data
 model_flex = FlexibleNoiseRiskModel(paradigm=df_sym, prior_estimate='full',
                                      fit_separate_evidence_sd=True, spline_order=5)
 model_flex.build_estimation_model(paradigm=df_sym, hierarchical=True, save_p_choice=True)
 idata_flex = model_flex.sample(draws=200, tune=200, chains=4, progressbar=False,
-                                idata_kwargs={'log_likelihood': True})
-"""),
+                                idata_kwargs={'log_likelihood': True})'''),
 
-code("""\
-# AffineNoiseRiskModel — intercept + linear noise for Arabic-numeral gambles
+code(r'''# AffineNoiseRiskModel — intercept + linear noise for Arabic-numeral gambles
 model_affine = AffineNoiseRiskModel(paradigm=df_sym, prior_estimate='full',
                                      fit_separate_evidence_sd=True)
 model_affine.build_estimation_model(paradigm=df_sym, hierarchical=True, save_p_choice=True)
 idata_affine = model_affine.sample(draws=200, tune=200, chains=4, progressbar=False,
-                                    idata_kwargs={'log_likelihood': True})
-"""),
+                                    idata_kwargs={'log_likelihood': True})'''),
 
-md(r"""### Posterior noise curves — Arabic numerals
+md(r'''### Posterior noise curves — Arabic numerals
 
 Three models are overlaid: the B-spline FlexNoise (red), the two-parameter AffineNoise
-(green), and the PMCM Weber reference (dashed blue).
-"""),
+(green), and the PMCM Weber reference (dashed blue).'''),
 
-code("""\
-sd_curves = model_flex.get_sd_curve(idata=idata_flex, variable='both',
+code(r'''sd_curves = model_flex.get_sd_curve(idata=idata_flex, variable='both',
                                      group=True, data=df_sym.reset_index())
 sd_curves_aff_sym = model_affine.get_sd_curve(idata=idata_affine, variable='both',
                                                 group=True, data=df_sym.reset_index())
@@ -2437,8 +2362,8 @@ colors = {'flex': '#d73027', 'affine': '#1a9850', 'pmcm': '#4393c3'}
 
 for ax, (var_col, nu_pmcm_samp, title) in zip(
         axes,
-        [('n1_evidence_sd', nu1_pmcm, 'First option  \u03c3\u2081(n)'),
-         ('n2_evidence_sd', nu2_pmcm, 'Second option  \u03c3\u2082(n)')]):
+        [('n1_evidence_sd', nu1_pmcm, 'First option  σ₁(n)'),
+         ('n2_evidence_sd', nu2_pmcm, 'Second option  σ₂(n)')]):
     # FlexNoise
     grp = sd_curves.groupby(level='x')[var_col]
     x_vals = grp.mean().index.values
@@ -2450,39 +2375,42 @@ for ax, (var_col, nu_pmcm_samp, title) in zip(
     x_a = grp_a.mean().index.values
     ax.fill_between(x_a, grp_a.quantile(0.025).values, grp_a.quantile(0.975).values,
                     alpha=.18, color=colors['affine'])
-    ax.plot(x_a, grp_a.mean().values, lw=2.5, color=colors['affine'], label='AffineNoise (a + b\u00b7n)')
+    ax.plot(x_a, grp_a.mean().values, lw=2.5, color=colors['affine'], label='AffineNoise (a + b·n)')
     # PMCM reference
     nu0 = nu_pmcm_samp.mean()
     ax.plot(x_vals, nu0 * x_vals, ls='--', lw=2, color=colors['pmcm'],
-            label=f'PMCM (Weber)  \u03bd\u2080={nu0:.2f}')
+            label=f'PMCM (Weber)  ν₀={nu0:.2f}')
     ax.fill_between(x_vals,
                     np.percentile(nu_pmcm_samp, 2.5) * x_vals,
                     np.percentile(nu_pmcm_samp, 97.5) * x_vals,
                     alpha=.10, color=colors['pmcm'])
     ax.set_xlabel('Payoff magnitude  n')
-    ax.set_ylabel('Natural-space noise  \u03c3(n)')
+    ax.set_ylabel('Natural-space noise  σ(n)')
     ax.set_title(title); ax.legend(fontsize=8.5); sns.despine(ax=ax)
 
-plt.suptitle('Arabic numerals: PMCM vs AffineNoise vs FlexNoise (95\u202f% posterior interval)',
+plt.suptitle('Arabic numerals: PMCM vs AffineNoise vs FlexNoise (95 % posterior interval)',
              fontsize=12, y=1.02)
-plt.tight_layout()
-"""),
+plt.tight_layout()'''),
 
-md("""## Posterior predictive comparison (Arabic numerals)
+md(r'''## Posterior predictive comparison (Arabic numerals)
 
 We overlay both models' predictions against the observed presentation-order
-\u00d7 stake-size pattern — the same diagnostic used in lesson 3.
-"""),
+× stake-size pattern — the same diagnostic used in lesson 3.'''),
 
-code("""\
-from bauer.utils import summarize_ppc_group
+code(r'''from bauer.utils import summarize_ppc_group
 stake_pal = dict(zip(['Low stakes', 'Mid stakes', 'High stakes'], sns.color_palette('YlOrRd', 3)))
 
 def add_model_ppc(df_orig, df_prepped, model, idata, model_name):
-    \"\"\"Two-step PPC via summarize_ppc_group.\"\"\"
-    ppc_df  = model.ppc(df_orig, idata, var_names=['ll_bernoulli'])
-    ppc_ll  = ppc_df.xs('ll_bernoulli', level='variable')
-    sample_cols = ppc_ll.columns.tolist()
+    """Two-step PPC via summarize_ppc_group.
+
+    bauer 0.3.0 unified PPC: model.ppc(data, idata) returns a long frame indexed
+    by (paradigm index..., ppc_sample) with one 'simulated_choice' column.
+    Unstack ppc_sample to wide layout and join the paradigm columns we need.
+    """
+    ppc_df  = model.ppc(df_orig, idata)
+    ppc_ll  = ppc_df['simulated_choice'].unstack('ppc_sample')
+    ppc_ll  = ppc_ll.join(df_orig[['p1', 'n1', 'n2']])
+    sample_cols = [c for c in ppc_ll.columns if c not in ('p1', 'n1', 'n2')]
 
     ppc_flat = ppc_ll.reset_index()
     risky_first = (ppc_flat['p1'] == 0.55)
@@ -2547,30 +2475,23 @@ for (mdl, idat, name), row in zip(
 
 plt.suptitle('Posterior predictive comparison: PMCM vs Flexible Noise (Arabic numerals)',
              fontsize=12, y=1.01)
-plt.tight_layout()
-"""),
+plt.tight_layout()'''),
 
-md(r"""### Model comparison: PMCM vs AffineNoise vs FlexNoise (Arabic numerals)
+md(r'''### Model comparison: PMCM vs AffineNoise vs FlexNoise (Arabic numerals)
 
-The same three-way ELPD comparison for the risk models.
-"""),
+The same three-way ELPD comparison for the risk models.'''),
 
-code("""\
-# ELPD comparison — Arabic numerals risky choice (3-way)
+code(r'''# ELPD comparison — Arabic numerals risky choice (3-way)
 compare_sym = az.compare({'PMCM (Weber)':   idata_pmcm,
                            'AffineNoise':    idata_affine,
                            'FlexNoise':      idata_flex})
-print(compare_sym[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())
-"""),
+print(compare_sym[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())'''),
 
-code("""\
-ax = az.plot_compare(compare_sym, figsize=(7, 3.5))
+code(r'''ax = az.plot_compare(compare_sym, figsize=(7, 3.5))
 ax.set_title('ELPD comparison — Arabic-numeral risky choice (higher = better prediction)')
-plt.tight_layout()
-"""),
+plt.tight_layout()'''),
 
-code("""\
-# ── Interpret the Arabic-numeral ELPD result (3-way) ─────────────────────────
+code(r'''# ── Interpret the Arabic-numeral ELPD result (3-way) ─────────────────────────
 print("ELPD ranking (Arabic numerals):")
 print(compare_sym[['elpd_loo', 'p_loo', 'elpd_diff', 'dse', 'warning']].to_string())
 print()
@@ -2588,14 +2509,13 @@ for i in range(1, len(compare_sym)):
 if 'AffineNoise' in compare_sym.index and 'FlexNoise' in compare_sym.index:
     aff_elpd = compare_sym.loc['AffineNoise', 'elpd_loo']
     flex_elpd = compare_sym.loc['FlexNoise', 'elpd_loo']
-    print(f"\\nAffineNoise ELPD: {aff_elpd:.1f},  FlexNoise ELPD: {flex_elpd:.1f}")
+    print(f"\nAffineNoise ELPD: {aff_elpd:.1f},  FlexNoise ELPD: {flex_elpd:.1f}")
     if abs(aff_elpd - flex_elpd) < 10:
         print("-> Affine noise captures most of the FlexNoise advantage (if any).")
     else:
-        print("-> Genuine nonlinearity in the noise function may be needed.")
-"""),
+        print("-> Genuine nonlinearity in the noise function may be needed.")'''),
 
-md(r"""## Take-aways
+md(r'''## Take-aways
 
 **What the ELPD actually tells us in this dataset:**
 
@@ -2619,8 +2539,7 @@ md(r"""## Take-aways
   (draws=200, tune=200) chosen for speed.  For real analyses use at least draws=1000,
   tune=1000.
 - Sampling with `idata_kwargs={{'log_likelihood': True}}` is all that is needed to
-  unlock `az.compare` — bauer handles everything else.
-"""),
+  unlock `az.compare` — bauer handles everything else.'''),
 
 ]
 
