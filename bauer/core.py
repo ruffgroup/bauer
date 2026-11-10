@@ -1052,7 +1052,22 @@ class BaseModel(object):
 BaseModel.__init__ = _translate_deprecated_kwargs(BaseModel.__init__)
 
 
-def _lapse_param_spec(group, mu_mean, mu_kappa, kappa_sd):
+def _effective_lapse_group(model):
+    """The lapse group prior actually used for ``model``.
+
+    The hierarchical-Beta prior is built by ``BaseModel.build_hierarchical_nodes``;
+    ``RegressionModel`` builds every parameter through a design matrix on the
+    untransformed scale and has no Beta branch. Before this guard, a
+    ``*LapseRegressionModel`` with the (default) Beta group silently got an
+    untransformed ``Normal(0, 0.5)`` lapse rate that could leave (0, 1).
+    Regression models therefore always use the logit-Normal group prior.
+    """
+    if isinstance(model, RegressionModel) and model.lapse_group == 'beta':
+        return 'logit_normal'
+    return model.lapse_group
+
+
+def _lapse_param_spec(group, mu_mean, mu_kappa, kappa_sd, regression=False):
     """Free-parameter spec dict for a lapse / outlier rate in (0, 1).
 
     ``group='logit_normal'`` (default) reproduces the historical logit-Normal
@@ -1068,7 +1083,15 @@ def _lapse_param_spec(group, mu_mean, mu_kappa, kappa_sd):
                 'beta_mu_kappa': mu_kappa,
                 'beta_kappa_sd': kappa_sd}
     elif group == 'logit_normal':
-        return {'mu_intercept': logit_np(mu_mean), 'transform': 'logistic'}
+        spec = {'mu_intercept': logit_np(mu_mean), 'transform': 'logistic'}
+        if regression:
+            # Lapse rates differ a lot between people (2% vs 15% is common).
+            # The regression path's default between-subject SD prior on the
+            # logit (HalfNormal(0.25)) shrinks a 15% lapser towards the group
+            # mean, and the model then explains their random answers with
+            # extra noise (inflated nu / evidence_sd). Widen it.
+            spec.update(sigma_intercept=1.0, cauchy_sigma_intercept=1.0)
+        return spec
     raise ValueError(
         f"lapse_group must be 'logit_normal' or 'beta', got {group!r}.")
 
@@ -1091,10 +1114,11 @@ class LapseModel(BaseModel):
     def get_free_parameters(self):
         pars = super().get_free_parameters()
 
-        pars['p_lapse'] = _lapse_param_spec(self.lapse_group,
+        pars['p_lapse'] = _lapse_param_spec(_effective_lapse_group(self),
                                             self.lapse_mu_mean,
                                             self.lapse_mu_kappa,
-                                            self.lapse_kappa_sd)
+                                            self.lapse_kappa_sd,
+                                            regression=isinstance(self, RegressionModel))
         return pars
 
     def _get_choice_predictions(self, model_inputs):
@@ -1210,10 +1234,11 @@ class RTLapseMixin(object):
         if isinstance(self.p_outlier, (int, float)):
             # Fixed contaminant rate (HSSM default): not a free parameter.
             return pars
-        spec = _lapse_param_spec(self.lapse_group,
+        spec = _lapse_param_spec(_effective_lapse_group(self),
                                  self.lapse_mu_mean,
                                  self.lapse_mu_kappa,
-                                 self.lapse_kappa_sd)
+                                 self.lapse_kappa_sd,
+                                 regression=isinstance(self, RegressionModel))
         if self.lapse_group == 'logit_normal':
             # Preserve the historical sigma_intercept=0.5 on the logit prior.
             spec['sigma_intercept'] = 0.5
@@ -1249,6 +1274,24 @@ class RTLapseMixin(object):
         mixed = pt.logaddexp(log_keep, log_lapse)
         # Match HSSM's +1e-29 guard against log(0) when both terms underflow.
         return pt.logaddexp(mixed, pt.constant(np.log(1e-29)))
+
+
+def _check_full_rank(dm, parameter, formula):
+    """Raise if a parameter's design matrix is rank-deficient.
+
+    A rank-deficient design (e.g. ``C(condition) + C(session)`` when baseline
+    is always session 1) is not identified: the sampler wanders along a flat
+    ridge and never converges. Better to fail before sampling.
+    """
+    X = np.asarray(dm, dtype=float)
+    rank = np.linalg.matrix_rank(X)
+    if rank < X.shape[1]:
+        raise ValueError(
+            f"Design matrix for {parameter!r} (formula {formula!r}) is rank-deficient: "
+            f"{X.shape[1]} columns {list(dm.design_info.column_names)} but rank {rank}. "
+            "Some terms are perfectly confounded (e.g. a condition that only ever "
+            "occurs in one session). Drop or recode a term, e.g. a linear session "
+            "trend instead of C(session).")
 
 
 class RegressionModel(BaseModel):
@@ -1302,6 +1345,7 @@ class RegressionModel(BaseModel):
 
         for key in free_parameters:
             dm = self.build_design_matrix(paradigm, key)
+            _check_full_rank(dm, key, self.regressors.get(key, '1'))
             self.design_matrices[key] = dm
             paradigm_[f'_dm_{key}'] = np.asarray(dm)
             self._compute_random_cols(paradigm, key, dm)
@@ -1607,6 +1651,41 @@ class RegressionModel(BaseModel):
             return pd.DataFrame(samples_pars, index=pd.Index(np.arange(1, n_subjects + 1), name='subject'))
         else:
             return samples_pars
+
+    def conditionwise_draws(self, idata, conditions, parameters=None, group=True):
+        """Posterior draws of each parameter per condition, natural scale, long format.
+
+        Parameters
+        ----------
+        conditions : pd.DataFrame
+            One row per condition, with every column the regression formulas use
+            (e.g. ``condition`` and ``session_c=0`` for "an average session").
+        parameters : list of str, optional
+            Subset of free parameters (default: all).
+        group : bool
+            True: group-level (``{par}_mu``) values. False: every subject.
+
+        Returns
+        -------
+        pd.DataFrame with columns ``parameter, chain, draw, [subject,]`` the
+        ``conditions`` columns, and ``value``. Feed it to
+        :func:`bauer.utils.summarize_posterior` and the forest plots.
+        """
+        est = self.get_conditionwise_parameters(idata, conditions, group=group)
+        if parameters is not None:
+            est = est.loc[[p for p in est.index.unique('parameter') if p in parameters]]
+        # Columns are the condition rows (one level per conditions column).
+        # Build the long frame explicitly: rows x condition-columns.
+        rows = est.index.to_frame(index=False)
+        n_rows, n_cols = est.shape
+        long = rows.loc[np.repeat(np.arange(n_rows), n_cols)].reset_index(drop=True)
+        cond = conditions.reset_index(drop=True)
+        cond_rep = cond.loc[np.tile(np.arange(n_cols), n_rows)].reset_index(drop=True)
+        long = pd.concat([long, cond_rep], axis=1)
+        long['value'] = est.values.ravel()
+        if parameters is not None:
+            long = long[long['parameter'].isin(parameters)].reset_index(drop=True)
+        return long
 
     def get_conditionwise_parameters(self, idata, conditions, group=True):
 

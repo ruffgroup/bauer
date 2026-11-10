@@ -261,3 +261,244 @@ def plot_subjectwise_pointplot(data, mean_col='mean', lo_col='lo', hi_col='hi',
         ax.set_xlabel('Subject')
     sns.despine(ax=ax)
     return ax
+
+
+# ─── House-style posterior and PPC plots ─────────────────────────────────────
+#
+# Inputs are the tidy summaries from bauer.utils.summaries
+# (summarize_posterior: mean / lo / hi; ppc_summary + ppc_observed: pred / lo /
+# hi and obs). Dot = posterior mean, line = 95% HDI, open circle = true value
+# (simulations), dashed line = reference (0 for contrasts, group mean for
+# subjects).
+
+HOUSE_STYLE = {
+    'font.family': 'sans-serif',
+    'font.sans-serif': ['Helvetica', 'Helvetica Neue', 'TeX Gyre Heros', 'Arial'],
+    'font.size': 7, 'axes.labelsize': 8, 'axes.titlesize': 8,
+    'xtick.labelsize': 7, 'ytick.labelsize': 7, 'legend.fontsize': 7,
+    'axes.linewidth': 0.8, 'axes.spines.top': False, 'axes.spines.right': False,
+    'xtick.direction': 'out', 'ytick.direction': 'out',
+    'xtick.major.size': 3, 'ytick.major.size': 3,
+    'xtick.major.width': 0.8, 'ytick.major.width': 0.8,
+    'lines.linewidth': 1.2, 'lines.markersize': 4,
+    'legend.frameon': False, 'pdf.fonttype': 42, 'ps.fonttype': 42,
+    'figure.dpi': 150, 'savefig.dpi': 300, 'savefig.bbox': 'tight',
+}
+
+
+def set_house_style():
+    """Publication style: Helvetica 7–8 pt, despined, outward ticks, editable PDF text."""
+    import matplotlib as mpl
+    mpl.rcParams.update(HOUSE_STYLE)
+
+
+def _levels(summary, col, order):
+    present = list(pd.unique(summary[col]))
+    return [c for c in order if c in present] if order is not None else present
+
+
+def _color(palette, key, default='#3B5BA5'):
+    if palette is None:
+        return default
+    if isinstance(palette, dict):
+        return palette.get(key, default)
+    return palette
+
+
+def _true_key(ax, x=1.04, y=0.92):
+    tf = ax.transAxes
+    ax.plot(x, y, 'o', color='0.35', ms=4.5, transform=tf, clip_on=False)
+    ax.text(x + 0.05, y, 'Estimate', transform=tf, va='center', fontsize=6.5)
+    ax.plot(x, y - 0.14, 'o', mfc='none', mec='0.15', ms=6, mew=0.8, transform=tf, clip_on=False)
+    ax.text(x + 0.05, y - 0.14, 'True', transform=tf, va='center', fontsize=6.5)
+
+
+def plot_forest(summary, parameters, row='condition', order=None, palette=None,
+                labels=None, row_labels=None, ref=None, true_col=None,
+                figsize=None, axes=None):
+    """Group-level forest plot.
+
+    One panel per parameter, one row per level of ``row`` (e.g. condition or
+    contrast). Dot = posterior mean, horizontal line = interval (``lo``–``hi``),
+    rows coloured by ``palette`` (dict level → colour), dashed vertical line at
+    ``ref`` (use 0 for contrasts), open circles at ``true_col`` if given.
+
+    Parameters
+    ----------
+    summary : DataFrame from :func:`bauer.utils.summarize_posterior` with
+        columns ``parameter``, ``row``, ``mean``, ``lo``, ``hi``.
+    labels : dict parameter → x-axis label.
+    row_labels : dict level → tick label.
+    """
+    parameters = [parameters] if isinstance(parameters, str) else list(parameters)
+    levels = _levels(summary, row, order)
+    if axes is None:
+        figsize = figsize or (2.5 * len(parameters), 0.35 * len(levels) + 0.8)
+        fig, axes = plt.subplots(1, len(parameters), figsize=figsize, constrained_layout=True)
+    axes = np.atleast_1d(axes)
+    fig = axes[0].figure
+    for ax, par in zip(axes, parameters):
+        d = summary[summary['parameter'] == par].set_index(row)
+        for i, lev in enumerate(levels):
+            if lev not in d.index:
+                continue
+            y, col = len(levels) - 1 - i, _color(palette, lev)
+            ax.plot([d.loc[lev, 'lo'], d.loc[lev, 'hi']], [y, y], color=col, lw=1.6,
+                    solid_capstyle='butt')
+            ax.plot(d.loc[lev, 'mean'], y, 'o', color=col, ms=5, zorder=3)
+            if true_col is not None:
+                ax.plot(d.loc[lev, true_col], y, 'o', mfc='none', mec='0.15', ms=6.5,
+                        mew=0.8, zorder=4)
+        if ref is not None:
+            ax.axvline(ref, color='0.6', lw=0.7, ls='--', zorder=0)
+        ax.set_yticks(range(len(levels)))
+        ax.set_yticklabels([(row_labels or {}).get(lev, lev) for lev in levels][::-1])
+        for t, lev in zip(ax.get_yticklabels(), levels[::-1]):
+            t.set_color(_color(palette, lev, '0.15'))
+        ax.set_ylim(-0.6, len(levels) - 0.4)
+        ax.set_xlabel((labels or {}).get(par, par))
+        ax.tick_params(axis='y', length=0)
+    for ax in axes[1:]:
+        ax.set_yticklabels([])
+    if true_col is not None:
+        _true_key(axes[-1])
+    sns.despine(fig=fig, offset=4, trim=True, left=True)
+    return fig
+
+
+def plot_sorted_forest(subject_summary, parameter, label=None, panel='condition',
+                       order=None, sort_by=None, palette=None, panel_labels=None,
+                       group_summary=None, ref=None, true_col=None, figsize=None,
+                       subject_col='subject'):
+    """Subject-level sorted forest plot (caterpillar), one panel per level of
+    ``panel``.
+
+    Subjects are sorted by their posterior mean under ``sort_by`` (default: the
+    first panel) and keep that row in every panel, so a subject can be followed
+    across conditions. Dot = posterior mean, line = interval, dashed line =
+    group mean (from ``group_summary``) or ``ref``. Pass ``panel=None`` for a
+    parameter with one value per subject.
+    """
+    d = subject_summary[subject_summary['parameter'] == parameter]
+    if panel is None:
+        d = d.assign(_panel='')
+        panel = '_panel'
+    levels = _levels(d, panel, order)
+    sort_by = levels[0] if sort_by is None else sort_by
+    ranking = d[d[panel] == sort_by].sort_values('mean')[subject_col].tolist()
+    rank = {s: i for i, s in enumerate(ranking)}
+    figsize = figsize or (min(7.25, 1.9 * len(levels) + 0.6), 2.0)
+    fig, axes = plt.subplots(1, len(levels), figsize=figsize, sharex=True, sharey=True,
+                             constrained_layout=True)
+    axes = np.atleast_1d(axes)
+    for ax, lev in zip(axes, levels):
+        dc = d[d[panel] == lev].assign(_y=lambda x: x[subject_col].map(rank))
+        col = _color(palette, lev)
+        if ref is not None:
+            ax.axvline(ref, color='0.6', lw=0.7, ls='--', zorder=0)
+        if group_summary is not None:
+            g = group_summary[group_summary['parameter'] == parameter]
+            if panel in g.columns:
+                g = g[g[panel] == lev]
+            if len(g):
+                ax.axvline(g['mean'].iloc[0], color='0.4', lw=0.7, ls='--', zorder=0)
+        ax.hlines(dc['_y'], dc['lo'], dc['hi'], color=col, lw=0.9)
+        ax.plot(dc['mean'], dc['_y'], 'o', color=col, ms=2.6, zorder=3)
+        if true_col is not None:
+            ax.plot(dc[true_col], dc['_y'], 'o', mfc='none', mec='0.15', ms=3.4, mew=0.6, zorder=4)
+        if panel != '_panel':
+            ax.set_title((panel_labels or {}).get(lev, lev), color=col)
+        ax.set_xlabel(label or parameter)
+        ax.set_yticks([])
+    sorted_txt = '' if panel == '_panel' else f' by {(panel_labels or {}).get(sort_by, sort_by)}'
+    axes[0].set_ylabel(f'Subject (sorted{sorted_txt})')
+    sns.despine(fig=fig, offset=4, trim=True, left=True)
+    return fig
+
+
+def plot_ppc_panels(pred, obs, x, panel='condition', order=None, palette=None,
+                    panel_labels=None, xlabel=None, ylabel=None, ref=None,
+                    figsize=None, logx=False, xticks=None, yticks=None):
+    """Group-level PPC, one panel per level of ``panel``: observed data as
+    dots, model as line + band (from :func:`bauer.utils.ppc_summary`)."""
+    levels = _levels(pred, panel, order)
+    figsize = figsize or (min(7.25, 1.8 * len(levels) + 0.5), 1.9)
+    fig, axes = plt.subplots(1, len(levels), figsize=figsize, sharey=True,
+                             constrained_layout=True)
+    axes = np.atleast_1d(axes)
+    for ax, lev in zip(axes, levels):
+        b, o, col = pred[pred[panel] == lev], obs[obs[panel] == lev], _color(palette, lev)
+        ax.fill_between(b[x], b['lo'], b['hi'], color=col, alpha=0.25, lw=0)
+        ax.plot(b[x], b['pred'], color=col)
+        ax.plot(o[x], o['obs'], 'o', color=col, ms=3.2, mec='white', mew=0.4, zorder=3)
+        if ref is not None:
+            ax.axhline(ref, color='0.7', lw=0.6, ls='--', zorder=0)
+        ax.set_title((panel_labels or {}).get(lev, lev), color=col)
+        ax.set_xlabel(xlabel or x)
+        _ticks(ax, logx, xticks)
+    axes[0].set_ylabel(ylabel or '')
+    if yticks is not None:
+        axes[0].set_yticks(yticks)
+    sns.despine(fig=fig, offset=4, trim=True)
+    return fig
+
+
+def plot_ppc_overlay(pred, obs, x, hue='condition', order=None, palette=None,
+                     hue_labels=None, xlabel=None, ylabel=None, ref=None,
+                     figsize=(3.4, 2.3), logx=False, xticks=None, yticks=None):
+    """All levels of ``hue`` on one axis (model line + data dots), with a
+    coloured text key in the upper left."""
+    levels = _levels(pred, hue, order)
+    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+    for i, lev in enumerate(levels):
+        b, o, col = pred[pred[hue] == lev], obs[obs[hue] == lev], _color(palette, lev)
+        ax.plot(b[x], b['pred'], color=col)
+        ax.plot(o[x], o['obs'], 'o', color=col, ms=2.6, mec='white', mew=0.3, zorder=3)
+        ax.text(0.03, 0.97 - i * 0.09, (hue_labels or {}).get(lev, lev), color=col,
+                transform=ax.transAxes, va='top', fontsize=7)
+    if ref is not None:
+        ax.axhline(ref, color='0.7', lw=0.6, ls='--', zorder=0)
+    ax.set(xlabel=xlabel or x, ylabel=ylabel or '')
+    _ticks(ax, logx, xticks)
+    if yticks is not None:
+        ax.set_yticks(yticks)
+    sns.despine(offset=4, trim=True)
+    return fig
+
+
+def plot_subject_ppc(pred, obs, x, subject_col='subject', col_wrap=8, color='#3B5BA5',
+                     xlabel=None, ylabel=None, logx=False, logy=False, xticks=None,
+                     yticks=None, identity=False, height=0.95, aspect=1.2, ref=None):
+    """Subject-level PPC as small multiples: data dots, model line + band."""
+    g = sns.FacetGrid(pred, col=subject_col, col_wrap=col_wrap, height=height, aspect=aspect)
+    for ax, (subj, b) in zip(g.axes.flat, pred.groupby(subject_col)):
+        o = obs[obs[subject_col] == subj]
+        if identity:
+            lim = [b[x].min(), b[x].max()]
+            ax.plot(lim, lim, color='0.75', lw=0.5, ls='--', zorder=0)
+        ax.fill_between(b[x], b['lo'], b['hi'], color=color, alpha=0.25, lw=0)
+        ax.plot(b[x], b['pred'], color=color, lw=1)
+        ax.plot(o[x], o['obs'], 'o', color='0.15', ms=1.8, zorder=3)
+        if ref is not None:
+            ax.axhline(ref, color='0.7', lw=0.6, ls='--', zorder=0)
+        _ticks(ax, logx, xticks)
+        _ticks(ax, logy, yticks, axis='y')
+    g.set_titles('Subject {col_name}', size=6)
+    g.set_axis_labels('', '')
+    g.figure.supxlabel(xlabel or x, fontsize=8)
+    g.figure.supylabel(ylabel or '', fontsize=8)
+    sns.despine(fig=g.figure, offset=3, trim=True)
+    return g
+
+
+def _ticks(ax, log, ticks, axis='x'):
+    import matplotlib.ticker as mticker
+    ax_ = ax.xaxis if axis == 'x' else ax.yaxis
+    if log:
+        (ax.set_xscale if axis == 'x' else ax.set_yscale)('log')
+        if ticks is not None:
+            ax_.set_major_locator(mticker.FixedLocator(ticks))
+        ax_.set_major_formatter(mticker.FuncFormatter(lambda v, _: f'{v:g}'))
+        ax_.set_minor_formatter(mticker.NullFormatter())
+    elif ticks is not None:
+        (ax.set_xticks if axis == 'x' else ax.set_yticks)(ticks)

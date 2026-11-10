@@ -12,6 +12,7 @@ from .magnitude import (
     PowerLawNoiseComparisonModel, PowerLawNoiseComparisonRegressionModel,
     PowerLawEncodingComparisonModel, PowerLawEncodingComparisonRegressionModel,
 )
+from .reproduction import ReproductionModel, ReproductionRegressionModel
 from .risky_choice import (
     RiskModelProbabilityDistortion, ProspectTheoryModel,
     LossAversionModel, LossAversionRegressionModel,

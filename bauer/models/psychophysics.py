@@ -40,8 +40,10 @@ class PsychophysicalLapseModel(LapseModel, PsychophysicalModel):
 class PsychophysicalRegressionModel(RegressionModel, PsychophysicalModel):
     """PsychophysicalModel with patsy formula regression on nu and/or bias."""
 
-    def __init__(self, paradigm, regressors, save_trialwise_estimates=False):
-        RegressionModel.__init__(self, regressors)
+    def __init__(self, paradigm, regressors=None, save_trialwise_estimates=False,
+                 fixed_regressors=None, random_regressors=None):
+        RegressionModel.__init__(self, regressors, fixed_regressors=fixed_regressors,
+                                 random_regressors=random_regressors)
         PsychophysicalModel.__init__(self, paradigm)
 
 

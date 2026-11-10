@@ -82,3 +82,24 @@ def trim_stuck_chains(idata, isolation_z=3.0, verbose=True):
     trimmed = idata.sel(chain=keep) if drop else idata
     return trimmed, {"dropped": drop, "kept": keep, "distance": dist, "lp": lp,
                      "majority_ok": bool(majority_ok)}
+
+
+def convergence_report(idata, var_names=None, rhat_max=1.01, ess_min=400, verbose=True):
+    """r̂, bulk ESS and divergences for the group-level parameters.
+
+    By default checks every ``*_mu`` / ``*_mu_untransformed`` variable (what
+    gets interpreted). Prints a one-line verdict and returns the arviz
+    diagnostics table.
+    """
+    import arviz as az
+    if var_names is None:
+        var_names = [v for v in idata.posterior.data_vars
+                     if v.endswith('_mu') or v.endswith('_mu_untransformed')]
+    summ = az.summary(idata, var_names=var_names, kind='diagnostics')
+    n_div = int(idata.sample_stats['diverging'].sum()) if 'diverging' in idata.sample_stats else 0
+    ok = summ['r_hat'].max() <= rhat_max and summ['ess_bulk'].min() >= ess_min and n_div == 0
+    if verbose:
+        print(f"Max r̂ = {summ['r_hat'].max():.3f} (want ≤ {rhat_max}), "
+              f"min bulk ESS = {summ['ess_bulk'].min():.0f} (want ≥ {ess_min}), "
+              f"divergences = {n_div} (want 0)  →  {'OK' if ok else 'CHECK BEFORE USING'}")
+    return summ
