@@ -85,21 +85,36 @@ def trim_stuck_chains(idata, isolation_z=3.0, verbose=True):
 
 
 def convergence_report(idata, var_names=None, rhat_max=1.01, ess_min=400, verbose=True):
-    """r̂, bulk ESS and divergences for the group-level parameters.
+    """r̂, bulk ESS and divergences, with a one-line verdict.
 
-    By default checks every ``*_mu`` / ``*_mu_untransformed`` variable (what
-    gets interpreted). Prints a one-line verdict and returns the arviz
-    diagnostics table.
+    By default checks every group-level variable (``*_mu``, ``*_mu_untransformed``
+    and ``*_sd``): the ones that get interpreted and the group SDs, which are
+    often the worst-mixing. Pass ``var_names`` to check others (e.g. the
+    subject-level parameters). A NaN r̂ (a stuck or constant chain) counts as a
+    failure.
+
+    Returns the arviz diagnostics table; ``table.attrs['ok']`` is the verdict.
     """
     import arviz as az
     if var_names is None:
         var_names = [v for v in idata.posterior.data_vars
-                     if v.endswith('_mu') or v.endswith('_mu_untransformed')]
+                     if v.endswith(('_mu', '_mu_untransformed', '_sd'))]
+        if not var_names:
+            raise ValueError('No group-level (*_mu / *_sd) variables found (non-hierarchical '
+                             'fit?). Pass var_names=[...].')
     summ = az.summary(idata, var_names=var_names, kind='diagnostics')
-    n_div = int(idata.sample_stats['diverging'].sum()) if 'diverging' in idata.sample_stats else 0
-    ok = summ['r_hat'].max() <= rhat_max and summ['ess_bulk'].min() >= ess_min and n_div == 0
+    ss = getattr(idata, 'sample_stats', None)
+    n_div = int(ss['diverging'].sum()) if ss is not None and 'diverging' in ss else 0
+    rhat_nan = summ['r_hat'].isna()
+    worst = summ['r_hat'].fillna(np.inf).idxmax()
+    ok = (not rhat_nan.any() and summ['r_hat'].max() <= rhat_max
+          and summ['ess_bulk'].min() >= ess_min and n_div == 0)
+    summ.attrs['ok'] = bool(ok)
     if verbose:
-        print(f"Max r̂ = {summ['r_hat'].max():.3f} (want ≤ {rhat_max}), "
-              f"min bulk ESS = {summ['ess_bulk'].min():.0f} (want ≥ {ess_min}), "
-              f"divergences = {n_div} (want 0)  →  {'OK' if ok else 'CHECK BEFORE USING'}")
+        msg = (f"Max r̂ = {summ['r_hat'].max():.3f} (want ≤ {rhat_max}; worst: {worst}), "
+               f"min bulk ESS = {summ['ess_bulk'].min():.0f} (want ≥ {ess_min}), "
+               f"divergences = {n_div} (want 0)")
+        if rhat_nan.any():
+            msg += f", r̂ is NaN for {int(rhat_nan.sum())} variable(s) (stuck chain?)"
+        print(msg + f"  →  {'OK' if ok else 'CHECK BEFORE USING'}")
     return summ

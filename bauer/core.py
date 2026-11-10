@@ -1397,6 +1397,20 @@ class RegressionModel(BaseModel):
                         "between-subject variance heteroscedastic. Put it only "
                         "in fixed_regressors unless this is intended.",
                         UserWarning, stacklevel=2)
+            # Within-subject identifiability of the random effects: if no
+            # subject's own rows span the random columns, the per-subject
+            # coefficients are separated only by the prior.
+            arr_r = np.asarray(fixed_dm)[:, cols]
+            ranks = [np.linalg.matrix_rank(arr_r[subj == s]) for s in np.unique(subj)]
+            if len(cols) and max(ranks) < len(cols):
+                names = [fixed_names[j] for j in cols]
+                warnings.warn(
+                    f"Random effects on {names} for {parameter!r} are not identified within "
+                    f"any subject (per-subject rank {max(ranks)} < {len(cols)}): each subject's "
+                    "data cannot separate them, only the prior does. Typical cause: a "
+                    "condition and a session trend that are fully crossed within subject "
+                    "(one condition per session). Keep the confounded term (e.g. session_c) "
+                    "in fixed_regressors only.", UserWarning, stacklevel=2)
         self._random_cols[parameter] = cols
 
     def rebuild_design_matrix(self, paradigm, parameter):
@@ -1671,6 +1685,16 @@ class RegressionModel(BaseModel):
         ``conditions`` columns, and ``value``. Feed it to
         :func:`bauer.utils.summarize_posterior` and the forest plots.
         """
+        if isinstance(parameters, str):
+            parameters = [parameters]
+        if parameters is not None:
+            unknown = sorted(set(parameters) - set(self.get_free_parameters()))
+            if unknown:
+                raise ValueError(f'Unknown parameter(s) {unknown}; free parameters are '
+                                 f'{list(self.get_free_parameters())}')
+        if conditions.duplicated().any():
+            raise ValueError('`conditions` has duplicate rows; every row should be a different '
+                             'condition.')
         est = self.get_conditionwise_parameters(idata, conditions, group=group)
         if parameters is not None:
             est = est.loc[[p for p in est.index.unique('parameter') if p in parameters]]

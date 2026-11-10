@@ -90,6 +90,8 @@ def test_conditionwise_draws_long_format():
     fig = plot_forest(summ, ['nu'], order=CONDS)
     fig2 = plot_sorted_forest(summarize_posterior(s, ['parameter', 'subject', 'condition']),
                               'nu', order=CONDS, sort_by='placebo', group_summary=summ)
+    plot_sorted_forest(summarize_posterior(s[s.condition == 'placebo'], ['parameter', 'subject']),
+                       'nu', by=None)
     assert fig is not None and fig2 is not None
 
 
@@ -153,3 +155,83 @@ def test_reproduction_fits_prior_width_and_noise():
     true_sd = np.log(np.geomspace(0.5, 2.0, 7)).std()
     assert abs(pars['nu'].mean() - 0.25) < 0.05
     assert abs(pars['prior_sd'].mean() - true_sd) < 0.1
+
+
+# ─── Misuse fails loudly ─────────────────────────────────────────────────────
+
+def _fake_draws(n=200, seed=0):
+    rng = np.random.default_rng(seed)
+    rows = []
+    for par in ['nu', 'bias']:
+        for cond, mu in zip(CONDS, [1.0, 1.0, 1.2, 1.4]):
+            rows.append(pd.DataFrame({'parameter': par, 'chain': 0, 'draw': np.arange(n),
+                                      'condition': cond, 'session_c': 0.0,
+                                      'value': mu + 0.1 * rng.standard_normal(n)}))
+    return pd.concat(rows, ignore_index=True)
+
+
+def test_contrast_draws_checks():
+    d = _fake_draws()
+    out = contrast_draws(d, 'condition', 'placebo')     # constant session_c is fine
+    assert list(pd.unique(out['condition'])) == ['baseline', '5 mg', '10 mg']
+    with pytest.raises(ValueError, match='not a level'):
+        contrast_draws(d, 'condition', 'Placebo')
+    varying = d.assign(session_c=np.where(d['condition'] == 'placebo', 0.0, 1.0))
+    with pytest.raises(ValueError, match='vary between rows'):
+        contrast_draws(varying, 'condition', 'placebo')
+    with pytest.raises(ValueError, match='Several rows'):
+        contrast_draws(pd.concat([d, d]), 'condition', 'placebo')
+
+
+def test_summarize_posterior_checks():
+    d = _fake_draws()
+    with pytest.raises(ValueError, match='NaN values'):
+        summarize_posterior(d.assign(value=np.where(d.index == 0, np.nan, d['value'])),
+                            ['parameter', 'condition'])
+    with pytest.warns(UserWarning, match='pooling'):
+        summarize_posterior(d, ['parameter'])
+    with pytest.warns(UserWarning, match='Only 5 draws'):
+        summarize_posterior(d[d['draw'] < 5], ['parameter', 'condition'])
+
+
+def test_ppc_coverage_checks():
+    pred = pd.DataFrame({'condition': ['a', 'b'], 'x': [1, 1], 'pred': [.5, .5],
+                         'lo': [.4, .4], 'hi': [.6, .6]})
+    obs = pd.DataFrame({'condition': ['a', 'c'], 'x': [1, 1], 'obs': [.5, .5]})
+    with pytest.raises(ValueError, match='only one of'):
+        ppc_coverage(pred, obs, ['condition', 'x'])
+    with pytest.raises(ValueError, match='several rows'):
+        ppc_coverage(pred, obs.assign(condition='a'), ['x'])
+
+
+def test_plot_input_checks():
+    s = summarize_posterior(_fake_draws(), ['parameter', 'condition'])
+    with pytest.raises(ValueError, match='not in order'):
+        plot_forest(s, ['nu'], order=['Placebo', 'baseline', '5 mg', '10 mg'])
+    with pytest.raises(ValueError, match="no rows for parameter 'Nu'"):
+        plot_forest(s, ['Nu'])
+    subj = pd.concat([s.assign(subject=i) for i in range(3)])
+    with pytest.raises(ValueError, match='several rows per'):
+        plot_forest(subj, ['nu'])
+    with pytest.raises(ValueError, match='sort_by'):
+        plot_sorted_forest(subj, 'nu', sort_by='Placebo')
+
+
+def test_random_slope_on_session_warns_and_conditionwise_checks():
+    df = _psychophysics()
+    with pytest.warns(UserWarning, match='not identified within any subject'):
+        m = PsychophysicalLapseRegressionModel(df.reset_index(), fixed_regressors={'nu': F},
+                                               random_regressors={'nu': F})
+        m.build_estimation_model(df, hierarchical=True)
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', UserWarning)
+        m = PsychophysicalLapseRegressionModel(
+            df.reset_index(), fixed_regressors={'nu': F},
+            random_regressors={'nu': "C(condition, Treatment('placebo'))"})
+        m.build_estimation_model(df, hierarchical=True)
+    idata = m.sample(draws=10, tune=10, chains=1, progressbar=False, random_seed=1)
+    conds = pd.DataFrame({'condition': CONDS, 'session_c': 0.0})
+    with pytest.raises(ValueError, match='Unknown parameter'):
+        m.conditionwise_draws(idata, conds, parameters=['Nu'])
+    with pytest.raises(ValueError, match='duplicate rows'):
+        m.conditionwise_draws(idata, pd.concat([conds, conds]), parameters='nu')
