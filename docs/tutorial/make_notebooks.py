@@ -482,17 +482,22 @@ idata_lin_reg = model_lin_reg.sample(draws=150, tune=150, chains=4, progressbar=
 """),
 
 code("""\
-# Extract group-level nu at each unique n1 level via the model's design matrix
-conditions_n1 = pd.DataFrame({'n1': n1_unique})
-cond_pars = model_lin_reg.get_conditionwise_parameters(idata_lin_reg, conditions_n1, group=True)
-nu_at_n1 = cond_pars.xs('nu', level='parameter')  # posterior samples × n1 levels
+from bauer.utils import summarize_posterior
 
-nu_mean = nu_at_n1.mean(0).values
-nu_lo, nu_hi = np.percentile(nu_at_n1.values, [2.5, 97.5], axis=0)
-n1_arr = np.array(n1_unique, dtype=float)
+# Group-level nu at each n1 level, on the natural scale. conditionwise_draws
+# rebuilds the design matrix for each row of `conditions_n1`, applies the
+# softplus link per posterior draw and returns long-format draws
+# (one row per parameter x chain x draw x condition).
+conditions_n1 = pd.DataFrame({'n1': n1_unique})
+nu_draws = model_lin_reg.conditionwise_draws(idata_lin_reg, conditions_n1, parameters=['nu'])
+
+# Posterior mean + 95% HDI per n1 level
+nu_summary = summarize_posterior(nu_draws, ['parameter', 'n1'])
+n1_arr = nu_summary['n1'].values.astype(float)
+nu_mean, nu_lo, nu_hi = nu_summary['mean'].values, nu_summary['lo'].values, nu_summary['hi'].values
 
 fig, ax = plt.subplots(figsize=(7, 4.5))
-ax.fill_between(n1_arr, nu_lo, nu_hi, alpha=.30, color='#d73027', label='95 % credible interval')
+ax.fill_between(n1_arr, nu_lo, nu_hi, alpha=.30, color='#d73027', label='95 % HDI')
 ax.plot(n1_arr, nu_mean, lw=2, color='#d73027', marker='o', ms=6,
         label='Group-level \u03bd(n\u2081)  (C(n1) model)')
 
@@ -587,8 +592,27 @@ an `arviz.InferenceData` object so all ArviZ diagnostics work out-of-the-box.
 
 code("""\
 model_mag = MagnitudeComparisonModel(paradigm=data)
-model_mag.build_estimation_model(data=data, hierarchical=True, save_p_choice=True)
+model_mag.build_estimation_model(data=data, hierarchical=True)
 idata_mag = model_mag.sample(draws=200, tune=200, chains=4, progressbar=False)
+"""),
+
+md(r"""### Did the sampler converge?
+
+Before looking at any posterior, check the convergence diagnostics:
+$\hat r \le 1.01$ (the chains agree), bulk ESS $\ge 400$ (enough effectively
+independent draws) and no divergences.  `convergence_report` checks every
+group-level variable (`*_mu`, `*_sd`) and prints a one-line verdict; the
+returned table has the per-variable numbers.  We use short chains
+(200 draws, 200 tuning steps) to keep the tutorial fast, so the report will
+likely flag a low ESS or a few divergences here.  For a real analysis run
+`draws=1000, tune=1000` (or more, with a higher `target_accept`) until it says OK.
+"""),
+
+code("""\
+from bauer.utils import convergence_report
+
+diag = convergence_report(idata_mag)
+diag
 """),
 
 md(r"""### Group-level posteriors
@@ -611,148 +635,150 @@ plt.tight_layout()
 md(r"""The group-level posterior for $\nu_1$ (`n1_evidence_sd_mu`) is consistently **larger**
 than for $\nu_2$ (`n2_evidence_sd_mu`) — working-memory degradation in action.
 
-### Individual subject estimates with 95 % credible intervals
+### Summarising posteriors: the long-draws convention
 
-The posterior also contains a full distribution for **each individual subject**.  bauer
-provides two complementary tools:
+`az.plot_posterior` is fine for one or two variables.  For everything else bauer uses one
+convention: posterior draws live in a **long DataFrame** — one row per draw, with columns
+`chain`, `draw`, grouping columns such as `parameter` / `subject` / `condition`, and the
+number in `value`.  Everything is then summarised the same way, as the **posterior mean
+plus a 95 % HDI**:
 
-- `plot_subjectwise_parameters(idata, parameter, ax=ax)` — direct call for a single parameter
-- `get_subject_posterior_df(idata, parameters)` + `plot_subjectwise_pointplot` — tidy
-  DataFrame workflow compatible with `sns.FacetGrid` (supports hue, facetting, etc.)
+- `posterior_draws(idata, var_names)` — long draws of plain variables (subject-level
+  `n1_evidence_sd`, group-level `n1_evidence_sd_mu`, ...).
+- `summarize_posterior(draws, by=[...])` — one row per group with `mean`, `lo`, `hi`
+  (95 % HDI) and `p_positive`.
+- `plot_forest(summary, ...)` — group level: dot = mean, line = 95 % HDI.
+- `plot_sorted_forest(summary, ...)` — subject level: one row per participant, sorted by
+  their posterior mean.
+
+Here we put $\nu_1$ and $\nu_2$ side by side as two levels of an `option` column, so the
+same plots can compare them.
 """),
 
 code("""\
-from bauer.utils import (plot_subjectwise_parameters,
-                          get_subject_posterior_df, plot_subjectwise_pointplot)
+from bauer.utils import posterior_draws, plot_forest, plot_sorted_forest
 
-# ── FacetGrid workflow: one panel per parameter ───────────────────────────────
-df_post = get_subject_posterior_df(
-    idata_mag, ['n1_evidence_sd', 'n2_evidence_sd'])
+OPTION = {'n1_evidence_sd': 'ν₁ (first)', 'n2_evidence_sd': 'ν₂ (second)'}
+OPTION_PALETTE = {'ν₁ (first)': '#d73027', 'ν₂ (second)': '#2166ac'}
 
-g = sns.FacetGrid(df_post, col='parameter', sharey=True, height=4.5, aspect=1.1)
-g.map_dataframe(plot_subjectwise_pointplot)  # uses default mean_col='mean', lo_col='lo', hi_col='hi'
-g.set_axis_labels('Subject (sorted)', 'Noise  \u03bd')
-g.set_titles(col_template='{col_name}')
-g.figure.suptitle('Subject-level noise estimates (error bars = 94 % HDI)', y=1.04)
+def noise_draws(var_names):
+    \"\"\"Long draws of nu1/nu2, relabelled as one parameter 'nu' with an 'option' column.\"\"\"
+    d = posterior_draws(idata_mag, var_names)
+    option = d['parameter'].str.replace('_mu', '').map(OPTION)
+    return d.assign(option=option, parameter='nu')
 
-# Add group-mean line to each panel
-for ax, param in zip(g.axes.flat, ['n1_evidence_sd', 'n2_evidence_sd']):
-    mu_key = param + '_mu'
-    if mu_key in idata_mag.posterior:
-        gm = idata_mag.posterior[mu_key].values.mean()
-        ax.axhline(gm, ls='--', lw=1.5, alpha=0.6, color='steelblue',
-                   label='Group mean')
-    sns.despine(ax=ax)
-
-plt.tight_layout()
+# Group level: one summary row per option
+group_nu = summarize_posterior(noise_draws(['n1_evidence_sd_mu', 'n2_evidence_sd_mu']),
+                               ['parameter', 'option'])
+# Subject level: one summary row per subject x option
+subject_nu = summarize_posterior(noise_draws(['n1_evidence_sd', 'n2_evidence_sd']),
+                                 ['parameter', 'subject', 'option'])
+group_nu
 """),
 
 code("""\
-# ── Scatter: ν₁ vs ν₂ per subject with 94 % HDI error bars ───────────────────
-n_subj = idata_mag.posterior['n1_evidence_sd'].shape[-1]
-s1 = idata_mag.posterior['n1_evidence_sd'].values.reshape(-1, n_subj)
-s2 = idata_mag.posterior['n2_evidence_sd'].values.reshape(-1, n_subj)
-nu1_mean, nu2_mean = s1.mean(0), s2.mean(0)
-nu1_lo, nu1_hi = np.percentile(s1, [3, 97], axis=0)
-nu2_lo, nu2_hi = np.percentile(s2, [3, 97], axis=0)
+fig = plot_forest(group_nu, 'nu', by='option', palette=OPTION_PALETTE,
+                  xlabels={'nu': 'Group-mean noise  ν'}, figsize=(4, 1.6))
+"""),
+
+md(r"""### Individual subject estimates: the sorted forest plot
+
+The posterior also contains a full distribution for **each individual subject**.  The
+sorted forest plot shows one row per participant (dot = posterior mean, line = 95 % HDI),
+sorted by their $\nu_1$; each participant keeps the same row in the $\nu_2$ panel, so you
+can follow them across panels.  The dashed line is the group mean.
+"""),
+
+code("""\
+fig = plot_sorted_forest(subject_nu, 'nu', 'Noise  ν', by='option',
+                         palette=OPTION_PALETTE, group_summary=group_nu,
+                         figsize=(6, 4))
+"""),
+
+code("""\
+# ── Scatter: ν₁ vs ν₂ per subject with 95 % HDI error bars ───────────────────
+wide = subject_nu.pivot(index='subject', columns='option', values=['mean', 'lo', 'hi'])
+nu1, nu2 = OPTION['n1_evidence_sd'], OPTION['n2_evidence_sd']
 
 fig, ax = plt.subplots(figsize=(5.5, 5))
-ax.errorbar(nu2_mean, nu1_mean,
-            xerr=[nu2_mean - nu2_lo, nu2_hi - nu2_mean],
-            yerr=[nu1_mean - nu1_lo, nu1_hi - nu1_mean],
+ax.errorbar(wide['mean', nu2], wide['mean', nu1],
+            xerr=[wide['mean', nu2] - wide['lo', nu2], wide['hi', nu2] - wide['mean', nu2]],
+            yerr=[wide['mean', nu1] - wide['lo', nu1], wide['hi', nu1] - wide['mean', nu1]],
             fmt='o', ms=5, alpha=.65, elinewidth=0.7, capsize=2.5,
             color='#2166ac', ecolor='#9ecae1', zorder=3)
-lim = max(nu1_hi.max(), nu2_hi.max()) * 1.1
-ax.plot([0, lim], [0, lim], 'k--', lw=1.2, label='\u03bd\u2081 = \u03bd\u2082')
-ax.set_xlabel('Second-option noise  \u03bd\u2082')
-ax.set_ylabel('First-option noise  \u03bd\u2081')
-ax.set_title('\u03bd\u2081 vs \u03bd\u2082 — most subjects above diagonal (memory noise)')
+lim = max(wide['hi', nu1].max(), wide['hi', nu2].max()) * 1.1
+ax.plot([0, lim], [0, lim], 'k--', lw=1.2, label='ν₁ = ν₂')
+ax.set_xlabel('Second-option noise  ν₂')
+ax.set_ylabel('First-option noise  ν₁')
+ax.set_title('ν₁ vs ν₂ — most subjects above diagonal (memory noise)')
 ax.legend(fontsize=9); sns.despine(ax=ax)
 plt.tight_layout()
 """),
 
 md("""## Posterior predictive check
 
-We draw predicted choice probabilities from the full posterior and overlay the 95 %
-credible interval on the observed group-average data (one panel per $n_1$ value).
-A good fit means the shaded band covers the observed dots — and the model should also
-capture the different slopes across $n_1$ values (the Weber's-law signature).
+`model.ppc(data, idata)` simulates new choices for every trial from (a subset of) the
+posterior draws: one row per trial × posterior-predictive sample (`ppc_sample`), with a
+boolean `simulated_choice`.  We then summarise each simulated dataset **exactly like the
+real data** — average within each subject and condition cell, then across subjects —
+and take the 95 % interval over samples.  `ppc_summary` does this two-step summary;
+`ppc_observed` does the same for the observed choices.  Because the band contains both
+parameter uncertainty and trial-level sampling noise, about 95 % of the observed cells
+should fall inside it: `ppc_coverage` reports that fraction.
+
+A good fit means the band covers the observed dots — and the model should also capture
+the different slopes across $n_1$ values (the Weber's-law signature).
 """),
 
 code("""\
-from bauer.utils import summarize_ppc_group
+from bauer.utils import (ppc_summary, ppc_observed, ppc_coverage,
+                          plot_ppc_panels, plot_ppc_overlay, plot_subject_ppc)
 
-# Simulate binary choices from the posterior predictive
-ppc_df  = model_mag.ppc(data, idata_mag, var_names=['ll_bernoulli'])
-ppc_ll  = ppc_df.xs('ll_bernoulli', level='variable')   # trials \u00d7 posterior samples
+# Simulated choices: one row per trial x posterior-predictive sample
+ppc = model_mag.ppc(data, idata_mag, n_posterior_samples=200, progressbar=False)
+ppc = ppc.join(data[['n1', 'bin']]).reset_index()      # add the condition columns
+ppc['p_chose_n2'] = ppc['simulated_choice'].astype(float)
 
-ppc_flat = ppc_ll.reset_index()
-ppc_flat['bin'] = (pd.cut(-ppc_flat['log(n1/n2)'], 12)
-                     .map(lambda x: x.mid).astype(float))
+obs_trials = data.reset_index().assign(p_chose_n2=lambda d: d['choice'].astype(float))
 
-g_ppc = summarize_ppc_group(ppc_flat, condition_cols=['n1', 'bin'])
-g_ppc = g_ppc.rename(columns={'p_predicted': 'p_mean', 'hdi025': 'p_lo', 'hdi975': 'p_hi'})
+pred = ppc_summary(ppc, ['n1', 'bin'], 'p_chose_n2')        # mean + 95% interval per cell
+obs = ppc_observed(obs_trials, ['n1', 'bin'], 'p_chose_n2')
+print(f"Group-level coverage of the 95% band: {ppc_coverage(pred, obs, ['n1', 'bin']):.0%}")
 
-data_copy = data.reset_index()
-data_copy['bin'] = (pd.cut(-data_copy['log(n1/n2)'], 12)
-                      .map(lambda x: x.mid).astype(float))
-obs = (data_copy.groupby(['subject', 'n1', 'bin'])['choice'].mean()
-                .groupby(['n1', 'bin']).mean())
-g_ppc['choice'] = obs
-g_ppc = g_ppc.reset_index()
+n1_levels = sorted(data['n1'].unique())
+n1_colors = dict(zip(n1_levels, sns.color_palette('flare', len(n1_levels))))
+n1_labels = {n: f'n₁ = {n}' for n in n1_levels}
 
-import matplotlib.patches as mpatches
-
-def draw_ppc(data, **kwargs):
-    ax = plt.gca()
-    ax.fill_between(data['bin'], data['p_lo'], data['p_hi'],
-                    color='steelblue', alpha=.25)
-    ax.plot(data['bin'], data['p_mean'], color='steelblue', lw=2)
-    ax.scatter(data['bin'], data['choice'], color='steelblue', s=20, zorder=5)
-    ax.axhline(.5, ls='--', c='gray', lw=1)
-    ax.axvline(0,  ls='--', c='gray', lw=1)
-    ax.set_ylim(-.05, 1.05)
-
-g = sns.FacetGrid(g_ppc, col='n1', col_wrap=3, height=3.2, aspect=1.1, sharey=True)
-g.map_dataframe(draw_ppc)
-g.set_axis_labels('log(n2 / n1)', 'P(chose n2)')
-g.set_titles('n\u2081 = {col_name}')
-for ax in g.axes.flat:
-    sns.despine(ax=ax)
-
-legend_handles = [
-    mpatches.Patch(color='steelblue', alpha=.25, label='95 % credible interval'),
-    plt.Line2D([0], [0], color='steelblue', lw=2, label='Model mean'),
-    plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='steelblue',
-               markersize=6, label='Observed'),
-]
-g.figure.legend(handles=legend_handles, loc='lower center', ncol=3,
-                fontsize=9, bbox_to_anchor=(.5, -.04))
-g.figure.suptitle('Posterior predictive check — MagnitudeComparisonModel',
-                   fontsize=13, y=1.02)
-g.figure.tight_layout()
+fig = plot_ppc_panels(pred, obs, 'bin', by='n1', palette=n1_colors, level_labels=n1_labels,
+                      xlabel='log(n₂ / n₁)', ylabel='P(chose n₂)', ref=0.5,
+                      figsize=(10, 2.4))
 """),
 
 code("""\
-# PPC overlay: all n1 values in one panel (hue = n1)
-n1_pal = sns.color_palette('YlOrRd', g_ppc['n1'].nunique())
-n1_colors = dict(zip(sorted(g_ppc['n1'].unique()), n1_pal))
+# All n1 values in one panel: model lines + data dots
+fig = plot_ppc_overlay(pred, obs, 'bin', by='n1', palette=n1_colors, level_labels=n1_labels,
+                       xlabel='log(n₂ / n₁)', ylabel='P(chose n₂)', ref=0.5,
+                       figsize=(4.5, 3.2))
+"""),
 
-fig, ax = plt.subplots(figsize=(8, 5))
-for n1_val in sorted(g_ppc['n1'].unique()):
-    d = g_ppc[g_ppc['n1'] == n1_val].sort_values('bin')
-    c = n1_colors[n1_val]
-    ax.fill_between(d['bin'], d['p_lo'], d['p_hi'], alpha=.15, color=c)
-    ax.plot(d['bin'], d['p_mean'], lw=2, color=c, label=f'n\u2081 = {n1_val}')
-    ax.scatter(d['bin'], d['choice'], s=20, color=c, zorder=5)
-ax.axhline(.5, ls='--', c='gray', lw=1)
-ax.axvline(0,  ls='--', c='gray', lw=1)
-ax.set_ylim(-.05, 1.05)
-ax.set_xlabel('log(n\u2082 / n\u2081)')
-ax.set_ylabel('P(chose n\u2082)')
-ax.set_title('PPC overlay: model predictions (bands) vs data (dots) by n\u2081')
-ax.legend(title='Reference n\u2081', fontsize=9)
-sns.despine(); plt.tight_layout()
+md(r"""Group-level coverage is well below 95 %, and the panels show where: at small $n_1$
+(5, 7) the observed curves are steeper than the model predicts.  This is the departure
+from strict Weber's law we saw in the raw data at the start of the lesson — with 64
+participants the group band is narrow enough to expose it.  [Lesson 4](lesson4.ipynb)
+fits models whose noise can vary with magnitude.
+
+The group-level check can also hide participants the model fits badly, so repeat it per
+participant (`subject_level=True`), here collapsed over $n_1$.  With ~200 trials per
+participant the per-subject bands are wide, and coverage should again be near 95 %.
+"""),
+
+code("""\
+pred_subj = ppc_summary(ppc, ['bin'], 'p_chose_n2', subject_level=True)
+obs_subj = ppc_observed(obs_trials, ['bin'], 'p_chose_n2', subject_level=True)
+print(f"Subject-level coverage: {ppc_coverage(pred_subj, obs_subj, ['subject', 'bin']):.0%}")
+
+fig = plot_subject_ppc(pred_subj, obs_subj, 'bin', xlabel='log(n₂ / n₁)',
+                       ylabel='P(chose n₂)', ref=0.5, yticks=[0, 0.5, 1])
 """),
 
 md(r"""## Summary
@@ -1225,20 +1251,37 @@ model_reg = RiskRegressionModel(
 model_reg.build_estimation_model(data=data_reg, hierarchical=True)
 idata_reg = model_reg.sample(draws=500, tune=500, chains=4, progressbar=False)
 
-# Posterior of evidence_sd at each format condition
+"""),
+
+md(r"""The regression coefficients live on the model's internal (pre-softplus) scale, so
+don't read them directly.  `conditionwise_draws` evaluates the formula at each condition
+you pass, applies the transform per posterior draw, and returns long-format draws of the
+natural-scale parameter.  `summarize_posterior` turns those into a posterior mean and
+95 % HDI per condition, and `contrast_draws` computes the format difference *per draw*
+(so its HDI is the HDI of the difference, not a difference of HDIs).
+"""),
+
+code("""\
+from bauer.utils import summarize_posterior, contrast_draws, plot_forest
+
+FORMAT_PALETTE = {'symbolic': '#1f78b4', 'non-symbolic': '#d95f02'}
+
+# Group-level evidence_sd per format, natural scale (long draws)
 conditions = pd.DataFrame({'format': ['symbolic', 'non-symbolic']})
-pars_cond  = model_reg.get_conditionwise_parameters(idata_reg, conditions, group=True)
+sd_draws = model_reg.conditionwise_draws(idata_reg, conditions, parameters=['evidence_sd'])
 
-sd_sym    = pars_cond.loc['evidence_sd']['symbolic'].values
-sd_nonsym = pars_cond.loc['evidence_sd']['non-symbolic'].values
+sd_summary = summarize_posterior(sd_draws, ['parameter', 'format'])
+# Non-symbolic minus symbolic, computed per posterior draw
+format_effect = summarize_posterior(contrast_draws(sd_draws, 'format', 'symbolic'),
+                                    ['parameter', 'format'])
+display(sd_summary)
+display(format_effect)
 
-fig, ax = plt.subplots(figsize=(6, 4))
-az.plot_kde(sd_sym,    label='Symbolic',     plot_kwargs={'color': '#1f78b4', 'lw': 2}, ax=ax)
-az.plot_kde(sd_nonsym, label='Non-symbolic',  plot_kwargs={'color': '#d95f02', 'lw': 2}, ax=ax)
-ax.set_xlabel('evidence_sd  (group level)')
-ax.set_ylabel('Posterior density')
-ax.set_title('RiskRegressionModel: format effect on noise')
-ax.legend(); sns.despine(); plt.tight_layout()
+fig = plot_forest(sd_summary, 'evidence_sd', by='format', palette=FORMAT_PALETTE,
+                  xlabels={'evidence_sd': 'Noise  ν  (group mean)'}, figsize=(4, 1.5))
+fig = plot_forest(format_effect, 'evidence_sd', by='format', palette=FORMAT_PALETTE, ref=0,
+                  level_labels={'non-symbolic': 'Non-symbolic − symbolic'},
+                  xlabels={'evidence_sd': 'Δν  (95% HDI)'}, figsize=(4, 1.2))
 """),
 
 md(r"""## Why noise produces risk aversion: the KLW mechanism
@@ -3182,20 +3225,22 @@ reason your fit converges — leave it on.**
 md(r"""## Diagnostics — did both models sample cleanly?
 
 Before interpreting any posterior, check $\hat r \le 1.01$ on the group-level
-means and ESS bulk $\ge 100$ per chain. Divergences should be a small
-fraction of post-warmup draws.
+means and ESS bulk $\ge 100$ per chain (400 over 4 chains). Divergences should be
+a small fraction of post-warmup draws. `bauer.utils.convergence_report` checks all
+three and prints a one-line verdict (without `var_names` it checks every group-level
+`*_mu` / `*_sd` variable).
 """),
 
 code("""\
+from bauer.utils import convergence_report
+
 shared = ['n1_evidence_sd_mu', 'n2_evidence_sd_mu',
           'prior_mu_mu', 'prior_sd_mu']
 for name, idata, extra in [('probit', idata_probit, []),
                             ('DDM',    idata_ddm,    ['a_mu', 't0_mu'])]:
-    diag = az.summary(idata, var_names=shared + extra, kind='diagnostics')
-    n_div = int(idata.sample_stats['diverging'].sum())
     print(f"--- {name} ---")
-    print(diag[['ess_bulk', 'r_hat']])
-    print(f"divergences: {n_div}, max r̂: {float(diag['r_hat'].max()):.3f}\\n")
+    diag = convergence_report(idata, var_names=shared + extra)
+    print(diag[['ess_bulk', 'r_hat']], '\\n')
 """),
 
 md(r"""## Question 1 — Do they fit choice equally well?
@@ -3721,63 +3766,42 @@ md(r"""### From contrast coefficient → on-scale noise per condition
 The summary above is on the un-softplus scale (so contrasts are
 additive). For interpretation it's easier to read the actual
 $\nu_1$ in each ISI condition. bauer's
-`model.get_conditionwise_parameters(idata, conditions, group=True)`
-does that for you — it rebuilds the design matrix at the conditions
-you pass, multiplies in the posterior coefficients, and **applies the
-transform** (softplus here, so the result is in the natural noise
-units used by the cognitive model).
+`model.conditionwise_draws(idata, conditions)` does that for you — it
+rebuilds the design matrix at the conditions you pass, multiplies in the
+posterior coefficients, **applies the transform** per draw (softplus here,
+so the result is in the natural noise units used by the cognitive model),
+and returns long-format draws (one row per parameter × chain × draw ×
+condition). `summarize_posterior` reduces them to a posterior mean and 95%
+HDI; `contrast_draws` gives the long − short difference **per draw**, so its
+HDI is the HDI of the difference.
 """),
 
 code("""\
-# Group-level n1_evidence_sd per ISI condition, with the softplus
-# transform applied — i.e. the actual noise the cognitive model uses.
+from bauer.utils import summarize_posterior, contrast_draws, plot_forest
+
+# Group-level n1_evidence_sd per ISI condition, natural scale
 isi_conditions = pd.DataFrame({'isi_cat': ['short', 'long']})
-cond_pars = m_isi.get_conditionwise_parameters(idata_isi, isi_conditions,
-                                                group=True)
-# cond_pars rows are (parameter, posterior_index); columns are conditions
-nu1 = cond_pars.loc['n1_evidence_sd']          # shape (n_post, 2)
-nu1.columns = ['short', 'long']
-diff = nu1['long'] - nu1['short']
-summary = pd.DataFrame({
-    'mean':   nu1.mean(),
-    'median': nu1.median(),
-    'hdi_3%': np.percentile(nu1, 3, axis=0),
-    'hdi_97%': np.percentile(nu1, 97, axis=0),
-})
-print('Group-level n1_evidence_sd per ISI condition (natural scale):')
-print(summary.round(3).to_string())
-print()
-print(f"long − short difference: mean = {diff.mean():+.4f}, "
-      f"94% HDI = [{np.percentile(diff, 3):+.4f}, "
-      f"{np.percentile(diff, 97):+.4f}]")
+nu1_draws = m_isi.conditionwise_draws(idata_isi, isi_conditions,
+                                      parameters=['n1_evidence_sd'])
+nu1_summary = summarize_posterior(nu1_draws, ['parameter', 'isi_cat'])
+isi_effect = summarize_posterior(contrast_draws(nu1_draws, 'isi_cat', 'short'),
+                                 ['parameter', 'isi_cat'])
+print('Group-level n1_evidence_sd per ISI condition (mean, 95% HDI):')
+print(nu1_summary.round(3).to_string(index=False))
+print('\\nLong − short difference (p_positive = posterior P(long > short)):')
+print(isi_effect.round(4).to_string(index=False))
 """),
 
 code("""\
-# Figure: per-condition posteriors of n1_evidence_sd, plus the difference.
-fig, (ax_pdf, ax_diff) = plt.subplots(1, 2, figsize=(10.5, 4.0))
-
+# Forest plots: dot = posterior mean, line = 95% HDI
 palette = {'short': '#377eb8', 'long': '#e41a1c'}
-for cond in ['short', 'long']:
-    sns.kdeplot(nu1[cond], ax=ax_pdf, fill=True, alpha=0.25,
-                 color=palette[cond], label=f'{cond} ISI', clip=(0, None))
-    ax_pdf.axvline(nu1[cond].median(), color=palette[cond], lw=1.2, ls='--')
-ax_pdf.set_xlabel(r'Group-level $\\nu_1$ (n1 encoding SD)')
-ax_pdf.set_ylabel('Posterior density')
-ax_pdf.set_title('Per-condition posterior')
-ax_pdf.legend()
-sns.despine(ax=ax_pdf)
-
-sns.kdeplot(diff, ax=ax_diff, fill=True, color='#666666', alpha=0.4,
-             clip=(diff.min(), diff.max()))
-ax_diff.axvline(0, color='black', ls=':', lw=1.2)
-hdi_lo, hdi_hi = np.percentile(diff, [3, 97])
-ax_diff.axvspan(hdi_lo, hdi_hi, color='gray', alpha=0.15,
-                 label=f'94% HDI [{hdi_lo:+.3f}, {hdi_hi:+.3f}]')
-ax_diff.set_xlabel(r'$\\nu_1$(long) − $\\nu_1$(short)')
-ax_diff.set_title('Long − short contrast posterior')
-ax_diff.legend(loc='upper left', fontsize=9)
-sns.despine(ax=ax_diff)
-plt.tight_layout()
+labels = {'short': 'Short ISI', 'long': 'Long ISI'}
+fig = plot_forest(nu1_summary, 'n1_evidence_sd', by='isi_cat', palette=palette,
+                  level_labels=labels, figsize=(4, 1.5),
+                  xlabels={'n1_evidence_sd': r'Group-level $\\nu_1$ (n1 encoding SD)'})
+fig = plot_forest(isi_effect, 'n1_evidence_sd', by='isi_cat', palette=palette, ref=0,
+                  level_labels={'long': 'Long − short'}, figsize=(4, 1.2),
+                  xlabels={'n1_evidence_sd': r'$\\nu_1$(long) − $\\nu_1$(short)'})
 """),
 
 md(r"""### Visualising the coefficient posterior
@@ -4189,17 +4213,15 @@ Before interpreting any posterior, check that NUTS sampled cleanly:
 """),
 
 code("""\
-diag = az.summary(
+from bauer.utils import convergence_report
+
+# r̂, bulk ESS and divergences in one call, with a one-line verdict
+diag = convergence_report(
     idata_ddm,
     var_names=['a_mu', 't0_mu', 'n1_evidence_sd_mu', 'n2_evidence_sd_mu',
                'prior_mu_mu', 'prior_sd_mu'],
-    kind='diagnostics',
 )
-print(diag)
-print()
-print(f"Divergences: {int(idata_ddm.sample_stats['diverging'].sum())}")
-print(f"Max r̂:       {float(diag['r_hat'].max()):.3f}")
-print(f"Min ESS bulk: {int(diag['ess_bulk'].min())}")
+diag
 """),
 
 md(r"""**Rules of thumb** (from the bauer convention, see CLAUDE.md):
@@ -4425,16 +4447,13 @@ idata_rdm = fit_or_load(m_rdm, 'rdm', tune=1500, target_accept=0.98)
 """),
 
 code("""\
-diag = az.summary(
+diag = convergence_report(
     idata_rdm,
     var_names=['a_mu', 't0_mu', 'w_0_mu', 'w_d_mu', 'w_s_mu',
                'n1_evidence_sd_mu', 'n2_evidence_sd_mu',
                'prior_mu_mu', 'prior_sd_mu'],
-    kind='diagnostics',
 )
-print(diag)
-print(f"\\nDivergences: {int(idata_rdm.sample_stats['diverging'].sum())}")
-print(f"Max r̂:       {float(diag['r_hat'].max()):.3f}")
+diag
 """),
 
 code("""\

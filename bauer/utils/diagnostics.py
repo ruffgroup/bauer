@@ -97,8 +97,12 @@ def convergence_report(idata, var_names=None, rhat_max=1.01, ess_min=400, verbos
     """
     import arviz as az
     if var_names is None:
+        # Match on the name AND require no subject dimension: subject-level
+        # parameters can themselves end in '_sd' or '_mu' (n1_evidence_sd,
+        # prior_sd, prior_mu), and would otherwise be swept in.
         var_names = [v for v in idata.posterior.data_vars
-                     if v.endswith(('_mu', '_mu_untransformed', '_sd'))]
+                     if v.endswith(('_mu', '_mu_untransformed', '_sd'))
+                     and 'subject' not in idata.posterior[v].dims]
         if not var_names:
             raise ValueError('No group-level (*_mu / *_sd) variables found (non-hierarchical '
                              'fit?). Pass var_names=[...].')

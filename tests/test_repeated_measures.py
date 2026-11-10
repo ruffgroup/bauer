@@ -13,7 +13,7 @@ from bauer.models import (PsychophysicalLapseRegressionModel, ReproductionModel,
                           ReproductionRegressionModel, MagnitudeComparisonLapseRegressionModel)
 from bauer.utils import (summarize_posterior, contrast_draws, ppc_summary, ppc_observed,  # noqa: E402
                          ppc_coverage, plot_forest, plot_sorted_forest, plot_ppc_panels,
-                         plot_subject_ppc)
+                         plot_subject_ppc, convergence_report)
 
 CONDS = ['baseline', 'placebo', '5 mg', '10 mg']
 
@@ -235,3 +235,18 @@ def test_random_slope_on_session_warns_and_conditionwise_checks():
         m.conditionwise_draws(idata, conds, parameters=['Nu'])
     with pytest.raises(ValueError, match='duplicate rows'):
         m.conditionwise_draws(idata, pd.concat([conds, conds]), parameters='nu')
+
+
+def test_convergence_report_skips_subject_level_sd_and_mu():
+    # Subject-level parameters whose names end in '_sd' / '_mu' (n1_evidence_sd,
+    # prior_mu) must not be swept into the default group-level check.
+    import arviz as az
+    rng = np.random.default_rng(0)
+    post = {'n1_evidence_sd': rng.normal(size=(2, 100, 5)),
+            'prior_mu': rng.normal(size=(2, 100, 5)),
+            'n1_evidence_sd_mu': rng.normal(size=(2, 100)),
+            'n1_evidence_sd_sd': rng.normal(size=(2, 100))}
+    idata = az.from_dict(posterior=post,
+                         dims={'n1_evidence_sd': ['subject'], 'prior_mu': ['subject']})
+    table = convergence_report(idata, verbose=False)
+    assert sorted(table.index) == ['n1_evidence_sd_mu', 'n1_evidence_sd_sd']
