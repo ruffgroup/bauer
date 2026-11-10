@@ -2,6 +2,31 @@
 History
 =======
 
+0.6.0 (unreleased)
+------------------
+
+Tools for repeated-measures designs (conditions, drugs, sessions) and for reading
+out any fit:
+
+* ``bauer.models.ReproductionModel`` / ``ReproductionRegressionModel``: log-space
+  Bayesian observer for magnitude reproduction (e.g. interval timing); the response
+  SD is the SD of the posterior mean, ``w * nu``.
+* Posterior summaries in long format (``bauer.utils``): ``summarize_posterior``
+  (posterior mean, 95% HDI, P(> 0)), ``contrast_draws`` (per-draw differences from a
+  reference level), ``posterior_draws``, and ``RegressionModel.conditionwise_draws``
+  (natural-scale draws per condition).
+* Posterior predictive summaries: ``ppc_summary`` / ``ppc_observed`` (within subject,
+  then across subjects, per sample) and ``ppc_coverage``.
+* Plots: ``plot_forest`` (group level), ``plot_sorted_forest`` (subject level),
+  ``plot_ppc_panels``, ``plot_ppc_overlay``, ``plot_subject_ppc``,
+  ``set_house_style``; and ``convergence_report`` (r-hat, ESS, divergences, verdict).
+* Fixes: ``*LapseRegressionModel`` built ``p_lapse`` as an untransformed Normal that
+  could leave (0, 1) (since 0.3.0); it now uses a logit-normal group prior. Re-fit
+  lapse-regression fits made with 0.3.0-0.5.x. Rank-deficient regression designs
+  now raise instead of fitting silently.
+
+See :ref:`summarising-posteriors` in the usage page, and tutorial lesson 1.
+
 0.5.0 (2026-10-18)
 ------------------
 

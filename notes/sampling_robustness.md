@@ -78,8 +78,9 @@ heavy upper tail ("1/x") — keeps the rate in (0,1) and removes the funnel
 `group_sd ~ HalfCauchy(0.25)` has an infinite-variance heavy tail; a
 weakly-identified group SD can run to huge values → funnel + divergences
 (seen on DDM noise components and near-0 lapse). `group_sd_dist='halfnormal'`
-(opt-in) tames the tail. Trade-off: mild over-shrinkage if true between-subject
-heterogeneity is genuinely large — so it's opt-in, not yet default.
+tames the tail and has been the **default since 0.3.0** (set
+`group_sd_dist='halfcauchy'` to restore the old prior). Trade-off: mild
+over-shrinkage if true between-subject heterogeneity is genuinely large.
 
 ---
 
@@ -135,7 +136,8 @@ return (geometry is *mostly*, not perfectly, fixed). So:
 2. **Defaults**: `mapjitter` init, `lapse_group='beta'` (default),
    `target_accept=0.9`, numpyro + `chain_method='vectorized'`, `tune≈2000`.
    Check r̂ / ESS / divergences.
-3. **If divergences concentrate at the `*_sd` level** → `group_sd_dist='halfnormal'`.
+3. **If divergences concentrate at the `*_sd` level** → check the group-SD prior
+   *scale* (HalfNormal is already the default since 0.3.0).
 4. **If still a seed-lottery / stuck chains** → `find_init='pathfinder'`
    (MAP-seeded; expensive — escalation only).
 5. **For the final clean fit**, raise `target_accept` to 0.95–0.99 to drive

@@ -1,3 +1,4 @@
+import warnings
 from .bayes import summarize_ppc
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -261,3 +262,379 @@ def plot_subjectwise_pointplot(data, mean_col='mean', lo_col='lo', hi_col='hi',
         ax.set_xlabel('Subject')
     sns.despine(ax=ax)
     return ax
+
+
+# ─── House-style posterior and PPC plots ─────────────────────────────────────
+#
+# One vocabulary for all of them:
+#   by            column whose levels are rows / panels / lines (default 'condition')
+#   order         the levels, in the order to draw them (default: order of appearance)
+#   palette       dict level -> colour, or one colour for everything
+#   level_labels  dict level -> display name
+#   xlabel(s)     axis labels
+# Inputs are the tidy summaries from bauer.utils.summaries
+# (summarize_posterior -> mean / lo / hi; ppc_summary + ppc_observed -> pred / lo /
+# hi and obs). Dot = posterior mean, line = 95% HDI, open circle = true value
+# (simulations), dashed line = reference (0 for contrasts, group mean for
+# subjects). Every function returns the matplotlib Figure and raises a
+# ValueError that says what is wrong instead of drawing empty panels.
+
+HOUSE_STYLE = {
+    'font.family': 'sans-serif',
+    'font.sans-serif': ['Helvetica', 'Helvetica Neue', 'TeX Gyre Heros', 'Arial'],
+    'font.size': 7, 'axes.labelsize': 8, 'axes.titlesize': 8,
+    'xtick.labelsize': 7, 'ytick.labelsize': 7, 'legend.fontsize': 7,
+    'axes.linewidth': 0.8, 'axes.spines.top': False, 'axes.spines.right': False,
+    'xtick.direction': 'out', 'ytick.direction': 'out',
+    'xtick.major.size': 3, 'ytick.major.size': 3,
+    'xtick.major.width': 0.8, 'ytick.major.width': 0.8,
+    'lines.linewidth': 1.2, 'lines.markersize': 4,
+    'legend.frameon': False, 'pdf.fonttype': 42, 'ps.fonttype': 42,
+    'figure.dpi': 150, 'savefig.dpi': 300, 'savefig.bbox': 'tight',
+}
+
+
+def set_house_style():
+    """Publication style: Helvetica 7–8 pt, despined, outward ticks, editable PDF text."""
+    import matplotlib as mpl
+    mpl.rcParams.update(HOUSE_STYLE)
+
+
+def _need(df, cols, what):
+    missing = [c for c in cols if c not in df.columns]
+    if missing:
+        raise ValueError(f"{what} is missing column(s) {missing}; it has {list(df.columns)}")
+
+
+def _levels(df, col, order):
+    present = list(pd.unique(df[col]))
+    if order is None:
+        return present
+    order = list(order)
+    unlisted = [lv for lv in present if lv not in order]
+    if unlisted:
+        raise ValueError(f"levels {unlisted} of {col!r} are not in order={order} "
+                         "(typo?); they would not be drawn.")
+    # order entries absent from the data are skipped (e.g. 'placebo' in a
+    # contrast plot), so one order list can serve every figure
+    return [lv for lv in order if lv in present]
+
+
+def _color(palette, key, default='#3B5BA5'):
+    if palette is None:
+        return default
+    if isinstance(palette, dict):
+        if key not in palette:
+            raise ValueError(f"palette has no colour for {key!r}; it has {list(palette)}")
+        return palette[key]
+    return palette          # a single colour
+
+
+def _label(level_labels, key):
+    return (level_labels or {}).get(key, key)
+
+
+def _select_parameter(df, parameter, what):
+    if 'parameter' not in df.columns:
+        return df
+    d = df[df['parameter'] == parameter]
+    if d.empty:
+        raise ValueError(f"{what} has no rows for parameter {parameter!r}; "
+                         f"parameters are {list(pd.unique(df['parameter']))}")
+    return d
+
+
+def _true_key(ax, x=1.04, y=0.92):
+    tf = ax.transAxes
+    ax.plot(x, y, 'o', color='0.35', ms=4.5, transform=tf, clip_on=False)
+    ax.text(x + 0.05, y, 'Estimate', transform=tf, va='center', fontsize=6.5)
+    ax.plot(x, y - 0.14, 'o', mfc='none', mec='0.15', ms=6, mew=0.8, transform=tf, clip_on=False)
+    ax.text(x + 0.05, y - 0.14, 'True', transform=tf, va='center', fontsize=6.5)
+
+
+def plot_forest(summary, parameters, by='condition', order=None, palette=None,
+                level_labels=None, xlabels=None, ref=None, true_col=None,
+                figsize=None, axes=None):
+    """Group-level forest plot.
+
+    One panel per parameter, one row per level of ``by`` (e.g. condition or
+    contrast). Dot = posterior mean, horizontal line = 95% HDI (``lo``–``hi``),
+    dashed vertical line at ``ref`` (use 0 for contrasts), open circles at
+    ``true_col`` (simulations).
+
+    Parameters
+    ----------
+    summary : DataFrame from :func:`bauer.utils.summarize_posterior` with
+        columns ``parameter``, ``by``, ``mean``, ``lo``, ``hi``; one row per
+        parameter × level.
+    parameters : parameter name or list of names (one panel each).
+    xlabels : dict parameter -> x-axis label.
+    """
+    parameters = [parameters] if isinstance(parameters, str) else list(parameters)
+    _need(summary, ['parameter', by, 'mean', 'lo', 'hi'] + ([true_col] if true_col else []),
+          'summary')
+    for par in parameters:
+        d = _select_parameter(summary, par, 'summary')
+        if d.duplicated(by).any():
+            raise ValueError(f"summary has several rows per {by!r} for {par!r} (a subject-level "
+                             'summary?). Use plot_sorted_forest, or summarise by '
+                             f"['parameter', {by!r}].")
+    levels = _levels(summary, by, order)
+    if axes is None:
+        figsize = figsize or (2.5 * len(parameters), 0.35 * len(levels) + 0.8)
+        fig, axes = plt.subplots(1, len(parameters), figsize=figsize, constrained_layout=True)
+    axes = np.atleast_1d(axes)
+    if len(axes) < len(parameters):
+        raise ValueError(f'{len(parameters)} parameters but only {len(axes)} axes')
+    fig = axes[0].figure
+    for ax, par in zip(axes, parameters):
+        d = summary[summary['parameter'] == par].set_index(by)
+        for i, lev in enumerate(levels):
+            if lev not in d.index:
+                continue
+            y, col = len(levels) - 1 - i, _color(palette, lev)
+            ax.plot([d.loc[lev, 'lo'], d.loc[lev, 'hi']], [y, y], color=col, lw=1.6,
+                    solid_capstyle='butt')
+            ax.plot(d.loc[lev, 'mean'], y, 'o', color=col, ms=5, zorder=3)
+            if true_col is not None:
+                ax.plot(d.loc[lev, true_col], y, 'o', mfc='none', mec='0.15', ms=6.5,
+                        mew=0.8, zorder=4)
+        if ref is not None:
+            ax.axvline(ref, color='0.6', lw=0.7, ls='--', zorder=0)
+        ax.set_yticks(range(len(levels)))
+        ax.set_yticklabels([_label(level_labels, lev) for lev in levels][::-1])
+        for t, lev in zip(ax.get_yticklabels(), levels[::-1]):
+            t.set_color(_color(palette, lev) if palette is not None else '0.15')
+        ax.set_ylim(-0.6, len(levels) - 0.4)
+        ax.set_xlabel((xlabels or {}).get(par, par))
+        ax.tick_params(axis='y', length=0)
+    for ax in axes[1:len(parameters)]:
+        ax.set_yticklabels([])
+    if true_col is not None:
+        _true_key(axes[len(parameters) - 1])
+    sns.despine(fig=fig, offset=4, left=True)
+    for ax in axes[:len(parameters)]:
+        _extend_ticks_to_data(ax)
+    return fig
+
+
+def _extend_ticks_to_data(ax):
+    """Put the outer x ticks at or beyond the data, so a trimmed spine never
+    ends inside an interval."""
+    import matplotlib.ticker as mticker
+    lo, hi = ax.get_xlim()
+    ticks = [t for t in ax.get_xticks() if lo <= t <= hi]
+    if len(ticks) < 2:
+        return
+    step = ticks[1] - ticks[0]
+    data = [ln.get_xdata() for ln in ax.lines if len(ln.get_xdata())]
+    data = np.concatenate([np.atleast_1d(d).astype(float) for d in data]) if data else np.array([])
+    data = data[np.isfinite(data)]
+    if data.size:
+        while ticks[0] > data.min() + 1e-12:
+            ticks.insert(0, ticks[0] - step)
+        while ticks[-1] < data.max() - 1e-12:
+            ticks.append(ticks[-1] + step)
+    ax.xaxis.set_major_locator(mticker.FixedLocator(ticks))
+    ax.set_xlim(min(lo, ticks[0]), max(hi, ticks[-1]))
+    ax.spines['bottom'].set_bounds(ticks[0], ticks[-1])
+
+
+def plot_sorted_forest(subject_summary, parameter, xlabel=None, by='condition', order=None,
+                       sort_by=None, palette=None, level_labels=None, group_summary=None,
+                       ref=None, true_col=None, figsize=None, subject_col='subject'):
+    """Subject-level sorted forest plot (caterpillar), one panel per level of ``by``.
+
+    Subjects are sorted by their posterior mean under ``sort_by`` (default: the
+    first level) and keep that row in every panel, so a subject can be followed
+    across conditions. Dot = posterior mean, line = 95% HDI, dashed line =
+    group mean (``group_summary``, matched on ``by``) or ``ref``. Use
+    ``by=None`` for a parameter with one value per subject.
+    """
+    _need(subject_summary, [subject_col, 'mean', 'lo', 'hi'], 'subject_summary')
+    d = _select_parameter(subject_summary, parameter, 'subject_summary')
+    if by is None:
+        d = d.assign(_panel='')
+        by = '_panel'
+    _need(d, [by], 'subject_summary')
+    if d.duplicated([subject_col, by]).any():
+        raise ValueError(f'Several rows per subject{"" if by == "_panel" else " × " + by}: add the '
+                         'missing column to summarize_posterior(by=...) or set by=.')
+    levels = _levels(d, by, order)
+    sort_by = levels[0] if sort_by is None else sort_by
+    if sort_by not in levels:
+        raise ValueError(f'sort_by={sort_by!r} is not a level of {by!r}; levels are {levels}')
+    ranking = d[d[by] == sort_by].sort_values('mean')[subject_col].tolist()
+    unranked = set(d[subject_col]) - set(ranking)
+    if unranked:
+        warnings.warn(f'{len(unranked)} subject(s) have no {sort_by!r} value and are placed '
+                      'at the top.', UserWarning, stacklevel=2)
+        ranking += sorted(unranked, key=str)
+    rank = {s: i for i, s in enumerate(ranking)}
+    figsize = figsize or (min(7.25, 1.9 * len(levels) + 0.6), 2.0)
+    fig, axes = plt.subplots(1, len(levels), figsize=figsize, sharex=True, sharey=True,
+                             constrained_layout=True)
+    axes = np.atleast_1d(axes)
+    for ax, lev in zip(axes, levels):
+        dc = d[d[by] == lev].assign(_y=lambda x: x[subject_col].map(rank))
+        if by == '_panel':
+            col = palette if isinstance(palette, str) else '#3B5BA5'
+        else:
+            col = _color(palette, lev)
+        if ref is not None:
+            ax.axvline(ref, color='0.6', lw=0.7, ls='--', zorder=0)
+        if group_summary is not None:
+            g = _select_parameter(group_summary, parameter, 'group_summary')
+            if by in g.columns:
+                g = g[g[by] == lev]
+            if len(g) != 1:
+                raise ValueError(f'group_summary must have exactly one row per panel; found {len(g)} '
+                                 f'for {lev!r}')
+            ax.axvline(g['mean'].iloc[0], color='0.4', lw=0.7, ls='--', zorder=0)
+        ax.hlines(dc['_y'], dc['lo'], dc['hi'], color=col, lw=0.9)
+        ax.plot(dc['mean'], dc['_y'], 'o', color=col, ms=2.6, zorder=3)
+        if true_col is not None:
+            ax.plot(dc[true_col], dc['_y'], 'o', mfc='none', mec='0.15', ms=3.4, mew=0.6, zorder=4)
+        if by != '_panel':
+            ax.set_title(_label(level_labels, lev), color=col)
+        ax.set_xlabel(xlabel or parameter)
+        ax.set_yticks([])
+    sorted_txt = '' if by == '_panel' else f' by {_label(level_labels, sort_by)}'
+    axes[0].set_ylabel(f'Subject (sorted{sorted_txt})')
+    sns.despine(fig=fig, offset=4, trim=True, left=True)
+    return fig
+
+
+def _check_ppc_frames(pred, obs, x, by):
+    _need(pred, [x, 'pred', 'lo', 'hi'] + ([by] if by else []), 'pred')
+    _need(obs, [x, 'obs'] + ([by] if by else []), 'obs')
+    keys = [x] + ([by] if by else [])
+    for name, df in [('pred', pred), ('obs', obs)]:
+        if df.duplicated(keys).any():
+            raise ValueError(f'{name} has several rows per {keys} (a subject-level summary? '
+                             'use plot_subject_ppc).')
+
+
+def plot_ppc_panels(pred, obs, x, by='condition', order=None, palette=None,
+                    level_labels=None, xlabel=None, ylabel=None, ref=None, xref=None,
+                    figsize=None, logx=False, xticks=None, yticks=None):
+    """Group-level PPC, one panel per level of ``by``: observed data as dots,
+    model as line + 95% band (from :func:`bauer.utils.ppc_summary` and
+    :func:`bauer.utils.ppc_observed`).
+
+    ``ref`` / ``xref``: dotted horizontal / vertical reference lines, e.g.
+    ``ref=0.5`` (chance) and ``xref=0`` (no stimulus difference) for a
+    psychometric curve."""
+    _check_ppc_frames(pred, obs, x, by)
+    levels = _levels(pred, by, order)
+    figsize = figsize or (min(7.25, 1.8 * len(levels) + 0.5), 1.9)
+    fig, axes = plt.subplots(1, len(levels), figsize=figsize, sharey=True,
+                             constrained_layout=True)
+    axes = np.atleast_1d(axes)
+    for ax, lev in zip(axes, levels):
+        b = pred[pred[by] == lev].sort_values(x)
+        o, col = obs[obs[by] == lev], _color(palette, lev)
+        ax.fill_between(b[x], b['lo'], b['hi'], color=col, alpha=0.25, lw=0)
+        ax.plot(b[x], b['pred'], color=col)
+        ax.plot(o[x], o['obs'], 'o', color=col, ms=3.2, mec='white', mew=0.4, zorder=3)
+        _ref_lines(ax, ref, xref)
+        ax.set_title(_label(level_labels, lev), color=col)
+        ax.set_xlabel(xlabel or x)
+        _ticks(ax, logx, xticks)
+    axes[0].set_ylabel(ylabel or '')
+    if yticks is not None:
+        axes[0].set_yticks(yticks)
+    sns.despine(fig=fig, offset=4, trim=True)
+    return fig
+
+
+def plot_ppc_overlay(pred, obs, x, by='condition', order=None, palette=None,
+                     level_labels=None, xlabel=None, ylabel=None, ref=None, xref=None,
+                     figsize=(3.4, 2.3), logx=False, xticks=None, yticks=None):
+    """All levels of ``by`` on one axis (model line + data dots), with a
+    coloured text key in the upper left."""
+    _check_ppc_frames(pred, obs, x, by)
+    levels = _levels(pred, by, order)
+    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+    for i, lev in enumerate(levels):
+        b = pred[pred[by] == lev].sort_values(x)
+        o, col = obs[obs[by] == lev], _color(palette, lev)
+        ax.plot(b[x], b['pred'], color=col)
+        ax.plot(o[x], o['obs'], 'o', color=col, ms=2.6, mec='white', mew=0.3, zorder=3)
+        ax.text(0.03, 0.97 - i * 0.09, _label(level_labels, lev), color=col,
+                transform=ax.transAxes, va='top', fontsize=7)
+    _ref_lines(ax, ref, xref)
+    ax.set(xlabel=xlabel or x, ylabel=ylabel or '')
+    _ticks(ax, logx, xticks)
+    if yticks is not None:
+        ax.set_yticks(yticks)
+    sns.despine(offset=4, trim=True)
+    return fig
+
+
+def plot_subject_ppc(pred, obs, x, subject_col='subject', col_wrap=8, palette='#3B5BA5',
+                     xlabel=None, ylabel=None, logx=False, logy=False, xticks=None,
+                     yticks=None, identity=False, ref=None, xref=None, height=0.95,
+                     aspect=1.2):
+    """Subject-level PPC as small multiples: data dots, model line + 95% band.
+
+    ``pred`` / ``obs`` from ``ppc_summary(..., subject_level=True)`` and
+    ``ppc_observed(..., subject_level=True)``. Returns the Figure.
+    """
+    _need(pred, [subject_col, x, 'pred', 'lo', 'hi'], 'pred')
+    _need(obs, [subject_col, x, 'obs'], 'obs')
+    if pred.duplicated([subject_col, x]).any():
+        raise ValueError(f'pred has several rows per {[subject_col, x]}: summarise per subject '
+                         'with ppc_summary(..., subject_level=True) and only x in by.')
+    subjects = list(pd.unique(pred[subject_col]))
+    no_obs = [s for s in subjects if not (obs[subject_col] == s).any()]
+    if no_obs:
+        raise ValueError(f'No observed data for {len(no_obs)} subject(s), e.g. {no_obs[:3]} '
+                         f'(subject id type mismatch? pred: {pred[subject_col].dtype}, '
+                         f'obs: {obs[subject_col].dtype}).')
+    n = len(subjects)
+    ncol = min(col_wrap, n)
+    nrow = int(np.ceil(n / ncol))
+    fig, axes = plt.subplots(nrow, ncol, figsize=(ncol * height * aspect, nrow * height + 0.4),
+                             sharex=True, sharey=True, constrained_layout=True, squeeze=False)
+    for ax in axes.flat[n:]:
+        ax.set_visible(False)
+    for ax, subj in zip(axes.flat, subjects):
+        b = pred[pred[subject_col] == subj].sort_values(x)
+        o = obs[obs[subject_col] == subj]
+        if identity:
+            lim = [b[x].min(), b[x].max()]
+            ax.plot(lim, lim, color='0.75', lw=0.5, ls='--', zorder=0)
+        _ref_lines(ax, ref, xref)
+        ax.fill_between(b[x], b['lo'], b['hi'], color=palette, alpha=0.25, lw=0)
+        ax.plot(b[x], b['pred'], color=palette, lw=1)
+        ax.plot(o[x], o['obs'], 'o', color='0.15', ms=1.8, zorder=3)
+        ax.set_title(f'Subject {subj}', fontsize=6)
+        _ticks(ax, logx, xticks)
+        _ticks(ax, logy, yticks, axis='y')
+    fig.supxlabel(xlabel or x, fontsize=8)
+    fig.supylabel(ylabel or '', fontsize=8)
+    sns.despine(fig=fig, offset=3, trim=True)
+    return fig
+
+
+def _ref_lines(ax, ref=None, xref=None):
+    """Dotted reference lines behind the data (horizontal at ``ref``,
+    vertical at ``xref``)."""
+    if ref is not None:
+        ax.axhline(ref, color='0.6', lw=0.7, ls=':', zorder=0)
+    if xref is not None:
+        ax.axvline(xref, color='0.6', lw=0.7, ls=':', zorder=0)
+
+
+def _ticks(ax, log, ticks, axis='x'):
+    import matplotlib.ticker as mticker
+    ax_ = ax.xaxis if axis == 'x' else ax.yaxis
+    if log:
+        (ax.set_xscale if axis == 'x' else ax.set_yscale)('log')
+        if ticks is not None:
+            ax_.set_major_locator(mticker.FixedLocator(ticks))
+        ax_.set_major_formatter(mticker.FuncFormatter(lambda v, _: f'{v:g}'))
+        ax_.set_minor_formatter(mticker.NullFormatter())
+    elif ticks is not None:
+        (ax.set_xticks if axis == 'x' else ax.set_yticks)(ticks)
