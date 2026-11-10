@@ -492,11 +492,15 @@ def _check_ppc_frames(pred, obs, x, by):
 
 
 def plot_ppc_panels(pred, obs, x, by='condition', order=None, palette=None,
-                    level_labels=None, xlabel=None, ylabel=None, ref=None,
+                    level_labels=None, xlabel=None, ylabel=None, ref=None, xref=None,
                     figsize=None, logx=False, xticks=None, yticks=None):
     """Group-level PPC, one panel per level of ``by``: observed data as dots,
     model as line + 95% band (from :func:`bauer.utils.ppc_summary` and
-    :func:`bauer.utils.ppc_observed`)."""
+    :func:`bauer.utils.ppc_observed`).
+
+    ``ref`` / ``xref``: dotted horizontal / vertical reference lines, e.g.
+    ``ref=0.5`` (chance) and ``xref=0`` (no stimulus difference) for a
+    psychometric curve."""
     _check_ppc_frames(pred, obs, x, by)
     levels = _levels(pred, by, order)
     figsize = figsize or (min(7.25, 1.8 * len(levels) + 0.5), 1.9)
@@ -509,8 +513,7 @@ def plot_ppc_panels(pred, obs, x, by='condition', order=None, palette=None,
         ax.fill_between(b[x], b['lo'], b['hi'], color=col, alpha=0.25, lw=0)
         ax.plot(b[x], b['pred'], color=col)
         ax.plot(o[x], o['obs'], 'o', color=col, ms=3.2, mec='white', mew=0.4, zorder=3)
-        if ref is not None:
-            ax.axhline(ref, color='0.7', lw=0.6, ls='--', zorder=0)
+        _ref_lines(ax, ref, xref)
         ax.set_title(_label(level_labels, lev), color=col)
         ax.set_xlabel(xlabel or x)
         _ticks(ax, logx, xticks)
@@ -522,7 +525,7 @@ def plot_ppc_panels(pred, obs, x, by='condition', order=None, palette=None,
 
 
 def plot_ppc_overlay(pred, obs, x, by='condition', order=None, palette=None,
-                     level_labels=None, xlabel=None, ylabel=None, ref=None,
+                     level_labels=None, xlabel=None, ylabel=None, ref=None, xref=None,
                      figsize=(3.4, 2.3), logx=False, xticks=None, yticks=None):
     """All levels of ``by`` on one axis (model line + data dots), with a
     coloured text key in the upper left."""
@@ -536,8 +539,7 @@ def plot_ppc_overlay(pred, obs, x, by='condition', order=None, palette=None,
         ax.plot(o[x], o['obs'], 'o', color=col, ms=2.6, mec='white', mew=0.3, zorder=3)
         ax.text(0.03, 0.97 - i * 0.09, _label(level_labels, lev), color=col,
                 transform=ax.transAxes, va='top', fontsize=7)
-    if ref is not None:
-        ax.axhline(ref, color='0.7', lw=0.6, ls='--', zorder=0)
+    _ref_lines(ax, ref, xref)
     ax.set(xlabel=xlabel or x, ylabel=ylabel or '')
     _ticks(ax, logx, xticks)
     if yticks is not None:
@@ -548,7 +550,8 @@ def plot_ppc_overlay(pred, obs, x, by='condition', order=None, palette=None,
 
 def plot_subject_ppc(pred, obs, x, subject_col='subject', col_wrap=8, palette='#3B5BA5',
                      xlabel=None, ylabel=None, logx=False, logy=False, xticks=None,
-                     yticks=None, identity=False, ref=None, height=0.95, aspect=1.2):
+                     yticks=None, identity=False, ref=None, xref=None, height=0.95,
+                     aspect=1.2):
     """Subject-level PPC as small multiples: data dots, model line + 95% band.
 
     ``pred`` / ``obs`` from ``ppc_summary(..., subject_level=True)`` and
@@ -578,8 +581,7 @@ def plot_subject_ppc(pred, obs, x, subject_col='subject', col_wrap=8, palette='#
         if identity:
             lim = [b[x].min(), b[x].max()]
             ax.plot(lim, lim, color='0.75', lw=0.5, ls='--', zorder=0)
-        if ref is not None:
-            ax.axhline(ref, color='0.7', lw=0.6, ls='--', zorder=0)
+        _ref_lines(ax, ref, xref)
         ax.fill_between(b[x], b['lo'], b['hi'], color=palette, alpha=0.25, lw=0)
         ax.plot(b[x], b['pred'], color=palette, lw=1)
         ax.plot(o[x], o['obs'], 'o', color='0.15', ms=1.8, zorder=3)
@@ -590,6 +592,15 @@ def plot_subject_ppc(pred, obs, x, subject_col='subject', col_wrap=8, palette='#
     fig.supylabel(ylabel or '', fontsize=8)
     sns.despine(fig=fig, offset=3, trim=True)
     return fig
+
+
+def _ref_lines(ax, ref=None, xref=None):
+    """Dotted reference lines behind the data (horizontal at ``ref``,
+    vertical at ``xref``)."""
+    if ref is not None:
+        ax.axhline(ref, color='0.6', lw=0.7, ls=':', zorder=0)
+    if xref is not None:
+        ax.axvline(xref, color='0.6', lw=0.7, ls=':', zorder=0)
 
 
 def _ticks(ax, log, ticks, axis='x'):
