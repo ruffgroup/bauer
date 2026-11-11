@@ -250,3 +250,16 @@ def test_convergence_report_skips_subject_level_sd_and_mu():
                          dims={'n1_evidence_sd': ['subject'], 'prior_mu': ['subject']})
     table = convergence_report(idata, verbose=False)
     assert sorted(table.index) == ['n1_evidence_sd_mu', 'n1_evidence_sd_sd']
+
+
+def test_distribution_and_stat_plots():
+    from bauer.utils import plot_ppc_distributions, plot_ppc_stats
+    rng = np.random.default_rng(0)
+    data = pd.DataFrame({'x': np.repeat([0.5, 1.0], 50), 'r': rng.lognormal(0, .2, 100)})
+    sim = pd.DataFrame({'x': np.repeat([0.5, 1.0], 500), 'r': rng.lognormal(0, .2, 1000)})
+    plot_ppc_distributions(data, sim, 'x', 'r')
+    with pytest.raises(ValueError, match='No observed data'):
+        plot_ppc_distributions(data, sim, 'x', 'r', panels=[2.0])
+    pred = pd.DataFrame({'condition': 'a', 'x': [1, 2], 'pred': [1, 2], 'lo': [0, 1], 'hi': [2, 3]})
+    obs = pd.DataFrame({'condition': 'a', 'x': [1, 2], 'obs': [1, 2]})
+    plot_ppc_stats({'sd': pred}, {'sd': obs}, 'x')

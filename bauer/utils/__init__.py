@@ -6,4 +6,5 @@ from .plotting import (plot_subjectwise_parameters,
                        plot_subjectwise_pointplot,
                        get_subject_posterior_df,
                        set_house_style, plot_forest, plot_sorted_forest,
-                       plot_ppc_panels, plot_ppc_overlay, plot_subject_ppc)
+                       plot_ppc_panels, plot_ppc_overlay, plot_subject_ppc,
+                       plot_ppc_distributions, plot_ppc_stats)

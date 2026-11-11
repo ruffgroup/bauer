@@ -638,3 +638,94 @@ def _ticks(ax, log, ticks, axis='x'):
         ax_.set_minor_formatter(mticker.NullFormatter())
     elif ticks is not None:
         (ax.set_xticks if axis == 'x' else ax.set_yticks)(ticks)
+
+
+def plot_ppc_distributions(data, sim, x, value, sim_value=None, panels=None, palette='#3B5BA5',
+                           level_labels=None, xlabel=None, bins=30, figsize=None, ref=True,
+                           x_format='{:.2f}'):
+    """Observed vs posterior-predictive **distributions**, one panel per value of ``x``.
+
+    Grey bars = observed histogram (density), coloured line = histogram of the
+    pooled posterior-predictive samples, dotted line at the stimulus value (when
+    ``ref`` and ``x`` is numeric). For continuous responses (reproductions,
+    estimates, RTs) per stimulus level.
+
+    Parameters
+    ----------
+    data : observed trials with columns ``x`` and ``value``.
+    sim : simulated trials (e.g. ``model.ppc(...)`` joined with the stimulus
+        column) with columns ``x`` and ``sim_value`` (default ``value``).
+    panels : the ``x`` levels to show (default: all, sorted).
+    """
+    sim_value = sim_value or value
+    _need(data, [x, value], 'data')
+    _need(sim, [x, sim_value], 'sim')
+    levels = sorted(pd.unique(data[x])) if panels is None else list(panels)
+    missing = [lv for lv in levels if not (np.isclose(data[x], lv) if np.issubdtype(
+        np.asarray(levels).dtype, np.number) else data[x] == lv).any()]
+    if missing:
+        raise ValueError(f'No observed data for {x}={missing}; levels are {sorted(pd.unique(data[x]))}')
+    figsize = figsize or (min(7.25, 1.05 * len(levels) + 0.4), 1.7)
+    fig, axes = plt.subplots(1, len(levels), figsize=figsize, sharey=False,
+                             constrained_layout=True)
+    axes = np.atleast_1d(axes)
+    numeric = np.issubdtype(np.asarray(levels).dtype, np.number)
+    for ax, lv in zip(axes, levels):
+        sel_o = np.isclose(data[x], lv) if numeric else data[x] == lv
+        sel_s = np.isclose(sim[x], lv) if numeric else sim[x] == lv
+        o = data.loc[sel_o, value].astype(float)
+        s = sim.loc[sel_s, sim_value].astype(float)
+        if s.empty:
+            raise ValueError(f'No simulated data for {x}={lv!r}')
+        lo, hi = np.nanpercentile(np.concatenate([o, s]), [0.5, 99.5])
+        edges = np.linspace(lo, hi, bins + 1)
+        ax.hist(o, bins=edges, density=True, color='0.75', lw=0)
+        dens, _ = np.histogram(s, bins=edges, density=True)
+        ax.plot((edges[:-1] + edges[1:]) / 2, dens, color=palette, lw=1.2)
+        if ref and numeric:
+            ax.axvline(lv, color='0.6', lw=0.7, ls=':', zorder=0)
+        title = _label(level_labels, lv)
+        ax.set_title(x_format.format(title) if numeric and title == lv else title, fontsize=7)
+        ax.set_yticks([])
+    axes[0].set_ylabel('Density')
+    fig.supxlabel(xlabel or value, fontsize=8)
+    sns.despine(fig=fig, offset=3, left=True)
+    return fig
+
+
+def plot_ppc_stats(pred_by_stat, obs_by_stat, x, by='condition', order=None, palette=None,
+                   level_labels=None, ylabels=None, xlabel=None, figsize=None, logx=False,
+                   xticks=None, refs=None):
+    """Several PPC statistics side by side (one panel per statistic), all
+    levels of ``by`` overlaid: data dots, model line + band.
+
+    ``pred_by_stat`` / ``obs_by_stat``: dicts statistic name -> output of
+    :func:`bauer.utils.ppc_summary` / :func:`bauer.utils.ppc_observed` for that
+    statistic (e.g. mean error, SD, CV, skewness of reproductions per duration).
+    ``refs``: dict statistic -> y of a dotted reference line.
+    """
+    stats = list(pred_by_stat)
+    missing = [s for s in stats if s not in obs_by_stat]
+    if missing:
+        raise ValueError(f'obs_by_stat lacks {missing}')
+    figsize = figsize or (min(7.25, 2.4 * len(stats)), 2.1)
+    fig, axes = plt.subplots(1, len(stats), figsize=figsize, constrained_layout=True)
+    axes = np.atleast_1d(axes)
+    for ax, stat in zip(axes, stats):
+        pred, obs = pred_by_stat[stat], obs_by_stat[stat]
+        _check_ppc_frames(pred, obs, x, by)
+        for lev in _levels(pred, by, order):
+            b = pred[pred[by] == lev].sort_values(x)
+            o, col = obs[obs[by] == lev], _color(palette, lev)
+            ax.fill_between(b[x], b['lo'], b['hi'], color=col, alpha=0.15, lw=0)
+            ax.plot(b[x], b['pred'], color=col)
+            ax.plot(o[x], o['obs'], 'o', color=col, ms=2.8, mec='white', mew=0.3, zorder=3)
+        _ref_lines(ax, (refs or {}).get(stat))
+        ax.set(xlabel=xlabel or x, ylabel=(ylabels or {}).get(stat, stat))
+        _ticks(ax, logx, xticks)
+    for i, lev in enumerate(_levels(pred_by_stat[stats[0]], by, order)):
+        axes[0].text(0.03, 0.97 - i * 0.09, _label(level_labels, lev),
+                     color=_color(palette, lev), transform=axes[0].transAxes, va='top',
+                     fontsize=7)
+    sns.despine(fig=fig, offset=4, trim=True)
+    return fig
