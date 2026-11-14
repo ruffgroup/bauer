@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="prev" title="Usage" href="usage.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>History - bauer 0.6.0 documentation</title>
+        <title>History - bauer 0.6.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">bauer 0.6.0 documentation</div></a>
+      <a href="index.html"><div class="brand">bauer 0.6.1 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">bauer 0.6.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.6.1 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -255,8 +255,27 @@
         <article role="main" id="furo-main-content">
           <section id="history">
 <h1>History<a class="headerlink" href="#history" title="Link to this heading">¶</a></h1>
-<section id="unreleased">
-<h2>0.6.0 (unreleased)<a class="headerlink" href="#unreleased" title="Link to this heading">¶</a></h2>
+<section id="id1">
+<h2>0.6.1 (2026-11-14)<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><strong>Input-scale warning.</strong> <code class="docutils literal notranslate"><span class="pre">build_estimation_model</span></code> now warns when inputs are far
+from order 1. bauer’s default priors (notably the <code class="docutils literal notranslate"><span class="pre">HalfNormal(0.25)</span></code> group-SD
+prior and <code class="docutils literal notranslate"><span class="pre">N(0,</span> <span class="pre">1)</span></code> regression slopes) assume order-1 parameters; with ~10-30
+subjects the group-SD prior is not swamped by the data, so raw units silently set
+the amount of shrinkage. Stimulus differences of ~10^3 shrink every subject onto
+the group mean; ~10^-3 gives no shrinkage at all. Checked: <code class="docutils literal notranslate"><span class="pre">x2</span> <span class="pre">-</span> <span class="pre">x1</span></code> in the
+<code class="docutils literal notranslate"><span class="pre">Psychophysical*</span></code> models, and continuous regressors in every
+<code class="docutils literal notranslate"><span class="pre">*RegressionModel</span></code>. Range <code class="docutils literal notranslate"><span class="pre">model.input_scale_range</span> <span class="pre">=</span> <span class="pre">(0.2,</span> <span class="pre">5)</span></code>; silence with
+<code class="docutils literal notranslate"><span class="pre">model.warn_on_input_scale</span> <span class="pre">=</span> <span class="pre">False</span></code>. Log-space magnitude / risk models are
+unaffected. <strong>Fix: standardize the inputs, fit, rescale parameters back.</strong> New
+docs section <a class="reference internal" href="concepts.html#input-scaling"><span class="std std-ref">Scale your inputs to order 1</span></a>.</p></li>
+<li><p><strong>Fixable static-choice lapse</strong> (from PR #4): <code class="docutils literal notranslate"><span class="pre">model.p_lapse</span> <span class="pre">=</span> <span class="pre">0.05</span></code> on any
+<code class="docutils literal notranslate"><span class="pre">*LapseModel</span></code> fixes the lapse rate instead of estimating it hierarchically
+(mirrors the DDM/RDM <code class="docutils literal notranslate"><span class="pre">p_outlier</span></code> API). Default <code class="docutils literal notranslate"><span class="pre">None</span></code> is unchanged.</p></li>
+</ul>
+</section>
+<section id="id2">
+<h2>0.6.0 (2026-11-10)<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h2>
 <p>Tools for repeated-measures designs (conditions, drugs, sessions) and for reading
 out any fit:</p>
 <ul class="simple">
@@ -279,15 +298,15 @@ now raise instead of fitting silently.</p></li>
 </ul>
 <p>See <a class="reference internal" href="usage.html#summarising-posteriors"><span class="std std-ref">Summarising and plotting posteriors</span></a> in the usage page, and tutorial lesson 1.</p>
 </section>
-<section id="id1">
-<h2>0.5.0 (2026-10-18)<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h2>
+<section id="id3">
+<h2>0.5.0 (2026-10-18)<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h2>
 <p>Extended <code class="docutils literal notranslate"><span class="pre">bauer.efficient_coding</span></code> (Bedi et al. 2026 models, hierarchical and
 numpyro-compilable) and a fix for hierarchical grid-based estimation fits that
 used subject 0’s parameters for every subject. See <code class="docutils literal notranslate"><span class="pre">CHANGELOG.md</span></code> for the
 full list. (<code class="docutils literal notranslate"><span class="pre">v0.4.0</span></code> was an unreleased side-branch tag and is not included.)</p>
 </section>
-<section id="id2">
-<h2>0.3.0 (2026-06-10)<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h2>
+<section id="id4">
+<h2>0.3.0 (2026-06-10)<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h2>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p><strong>Breaking changes since 0.2.0</strong> — read before re-running old analyses:</p>
@@ -391,8 +410,8 @@ deprecated <code class="docutils literal notranslate"><span class="pre">prior_es
 bundled CSVs trimmed of derived columns.</p></li>
 </ul>
 </section>
-<section id="id3">
-<h2>0.2.0 (2026-04-03)<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h2>
+<section id="id5">
+<h2>0.2.0 (2026-04-03)<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h2>
 <ul class="simple">
 <li><p>Refactored model classes into a dedicated <code class="docutils literal notranslate"><span class="pre">bauer/models/</span></code> package
 (<code class="docutils literal notranslate"><span class="pre">psychophysics</span></code>, <code class="docutils literal notranslate"><span class="pre">magnitude</span></code>, <code class="docutils literal notranslate"><span class="pre">risky_choice</span></code> submodules).</p></li>
@@ -404,8 +423,8 @@ risky choice with the KLW model, and de Hollander et al. (2024) stake effects.</
 <li><p>Documentation expanded with API reference, concepts page, and tutorial.</p></li>
 </ul>
 </section>
-<section id="id4">
-<h2>0.1.0 (2022-11-17)<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h2>
+<section id="id6">
+<h2>0.1.0 (2022-11-17)<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h2>
 <ul class="simple">
 <li><p>First release on PyPI.</p></li>
 </ul>
@@ -460,11 +479,12 @@ risky choice with the KLW model, and de Hollander et al. (2024) stake effects.</
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">History</a><ul>
-<li><a class="reference internal" href="#unreleased">0.6.0 (unreleased)</a></li>
-<li><a class="reference internal" href="#id1">0.5.0 (2026-10-18)</a></li>
-<li><a class="reference internal" href="#id2">0.3.0 (2026-06-10)</a></li>
-<li><a class="reference internal" href="#id3">0.2.0 (2026-04-03)</a></li>
-<li><a class="reference internal" href="#id4">0.1.0 (2022-11-17)</a></li>
+<li><a class="reference internal" href="#id1">0.6.1 (2026-11-14)</a></li>
+<li><a class="reference internal" href="#id2">0.6.0 (2026-11-10)</a></li>
+<li><a class="reference internal" href="#id3">0.5.0 (2026-10-18)</a></li>
+<li><a class="reference internal" href="#id4">0.3.0 (2026-06-10)</a></li>
+<li><a class="reference internal" href="#id5">0.2.0 (2026-04-03)</a></li>
+<li><a class="reference internal" href="#id6">0.1.0 (2022-11-17)</a></li>
 </ul>
 </li>
 </ul>
@@ -476,7 +496,7 @@ risky choice with the KLW model, and de Hollander et al. (2024) stake effects.</
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=8fa8b3e9"></script>
+</div><script src="_static/documentation_options.js?v=2bd037f0"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

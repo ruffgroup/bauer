@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Lesson 8: DDM vs probit on the Garcia magnitude task" href="lesson8.html"><link rel="prev" title="Lesson 4: Flexible Noise Curves — FlexibleNoiseComparisonModel and FlexibleNoiseRiskModel" href="lesson4.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood - bauer 0.6.0 documentation</title>
+        <title>Lesson 5: Why Hierarchical Modelling Beats Maximum Likelihood - bauer 0.6.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -162,7 +162,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">bauer 0.6.0 documentation</div></a>
+      <a href="../index.html"><div class="brand">bauer 0.6.1 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -183,7 +183,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.6.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.6.1 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -261,8 +261,8 @@
 <p>Maximum-likelihood estimation (MLE) and MAP estimation fit each participant independently. With hundreds of trials per subject this works fine, but in practice most psychophysics experiments give you <strong>100–250 trials per condition</strong>. At those trial counts individual MLE/MAP estimates are:</p>
 <ul class="simple">
 <li><p><strong>Noisy</strong> — refit the same subject on a different random half of their data and you get a substantially different answer.</p></li>
-<li><p><strong>Biased at the boundaries</strong> — with few trials, the likelihood surface is broad and the optimiser can land at extreme values. Noise parameters (<span class="math notranslate nohighlight">\(\nu\)</span>) may converge to near-zero (the model “explains” every trial perfectly by overfitting) or explode to very large values (flat psychometric curve, no discrimination at all). Lapse-rate parameters can rail at 0 or 1. These boundary estimates are not meaningful — they reflect the instability of the optimisation, not the participant’s true
-noise level.</p></li>
+<li><p><strong>Biased at the boundaries</strong> — with few trials, the likelihood surface is broad and the optimiser can land at extreme values. Noise parameters (<span class="math notranslate nohighlight">\(\nu\)</span>) may converge to near-zero (the model “explains” every trial perfectly by overfitting) or explode to very large values (flat psychometric curve, no discrimination at all). Lapse-rate parameters can rail at 0 or 1. These boundary estimates are not meaningful — they reflect the instability of the optimisation, not the participant’s true noise
+level.</p></li>
 <li><p><strong>Worse for complex models</strong> — every additional parameter increases the volume of the parameter space that the optimiser must search. The most theoretically interesting models (KLW with prior <span class="math notranslate nohighlight">\(\sigma_0\)</span>, FlexibleNoise with spline coefficients) are exactly the ones that suffer most, because they have more parameters per subject and more opportunities for the likelihood to be flat.</p></li>
 </ul>
 <p><strong>Hierarchical Bayesian estimation</strong> avoids all three problems. By sharing statistical strength across participants, the group prior acts as an <em>adaptive regulariser</em>: subjects with extreme or unreliable data are pulled toward the population, while well-identified subjects are left alone.</p>
@@ -1021,7 +1021,7 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=8fa8b3e9"></script>
+</div><script src="../_static/documentation_options.js?v=2bd037f0"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>

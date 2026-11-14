@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>bauer.core - bauer 0.6.0 documentation</title>
+        <title>bauer.core - bauer 0.6.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -160,7 +160,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../index.html"><div class="brand">bauer 0.6.0 documentation</div></a>
+      <a href="../../index.html"><div class="brand">bauer 0.6.1 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -181,7 +181,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
   
-  <span class="sidebar-brand-text">bauer 0.6.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.6.1 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -365,6 +365,17 @@
     <span class="c1"># accumulators (DDM/RDM) already use posterior_mean_sd internally.</span>
     <span class="n">consistent_choice_noise</span> <span class="o">=</span> <span class="kc">False</span>
 
+    <span class="c1"># Input-scale check (see ``_check_input_scales``). The default priors --</span>
+    <span class="c1"># Normal(., 0.5-10) on group means, HalfNormal(0.25) on group SDs, N(0, 1)</span>
+    <span class="c1"># on regression slopes -- assume parameters of order 1. Models whose</span>
+    <span class="c1"># parameters live in the *raw units* of some paradigm columns list them in</span>
+    <span class="c1"># ``scale_sensitive_keys``; if the typical stimulus difference falls outside</span>
+    <span class="c1"># ``input_scale_range``, a warning tells the user to standardize. Models in</span>
+    <span class="c1"># log-space (magnitude, risk) are scale-invariant and leave this empty.</span>
+    <span class="n">scale_sensitive_keys</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">input_scale_range</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.2</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">)</span>
+    <span class="n">warn_on_input_scale</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">__init_subclass__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init_subclass__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="c1"># Wrap each subclass's own __init__ (if it defines one) so the</span>
@@ -490,10 +501,69 @@
 
         <span class="k">with</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="p">(</span><span class="n">coords</span><span class="o">=</span><span class="n">coords</span><span class="p">)</span> <span class="k">as</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimation_model</span><span class="p">:</span>
             <span class="n">paradigm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_paradigm</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">warn_on_input_scale</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_check_input_scales</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="n">hierarchical</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">set_paradigm</span><span class="p">(</span><span class="n">paradigm</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">build_priors</span><span class="p">(</span><span class="n">hierarchical</span><span class="o">=</span><span class="n">hierarchical</span><span class="p">,</span> <span class="n">flat_prior</span><span class="o">=</span><span class="n">flat_prior</span><span class="p">)</span>
             <span class="n">parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter_values</span><span class="p">()</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">build_likelihood</span><span class="p">(</span><span class="n">parameters</span><span class="p">,</span> <span class="n">save_p_choice</span><span class="o">=</span><span class="n">save_p_choice</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_input_scale_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">what</span><span class="p">,</span> <span class="n">scale</span><span class="p">,</span> <span class="n">hierarchical</span><span class="p">,</span> <span class="n">param_scale</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Build the warning text. ``scale`` is the input's typical scale;</span>
+<span class="sd">        ``param_scale`` the implied parameter scale (defaults to ``scale``;</span>
+<span class="sd">        for a regression slope it is ``1 / scale``)."""</span>
+        <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_scale_range</span>
+        <span class="k">if</span> <span class="n">param_scale</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">param_scale</span> <span class="o">=</span> <span class="n">scale</span>
+        <span class="n">direction</span> <span class="o">=</span> <span class="s1">'large'</span> <span class="k">if</span> <span class="n">scale</span> <span class="o">&gt;</span> <span class="n">hi</span> <span class="k">else</span> <span class="s1">'small'</span>
+        <span class="n">consequence</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">"The parameters it drives will be of order </span><span class="si">{:.2g}</span><span class="s2">, but bauer's "</span>
+            <span class="s2">"default priors assume order-1 parameters (group-SD prior "</span>
+            <span class="s2">"HalfNormal(0.25), regression slopes N(0, 1)). "</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">param_scale</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">hierarchical</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">param_scale</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">consequence</span> <span class="o">+=</span> <span class="p">(</span><span class="s2">"The group-SD prior is then far too narrow: "</span>
+                                <span class="s2">"subjects get shrunk (almost) completely onto "</span>
+                                <span class="s2">"the group mean, whatever the data say. "</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">consequence</span> <span class="o">+=</span> <span class="p">(</span><span class="s2">"The group-SD prior is then far too wide: "</span>
+                                <span class="s2">"with a typical number of subjects the data "</span>
+                                <span class="s2">"cannot constrain it, so there is effectively "</span>
+                                <span class="s2">"NO shrinkage towards the group mean. "</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">what</span><span class="si">}</span><span class="s2"> has a typical scale of "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">scale</span><span class="si">:</span><span class="s2">.3g</span><span class="si">}</span><span class="s2">, which is </span><span class="si">{</span><span class="n">direction</span><span class="si">}</span><span class="s2"> (outside "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">lo</span><span class="si">:</span><span class="s2">g</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">hi</span><span class="si">:</span><span class="s2">g</span><span class="si">}</span><span class="s2">). "</span> <span class="o">+</span> <span class="n">consequence</span> <span class="o">+</span>
+                <span class="s2">"Standardize the input so it is of order 1 (e.g. divide by "</span>
+                <span class="s2">"its SD or by a meaningful unit) and rescale the fitted "</span>
+                <span class="s2">"parameters back afterwards. Silence with "</span>
+                <span class="s2">"`model.warn_on_input_scale = False` or widen "</span>
+                <span class="s2">"`model.input_scale_range`."</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_input_scales</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Warn when scale-sensitive paradigm columns are far from order 1.</span>
+
+<span class="sd">        The scale used is the SD of the trialwise difference between the</span>
+<span class="sd">        ``scale_sensitive_keys`` (``x2 - x1`` for psychophysics): sensitivity</span>
+<span class="sd">        and bias parameters are in those units. A constant shift of all</span>
+<span class="sd">        stimuli does not matter, only their scale.</span>
+<span class="sd">        """</span>
+        <span class="n">keys</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale_sensitive_keys</span>
+                <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s1">'columns'</span><span class="p">,</span> <span class="p">[])]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">keys</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">vals</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">scale</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanstd</span><span class="p">(</span><span class="n">vals</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">vals</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">scale</span><span class="p">)</span> <span class="ow">or</span> <span class="n">scale</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">scale</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanstd</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">vals</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">scale</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanstd</span><span class="p">(</span><span class="n">vals</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_scale_range</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">scale</span><span class="p">)</span> <span class="ow">and</span> <span class="n">scale</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">lo</span> <span class="o">&lt;=</span> <span class="n">scale</span> <span class="o">&lt;=</span> <span class="n">hi</span><span class="p">):</span>
+            <span class="n">what</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s2">"the stimulus difference </span><span class="si">{</span><span class="n">keys</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2"> - </span><span class="si">{</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">keys</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"column </span><span class="si">{</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_input_scale_message</span><span class="p">(</span><span class="n">what</span><span class="p">,</span> <span class="n">scale</span><span class="p">,</span> <span class="n">hierarchical</span><span class="p">),</span>
+                          <span class="ne">UserWarning</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">build_priors</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">flat_prior</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 
@@ -1379,10 +1449,42 @@
     <span class="n">lapse_mu_mean</span> <span class="o">=</span> <span class="mf">0.02</span>
     <span class="n">lapse_mu_kappa</span> <span class="o">=</span> <span class="mf">8.0</span>
     <span class="n">lapse_kappa_sd</span> <span class="o">=</span> <span class="mf">3.0</span>
+    <span class="c1"># ``p_lapse`` mirrors the DDM/RDM ``p_outlier`` API:</span>
+    <span class="c1">#   - None (default): the per-subject lapse rate is estimated</span>
+    <span class="c1">#     hierarchically under ``lapse_group`` (unchanged behaviour).</span>
+    <span class="c1">#   - a float in [0, 1): the lapse rate is FIXED at that value and is not</span>
+    <span class="c1">#     a sampled parameter, so it cannot funnel. Useful on hard geometries</span>
+    <span class="c1">#     (e.g. full-prior estimation) and when you would rather assume a small</span>
+    <span class="c1">#     lapse than estimate a weakly identified one.</span>
+    <span class="c1"># Set it on the class (subclass) or on an instance; setting it on an</span>
+    <span class="c1"># instance refreshes ``free_parameters``, so do it before</span>
+    <span class="c1"># ``build_estimation_model``.</span>
+    <span class="n">_p_lapse</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">p_lapse</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_p_lapse</span>
+
+    <span class="nd">@p_lapse</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">p_lapse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">val</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">floating</span><span class="p">)):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"p_lapse must be None or a float, got </span><span class="si">{</span><span class="n">val</span><span class="si">!r}</span><span class="s2">."</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="mf">0.</span> <span class="o">&lt;=</span> <span class="nb">float</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1.</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"fixed p_lapse must lie in [0, 1), got </span><span class="si">{</span><span class="n">val</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_p_lapse</span> <span class="o">=</span> <span class="n">val</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">'free_parameters'</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">free_parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_free_parameters</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_fixed_p_lapse</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_p_lapse</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_free_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">pars</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">get_free_parameters</span><span class="p">()</span>
 
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fixed_p_lapse</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">pars</span>
         <span class="n">pars</span><span class="p">[</span><span class="s1">'p_lapse'</span><span class="p">]</span> <span class="o">=</span> <span class="n">_lapse_param_spec</span><span class="p">(</span><span class="n">_effective_lapse_group</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span>
                                             <span class="bp">self</span><span class="o">.</span><span class="n">lapse_mu_mean</span><span class="p">,</span>
                                             <span class="bp">self</span><span class="o">.</span><span class="n">lapse_mu_kappa</span><span class="p">,</span>
@@ -1397,7 +1499,9 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_model_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
         <span class="n">model_inputs</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">get_model_inputs</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span>
-        <span class="n">model_inputs</span><span class="p">[</span><span class="s1">'p_lapse'</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">'p_lapse'</span><span class="p">]</span>
+        <span class="n">fixed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fixed_p_lapse</span><span class="p">()</span>
+        <span class="n">model_inputs</span><span class="p">[</span><span class="s1">'p_lapse'</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">fixed</span> <span class="k">if</span> <span class="n">fixed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                                   <span class="k">else</span> <span class="n">parameters</span><span class="p">[</span><span class="s1">'p_lapse'</span><span class="p">])</span>
         <span class="k">return</span> <span class="n">model_inputs</span></div>
 
 
@@ -1623,6 +1727,33 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">_compute_random_cols</span><span class="p">(</span><span class="n">paradigm</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">dm</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">paradigm_</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_input_scales</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Also warn on continuous regressors far from order 1.</span>
+
+<span class="sd">        Slopes get an N(0, 1) prior (and a HalfNormal(0.25) group SD when they</span>
+<span class="sd">        carry a random effect), so a covariate in, say, milliseconds or CHF</span>
+<span class="sd">        makes the slope prior absurdly tight or wide. Binary / contrast-coded</span>
+<span class="sd">        columns (&lt;= 2 unique values) are skipped.</span>
+<span class="sd">        """</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_check_input_scales</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">hierarchical</span><span class="o">=</span><span class="n">hierarchical</span><span class="p">)</span>
+        <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_scale_range</span>
+        <span class="n">flagged</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">param</span><span class="p">,</span> <span class="n">dm</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">design_matrices</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dm</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">nm</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">dm</span><span class="o">.</span><span class="n">design_info</span><span class="o">.</span><span class="n">column_names</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">nm</span> <span class="o">==</span> <span class="s1">'Intercept'</span> <span class="ow">or</span> <span class="n">nm</span> <span class="ow">in</span> <span class="n">flagged</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">col</span> <span class="o">=</span> <span class="n">arr</span><span class="p">[:,</span> <span class="n">j</span><span class="p">]</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">col</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">col</span><span class="p">)]))</span> <span class="o">&lt;=</span> <span class="mi">2</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">sd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanstd</span><span class="p">(</span><span class="n">col</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">sd</span><span class="p">)</span> <span class="ow">and</span> <span class="n">sd</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">lo</span> <span class="o">&lt;=</span> <span class="n">sd</span> <span class="o">&lt;=</span> <span class="n">hi</span><span class="p">):</span>
+                    <span class="n">flagged</span><span class="p">[</span><span class="n">nm</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">sd</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">nm</span><span class="p">,</span> <span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">sd</span><span class="p">)</span> <span class="ow">in</span> <span class="n">flagged</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_input_scale_message</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"continuous regressor '</span><span class="si">{</span><span class="n">nm</span><span class="si">}</span><span class="s2">' (on </span><span class="si">{</span><span class="n">param</span><span class="si">!r}</span><span class="s2">)"</span><span class="p">,</span> <span class="n">sd</span><span class="p">,</span>
+                <span class="n">hierarchical</span><span class="p">,</span> <span class="n">param_scale</span><span class="o">=</span><span class="mf">1.</span> <span class="o">/</span> <span class="n">sd</span><span class="p">),</span> <span class="ne">UserWarning</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">build_design_matrix</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">parameter</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">parameter</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">regressors</span><span class="p">:</span>
@@ -2056,7 +2187,7 @@
       
     </aside>
   </div>
-</div><script src="../../_static/documentation_options.js?v=8fa8b3e9"></script>
+</div><script src="../../_static/documentation_options.js?v=2bd037f0"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>

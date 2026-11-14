@@ -89,6 +89,67 @@ Data conventions
   the WFPT likelihood has a flat, zero-gradient region when the non-decision
   time exceeds the fastest RT, and the sampler gets stuck there.
 
+.. _input-scaling:
+
+Scale your inputs to order 1
+----------------------------
+
+bauer's default priors assume that every free parameter is **of order 1**:
+group means get ``Normal(mu, 0.5–10)`` priors, group SDs a
+``HalfNormal(0.25)`` prior, and regression slopes ``N(0, 1)``. With a
+typical sample (10–30 subjects) the **group-SD prior is not swamped by the
+data**, so its scale effectively sets how much subjects are shrunk towards
+the group mean. If your inputs are in units where the parameters are far
+from 1, that scale is wrong by orders of magnitude:
+
+- **Inputs too large** (e.g. stimulus differences of ~1000 ms, Hz, CHF):
+  ``nu`` and ``bias`` are ~1000, so a group SD of ~0.25 forces **near-total
+  shrinkage** — every subject collapses onto the group mean.
+- **Inputs too small** (e.g. stimulus differences of ~10⁻³): ``bias`` is
+  ~10⁻³, the group-SD prior is ~250× wider than any plausible spread, and there is
+  **effectively no shrinkage** — the hierarchy does nothing. (``nu`` is
+  partly protected here: below ~1 the softplus is close to ``exp``, so its
+  group SD acts roughly on ``log(nu)``. Above ~1 softplus is close to the
+  identity, which is why large units hit ``nu`` hard.)
+
+The fix is to **standardize the inputs** so that the quantity a parameter
+lives in is of order 1, fit, and rescale the parameters back:
+
+.. code-block:: python
+
+    scale = (df['x2'] - df['x1']).std()       # or a meaningful unit (e.g. 100 ms)
+    df_fit = df.assign(x1=df['x1'] / scale, x2=df['x2'] / scale)
+    model = PsychophysicalModel(paradigm=df_fit)
+    model.build_estimation_model(data=df_fit)
+    idata = model.sample()
+    # nu and bias are in units of `scale`: multiply back for reporting
+    nu_raw = idata.posterior['nu'] * scale
+
+Only the *scale* matters, not the location (the psychophysical model depends
+on ``x2 - x1``). When you compare several tasks, standardize each task
+separately (or fit them in a common, order-1 unit) so the priors mean the same
+thing in each.
+
+Which models are affected:
+
+- **Linear-unit models** — ``Psychophysical*`` (``x1``/``x2``): ``nu`` and
+  ``bias`` are in the units of ``x``. ``ProspectTheoryModel`` and
+  ``LossAversionModel`` also take raw amounts and have priors / grids written
+  for amounts of roughly 1–100; check they match your units.
+- **Continuous regressors** in any ``*RegressionModel``: a covariate with SD
+  300 implies a slope of ~1/300 under an ``N(0, 1)`` prior. z-score it (or use
+  a meaningful unit). Binary / contrast-coded factors are fine as they are.
+- **Not affected**: the magnitude and risky-choice Bayesian-observer models
+  (``MagnitudeComparison*``, ``Risk*``, flex / power-law, DDM / race
+  variants) work on ``log(n)``, so a change of units is a constant shift that
+  the prior mean absorbs; noise is a Weber fraction.
+
+bauer raises a ``UserWarning`` from :meth:`build_estimation_model` when the
+typical stimulus difference (psychophysics) or a continuous regressor's SD
+falls outside ``model.input_scale_range`` (default ``(0.2, 5)``). Silence it
+with ``model.warn_on_input_scale = False`` if the units are deliberate (e.g.
+you also passed matching custom priors).
+
 Using your own data
 -------------------
 

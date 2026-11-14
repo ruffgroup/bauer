@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Usage" href="usage.html"><link rel="prev" title="Lesson 10: Fixed vs random effects (fixed_regressors / random_regressors)" href="tutorial/lesson10_fixed_vs_random_effects.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>API Reference - bauer 0.6.0 documentation</title>
+        <title>API Reference - bauer 0.6.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">bauer 0.6.0 documentation</div></a>
+      <a href="index.html"><div class="brand">bauer 0.6.1 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">bauer 0.6.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.6.1 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -510,6 +510,11 @@ geometry without the logit funnel (the per-subject scale is set by the
 <p>Parameters <code class="docutils literal notranslate"><span class="pre">nu</span></code> (discrimination sensitivity, softplus-transformed) and <code class="docutils literal notranslate"><span class="pre">bias</span></code>
 (decision criterion) describe the probability of choosing option 2 given stimuli x1 and x2.
 Paradigm requires columns <code class="docutils literal notranslate"><span class="pre">x1</span></code>, <code class="docutils literal notranslate"><span class="pre">x2</span></code>, and <code class="docutils literal notranslate"><span class="pre">choice</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">nu</span></code> and <code class="docutils literal notranslate"><span class="pre">bias</span></code> are in the raw units of <code class="docutils literal notranslate"><span class="pre">x</span></code>, while the default priors
+(notably the HalfNormal(0.25) group-SD prior) assume order-1 parameters.
+<strong>Standardize x so that x2 - x1 is of order 1</strong> (e.g. divide by its SD);
+otherwise hierarchical shrinkage is near-total (large units) or absent
+(small units). A warning is raised when this looks off.</p>
 </dd></dl>
 
 <dl class="py class">
@@ -1425,7 +1430,7 @@ draw a dashed horizontal line at the group-mean posterior mean.</p></li>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=8fa8b3e9"></script>
+</div><script src="_static/documentation_options.js?v=2bd037f0"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

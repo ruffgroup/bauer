@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Estimation tasks (continuous reports)" href="estimation_task.html"><link rel="prev" title="Installation" href="installation.html">
 
     <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
-        <title>Architecture &amp; Concepts - bauer 0.6.0 documentation</title>
+        <title>Architecture &amp; Concepts - bauer 0.6.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">bauer 0.6.0 documentation</div></a>
+      <a href="index.html"><div class="brand">bauer 0.6.1 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">bauer 0.6.0 documentation</span>
+  <span class="sidebar-brand-text">bauer 0.6.1 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -348,6 +348,61 @@ the WFPT likelihood has a flat, zero-gradient region when the non-decision
 time exceeds the fastest RT, and the sampler gets stuck there.</p></li>
 </ul>
 </section>
+<section id="scale-your-inputs-to-order-1">
+<span id="input-scaling"></span><h2>Scale your inputs to order 1<a class="headerlink" href="#scale-your-inputs-to-order-1" title="Link to this heading">¶</a></h2>
+<p>bauer’s default priors assume that every free parameter is <strong>of order 1</strong>:
+group means get <code class="docutils literal notranslate"><span class="pre">Normal(mu,</span> <span class="pre">0.5–10)</span></code> priors, group SDs a
+<code class="docutils literal notranslate"><span class="pre">HalfNormal(0.25)</span></code> prior, and regression slopes <code class="docutils literal notranslate"><span class="pre">N(0,</span> <span class="pre">1)</span></code>. With a
+typical sample (10–30 subjects) the <strong>group-SD prior is not swamped by the
+data</strong>, so its scale effectively sets how much subjects are shrunk towards
+the group mean. If your inputs are in units where the parameters are far
+from 1, that scale is wrong by orders of magnitude:</p>
+<ul class="simple">
+<li><p><strong>Inputs too large</strong> (e.g. stimulus differences of ~1000 ms, Hz, CHF):
+<code class="docutils literal notranslate"><span class="pre">nu</span></code> and <code class="docutils literal notranslate"><span class="pre">bias</span></code> are ~1000, so a group SD of ~0.25 forces <strong>near-total
+shrinkage</strong> — every subject collapses onto the group mean.</p></li>
+<li><p><strong>Inputs too small</strong> (e.g. stimulus differences of ~10⁻³): <code class="docutils literal notranslate"><span class="pre">bias</span></code> is
+~10⁻³, the group-SD prior is ~250× wider than any plausible spread, and there is
+<strong>effectively no shrinkage</strong> — the hierarchy does nothing. (<code class="docutils literal notranslate"><span class="pre">nu</span></code> is
+partly protected here: below ~1 the softplus is close to <code class="docutils literal notranslate"><span class="pre">exp</span></code>, so its
+group SD acts roughly on <code class="docutils literal notranslate"><span class="pre">log(nu)</span></code>. Above ~1 softplus is close to the
+identity, which is why large units hit <code class="docutils literal notranslate"><span class="pre">nu</span></code> hard.)</p></li>
+</ul>
+<p>The fix is to <strong>standardize the inputs</strong> so that the quantity a parameter
+lives in is of order 1, fit, and rescale the parameters back:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">scale</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">'x2'</span><span class="p">]</span> <span class="o">-</span> <span class="n">df</span><span class="p">[</span><span class="s1">'x1'</span><span class="p">])</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>       <span class="c1"># or a meaningful unit (e.g. 100 ms)</span>
+<span class="n">df_fit</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">x1</span><span class="o">=</span><span class="n">df</span><span class="p">[</span><span class="s1">'x1'</span><span class="p">]</span> <span class="o">/</span> <span class="n">scale</span><span class="p">,</span> <span class="n">x2</span><span class="o">=</span><span class="n">df</span><span class="p">[</span><span class="s1">'x2'</span><span class="p">]</span> <span class="o">/</span> <span class="n">scale</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">PsychophysicalModel</span><span class="p">(</span><span class="n">paradigm</span><span class="o">=</span><span class="n">df_fit</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">build_estimation_model</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">df_fit</span><span class="p">)</span>
+<span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span>
+<span class="c1"># nu and bias are in units of `scale`: multiply back for reporting</span>
+<span class="n">nu_raw</span> <span class="o">=</span> <span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">'nu'</span><span class="p">]</span> <span class="o">*</span> <span class="n">scale</span>
+</pre></div>
+</div>
+<p>Only the <em>scale</em> matters, not the location (the psychophysical model depends
+on <code class="docutils literal notranslate"><span class="pre">x2</span> <span class="pre">-</span> <span class="pre">x1</span></code>). When you compare several tasks, standardize each task
+separately (or fit them in a common, order-1 unit) so the priors mean the same
+thing in each.</p>
+<p>Which models are affected:</p>
+<ul class="simple">
+<li><p><strong>Linear-unit models</strong> — <code class="docutils literal notranslate"><span class="pre">Psychophysical*</span></code> (<code class="docutils literal notranslate"><span class="pre">x1</span></code>/<code class="docutils literal notranslate"><span class="pre">x2</span></code>): <code class="docutils literal notranslate"><span class="pre">nu</span></code> and
+<code class="docutils literal notranslate"><span class="pre">bias</span></code> are in the units of <code class="docutils literal notranslate"><span class="pre">x</span></code>. <code class="docutils literal notranslate"><span class="pre">ProspectTheoryModel</span></code> and
+<code class="docutils literal notranslate"><span class="pre">LossAversionModel</span></code> also take raw amounts and have priors / grids written
+for amounts of roughly 1–100; check they match your units.</p></li>
+<li><p><strong>Continuous regressors</strong> in any <code class="docutils literal notranslate"><span class="pre">*RegressionModel</span></code>: a covariate with SD
+300 implies a slope of ~1/300 under an <code class="docutils literal notranslate"><span class="pre">N(0,</span> <span class="pre">1)</span></code> prior. z-score it (or use
+a meaningful unit). Binary / contrast-coded factors are fine as they are.</p></li>
+<li><p><strong>Not affected</strong>: the magnitude and risky-choice Bayesian-observer models
+(<code class="docutils literal notranslate"><span class="pre">MagnitudeComparison*</span></code>, <code class="docutils literal notranslate"><span class="pre">Risk*</span></code>, flex / power-law, DDM / race
+variants) work on <code class="docutils literal notranslate"><span class="pre">log(n)</span></code>, so a change of units is a constant shift that
+the prior mean absorbs; noise is a Weber fraction.</p></li>
+</ul>
+<p>bauer raises a <code class="docutils literal notranslate"><span class="pre">UserWarning</span></code> from <code class="xref py py-meth docutils literal notranslate"><span class="pre">build_estimation_model()</span></code> when the
+typical stimulus difference (psychophysics) or a continuous regressor’s SD
+falls outside <code class="docutils literal notranslate"><span class="pre">model.input_scale_range</span></code> (default <code class="docutils literal notranslate"><span class="pre">(0.2,</span> <span class="pre">5)</span></code>). Silence it
+with <code class="docutils literal notranslate"><span class="pre">model.warn_on_input_scale</span> <span class="pre">=</span> <span class="pre">False</span></code> if the units are deliberate (e.g.
+you also passed matching custom priors).</p>
+</section>
 <section id="using-your-own-data">
 <h2>Using your own data<a class="headerlink" href="#using-your-own-data" title="Link to this heading">¶</a></h2>
 <p>Point a model at any DataFrame that follows the conventions above:</p>
@@ -507,6 +562,7 @@ uncertainty, not a failed fit.</p>
 <li><a class="reference internal" href="#model-families">Model families</a></li>
 <li><a class="reference internal" href="#parameter-transforms">Parameter transforms</a></li>
 <li><a class="reference internal" href="#data-conventions">Data conventions</a></li>
+<li><a class="reference internal" href="#scale-your-inputs-to-order-1">Scale your inputs to order 1</a></li>
 <li><a class="reference internal" href="#using-your-own-data">Using your own data</a></li>
 <li><a class="reference internal" href="#typical-workflow">Typical workflow</a></li>
 <li><a class="reference internal" href="#sampler-backends-and-speed">Sampler backends and speed</a></li>
@@ -522,7 +578,7 @@ uncertainty, not a failed fit.</p>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=8fa8b3e9"></script>
+</div><script src="_static/documentation_options.js?v=2bd037f0"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
