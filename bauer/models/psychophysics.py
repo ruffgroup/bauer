@@ -11,10 +11,20 @@ class PsychophysicalModel(BaseModel):
     Parameters ``nu`` (discrimination sensitivity, softplus-transformed) and ``bias``
     (decision criterion) describe the probability of choosing option 2 given stimuli x1 and x2.
     Paradigm requires columns ``x1``, ``x2``, and ``choice``.
+
+    ``nu`` and ``bias`` are in the raw units of ``x``, while the default priors
+    (notably the HalfNormal(0.25) group-SD prior) assume order-1 parameters.
+    **Standardize x so that x2 - x1 is of order 1** (e.g. divide by its SD);
+    otherwise hierarchical shrinkage is near-total (large units) or absent
+    (small units). A warning is raised when this looks off.
     """
 
     paradigm_keys = ['x1', 'x2']
     base_parameters = ['nu', 'bias']
+    # nu and bias are in the raw units of x: warn if x2 - x1 is far from
+    # order 1 (the default priors would then mis-regularize; see
+    # BaseModel._check_input_scales).
+    scale_sensitive_keys = ('x1', 'x2')
 
     def __init__(self, paradigm=None):
         super().__init__(paradigm)
