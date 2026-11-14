@@ -114,6 +114,17 @@ class BaseModel(object):
     # accumulators (DDM/RDM) already use posterior_mean_sd internally.
     consistent_choice_noise = False
 
+    # Input-scale check (see ``_check_input_scales``). The default priors --
+    # Normal(., 0.5-10) on group means, HalfNormal(0.25) on group SDs, N(0, 1)
+    # on regression slopes -- assume parameters of order 1. Models whose
+    # parameters live in the *raw units* of some paradigm columns list them in
+    # ``scale_sensitive_keys``; if the typical stimulus difference falls outside
+    # ``input_scale_range``, a warning tells the user to standardize. Models in
+    # log-space (magnitude, risk) are scale-invariant and leave this empty.
+    scale_sensitive_keys: tuple = ()
+    input_scale_range: tuple = (0.2, 5.0)
+    warn_on_input_scale: bool = True
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         # Wrap each subclass's own __init__ (if it defines one) so the
@@ -239,10 +250,69 @@ class BaseModel(object):
 
         with pm.Model(coords=coords) as self.estimation_model:
             paradigm = self._get_paradigm(paradigm=data)
+            if self.warn_on_input_scale:
+                self._check_input_scales(data, hierarchical=hierarchical)
             self.set_paradigm(paradigm)
             self.build_priors(hierarchical=hierarchical, flat_prior=flat_prior)
             parameters = self.get_parameter_values()
             self.build_likelihood(parameters, save_p_choice=save_p_choice)
+
+    def _input_scale_message(self, what, scale, hierarchical, param_scale=None):
+        """Build the warning text. ``scale`` is the input's typical scale;
+        ``param_scale`` the implied parameter scale (defaults to ``scale``;
+        for a regression slope it is ``1 / scale``)."""
+        lo, hi = self.input_scale_range
+        if param_scale is None:
+            param_scale = scale
+        direction = 'large' if scale > hi else 'small'
+        consequence = (
+            "The parameters it drives will be of order {:.2g}, but bauer's "
+            "default priors assume order-1 parameters (group-SD prior "
+            "HalfNormal(0.25), regression slopes N(0, 1)). ".format(param_scale))
+        if hierarchical:
+            if param_scale > 1:
+                consequence += ("The group-SD prior is then far too narrow: "
+                                "subjects get shrunk (almost) completely onto "
+                                "the group mean, whatever the data say. ")
+            else:
+                consequence += ("The group-SD prior is then far too wide: "
+                                "with a typical number of subjects the data "
+                                "cannot constrain it, so there is effectively "
+                                "NO shrinkage towards the group mean. ")
+        return (f"{type(self).__name__}: {what} has a typical scale of "
+                f"{scale:.3g}, which is {direction} (outside "
+                f"{lo:g}-{hi:g}). " + consequence +
+                "Standardize the input so it is of order 1 (e.g. divide by "
+                "its SD or by a meaningful unit) and rescale the fitted "
+                "parameters back afterwards. Silence with "
+                "`model.warn_on_input_scale = False` or widen "
+                "`model.input_scale_range`.")
+
+    def _check_input_scales(self, data, hierarchical=True):
+        """Warn when scale-sensitive paradigm columns are far from order 1.
+
+        The scale used is the SD of the trialwise difference between the
+        ``scale_sensitive_keys`` (``x2 - x1`` for psychophysics): sensitivity
+        and bias parameters are in those units. A constant shift of all
+        stimuli does not matter, only their scale.
+        """
+        keys = [k for k in self.scale_sensitive_keys
+                if k in getattr(data, 'columns', [])]
+        if not keys:
+            return
+        vals = [np.asarray(data[k], dtype=float) for k in keys]
+        if len(vals) >= 2:
+            scale = np.nanstd(vals[1] - vals[0])
+            if not np.isfinite(scale) or scale == 0:
+                scale = np.nanstd(np.concatenate(vals))
+        else:
+            scale = np.nanstd(vals[0])
+        lo, hi = self.input_scale_range
+        if np.isfinite(scale) and scale > 0 and not (lo <= scale <= hi):
+            what = (f"the stimulus difference {keys[-1]} - {keys[0]}"
+                    if len(keys) >= 2 else f"column {keys[0]!r}")
+            warnings.warn(self._input_scale_message(what, scale, hierarchical),
+                          UserWarning, stacklevel=3)
 
     def build_priors(self, hierarchical=True, flat_prior=False):
 
@@ -1110,10 +1180,42 @@ class LapseModel(BaseModel):
     lapse_mu_mean = 0.02
     lapse_mu_kappa = 8.0
     lapse_kappa_sd = 3.0
+    # ``p_lapse`` mirrors the DDM/RDM ``p_outlier`` API:
+    #   - None (default): the per-subject lapse rate is estimated
+    #     hierarchically under ``lapse_group`` (unchanged behaviour).
+    #   - a float in [0, 1): the lapse rate is FIXED at that value and is not
+    #     a sampled parameter, so it cannot funnel. Useful on hard geometries
+    #     (e.g. full-prior estimation) and when you would rather assume a small
+    #     lapse than estimate a weakly identified one.
+    # Set it on the class (subclass) or on an instance; setting it on an
+    # instance refreshes ``free_parameters``, so do it before
+    # ``build_estimation_model``.
+    _p_lapse = None
+
+    @property
+    def p_lapse(self):
+        return self._p_lapse
+
+    @p_lapse.setter
+    def p_lapse(self, val):
+        if val is not None:
+            if isinstance(val, bool) or not isinstance(val, (int, float, np.floating)):
+                raise TypeError(f"p_lapse must be None or a float, got {val!r}.")
+            if not 0. <= float(val) < 1.:
+                raise ValueError(f"fixed p_lapse must lie in [0, 1), got {val}.")
+            val = float(val)
+        self._p_lapse = val
+        if hasattr(self, 'free_parameters'):
+            self.free_parameters = self.get_free_parameters()
+
+    def _fixed_p_lapse(self):
+        return self._p_lapse
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
 
+        if self._fixed_p_lapse() is not None:
+            return pars
         pars['p_lapse'] = _lapse_param_spec(_effective_lapse_group(self),
                                             self.lapse_mu_mean,
                                             self.lapse_mu_kappa,
@@ -1128,7 +1230,9 @@ class LapseModel(BaseModel):
 
     def get_model_inputs(self, parameters):
         model_inputs = super().get_model_inputs(parameters)
-        model_inputs['p_lapse'] = parameters['p_lapse']
+        fixed = self._fixed_p_lapse()
+        model_inputs['p_lapse'] = (fixed if fixed is not None
+                                   else parameters['p_lapse'])
         return model_inputs
 
 
@@ -1351,6 +1455,33 @@ class RegressionModel(BaseModel):
             self._compute_random_cols(paradigm, key, dm)
 
         return paradigm_
+
+    def _check_input_scales(self, data, hierarchical=True):
+        """Also warn on continuous regressors far from order 1.
+
+        Slopes get an N(0, 1) prior (and a HalfNormal(0.25) group SD when they
+        carry a random effect), so a covariate in, say, milliseconds or CHF
+        makes the slope prior absurdly tight or wide. Binary / contrast-coded
+        columns (<= 2 unique values) are skipped.
+        """
+        super()._check_input_scales(data, hierarchical=hierarchical)
+        lo, hi = self.input_scale_range
+        flagged = {}
+        for param, dm in self.design_matrices.items():
+            arr = np.asarray(dm, dtype=float)
+            for j, nm in enumerate(dm.design_info.column_names):
+                if nm == 'Intercept' or nm in flagged:
+                    continue
+                col = arr[:, j]
+                if len(np.unique(col[np.isfinite(col)])) <= 2:
+                    continue
+                sd = np.nanstd(col)
+                if np.isfinite(sd) and sd > 0 and not (lo <= sd <= hi):
+                    flagged[nm] = (param, sd)
+        for nm, (param, sd) in flagged.items():
+            warnings.warn(self._input_scale_message(
+                f"continuous regressor '{nm}' (on {param!r})", sd,
+                hierarchical, param_scale=1. / sd), UserWarning, stacklevel=3)
 
     def build_design_matrix(self, data, parameter):
         if parameter not in self.regressors:

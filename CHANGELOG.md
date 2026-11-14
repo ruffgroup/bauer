@@ -3,6 +3,23 @@
 All notable changes to **bauer** are documented here. This project loosely
 follows [Keep a Changelog](https://keepachangelog.com/) and semantic versioning.
 
+## 0.6.1 (2026-11-14)
+
+### Added
+- Input-scale warning in `BaseModel.build_estimation_model`: a `UserWarning`
+  when `x2 - x1` (`Psychophysical*`) or a continuous regressor (any
+  `*RegressionModel`) has a typical scale outside `input_scale_range`
+  (default `(0.2, 5)`). Default priors assume order-1 parameters; the fixed
+  `HalfNormal(0.25)` group-SD prior otherwise gives near-total shrinkage
+  (large units) or none (small units). New class attributes
+  `scale_sensitive_keys`, `input_scale_range`, `warn_on_input_scale`.
+- Docs: "Scale your inputs to order 1" in `docs/concepts.rst`.
+- Fixable static-choice lapse (PR #4): set `p_lapse` to a float in [0, 1) on
+  any `*LapseModel` (class attribute or instance, before
+  `build_estimation_model`) to fix the lapse rate; it is then not sampled, so
+  it cannot funnel. Mirrors the DDM/RDM `p_outlier` API. Default `None`
+  (hierarchical per-subject lapse) is unchanged.
+
 ## 0.5.2 (2026-11-02)
 
 A new observer model for magnitude *estimation* (a slider / integer response

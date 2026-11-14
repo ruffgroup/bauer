@@ -630,3 +630,78 @@ def test_consistent_choice_noise_builds_and_differs(paradigm_magnitude):
     assert not np.isclose(lp_default, lp_consistent), (
         'consistent_choice_noise=True did not change the choice likelihood — '
         'the flag is being ignored.')
+
+
+# ─── Input-scale warning ──────────────────────────────────────────────────────
+
+def _psychophysics_data(scale, n_subjects=4, n_trials=40, seed=0):
+    rng = np.random.default_rng(seed)
+    frames = []
+    for s in range(n_subjects):
+        x1 = np.full(n_trials, 10. * scale)
+        x2 = x1 + rng.normal(0, scale, n_trials)
+        frames.append(pd.DataFrame({'subject': s, 'x1': x1, 'x2': x2,
+                                    'choice': rng.random(n_trials) < .5,
+                                    'cov': rng.normal(0, 300, n_trials)}))
+    return pd.concat(frames).set_index('subject')
+
+
+def _scale_warnings(model, data):
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        model.build_estimation_model(data)
+    return [str(x.message) for x in w
+            if issubclass(x.category, UserWarning)
+            and 'typical scale' in str(x.message)]
+
+
+@pytest.mark.parametrize('scale, n_expected', [(0.05, 1), (1., 0), (1000., 1)])
+def test_psychophysics_input_scale_warning(scale, n_expected):
+    from bauer.models import PsychophysicalModel
+    data = _psychophysics_data(scale)
+    msgs = _scale_warnings(PsychophysicalModel(data), data)
+    assert len(msgs) == n_expected, msgs
+
+
+def test_input_scale_warning_can_be_silenced_and_flags_regressors():
+    from bauer.models import PsychophysicalModel, PsychophysicalRegressionModel
+    data = _psychophysics_data(1000.)
+    m = PsychophysicalModel(data)
+    m.warn_on_input_scale = False
+    assert _scale_warnings(m, data) == []
+
+    data = _psychophysics_data(1.)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', DeprecationWarning)
+        m = PsychophysicalRegressionModel(data, regressors={'nu': 'cov'})
+    msgs = _scale_warnings(m, data)
+    assert len(msgs) == 1 and "regressor 'cov'" in msgs[0], msgs
+
+
+# ─── Fixed static-choice lapse (p_lapse = float) ──────────────────────────────
+
+def test_fixed_p_lapse_is_not_sampled_and_enters_likelihood():
+    from bauer.models import PsychophysicalLapseModel
+    data = _psychophysics_data(1.)
+    data['x1'] = 0.
+
+    def logp(p_lapse):
+        m = PsychophysicalLapseModel(data)
+        m.p_lapse = p_lapse
+        m.build_estimation_model(data)
+        names = [v.name for v in m.estimation_model.free_RVs]
+        if p_lapse is None:
+            assert 'p_lapse_mu' in names
+            return None
+        assert not any('lapse' in n for n in names), names
+        return m.estimation_model.compile_logp()(
+            m.estimation_model.initial_point())
+
+    logp(None)
+    assert not np.isclose(logp(0.0), logp(0.3))
+
+    m = PsychophysicalLapseModel(data)
+    with pytest.raises(ValueError):
+        m.p_lapse = 1.5
+    with pytest.raises(TypeError):
+        m.p_lapse = True

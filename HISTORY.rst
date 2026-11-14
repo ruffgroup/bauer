@@ -2,7 +2,25 @@
 History
 =======
 
-0.6.0 (unreleased)
+0.6.1 (2026-11-14)
+------------------
+
+* **Input-scale warning.** ``build_estimation_model`` now warns when inputs are far
+  from order 1. bauer's default priors (notably the ``HalfNormal(0.25)`` group-SD
+  prior and ``N(0, 1)`` regression slopes) assume order-1 parameters; with ~10-30
+  subjects the group-SD prior is not swamped by the data, so raw units silently set
+  the amount of shrinkage. Stimulus differences of ~10^3 shrink every subject onto
+  the group mean; ~10^-3 gives no shrinkage at all. Checked: ``x2 - x1`` in the
+  ``Psychophysical*`` models, and continuous regressors in every
+  ``*RegressionModel``. Range ``model.input_scale_range = (0.2, 5)``; silence with
+  ``model.warn_on_input_scale = False``. Log-space magnitude / risk models are
+  unaffected. **Fix: standardize the inputs, fit, rescale parameters back.** New
+  docs section :ref:`input-scaling`.
+* **Fixable static-choice lapse** (from PR #4): ``model.p_lapse = 0.05`` on any
+  ``*LapseModel`` fixes the lapse rate instead of estimating it hierarchically
+  (mirrors the DDM/RDM ``p_outlier`` API). Default ``None`` is unchanged.
+
+0.6.0 (2026-11-10)
 ------------------
 
 Tools for repeated-measures designs (conditions, drugs, sessions) and for reading
