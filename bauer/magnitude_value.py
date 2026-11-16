@@ -198,6 +198,7 @@ class MagnitudeValueModel(EstimationBaseModel):
         paradigm_ = super()._get_paradigm(paradigm, subject_mapping)
         u = (paradigm_['number'].astype(float) - self.lo) / (self.hi - self.lo)
         paradigm_['stimulus_ix'] = np.clip(np.round(u / self.du), 0, self.grid_resolution - 1).astype(int)
+        self._n_sub = int(np.max(paradigm_['subject_ix'])) + 1
         paradigm_['mapping_ix'] = np.array([self.mappings.index(str(m)) for m in paradigm['mapping'].astype(str)],
                                            dtype=int)
         k = paradigm_['response'] / self.round_step
@@ -232,7 +233,7 @@ class MagnitudeValueModel(EstimationBaseModel):
 
     def _response_masses(self, inputs):
         """(S, C, N_number, N_response) probability masses of the answer (before rounding and lapse)."""
-        n_sub = len(pm.Model.get_context().coords.get('subject', [None]))
+        n_sub = self._n_sub  # from the paradigm: prediction models built without coords need it too
         u = pt.as_tensor_variable(self.u_grid)
         sigma_per, sigma_rep = self._stage_sds(inputs, n_sub)
         G = pt.as_tensor_variable(self.G)[None]                                        # (1, C, N)
