@@ -12,7 +12,8 @@ Generative model, per trial with stimulus x on [lo, hi] and mapping G (concave /
        value prior this is a Jensen pull toward the diagonal on a curved G.
        Without it, v_hat = G(x_hat).
     3. Response: v_hat + Gaussian response noise ``sigma_motor``, truncated to [lo, hi]; with probability ``rho``
-       rounded to a multiple of ``round_step``, otherwise to ``response_bin_width``; a fixed uniform lapse.
+       rounded to a multiple of ``round_step`` (values below the lowest multiple in the range round up to it),
+       otherwise to ``response_bin_width``; a fixed uniform lapse.
 
 All noise SDs are in % of the code range (order 1 to 10), so priors do not depend on the stimulus range. With both
 stages (``share_parameterisation``) the sampler sees the total noise T and the number stage's share s of its
@@ -119,6 +120,9 @@ class MagnitudeValueModel(EstimationBaseModel):
         the resolution ceiling of every noise SD (the cell kernel makes the limit smooth, not a cliff).
     """
 
+    # Default inits jitter the untransformed parameters around 0; on the hierarchical grid model that left 2 of 4
+    # chains frozen (step size ~1e-17, a subject's noise SD near 0) in every design-recovery run. MAP + jitter is the fix.
+    recommended_init = 'mapjitter'
     paradigm_keys = ['number']
     warn_on_input_scale = False  # noise SDs are in % of range by construction
 
@@ -311,7 +315,11 @@ class MagnitudeValueModel(EstimationBaseModel):
         p_exact = cdf_at(r + self.response_bin_width / 2) - cdf_at(r - self.response_bin_width / 2)
         if self.fit_rounding:
             rho = inputs['rho'][inputs['subject_ix']]
-            p_round = (cdf_at(r + self.round_step / 2) - cdf_at(r - self.round_step / 2)) * model['is_round']
+            # A rounded answer r owns [r - step/2, r + step/2]; the lowest multiple in the range also owns everything
+            # below it (a value of 2 rounded to the nearest 5 is answered as 5, not 0)
+            lowest = self.round_step * np.ceil(self.lo / self.round_step)
+            lower = pt.switch(pt.le(r, lowest + 1e-6), self.lo - d, r - self.round_step / 2)
+            p_round = (cdf_at(r + self.round_step / 2) - cdf_at(lower)) * model['is_round']
             p_answer = (1 - rho) * p_exact + rho * p_round
         else:
             p_answer = p_exact
