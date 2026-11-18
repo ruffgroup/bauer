@@ -36,6 +36,11 @@ The plots share their vocabulary: ``by`` (the column that defines rows or panels
 default ``'condition'``), ``order``, ``palette`` (a dict level → colour, or one colour),
 ``level_labels`` and ``xlabel`` / ``xlabels``.
 
+The figures below come from a **simulated** experiment: 24 participants, each doing a
+two-alternative discrimination task under placebo, 5 mg and 10 mg in each of two
+sessions, where the higher doses increase both noise and bias. ``docs/make_usage_figures.py``
+regenerates them.
+
 Convergence first
 ~~~~~~~~~~~~~~~~~
 
@@ -63,18 +68,32 @@ For a regression model such as
 
     CONDITIONS = ['placebo', '5 mg', '10 mg']
     PALETTE = {'placebo': '0.4', '5 mg': '#3B5BA5', '10 mg': '#C0392B'}
+    COND = dict(order=CONDITIONS, palette=PALETTE, level_labels={'placebo': 'Placebo'})
 
     # One row per condition; session_c = 0 is "an average session"
     conds = pd.DataFrame({'condition': CONDITIONS, 'session_c': 0.0})
     draws = model.conditionwise_draws(idata, conds, parameters=['nu', 'bias'])
 
     group = summarize_posterior(draws, ['parameter', 'condition'])   # mean, lo, hi, p_positive
-    plot_forest(group, ['nu', 'bias'], order=CONDITIONS, palette=PALETTE)
+    plot_forest(group, ['nu', 'bias'], xlabels={'nu': 'Noise ν', 'bias': 'Bias'}, **COND)
 
     # Each condition minus placebo, per draw; p_positive = P(effect > 0)
     effects = summarize_posterior(contrast_draws(draws, 'condition', 'placebo'),
                                   ['parameter', 'condition'])
-    plot_forest(effects, ['nu', 'bias'], order=CONDITIONS, palette=PALETTE, ref=0)
+    plot_forest(effects, ['nu', 'bias'], ref=0,
+                xlabels={'nu': 'Δ noise ν (vs. placebo)', 'bias': 'Δ bias (vs. placebo)'}, **COND)
+
+.. figure:: _static/usage/forest_group.png
+   :width: 75%
+   :alt: Forest plot of group-level noise and bias for placebo, 5 mg and 10 mg.
+
+   ``plot_forest`` on the group-level summary. Dot = posterior mean, line = 95% HDI.
+
+.. figure:: _static/usage/forest_contrast.png
+   :width: 75%
+   :alt: Forest plot of the 5 mg and 10 mg effects relative to placebo on noise and bias.
+
+   The same plot for the contrasts against placebo, with ``ref=0`` marking no effect.
 
 ``summarize_posterior`` needs every column that distinguishes rows *within* a draw in
 ``by``; it warns if you forget one rather than silently pooling. ``contrast_draws``
@@ -92,8 +111,13 @@ Subject level: sorted forest plot
     subj = summarize_posterior(
         model.conditionwise_draws(idata, conds, parameters=['nu'], group=False),
         ['parameter', 'subject', 'condition'])
-    plot_sorted_forest(subj, 'nu', 'Noise ν', order=CONDITIONS, palette=PALETTE,
-                       sort_by='placebo', group_summary=group)
+    plot_sorted_forest(subj, 'nu', 'Noise ν', sort_by='placebo', group_summary=group, **COND)
+
+.. figure:: _static/usage/forest_subjects.png
+   :width: 100%
+   :alt: Per-participant noise estimates in three panels, sorted by the placebo estimate.
+
+   ``plot_sorted_forest``: every participant's noise in each condition.
 
 One panel per condition, one row per participant (dot = posterior mean, line = 95%
 HDI). Participants are sorted once, by their ``sort_by`` value, and keep their row in
@@ -125,18 +149,40 @@ checks.
     ppc['y'] = ppc['simulated_choice'].astype(float)
     data = df.reset_index().assign(y=lambda d: d['choice'].astype(float))
 
+    # Axis labels, plus dotted reference lines at chance and at no stimulus difference
+    AXES = dict(xlabel='Stimulus difference (x2 − x1)', ylabel='P(chose option 2)',
+                ref=0.5, xref=0)
+
     # Group level: data as dots, model as line + 95% band
     pred = ppc_summary(ppc, ['condition', 'delta'], 'y')
     obs = ppc_observed(data, ['condition', 'delta'], 'y')
     print(f"Coverage: {ppc_coverage(pred, obs, ['condition', 'delta']):.0%}")
-    plot_ppc_panels(pred, obs, 'delta', order=CONDITIONS, palette=PALETTE)
-    plot_ppc_overlay(pred, obs, 'delta', order=CONDITIONS, palette=PALETTE)
+    plot_ppc_panels(pred, obs, 'delta', **COND, **AXES)
+    plot_ppc_overlay(pred, obs, 'delta', **COND, **AXES)
 
     # Subject level: small multiples, one panel per participant
     pred_s = ppc_summary(ppc, ['delta'], 'y', subject_level=True)
     obs_s = ppc_observed(data, ['delta'], 'y', subject_level=True)
     print(f"Coverage: {ppc_coverage(pred_s, obs_s, ['subject', 'delta']):.0%}")
-    plot_subject_ppc(pred_s, obs_s, 'delta')
+    plot_subject_ppc(pred_s, obs_s, 'delta', **AXES)
+
+.. figure:: _static/usage/ppc_panels.png
+   :width: 100%
+   :alt: Observed and predicted psychometric curves in one panel per condition.
+
+   ``plot_ppc_panels``: observed choices (dots) against the model (line + 95% band).
+
+.. figure:: _static/usage/ppc_overlay.png
+   :width: 50%
+   :alt: Observed and predicted psychometric curves of all conditions on one axis.
+
+   ``plot_ppc_overlay``: the same curves on one axis, to compare conditions directly.
+
+.. figure:: _static/usage/ppc_subjects.png
+   :width: 100%
+   :alt: Observed and predicted psychometric curves in one small panel per participant.
+
+   ``plot_subject_ppc``: one panel per participant.
 
 The same works for any simulated quantity: ``simulated_rt`` from the DDM / race
 models, ``simulated_response`` from :class:`~bauer.models.ReproductionModel`, or a
