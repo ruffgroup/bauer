@@ -33,6 +33,13 @@ Priors have few parameters, so that the data can pin them down:
 
 Each stage codes efficiently for its own prior (the code is the prior's CDF) and decodes with it.
 
+``formats``: several stimulus formats (e.g. ('numeral', 'dots')) in one fit, named in a 'format' column. The number
+stage gets its own noise and code exponent per format (``sigma_per_<format>``, ``beta_<format>``); the value stage,
+the value prior, the mapping shrinkage, response noise and rounding are shared, because they act on value, not on the
+stimulus. A format with a well-identified split (dots: large, compressive number noise) then pins the value-stage
+noise, and with it the split of a format that cannot pin it alone (numerals). Uses separate stage SDs (no
+``share_parameterisation``).
+
 ``fit_mapping_shrinkage``: the internal mapping is (1 - lambda) G + lambda * identity, an imperfectly learned curve
 pulled toward the diagonal (as ``mapping_shrinkage`` in :mod:`bauer.efficient_coding`).
 
@@ -129,7 +136,7 @@ class MagnitudeValueModel(EstimationBaseModel):
     def __init__(self, paradigm=None, perception=True, valuation=True, number_encoding='linear',
                  number_decoding_prior='efficient', value_prior='objective', share_parameterisation=True, stimulus_range=(1., 50.), curvature=2.79,
                  response_bin_width=1.0, round_step=5.0, fit_rounding=True, fit_mapping_shrinkage=False,
-                 grid_resolution=301, lapse_rate=0.01, **kwargs):
+                 grid_resolution=301, lapse_rate=0.01, formats=None, **kwargs):
         if number_encoding not in NUMBER_ENCODINGS:
             raise ValueError(f'number_encoding must be one of {NUMBER_ENCODINGS}')
         if number_decoding_prior not in NUMBER_DECODING_PRIORS:
@@ -139,7 +146,9 @@ class MagnitudeValueModel(EstimationBaseModel):
         self.perception, self.valuation = bool(perception), bool(valuation)
         self.number_encoding, self.number_decoding_prior = number_encoding, number_decoding_prior
         self.value_prior = value_prior
-        self.share_parameterisation = bool(share_parameterisation) and self.perception and self.valuation
+        self.formats = tuple(formats) if formats else None
+        self.share_parameterisation = (bool(share_parameterisation) and self.perception and self.valuation
+                                       and self.formats is None)
         self.lo, self.hi = map(float, stimulus_range)
         self.offset = max(0., 1. - self.lo)
         self.curvature = float(curvature)
@@ -157,7 +166,7 @@ class MagnitudeValueModel(EstimationBaseModel):
             pars.update(sigma_total=TOTAL_NOISE_PRIOR, share_per=SHARE_PRIOR)
         else:
             if self.perception:
-                pars['sigma_per'] = SIGMA_STAGE_PRIOR
+                pars.update({n: SIGMA_STAGE_PRIOR for n in self._per_format('sigma_per')})
             if self.valuation:
                 pars['sigma_rep'] = SIGMA_STAGE_PRIOR
         pars['sigma_motor'] = SIGMA_MOTOR_PRIOR
@@ -166,10 +175,14 @@ class MagnitudeValueModel(EstimationBaseModel):
         if self.fit_mapping_shrinkage:
             pars['mapping_shrinkage'] = MAPPING_SHRINKAGE_PRIOR
         if self.perception and self.number_encoding == 'power':
-            pars['beta'] = BETA_PRIOR
+            pars.update({n: BETA_PRIOR for n in self._per_format('beta')})
         if self.valuation and self.value_prior == 'mixture':
             pars['value_prior_uniform'] = VALUE_MIX_PRIOR
         return pars
+
+    def _per_format(self, name):
+        """Parameter names of a number-stage parameter: one, or one per format."""
+        return [name] if self.formats is None else [f'{name}_{f}' for f in self.formats]
 
     def get_model_inputs(self, parameters):
         model = pm.Model.get_context()
@@ -205,6 +218,14 @@ class MagnitudeValueModel(EstimationBaseModel):
         self._n_sub = int(np.max(paradigm_['subject_ix'])) + 1
         paradigm_['mapping_ix'] = np.array([self.mappings.index(str(m)) for m in paradigm['mapping'].astype(str)],
                                            dtype=int)
+        if self.formats is None:
+            paradigm_['format_ix'] = np.zeros(len(paradigm), dtype=int)
+        else:
+            unknown = set(paradigm['format'].astype(str)) - set(self.formats)
+            if unknown:
+                raise ValueError(f'formats {unknown} not in {self.formats}')
+            paradigm_['format_ix'] = np.array([self.formats.index(str(f)) for f in paradigm['format'].astype(str)],
+                                              dtype=int)
         k = paradigm_['response'] / self.round_step
         paradigm_['is_round'] = (np.abs(k - np.round(k)) < 1e-6).astype(float)
         return paradigm_
@@ -232,11 +253,12 @@ class MagnitudeValueModel(EstimationBaseModel):
         shape = lambda name: pt.specify_shape(inputs[name], (n_sub,))
         if self.share_parameterisation:
             total, share = shape('sigma_total'), shape('share_per')
-            return total * pt.sqrt(share), total * pt.sqrt(1 - share)
-        return (shape('sigma_per') if self.perception else None), (shape('sigma_rep') if self.valuation else None)
+            return [total * pt.sqrt(share)], total * pt.sqrt(1 - share)
+        per = [shape(n) for n in self._per_format('sigma_per')] if self.perception else None
+        return per, (shape('sigma_rep') if self.valuation else None)
 
     def _response_masses(self, inputs):
-        """(S, C, N_number, N_response) probability masses of the answer (before rounding and lapse)."""
+        """(S, F, C, N_number, N_response) probability masses of the answer (before rounding and lapse), F formats."""
         n_sub = self._n_sub  # from the paradigm: prediction models built without coords need it too
         u = pt.as_tensor_variable(self.u_grid)
         sigma_per, sigma_rep = self._stage_sds(inputs, n_sub)
@@ -266,36 +288,43 @@ class MagnitudeValueModel(EstimationBaseModel):
         else:
             to_value = tent(G, u, self.du)                                              # (S, C, N, N_value)
 
-        # Number stage: from the presented number to the decoded one, (S, N, N)
+        # Number stage, per format: from the presented number to the decoded one, (S, N, N)
+        n_formats = 1 if self.formats is None else len(self.formats)
         if self.perception:
             logx = np.log(self.x_grid + self.offset)[None, :]
-            if self.number_encoding == 'linear':
-                beta = pt.ones((n_sub, 1))
-            elif self.number_encoding == 'log':
-                beta = pt.zeros((n_sub, 1))
-            else:
-                beta = pt.specify_shape(inputs['beta'], (n_sub,))[:, None]
-            b = pt.switch(pt.lt(pt.abs(beta), 1e-4), 1e-4, beta)
-            f = pt.expm1(b * logx) / b                                                  # Box-Cox, (S, N)
-            F_x = (f - f[:, :1]) / (f[:, -1:] - f[:, :1])
-            if self.number_decoding_prior == 'efficient':
-                p_x = pt.exp((beta - 1) * logx)                                         # dF/dx
-            else:
-                p_x = pt.ones((n_sub, self.grid_resolution))
-            K = self._kernel(F_x, sigma_per[:, None, None])                             # (S, N, M)
-            post = K * p_x[:, :, None]
-            x_hat = pt.sum(post * u[None, :, None], axis=1) / (pt.sum(post, axis=1) + 1e-30)  # (S, M)
-            to_number = pt.einsum('snm,smk->snk', K, tent(x_hat, u, self.du))
-            to_value = pt.einsum('snk,sckv->scnv', to_number, to_value)
+            per_format = []
+            for f, beta_name in enumerate(self._per_format('beta')):
+                if self.number_encoding == 'linear':
+                    beta = pt.ones((n_sub, 1))
+                elif self.number_encoding == 'log':
+                    beta = pt.zeros((n_sub, 1))
+                else:
+                    beta = pt.specify_shape(inputs[beta_name], (n_sub,))[:, None]
+                b = pt.switch(pt.lt(pt.abs(beta), 1e-4), 1e-4, beta)
+                fx = pt.expm1(b * logx) / b                                             # Box-Cox, (S, N)
+                F_x = (fx - fx[:, :1]) / (fx[:, -1:] - fx[:, :1])
+                if self.number_decoding_prior == 'efficient':
+                    p_x = pt.exp((beta - 1) * logx)                                     # dF/dx
+                else:
+                    p_x = pt.ones((n_sub, self.grid_resolution))
+                K = self._kernel(F_x, sigma_per[f][:, None, None])                      # (S, N, M)
+                post = K * p_x[:, :, None]
+                x_hat = pt.sum(post * u[None, :, None], axis=1) / (pt.sum(post, axis=1) + 1e-30)  # (S, M)
+                to_number = pt.einsum('snm,smk->snk', K, tent(x_hat, u, self.du))
+                per_format.append(pt.einsum('snk,sckv->scnv', to_number, to_value))
+            to_value = pt.stack(per_format, axis=1)                                     # (S, F, C, N, V)
+        else:
+            to_value = pt.stack([to_value] * n_formats, axis=1)
 
         # Response noise, truncated to the range
         sm = pt.specify_shape(inputs['sigma_motor'], (n_sub,))
         R = self._kernel(pt.tile(u[None, :], (n_sub, 1)), sm[:, None, None])            # (S, N_value, N_response)
-        return pt.einsum('scnv,svr->scnr', to_value, R)
+        return pt.einsum('sfcnv,svr->sfcnr', to_value, R)
 
     def _trial_log_likelihood(self, inputs):
         model = pm.Model.get_context()
-        masses = self._response_masses(inputs)[inputs['subject_ix'], model['mapping_ix'], model['stimulus_ix']]  # (T, N)
+        masses = self._response_masses(inputs)[inputs['subject_ix'], model['format_ix'], model['mapping_ix'],
+                                               model['stimulus_ix']]                                          # (T, N)
         # CDF at the cell edges: grid point i owns [x_i - d/2, x_i + d/2]
         d = self.x_grid[1] - self.x_grid[0]
         cdf = pt.concatenate([pt.zeros((masses.shape[0], 1)), pt.cumsum(masses, axis=1)], axis=1)  # (T, N + 1)
@@ -334,8 +363,8 @@ class MagnitudeValueModel(EstimationBaseModel):
         """Per-trial density on the response grid (rounding and lapse not included), for predict()."""
         model = pm.Model.get_context()
         d = self.x_grid[1] - self.x_grid[0]
-        return self._response_masses(model_inputs)[model_inputs['subject_ix'], model['mapping_ix'],
-                                                   model['stimulus_ix']] / d
+        return self._response_masses(model_inputs)[model_inputs['subject_ix'], model['format_ix'],
+                                                   model['mapping_ix'], model['stimulus_ix']] / d
 
     # ---- after fitting ----
 
