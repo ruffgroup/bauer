@@ -130,8 +130,9 @@ def value_noise_kernel(x, mu, sigma, d, kind='cell'):
     r_hat 1.53).  'cell' always puts the mass in the cell that contains mu, so
     sigma -> 0 is the smooth deterministic limit instead of a cliff.
 
-    The upper tail uses erfc so that cells far above mu keep their (small)
-    mass instead of cancelling to 0 in erf(a) - erf(b) with both near 1.
+    Both tails use erfc so that cells far from mu keep their (small) mass
+    instead of cancelling to 0 in erf(a) - erf(b) with both near +-1 (the lower
+    tail did cancel, in float32 beyond ~4 SD, until 2026-11).
     """
     if kind == 'point':
         return pt.exp(-0.5 * ((x - mu) / sigma) ** 2)
@@ -140,9 +141,10 @@ def value_noise_kernel(x, mu, sigma, d, kind='cell'):
     s = sigma * np.sqrt(2.0)
     hi = (x - mu + 0.5 * d) / s
     lo = (x - mu - 0.5 * d) / s
-    below = 0.5 * (pt.erf(hi) - pt.erf(lo))
-    above = 0.5 * (pt.erfc(lo) - pt.erfc(hi))
-    return pt.maximum(pt.switch(lo > 0, above, below), 0.0)
+    central = 0.5 * (pt.erf(hi) - pt.erf(lo))
+    above = 0.5 * (pt.erfc(lo) - pt.erfc(hi))      # cells entirely above mu
+    below = 0.5 * (pt.erfc(-hi) - pt.erfc(-lo))    # cells entirely below mu: the mirror image, same precision
+    return pt.maximum(pt.switch(lo > 0, above, pt.switch(hi < 0, below, central)), 0.0)
 
 
 def kappa_r_prior(grid_resolution=None):

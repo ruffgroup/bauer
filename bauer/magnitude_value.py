@@ -214,7 +214,13 @@ class MagnitudeValueModel(EstimationBaseModel):
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
         paradigm_ = super()._get_paradigm(paradigm, subject_mapping)
         u = (paradigm_['number'].astype(float) - self.lo) / (self.hi - self.lo)
-        paradigm_['stimulus_ix'] = np.clip(np.round(u / self.du), 0, self.grid_resolution - 1).astype(int)
+        # The stimulus lies between two grid points: its answer distribution is interpolated linearly between theirs
+        # (snapping to the nearest point shifts a numeral by up to du/2, ~0.08 of 1-50, i.e. ~0.25 CHF where the
+        # mapping is steep)
+        f = np.clip(u / self.du, 0, self.grid_resolution - 1)
+        lo_ix = np.clip(np.floor(f), 0, self.grid_resolution - 2).astype(int)
+        paradigm_['stimulus_ix'] = lo_ix
+        paradigm_['stimulus_w'] = (f - lo_ix).astype(float)
         self._n_sub = int(np.max(paradigm_['subject_ix'])) + 1
         paradigm_['mapping_ix'] = np.array([self.mappings.index(str(m)) for m in paradigm['mapping'].astype(str)],
                                            dtype=int)
@@ -321,10 +327,17 @@ class MagnitudeValueModel(EstimationBaseModel):
         R = self._kernel(pt.tile(u[None, :], (n_sub, 1)), sm[:, None, None])            # (S, N_value, N_response)
         return pt.einsum('sfcnv,svr->sfcnr', to_value, R)
 
+    @staticmethod
+    def _trial_masses(masses, subject_ix):
+        """Answer masses (T, N) of every trial: linear interpolation between the two grid points around its stimulus."""
+        model = pm.Model.get_context()
+        ix = (subject_ix, model['format_ix'], model['mapping_ix'])
+        w = model['stimulus_w'][:, None]
+        return (1 - w) * masses[ix + (model['stimulus_ix'],)] + w * masses[ix + (model['stimulus_ix'] + 1,)]
+
     def _trial_log_likelihood(self, inputs):
         model = pm.Model.get_context()
-        masses = self._response_masses(inputs)[inputs['subject_ix'], model['format_ix'], model['mapping_ix'],
-                                               model['stimulus_ix']]                                          # (T, N)
+        masses = self._trial_masses(self._response_masses(inputs), inputs['subject_ix'])                   # (T, N)
         # CDF at the cell edges: grid point i owns [x_i - d/2, x_i + d/2]
         d = self.x_grid[1] - self.x_grid[0]
         cdf = pt.concatenate([pt.zeros((masses.shape[0], 1)), pt.cumsum(masses, axis=1)], axis=1)  # (T, N + 1)
@@ -363,8 +376,7 @@ class MagnitudeValueModel(EstimationBaseModel):
         """Per-trial density on the response grid (rounding and lapse not included), for predict()."""
         model = pm.Model.get_context()
         d = self.x_grid[1] - self.x_grid[0]
-        return self._response_masses(model_inputs)[model_inputs['subject_ix'], model['format_ix'],
-                                                   model['mapping_ix'], model['stimulus_ix']] / d
+        return self._trial_masses(self._response_masses(model_inputs), model_inputs['subject_ix']) / d
 
     # ---- after fitting ----
 
