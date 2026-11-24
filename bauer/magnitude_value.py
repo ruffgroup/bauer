@@ -471,9 +471,34 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
     Prediction on a response grid (``predict``) is not available; fit and score with this class.
     """
 
-    def __init__(self, *args, grid_resolution=601, n_nodes=48, n_cells=40, **kwargs):
+    def __init__(self, *args, grid_resolution=601, n_nodes=48, n_cells=40, answer_precision_bins=False,
+                 group_sd_factor=1.0, **kwargs):
         self.n_nodes, self.n_cells = int(n_nodes), int(n_cells)
+        # Score each answer in the bin of the precision it was typed with (whole number: 1, x.5: 0.5, anything finer:
+        # 0.01), instead of one response_bin_width for everyone: a numeral typed as '37' was rounded, '36.85' was not.
+        # The bins are the same for every model, so comparisons between models stay fair.
+        self.answer_precision_bins = bool(answer_precision_bins)
+        # Multiplies the scale of every group-SD prior (hierarchical fits): < 1 tames the funnel
+        self.group_sd_factor = float(group_sd_factor)
         super().__init__(*args, grid_resolution=grid_resolution, **kwargs)
+
+    def get_free_parameters(self):
+        pars = super().get_free_parameters()
+        if self.group_sd_factor != 1.0:
+            pars = {k: dict(v, cauchy_sigma_intercept=v['cauchy_sigma_intercept'] * self.group_sd_factor)
+                    for k, v in pars.items()}
+        return pars
+
+    def _get_paradigm(self, paradigm=None, subject_mapping=None):
+        paradigm_ = super()._get_paradigm(paradigm, subject_mapping)
+        r = np.asarray(paradigm_['response'], dtype=float)
+        if self.answer_precision_bins:
+            whole = np.abs(r - np.round(r)) < 1e-6
+            half = np.abs(2 * r - np.round(2 * r)) < 1e-6
+            paradigm_['bin_width'] = np.where(whole, 1.0, np.where(half, 0.5, 0.01))
+        else:
+            paradigm_['bin_width'] = np.full(len(r), float(self.response_bin_width))
+        return paradigm_
 
     def _tables(self, inputs):
         """1-D tables on the uniform grid: F_x (S, F, N), x_hat (S, F, N), G (S, C, N), F_v (S, C, N), v_hat (S, C, N)."""
@@ -601,7 +626,8 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
                 return (_phi_cdf((a1 - v0) / s_m) - _phi_cdf((a0 - v0) / s_m)) / pt.maximum(zt, 1e-30)
             return pt.sum(wk * self._window_probability(H_at, a0, a1, s_m), axis=1)
 
-        hb = self.response_bin_width / 2 / rng
+        bw = model['bin_width']                                                          # (T,) CHF
+        hb = bw / 2 / rng
         p_exact = prob(r - hb, r + hb)
         if self.fit_rounding:
             rho = inputs['rho'][s_ix]
@@ -612,7 +638,7 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
         else:
             p_answer = p_exact
         d = self.x_grid[1] - self.x_grid[0]
-        p_answer = (1 - self.lapse_rate) * p_answer + self.lapse_rate * self.response_bin_width / (self.hi - self.lo + d)
+        p_answer = (1 - self.lapse_rate) * p_answer + self.lapse_rate * bw / (self.hi - self.lo + d)
         return pt.log(pt.clip(p_answer, 1e-300, 1.))
 
     def _compute_trial_distributions(self, model_inputs):
