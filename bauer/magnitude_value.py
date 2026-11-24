@@ -471,9 +471,20 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
     Prediction on a response grid (``predict``) is not available; fit and score with this class.
     """
 
+    # Precision levels answers can be typed at, per format (the dots input takes 0.5 steps)
+    ROUNDING_LEVELS = (0.01, 0.1, 0.5, 1.0, 5.0)
+    FORMAT_LEVELS = {'numeral': (0.01, 0.1, 1.0, 5.0), 'dots': (0.5, 1.0, 5.0)}
+
     def __init__(self, *args, grid_resolution=601, n_nodes=48, n_cells=40, answer_precision_bins=False,
-                 group_sd_factor=1.0, **kwargs):
+                 group_sd_factor=1.0, rounding_mixture=False, default_format=None, **kwargs):
         self.n_nodes, self.n_cells = int(n_nodes), int(n_cells)
+        # Rounding as a mixture over precision levels with FIXED per-participant x format weights: the share of that
+        # participant's answers typed at that precision (the coarsest lattice they lie on). An answer's probability sums over every level whose
+        # lattice it lies on (a '35' could be typed exactly, as a whole number or as a multiple of 5). Replaces rho.
+        self.rounding_mixture = bool(rounding_mixture)
+        self.default_format = default_format
+        if self.rounding_mixture:
+            kwargs['fit_rounding'] = False
         # Score each answer in the bin of the precision it was typed with (whole number: 1, x.5: 0.5, anything finer:
         # 0.01), instead of one response_bin_width for everyone: a numeral typed as '37' was rounded, '36.85' was not.
         # The bins are the same for every model, so comparisons between models stay fair.
@@ -492,6 +503,9 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
         paradigm_ = super()._get_paradigm(paradigm, subject_mapping)
         r = np.asarray(paradigm_['response'], dtype=float)
+        if self.rounding_mixture:
+            paradigm_['level_w'] = self._rounding_weights(paradigm if paradigm is not None else self.data,
+                                                          r, np.asarray(paradigm_['subject_ix']))
         if self.answer_precision_bins:
             whole = np.abs(r - np.round(r)) < 1e-6
             half = np.abs(2 * r - np.round(2 * r)) < 1e-6
@@ -499,6 +513,26 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
         else:
             paradigm_['bin_width'] = np.full(len(r), float(self.response_bin_width))
         return paradigm_
+
+    def _rounding_weights(self, paradigm, r, subject_ix):
+        """(T, n_levels) weight of each precision level for each answer: the participant x format's share of answers
+        typed at that precision (coarsest lattice they lie on), if the answer lies on that level's lattice, else 0."""
+        L = np.array(self.ROUNDING_LEVELS)
+        fmt = (paradigm['format'].astype(str).values if 'format' in paradigm
+               else np.full(len(r), str(self.default_format or 'numeral')))
+        allowed = np.array([[lev in self.FORMAT_LEVELS[f] for lev in L] for f in fmt])
+        on = (np.abs(r[:, None] / L[None, :] - np.round(r[:, None] / L[None, :])) < 1e-6) & allowed
+        # the precision an answer was typed at: the COARSEST allowed lattice it lies on ('35' -> 5, '37' -> 1,
+        # '36.8' -> 0.1); an answer on none counts as typed at the finest allowed level
+        coarsest = len(L) - 1 - np.argmax(on[:, ::-1], axis=1)
+        typed = np.where(on.any(1), coarsest, np.argmax(allowed, axis=1))
+        on[np.arange(len(r)), typed] = True
+        w = np.zeros((len(r), len(L)))
+        for key in set(zip(subject_ix, fmt)):
+            ix = (subject_ix == key[0]) & (fmt == key[1])
+            share = np.bincount(typed[ix], minlength=len(L)) / ix.sum()
+            w[ix] = share[None, :] * on[ix]
+        return w
 
     def _tables(self, inputs):
         """1-D tables on the uniform grid: F_x (S, F, N), x_hat (S, F, N), G (S, C, N), F_v (S, C, N), v_hat (S, C, N)."""
@@ -626,6 +660,19 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
                 return (_phi_cdf((a1 - v0) / s_m) - _phi_cdf((a0 - v0) / s_m)) / pt.maximum(zt, 1e-30)
             return pt.sum(wk * self._window_probability(H_at, a0, a1, s_m), axis=1)
 
+        d = self.x_grid[1] - self.x_grid[0]
+        if self.rounding_mixture:
+            lowest = self.round_step * np.ceil(self.lo / self.round_step)
+            w = model['level_w']                                                         # (T, n_levels)
+            p_answer, lapse = 0., 0.
+            for j, lev in enumerate(self.ROUNDING_LEVELS):
+                a0 = r - lev / 2 / rng
+                if lev == self.round_step:   # the lowest multiple also owns everything below it
+                    a0 = pt.switch(pt.le(inputs['response'], lowest + 1e-6), 0., a0)
+                p_answer = p_answer + w[:, j] * prob(a0, r + lev / 2 / rng)
+                lapse = lapse + w[:, j] * lev / (self.hi - self.lo + d)
+            p_answer = (1 - self.lapse_rate) * p_answer + self.lapse_rate * lapse
+            return pt.log(pt.clip(p_answer, 1e-300, 1.))
         bw = model['bin_width']                                                          # (T,) CHF
         hb = bw / 2 / rng
         p_exact = prob(r - hb, r + hb)
@@ -637,7 +684,6 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
             p_answer = (1 - rho) * p_exact + rho * p_round
         else:
             p_answer = p_exact
-        d = self.x_grid[1] - self.x_grid[0]
         p_answer = (1 - self.lapse_rate) * p_answer + self.lapse_rate * bw / (self.hi - self.lo + d)
         return pt.log(pt.clip(p_answer, 1e-300, 1.))
 
