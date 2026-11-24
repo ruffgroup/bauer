@@ -407,3 +407,213 @@ class MagnitudeValueModel(EstimationBaseModel):
                 out[c, i] = fn()
         return az.from_dict(log_likelihood={'response': out}, dims={'response': ['trial']},
                             coords={'trial': np.arange(len(data))})
+
+
+# ---- likelihood relative to the truth: per-trial quadrature instead of global response grids ----
+
+def _phi_cdf(z):
+    return 0.5 * pt.erfc(-z / np.sqrt(2.0))
+
+
+def _trunc_cdf(c, mu, s):
+    """CDF at c of N(mu, s) truncated to [0, 1] (the code range)."""
+    lo, hi = _phi_cdf((0. - mu) / s), _phi_cdf((1. - mu) / s)
+    return pt.clip((_phi_cdf((c - mu) / s) - lo) / pt.maximum(hi - lo, 1e-30), 0., 1.)
+
+
+def _interp_uniform(table, prefix, x, n):
+    """Linear interpolation of tables (..., n) on the uniform grid [0, 1] at x, rows picked by the index arrays in
+    prefix (broadcast against x)."""
+    f = pt.clip(x, 0., 1.) * (n - 1)
+    i = pt.clip(pt.floor(f), 0, n - 2).astype('int64')
+    w = f - i
+    return (1 - w) * table[prefix + (i,)] + w * table[prefix + (i + 1,)]
+
+
+def _inverse_table(f, n):
+    """Inverse of non-decreasing tables f (..., n) on the uniform grid [0, 1], tabulated on the same grid: the code c
+    with f(c) = y for y = 0, 1/(n-1), ..., 1 (0 below the range of f, 1 above it)."""
+    y = pt.as_tensor_variable(np.linspace(0., 1., n))
+    cnt = pt.sum(pt.le(f[..., None, :], y[:, None]), axis=-1)                 # (..., n_y)
+    j = pt.clip(cnt - 1, 0, n - 2).astype('int64')
+    f0, f1 = pt.take_along_axis(f, j, axis=-1), pt.take_along_axis(f, j + 1, axis=-1)
+    frac = pt.clip((y - f0) / pt.maximum(f1 - f0, 1e-12), 0., 1.)
+    return (j + frac) / (n - 1)
+
+
+def _cell_mean_window(y0, y1, a0, a1, s):
+    """Mean over y in [y0, y1] of P(y + N(0, s) in [a0, a1]), exact (I(z) = z Phi(z) + phi(z) is the integral of
+    Phi); the midpoint value when the cell is much narrower than s."""
+    I = lambda z: z * _phi_cdf(z) + pt.exp(-0.5 * z ** 2) / np.sqrt(2 * np.pi)
+    w = y1 - y0
+    exact = s / pt.maximum(w, 1e-12) * ((I((a1 - y0) / s) - I((a1 - y1) / s)) - (I((a0 - y0) / s) - I((a0 - y1) / s)))
+    ym = (y0 + y1) / 2
+    mid = _phi_cdf((a1 - ym) / s) - _phi_cdf((a0 - ym) / s)
+    return pt.switch(pt.lt(w, 1e-3 * s), mid, exact)
+
+
+class MagnitudeValueLocalModel(MagnitudeValueModel):
+    """:class:`MagnitudeValueModel` with a likelihood computed relative to each trial's truth and response, instead of
+    on global grids over the whole range.
+
+    The stages only use global grids for 1-D tables (the codes F, the decoders x_hat(c) and v_hat(c), the mapping), at
+    ``grid_resolution`` points. Per trial:
+
+    * the number-stage noise is integrated by quadrature over ``n_nodes`` cells of the truncated Gaussian around the
+      trial's own code F(x) (cell weights are CDF differences, so a vanishing SD is the exact deterministic limit);
+    * the LAST noisy code stage is handled analytically: the decoder is monotone, so the CDF of the decoded estimate is
+      the code noise's CDF at the inverse decoder, P(v_hat <= y) = Phi((v_hat^-1(y) - mu) / sigma);
+    * response noise is integrated exactly over ``n_cells`` cells of a window around the RESPONSE's own bin
+      (bin +- 5 SD of the response noise): the mean of Phi over each cell has a closed form.
+
+    So the resolution follows the noise and the response instead of the range: a numeral answered to within 0.1 CHF
+    is resolved as finely as a dot cloud answered 10 CHF off, and the likelihood stays smooth in every SD.
+    Prediction on a response grid (``predict``) is not available; fit and score with this class.
+    """
+
+    def __init__(self, *args, grid_resolution=601, n_nodes=48, n_cells=40, **kwargs):
+        self.n_nodes, self.n_cells = int(n_nodes), int(n_cells)
+        super().__init__(*args, grid_resolution=grid_resolution, **kwargs)
+
+    def _tables(self, inputs):
+        """1-D tables on the uniform grid: F_x (S, F, N), x_hat (S, F, N), G (S, C, N), F_v (S, C, N), v_hat (S, C, N)."""
+        n_sub, N = self._n_sub, self.grid_resolution
+        u = pt.as_tensor_variable(self.u_grid)
+        sigma_per, sigma_rep = self._stage_sds(inputs, n_sub)
+        G = pt.as_tensor_variable(self.G)[None]
+        if self.fit_mapping_shrinkage:
+            lam = pt.specify_shape(inputs['mapping_shrinkage'], (n_sub,))[:, None, None]
+            G = (1 - lam) * G + lam * u[None, None, :]
+        else:
+            G = pt.tile(G, (n_sub, 1, 1))
+        out = dict(G=G, sigma_per=sigma_per, sigma_rep=sigma_rep)
+        if self.valuation:
+            p_v = pt.as_tensor_variable(self.p_value_objective)[None]
+            if self.value_prior == 'uniform':
+                p_v = pt.ones_like(p_v)
+            elif self.value_prior == 'mixture':
+                w = pt.specify_shape(inputs['value_prior_uniform'], (n_sub,))[:, None, None]
+                p_v = (1 - w) * p_v + w
+            p_v = p_v * pt.ones((n_sub, 1, 1))
+            F_v = self._cdf(p_v, self.du)                                                   # (S, C, N)
+            K_dec = self._kernel(F_v, sigma_rep[:, None, None, None]) * p_v[..., None]    # (S, C, V, M)
+            out['F_v'] = F_v
+            out['v_hat'] = pt.sum(K_dec * u[None, None, :, None], axis=2) / (pt.sum(K_dec, axis=2) + 1e-30)
+        if self.perception:
+            logx = np.log(self.x_grid + self.offset)[None, :]
+            F_xs, x_hats = [], []
+            for f, beta_name in enumerate(self._per_format('beta')):
+                if self.number_encoding == 'linear':
+                    beta = pt.ones((n_sub, 1))
+                elif self.number_encoding == 'log':
+                    beta = pt.zeros((n_sub, 1))
+                else:
+                    beta = pt.specify_shape(inputs[beta_name], (n_sub,))[:, None]
+                b = pt.switch(pt.lt(pt.abs(beta), 1e-4), 1e-4, beta)
+                fx = pt.expm1(b * logx) / b
+                F_x = (fx - fx[:, :1]) / (fx[:, -1:] - fx[:, :1])
+                p_x = pt.exp((beta - 1) * logx) if self.number_decoding_prior == 'efficient' \
+                    else pt.ones((n_sub, N))
+                post = self._kernel(F_x, sigma_per[f][:, None, None]) * p_x[:, :, None]   # (S, N, M)
+                F_xs.append(F_x)
+                x_hats.append(pt.sum(post * u[None, :, None], axis=1) / (pt.sum(post, axis=1) + 1e-30))
+            out['F_x'], out['x_hat'] = pt.stack(F_xs, axis=1), pt.stack(x_hats, axis=1)  # (S, F, N)
+        return out
+
+    def _window_probability(self, H_at, a0, a1, s_m):
+        """P(answer in [a0, a1]) (T,), with v_hat's CDF H_at(edges (T, L+1)) -> (T, K, L+1) and response noise s_m (T,);
+        everything in [0, 1] units of the range. Window: [a0 - 5 s_m, a1 + 5 s_m] in n_cells cells, within [0, 1]."""
+        L = self.n_cells
+        t = pt.as_tensor_variable(np.linspace(0., 1., L + 1))
+        w0, w1 = pt.clip(a0 - 5 * s_m, 0., 1.), pt.clip(a1 + 5 * s_m, 0., 1.)
+        edges = w0[:, None] + (w1 - w0)[:, None] * t[None, :]                            # (T, L+1)
+        H = H_at(edges)                                                                  # (T, K, L+1)
+        dH = H[..., 1:] - H[..., :-1]                                                    # (T, K, L)
+        y0, y1 = edges[:, :-1], edges[:, 1:]
+        sm = s_m[:, None]
+        psi = _cell_mean_window(y0, y1, a0[:, None], a1[:, None], sm)                     # (T, L)
+        ym = (y0 + y1) / 2
+        z_trunc = _phi_cdf((1. - ym) / sm) - _phi_cdf((0. - ym) / sm)                    # response noise truncated
+        psi = psi / pt.maximum(z_trunc, 1e-30)
+        return pt.sum(dH * psi[:, None, :], axis=2)                                      # (T, K)
+
+    def _trial_log_likelihood(self, inputs):
+        model = pm.Model.get_context()
+        N, K = self.grid_resolution, self.n_nodes
+        tb = self._tables(inputs)
+        s_ix, f_ix, c_ix = inputs['subject_ix'], model['format_ix'], model['mapping_ix']
+        s1, f1, c1 = s_ix[:, None], f_ix[:, None], c_ix[:, None]
+        rng = self.hi - self.lo
+        x_u = pt.clip((model['number'] - self.lo) / rng, 0., 1.)                          # (T,) truth, [0, 1] units
+        s_m = pt.specify_shape(inputs['sigma_motor'], (self._n_sub,))[s_ix] / 100.         # (T,) in [0, 1] units
+
+        if self.valuation:
+            s_r = (tb['sigma_rep'] / 100.)[s_ix]
+            if self.perception:
+                s_p = (pt.stack(tb['sigma_per'], axis=1) / 100.)[s_ix, f_ix]              # (T,)
+                F0 = _interp_uniform(tb['F_x'], (s_ix, f_ix), x_u, N)                      # (T,)
+                z = np.linspace(-5., 5., K + 1)
+                ce = pt.clip(F0[:, None] + s_p[:, None] * z[None, :], 0., 1.)              # (T, K+1) cell edges
+                cdf = _trunc_cdf(ce, F0[:, None], s_p[:, None])
+                wk = cdf[:, 1:] - cdf[:, :-1]
+                wk = wk / pt.maximum(pt.sum(wk, axis=1, keepdims=True), 1e-30)             # (T, K)
+                node = (ce[:, 1:] + ce[:, :-1]) / 2
+                x_hat = _interp_uniform(tb['x_hat'], (s1, f1), node, N)                   # (T, K)
+            else:
+                wk = pt.ones((x_u.shape[0], 1))
+                x_hat = x_u[:, None]
+            v_in = _interp_uniform(tb['G'], (s1, c1), x_hat, N)
+            e = _interp_uniform(tb['F_v'], (s1, c1), v_in, N)                             # (T, K) value codes
+            inv = _inverse_table(tb['v_hat'], N)                                          # (S, C, N)
+
+            def H_at(edges):
+                c = _interp_uniform(inv, (s1, c1), edges, N)                              # (T, L+1)
+                return _trunc_cdf(c[:, None, :], e[:, :, None], s_r[:, None, None])
+        elif self.perception:
+            s_p = (pt.stack(tb['sigma_per'], axis=1) / 100.)[s_ix, f_ix]
+            F0 = _interp_uniform(tb['F_x'], (s_ix, f_ix), x_u, N)
+            # value of a number code: G(x_hat(c)), per subject, format and mapping; its inverse gives the CDF
+            S, Fn, C = self._n_sub, (1 if self.formats is None else len(self.formats)), len(self.mappings)
+            xh = pt.clip(tb['x_hat'], 0., 1.) * (N - 1)                                   # (S, F, N)
+            i = pt.clip(pt.floor(xh), 0, N - 2).astype('int64')
+            w = xh - i
+            Gt = tb['G'][:, None, :, :]                                                   # (S, 1, C, N)
+            ii, ww = i[:, :, None, :], w[:, :, None, :]
+            comp = (1 - ww) * pt.take_along_axis(pt.broadcast_to(Gt, (S, Fn, C, N)), pt.broadcast_to(ii, (S, Fn, C, N)), axis=-1) \
+                + ww * pt.take_along_axis(pt.broadcast_to(Gt, (S, Fn, C, N)), pt.broadcast_to(ii + 1, (S, Fn, C, N)), axis=-1)
+            inv = _inverse_table(comp, N)                                                 # (S, F, C, N)
+            wk = pt.ones((x_u.shape[0], 1))
+
+            def H_at(edges):
+                c = _interp_uniform(inv, (s1, f1, c1), edges, N)
+                return _trunc_cdf(c[:, None, :], F0[:, None, None], s_p[:, None, None])
+        else:
+            v0 = _interp_uniform(tb['G'], (s_ix, c_ix), x_u, N)                           # exact value, no code noise
+            H_at = None
+
+        r = (inputs['response'] - self.lo) / rng
+
+        def prob(a0, a1):
+            # the response noise is truncated to the range: only the part of the bin inside it can be answered
+            a0, a1 = pt.clip(a0, 0., 1.), pt.clip(a1, 0., 1.)
+            if H_at is None:   # response noise only: closed form
+                zt = _phi_cdf((1. - v0) / s_m) - _phi_cdf((0. - v0) / s_m)
+                return (_phi_cdf((a1 - v0) / s_m) - _phi_cdf((a0 - v0) / s_m)) / pt.maximum(zt, 1e-30)
+            return pt.sum(wk * self._window_probability(H_at, a0, a1, s_m), axis=1)
+
+        hb = self.response_bin_width / 2 / rng
+        p_exact = prob(r - hb, r + hb)
+        if self.fit_rounding:
+            rho = inputs['rho'][s_ix]
+            lowest = self.round_step * np.ceil(self.lo / self.round_step)
+            lower = pt.switch(pt.le(inputs['response'], lowest + 1e-6), 0., r - self.round_step / 2 / rng)
+            p_round = prob(lower, r + self.round_step / 2 / rng) * model['is_round']
+            p_answer = (1 - rho) * p_exact + rho * p_round
+        else:
+            p_answer = p_exact
+        d = self.x_grid[1] - self.x_grid[0]
+        p_answer = (1 - self.lapse_rate) * p_answer + self.lapse_rate * self.response_bin_width / (self.hi - self.lo + d)
+        return pt.log(pt.clip(p_answer, 1e-300, 1.))
+
+    def _compute_trial_distributions(self, model_inputs):
+        raise NotImplementedError('MagnitudeValueLocalModel scores responses; predict with MagnitudeValueModel')
