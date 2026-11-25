@@ -441,6 +441,19 @@ def _inverse_table(f, n):
     return (j + frac) / (n - 1)
 
 
+def _invert_rows(rows, y):
+    """Exact inverse of piecewise-linear, non-decreasing rows (T, n) on the uniform grid [0, 1] at y (T, E): the code
+    c with row(c) = y (0 below the row's range, 1 above it). Costs T x E x n, for a few edges per trial."""
+    n = rows.shape[-1]
+    cnt = pt.sum(pt.le(rows[:, None, :], y[:, :, None]), axis=-1)                   # (T, E)
+    j = pt.clip(cnt - 1, 0, n - 2).astype('int64')
+    f0 = pt.take_along_axis(rows, j, axis=-1)
+    f1 = pt.take_along_axis(rows, j + 1, axis=-1)
+    frac = pt.clip((y - f0) / pt.maximum(f1 - f0, 1e-12), 0., 1.)
+    c = (j + frac) / (n - 1)
+    return pt.switch(pt.eq(cnt, 0), 0., c)
+
+
 def _cell_mean_window(y0, y1, a0, a1, s):
     """Mean over y in [y0, y1] of P(y + N(0, s) in [a0, a1]), exact (I(z) = z Phi(z) + phi(z) is the integral of
     Phi); the midpoint value when the cell is much narrower than s."""
@@ -476,8 +489,14 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
     FORMAT_LEVELS = {'numeral': (0.01, 0.1, 1.0, 5.0), 'dots': (0.5, 1.0, 5.0)}
 
     def __init__(self, *args, grid_resolution=601, n_nodes=48, n_cells=40, answer_precision_bins=False,
-                 group_sd_factor=1.0, rounding_mixture=False, default_format=None, **kwargs):
+                 group_sd_factor=1.0, rounding_mixture=False, default_format=None, motor_noise=True, **kwargs):
         self.n_nodes, self.n_cells = int(n_nodes), int(n_cells)
+        # Without response noise the answer's probability is the decoded estimate's CDF difference over the answer's
+        # bin (no window of cells): exact and cheap. Needs a noisy code stage; answers outside the decodable range are
+        # then explained by rounding and the lapses only.
+        # A number instead: response noise with this FIXED SD (% of range), not a free parameter.
+        self.motor_fixed = None if isinstance(motor_noise, bool) else float(motor_noise)
+        self.motor_noise = bool(motor_noise) and self.motor_fixed is None
         # Rounding as a mixture over precision levels with FIXED per-participant x format weights: the share of that
         # participant's answers typed at that precision (the coarsest lattice they lie on). An answer's probability sums over every level whose
         # lattice it lies on (a '35' could be typed exactly, as a whole number or as a multiple of 5). Replaces rho.
@@ -492,9 +511,13 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
         # Multiplies the scale of every group-SD prior (hierarchical fits): < 1 tames the funnel
         self.group_sd_factor = float(group_sd_factor)
         super().__init__(*args, grid_resolution=grid_resolution, **kwargs)
+        if not self.motor_noise and self.motor_fixed is None and not (self.perception or self.valuation):
+            raise ValueError('motor_noise=False needs a noisy number or value stage')
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
+        if not self.motor_noise:
+            pars.pop('sigma_motor')
         if self.group_sd_factor != 1.0:
             pars = {k: dict(v, cauchy_sigma_intercept=v['cauchy_sigma_intercept'] * self.group_sd_factor)
                     for k, v in pars.items()}
@@ -555,9 +578,8 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
                 p_v = (1 - w) * p_v + w
             p_v = p_v * pt.ones((n_sub, 1, 1))
             F_v = self._cdf(p_v, self.du)                                                   # (S, C, N)
-            K_dec = self._kernel(F_v, sigma_rep[:, None, None, None]) * p_v[..., None]    # (S, C, V, M)
             out['F_v'] = F_v
-            out['v_hat'] = pt.sum(K_dec * u[None, None, :, None], axis=2) / (pt.sum(K_dec, axis=2) + 1e-30)
+            out['v_hat'] = self._decoder(F_v, p_v, sigma_rep[:, None, None] / 100.)       # (S, C, M)
         if self.perception:
             logx = np.log(self.x_grid + self.offset)[None, :]
             F_xs, x_hats = [], []
@@ -573,11 +595,38 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
                 F_x = (fx - fx[:, :1]) / (fx[:, -1:] - fx[:, :1])
                 p_x = pt.exp((beta - 1) * logx) if self.number_decoding_prior == 'efficient' \
                     else pt.ones((n_sub, N))
-                post = self._kernel(F_x, sigma_per[f][:, None, None]) * p_x[:, :, None]   # (S, N, M)
                 F_xs.append(F_x)
-                x_hats.append(pt.sum(post * u[None, :, None], axis=1) / (pt.sum(post, axis=1) + 1e-30))
+                x_hats.append(self._decoder(F_x, p_x, sigma_per[f][:, None] / 100.))          # (S, M)
             out['F_x'], out['x_hat'] = pt.stack(F_xs, axis=1), pt.stack(x_hats, axis=1)  # (S, F, N)
         return out
+
+    def _decoder(self, F, p, s):
+        """Posterior-mean decoder on the code grid: E[u | m] for m = u_grid, under prior density p (..., N) on the
+        uniform grid u, code F(u) (..., N) and code noise N(0, s) truncated to [0, 1] (s broadcastable to F[..., :1]).
+
+        The likelihood is integrated over each u-cell analytically in the code: over a cell where F runs from F_lo to
+        F_hi, the integral of phi((m - F(u)) / s) du is (Phi((F_hi - m) / s) - Phi((F_lo - m) / s)) times the cell
+        width over (F_hi - F_lo), for F linear on the cell. So the decoder is exact at every code point (the edges
+        included) and the limit of a noise SD below the grid step is the deterministic inverse, not a grid artefact.
+        """
+        N = self.grid_resolution
+        du = self.du
+        width = np.full(N, du)
+        width[[0, -1]] = du / 2                                                       # trapezoid end cells
+        Fe = pt.concatenate([F[..., :1], (F[..., 1:] + F[..., :-1]) / 2, F[..., -1:]], axis=-1)   # (..., N+1)
+        m = pt.as_tensor_variable(self.u_grid)
+        s_ = s[..., None]                                                             # (..., 1, 1)
+        z_hi = (Fe[..., 1:, None] - m) / s_                                           # (..., N, M)
+        z_lo = (Fe[..., :-1, None] - m) / s_
+        dF = (Fe[..., 1:] - Fe[..., :-1])[..., None]
+        z_mid = (F[..., :, None] - m) / s_
+        dens = pt.exp(-0.5 * z_mid ** 2)                                              # cell flat in the code
+        integ = (_phi_cdf(z_hi) - _phi_cdf(z_lo)) * s_ * np.sqrt(2 * np.pi) / pt.maximum(dF, 1e-30)
+        lik = pt.switch(pt.lt(dF, 1e-3 * s_), dens, integ)
+        Z = _phi_cdf((1. - F) / s) - _phi_cdf((0. - F) / s)                           # truncation of the code noise
+        w = lik * (p * width / pt.maximum(Z, 1e-30))[..., None]                       # (..., N, M)
+        u = pt.as_tensor_variable(self.u_grid)
+        return pt.sum(w * u[:, None], axis=-2) / (pt.sum(w, axis=-2) + 1e-300)
 
     def _window_probability(self, H_at, a0, a1, s_m):
         """P(answer in [a0, a1]) (T,), with v_hat's CDF H_at(edges (T, L+1)) -> (T, K, L+1) and response noise s_m (T,);
@@ -604,7 +653,12 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
         s1, f1, c1 = s_ix[:, None], f_ix[:, None], c_ix[:, None]
         rng = self.hi - self.lo
         x_u = pt.clip((model['number'] - self.lo) / rng, 0., 1.)                          # (T,) truth, [0, 1] units
-        s_m = pt.specify_shape(inputs['sigma_motor'], (self._n_sub,))[s_ix] / 100.         # (T,) in [0, 1] units
+        if self.motor_noise:
+            s_m = pt.specify_shape(inputs['sigma_motor'], (self._n_sub,))[s_ix] / 100.     # (T,) in [0, 1] units
+        elif self.motor_fixed is not None:
+            s_m = pt.fill(x_u, self.motor_fixed / 100.)
+        else:
+            s_m = None
 
         if self.valuation:
             s_r = (tb['sigma_rep'] / 100.)[s_ix]
@@ -623,10 +677,14 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
                 x_hat = x_u[:, None]
             v_in = _interp_uniform(tb['G'], (s1, c1), x_hat, N)
             e = _interp_uniform(tb['F_v'], (s1, c1), v_in, N)                             # (T, K) value codes
-            inv = _inverse_table(tb['v_hat'], N)                                          # (S, C, N)
+            if self.motor_noise:
+                inv = _inverse_table(tb['v_hat'], N)                                      # (S, C, N)
+            else:   # two edges per trial: invert each trial's own decoder row exactly
+                v_rows = tb['v_hat'][s_ix, c_ix]                                          # (T, N)
 
             def H_at(edges):
-                c = _interp_uniform(inv, (s1, c1), edges, N)                              # (T, L+1)
+                c = (_interp_uniform(inv, (s1, c1), edges, N) if self.motor_noise
+                     else _invert_rows(v_rows, edges))                                    # (T, L+1)
                 return _trunc_cdf(c[:, None, :], e[:, :, None], s_r[:, None, None])
         elif self.perception:
             s_p = (pt.stack(tb['sigma_per'], axis=1) / 100.)[s_ix, f_ix]
@@ -640,11 +698,15 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
             ii, ww = i[:, :, None, :], w[:, :, None, :]
             comp = (1 - ww) * pt.take_along_axis(pt.broadcast_to(Gt, (S, Fn, C, N)), pt.broadcast_to(ii, (S, Fn, C, N)), axis=-1) \
                 + ww * pt.take_along_axis(pt.broadcast_to(Gt, (S, Fn, C, N)), pt.broadcast_to(ii + 1, (S, Fn, C, N)), axis=-1)
-            inv = _inverse_table(comp, N)                                                 # (S, F, C, N)
             wk = pt.ones((x_u.shape[0], 1))
+            if self.motor_noise:
+                inv = _inverse_table(comp, N)                                             # (S, F, C, N)
+            else:
+                comp_rows = comp[s_ix, f_ix, c_ix]                                        # (T, N)
 
             def H_at(edges):
-                c = _interp_uniform(inv, (s1, f1, c1), edges, N)
+                c = (_interp_uniform(inv, (s1, f1, c1), edges, N) if self.motor_noise
+                     else _invert_rows(comp_rows, edges))
                 return _trunc_cdf(c[:, None, :], F0[:, None, None], s_p[:, None, None])
         else:
             v0 = _interp_uniform(tb['G'], (s_ix, c_ix), x_u, N)                           # exact value, no code noise
@@ -655,6 +717,9 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
         def prob(a0, a1):
             # the response noise is truncated to the range: only the part of the bin inside it can be answered
             a0, a1 = pt.clip(a0, 0., 1.), pt.clip(a1, 0., 1.)
+            if s_m is None:   # no response noise: CDF of the decoded estimate over the bin
+                H = H_at(pt.stack([a0, a1], axis=1))                                     # (T, K, 2)
+                return pt.sum(wk * (H[..., 1] - H[..., 0]), axis=1)
             if H_at is None:   # response noise only: closed form
                 zt = _phi_cdf((1. - v0) / s_m) - _phi_cdf((0. - v0) / s_m)
                 return (_phi_cdf((a1 - v0) / s_m) - _phi_cdf((a0 - v0) / s_m)) / pt.maximum(zt, 1e-30)
