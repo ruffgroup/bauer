@@ -122,6 +122,8 @@ class MagnitudeValueModel(EstimationBaseModel):
     perception, valuation : bool
         Which noisy, Bayesian-decoded stages are present. Both False: exact value plus response noise.
     number_encoding : 'linear', 'log', 'power' or 'power_offset' (power law of x + c, c fitted per format)
+    shared_number_code : bool
+        With several formats: one code exponent (and offset) for all formats, noise still per format.
     number_decoding_prior : 'efficient' or 'objective'
     value_prior : 'objective', 'uniform', 'mixture', 'internal', 'power' or 'power_mixture'
     share_parameterisation : bool
@@ -146,7 +148,7 @@ class MagnitudeValueModel(EstimationBaseModel):
     def __init__(self, paradigm=None, perception=True, valuation=True, number_encoding='linear',
                  number_decoding_prior='efficient', value_prior='objective', share_parameterisation=True, stimulus_range=(1., 50.), curvature=2.79,
                  response_bin_width=1.0, round_step=5.0, fit_rounding=True, fit_mapping_shrinkage=False,
-                 grid_resolution=301, lapse_rate=0.01, formats=None, **kwargs):
+                 grid_resolution=301, lapse_rate=0.01, formats=None, shared_number_code=False, **kwargs):
         if number_encoding not in NUMBER_ENCODINGS:
             raise ValueError(f'number_encoding must be one of {NUMBER_ENCODINGS}')
         if number_decoding_prior not in NUMBER_DECODING_PRIORS:
@@ -157,6 +159,9 @@ class MagnitudeValueModel(EstimationBaseModel):
         self.number_encoding, self.number_decoding_prior = number_encoding, number_decoding_prior
         self.value_prior = value_prior
         self.formats = tuple(formats) if formats else None
+        # one number code (exponent, offset) for every format, with format-specific noise: the formats differ only in
+        # how precisely the shared magnitude code is read
+        self.shared_number_code = bool(shared_number_code)
         self.share_parameterisation = (bool(share_parameterisation) and self.perception and self.valuation
                                        and self.formats is None)
         self.lo, self.hi = map(float, stimulus_range)
@@ -185,9 +190,9 @@ class MagnitudeValueModel(EstimationBaseModel):
         if self.fit_mapping_shrinkage:
             pars['mapping_shrinkage'] = MAPPING_SHRINKAGE_PRIOR
         if self.perception and self.number_encoding in ('power', 'power_offset'):
-            pars.update({n: BETA_PRIOR for n in self._per_format('beta')})
+            pars.update({n: BETA_PRIOR for n in dict.fromkeys(self._code_names('beta'))})
         if self.perception and self.number_encoding == 'power_offset':
-            pars.update({n: NUMBER_OFFSET_PRIOR for n in self._per_format('number_offset')})
+            pars.update({n: NUMBER_OFFSET_PRIOR for n in dict.fromkeys(self._code_names('number_offset'))})
         if self.valuation and self.value_prior == 'mixture':
             pars['value_prior_uniform'] = VALUE_MIX_PRIOR
         if self.valuation and self.value_prior in ('power', 'power_mixture'):
@@ -199,6 +204,13 @@ class MagnitudeValueModel(EstimationBaseModel):
     def _per_format(self, name):
         """Parameter names of a number-stage parameter: one, or one per format."""
         return [name] if self.formats is None else [f'{name}_{f}' for f in self.formats]
+
+    def _code_names(self, name):
+        """Names of a number-CODE parameter (exponent, offset) for each format in turn: per format, or with
+        shared_number_code the same single parameter for every format."""
+        if self.formats is not None and self.shared_number_code:
+            return [name] * len(self.formats)
+        return self._per_format(name)
 
     def get_model_inputs(self, parameters):
         model = pm.Model.get_context()
@@ -269,7 +281,7 @@ class MagnitudeValueModel(EstimationBaseModel):
         """log(x + offset) on the number grid, (1 or S, N); with 'power_offset' plus the fitted offset of format f."""
         if self.number_encoding != 'power_offset':
             return logx
-        c = pt.specify_shape(inputs[self._per_format('number_offset')[f]], (n_sub,))[:, None]
+        c = pt.specify_shape(inputs[self._code_names('number_offset')[f]], (n_sub,))[:, None]
         return pt.log(self.x_grid[None, :] + self.offset + c)
 
     def _power_value_prior(self, gamma):
@@ -353,7 +365,7 @@ class MagnitudeValueModel(EstimationBaseModel):
         if self.perception:
             logx = np.log(self.x_grid + self.offset)[None, :]
             per_format = []
-            for f, beta_name in enumerate(self._per_format('beta')):
+            for f, beta_name in enumerate(self._code_names('beta')):
                 if self.number_encoding == 'linear':
                     beta = pt.ones((n_sub, 1))
                 elif self.number_encoding == 'log':
@@ -672,7 +684,7 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
         if self.perception:
             logx = np.log(self.x_grid + self.offset)[None, :]
             F_xs, x_hats = [], []
-            for f, beta_name in enumerate(self._per_format('beta')):
+            for f, beta_name in enumerate(self._code_names('beta')):
                 if self.number_encoding == 'linear':
                     beta = pt.ones((n_sub, 1))
                 elif self.number_encoding == 'log':
