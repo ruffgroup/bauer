@@ -886,8 +886,16 @@ class BaseModel(object):
     def build_hierarchical_nodes(self, name, mu_intercept=None, sigma_intercept=None,
                                  cauchy_sigma_intercept=None, transform='identity',
                                  min_value=0.0, beta_mu_mean=0.05, beta_mu_kappa=8.0,
-                                 beta_kappa_sd=3.0, **kwargs):
+                                 beta_kappa_sd=3.0, centered=None, **kwargs):
         """Build a hierarchical (group_mu, group_sd, per-subject offset) node.
+
+        ``centered``: None/False (default) is the non-centred parameterisation, subject = mu + sd * offset with
+        offset ~ N(0, 1). True, or a boolean mask over subjects, samples those subjects' (untransformed) values
+        directly, ``{name}_centered ~ N(mu, sd)`` (same model, different geometry). Centred is the better geometry when
+        a subject's data pin its value down much more tightly than the group SD: non-centred then ties every offset to
+        mu and sd along a long ridge (tree depth saturates). Subjects outside the mask (e.g. no data in a format) keep
+        the non-centred offset; the unused entries of each vector are independent N(0, 1) and do not touch the
+        likelihood.
 
         ``transform`` ∈ {'identity', 'softplus', 'logistic', 'beta', 'beta_pooled'}. When
         ``transform`` is 'softplus' and ``min_value > 0``, the transformed
@@ -981,12 +989,25 @@ class BaseModel(object):
 
         group_sd = _group_sd_rv(f'{name}_sd', cauchy_sigma_intercept,
                                 getattr(self, 'group_sd_dist', 'halfnormal'))
-        subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject',))
+        if centered is None or centered is False:
+            subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject',))
+            subject_vals = group_mu + group_sd * subject_offset
+        else:
+            n_sub = len(pm.modelcontext(None).coords['subject'])
+            mask = np.ones(n_sub, bool) if centered is True else np.asarray(centered, bool)
+            assert mask.shape == (n_sub,), f'{name}: centred mask has shape {mask.shape}, expected ({n_sub},)'
+            subject_c = pm.Normal(f'{name}_centered', mu=pt.where(mask, group_mu, 0.),
+                                  sigma=pt.where(mask, group_sd, 1.), dims=('subject',))
+            if mask.all():
+                subject_vals = subject_c
+            else:
+                subject_offset = pm.Normal(f'{name}_offset', mu=0, sigma=1, dims=('subject',))
+                subject_vals = pt.where(mask, subject_c, group_mu + group_sd * subject_offset)
 
         if transform == 'identity':
-            return pm.Deterministic(f'{name}', group_mu + group_sd * subject_offset, dims=('subject',))
+            return pm.Deterministic(f'{name}', subject_vals, dims=('subject',))
         else:
-            subjectwise_untrans = pm.Deterministic(f'{name}_untransformed', group_mu + group_sd * subject_offset, dims=('subject',))
+            subjectwise_untrans = pm.Deterministic(f'{name}_untransformed', subject_vals, dims=('subject',))
 
             if transform == 'softplus':
                 return pm.Deterministic(name=name, var=_softplus_with_floor(subjectwise_untrans), dims=('subject',))

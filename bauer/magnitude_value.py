@@ -210,6 +210,7 @@ class MagnitudeValueModel(EstimationBaseModel):
         if data is None:
             data = paradigm if paradigm is not None else self.paradigm
         self._setup_grids(data)
+        self._build_data = data
         super().build_estimation_model(data, coords, hierarchical, save_p_choice, flat_prior)
 
     def _get_paradigm(self, paradigm=None, subject_mapping=None):
@@ -504,8 +505,14 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
     FORMAT_LEVELS = {'numeral': (0.01, 0.1, 1.0, 5.0), 'dots': (0.5, 1.0, 5.0)}
 
     def __init__(self, *args, grid_resolution=601, n_nodes=48, n_cells=40, answer_precision_bins=False,
-                 group_sd_factor=1.0, rounding_mixture=False, default_format=None, motor_noise=True, **kwargs):
+                 group_sd_factor=1.0, rounding_mixture=False, default_format=None, motor_noise=True, centered=False,
+                 **kwargs):
         self.n_nodes, self.n_cells = int(n_nodes), int(n_cells)
+        # Hierarchical fits: sample every subject's value directly (centred) instead of as mu + sd * offset, for the
+        # subjects that have data on that parameter (number-stage parameters: subjects seen in that format). Each
+        # participant's ~300 trials pin their parameters far more tightly than the group SD, which is the regime where
+        # the non-centred form makes a long mu/sd/offset ridge.
+        self.centered = bool(centered)
         # Without response noise the answer's probability is the decoded estimate's CDF difference over the answer's
         # bin (no window of cells): exact and cheap. Needs a noisy code stage; answers outside the decodable range are
         # then explained by rounding and the lapses only.
@@ -528,6 +535,20 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
         super().__init__(*args, grid_resolution=grid_resolution, **kwargs)
         if not self.motor_noise and self.motor_fixed is None and not (self.perception or self.valuation):
             raise ValueError('motor_noise=False needs a noisy number or value stage')
+
+    def build_priors(self, hierarchical=True, flat_prior=False):
+        if not (hierarchical and self.centered):
+            return super().build_priors(hierarchical=hierarchical, flat_prior=flat_prior)
+        model = pm.Model.get_context()
+        subjects = list(model.coords['subject'])
+        data = self._build_data
+        sub = data.index.get_level_values('subject').astype(str)
+        fmt = data['format'].astype(str).values if 'format' in data else np.full(len(data), '')
+        for key, info in self.free_parameters.items():
+            f = next((ff for ff in (self.formats or ()) if key.endswith(f'_{ff}')), None)
+            have = set(sub) if f is None else set(sub[fmt == f])
+            mask = np.array([str(s_) in have for s_ in subjects])
+            self.build_hierarchical_nodes(key, centered=mask, **info)
 
     def get_free_parameters(self):
         pars = super().get_free_parameters()
