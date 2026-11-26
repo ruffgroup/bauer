@@ -30,7 +30,9 @@ Priors have few parameters, so that the data can pin them down:
 * value prior: the objective prior (uniform numbers pushed through the true mapping, which piles values up where the
   curve is flat), mixed with a uniform prior over values with weight w. 'internal': the same construction through the
   participant's own (shrunk) mapping instead of the taught one, so value code and mapping agree. ``value_prior`` = 'objective' (w = 0),
-  'uniform' (w = 1) or 'mixture' (w fitted).
+  'uniform' (w = 1) or 'mixture' (w fitted). 'power': a fixed, context-free prior over amounts p(v) ~ v^(gamma - 1)
+  (gamma fitted; 1 = uniform), the value-side analogue of the number code's natural prior; 'power_mixture': that prior
+  mixed with the objective one, weight ``value_prior_context`` on the context.
 
 Each stage codes efficiently for its own prior (the code is the prior's CDF) and decodes with it.
 
@@ -69,16 +71,23 @@ ROUNDING_PRIOR = {'mu_intercept': -1.0, 'sigma_intercept': 1.5, 'cauchy_sigma_in
 
 
 # Stevens exponent of the number code, as bauer's PowerLawEncoding models: softplus(N(0.5, 0.5)), mostly 0.2-1.3
+# Offset c of the shifted power-law number code f(x) = ((x + c)^beta - 1) / beta, in number units: c > 0 flattens the
+# code's compression at small numbers (noise in number units ~ (x + c)^(1 - beta) no longer vanishes as x -> 0, and
+# the Weber fraction no longer blows up). softplus(N(1, 1.5)): mostly 0.3-6
+NUMBER_OFFSET_PRIOR = {'mu_intercept': 1.0, 'sigma_intercept': 1.5, 'cauchy_sigma_intercept': 2.0, 'transform': 'softplus'}
 BETA_PRIOR = {'mu_intercept': 0.5, 'sigma_intercept': 0.5, 'cauchy_sigma_intercept': 0.75, 'transform': 'softplus'}
 # Weight of the uniform component in the value prior: mostly objective a priori
+# Exponent of a fixed (context-free) power-law value prior p(v) ~ v^(gamma - 1), v in CHF; gamma = 1 is uniform, gamma
+# < 1 piles mass on small amounts. softplus(N(0.5, 0.5)): centred near 1 (uniform)
+VALUE_GAMMA_PRIOR = {'mu_intercept': 0.5, 'sigma_intercept': 0.5, 'cauchy_sigma_intercept': 0.75, 'transform': 'softplus'}
 VALUE_MIX_PRIOR = {'mu_intercept': -1.5, 'sigma_intercept': 1.5, 'cauchy_sigma_intercept': 1.5,
                    'transform': 'logistic'}
 TOTAL_NOISE_PRIOR = {'mu_intercept': 4.0, 'sigma_intercept': 3.0, 'cauchy_sigma_intercept': 4.5,
                      'transform': 'softplus'}
 SHARE_PRIOR = {'mu_intercept': 0.0, 'sigma_intercept': 1.0, 'cauchy_sigma_intercept': 1.0, 'transform': 'logistic'}
-NUMBER_ENCODINGS = ('linear', 'log', 'power')
+NUMBER_ENCODINGS = ('linear', 'log', 'power', 'power_offset')
 NUMBER_DECODING_PRIORS = ('efficient', 'objective')
-VALUE_PRIORS = ('objective', 'uniform', 'mixture', 'internal')
+VALUE_PRIORS = ('objective', 'uniform', 'mixture', 'internal', 'power', 'power_mixture')
 
 
 def mapping_curve_np(u, mapping, curvature):
@@ -112,9 +121,9 @@ class MagnitudeValueModel(EstimationBaseModel):
     paradigm : DataFrame with 'number', 'mapping' and 'response' (and 'subject' as index level for hierarchical fits).
     perception, valuation : bool
         Which noisy, Bayesian-decoded stages are present. Both False: exact value plus response noise.
-    number_encoding : 'linear', 'log' or 'power'
+    number_encoding : 'linear', 'log', 'power' or 'power_offset' (power law of x + c, c fitted per format)
     number_decoding_prior : 'efficient' or 'objective'
-    value_prior : 'objective', 'uniform' or 'mixture'
+    value_prior : 'objective', 'uniform', 'mixture', 'internal', 'power' or 'power_mixture'
     share_parameterisation : bool
         With both stages, sample total noise and the number stage's share (default) instead of the two SDs.
     stimulus_range : (lo, hi)
@@ -175,10 +184,16 @@ class MagnitudeValueModel(EstimationBaseModel):
             pars['rho'] = ROUNDING_PRIOR
         if self.fit_mapping_shrinkage:
             pars['mapping_shrinkage'] = MAPPING_SHRINKAGE_PRIOR
-        if self.perception and self.number_encoding == 'power':
+        if self.perception and self.number_encoding in ('power', 'power_offset'):
             pars.update({n: BETA_PRIOR for n in self._per_format('beta')})
+        if self.perception and self.number_encoding == 'power_offset':
+            pars.update({n: NUMBER_OFFSET_PRIOR for n in self._per_format('number_offset')})
         if self.valuation and self.value_prior == 'mixture':
             pars['value_prior_uniform'] = VALUE_MIX_PRIOR
+        if self.valuation and self.value_prior in ('power', 'power_mixture'):
+            pars['value_gamma'] = VALUE_GAMMA_PRIOR
+        if self.valuation and self.value_prior == 'power_mixture':
+            pars['value_prior_context'] = VALUE_MIX_PRIOR
         return pars
 
     def _per_format(self, name):
@@ -250,6 +265,22 @@ class MagnitudeValueModel(EstimationBaseModel):
         cum = pt.concatenate([pt.zeros_like(p[..., :1]), cum], axis=-1)
         return cum / cum[..., -1:]
 
+    def _log_number(self, logx, inputs, f, n_sub):
+        """log(x + offset) on the number grid, (1 or S, N); with 'power_offset' plus the fitted offset of format f."""
+        if self.number_encoding != 'power_offset':
+            return logx
+        c = pt.specify_shape(inputs[self._per_format('number_offset')[f]], (n_sub,))[:, None]
+        return pt.log(self.x_grid[None, :] + self.offset + c)
+
+    def _power_value_prior(self, gamma):
+        """(S, C, N) density on the value grid (as a fraction of the range, integrating to 1) of a fixed power-law
+        prior over amounts, p(v) ~ v^(gamma - 1) with v in CHF: the same for every mapping, so it does not adapt to
+        the values the context presents."""
+        logv = np.log(self.x_grid + self.offset)[None, :]
+        p = pt.exp((gamma[:, None] - 1) * logv)                                          # (S, N)
+        p = p / (pt.sum(p, axis=-1, keepdims=True) * self.du)
+        return p[:, None, :] * np.ones((1, len(self.mappings), 1))                     # (S, C, N)
+
     def _internal_value_prior(self, G):
         """Density on the value grid of G(U), U uniform, for the mapping rows G (S, C, N) actually used: the CDF of
         the values is the inverse mapping, F_v(v) = G^-1(v) (exact for the piecewise-linear rows), and its slope is
@@ -299,6 +330,13 @@ class MagnitudeValueModel(EstimationBaseModel):
             elif self.value_prior == 'mixture':
                 w = pt.specify_shape(inputs['value_prior_uniform'], (n_sub,))[:, None, None]
                 p_v = (1 - w) * p_v + w
+            elif self.value_prior in ('power', 'power_mixture'):
+                p_pow = self._power_value_prior(pt.specify_shape(inputs['value_gamma'], (n_sub,)))  # (S, C, N)
+                if self.value_prior == 'power':
+                    p_v = p_pow
+                else:  # weight on the values the context presents (the taught curve's objective prior)
+                    w = pt.specify_shape(inputs['value_prior_context'], (n_sub,))[:, None, None]
+                    p_v = (1 - w) * p_pow + w * p_v
             p_v = p_v * pt.ones((n_sub, 1, 1))                                          # (S, C, N)
             F_v = self._cdf(p_v, self.du)                                               # (S, C, N)
             enc = pt.einsum('scnv,scv->scn', tent(G, u, self.du), F_v)                  # F_v(G(x)), (S, C, N)
@@ -323,10 +361,11 @@ class MagnitudeValueModel(EstimationBaseModel):
                 else:
                     beta = pt.specify_shape(inputs[beta_name], (n_sub,))[:, None]
                 b = pt.switch(pt.lt(pt.abs(beta), 1e-4), 1e-4, beta)
-                fx = pt.expm1(b * logx) / b                                             # Box-Cox, (S, N)
+                lx = self._log_number(logx, inputs, f, n_sub)
+                fx = pt.expm1(b * lx) / b                                               # Box-Cox, (S, N)
                 F_x = (fx - fx[:, :1]) / (fx[:, -1:] - fx[:, :1])
                 if self.number_decoding_prior == 'efficient':
-                    p_x = pt.exp((beta - 1) * logx)                                     # dF/dx
+                    p_x = pt.exp((beta - 1) * lx)                                       # dF/dx
                 else:
                     p_x = pt.ones((n_sub, self.grid_resolution))
                 K = self._kernel(F_x, sigma_per[f][:, None, None])                      # (S, N, M)
@@ -619,6 +658,13 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
             elif self.value_prior == 'mixture':
                 w = pt.specify_shape(inputs['value_prior_uniform'], (n_sub,))[:, None, None]
                 p_v = (1 - w) * p_v + w
+            elif self.value_prior in ('power', 'power_mixture'):
+                p_pow = self._power_value_prior(pt.specify_shape(inputs['value_gamma'], (n_sub,)))  # (S, C, N)
+                if self.value_prior == 'power':
+                    p_v = p_pow
+                else:  # weight on the values the context presents (the taught curve's objective prior)
+                    w = pt.specify_shape(inputs['value_prior_context'], (n_sub,))[:, None, None]
+                    p_v = (1 - w) * p_pow + w * p_v
             p_v = p_v * pt.ones((n_sub, 1, 1))
             F_v = self._cdf(p_v, self.du)                                                   # (S, C, N)
             out['F_v'] = F_v
@@ -634,9 +680,10 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
                 else:
                     beta = pt.specify_shape(inputs[beta_name], (n_sub,))[:, None]
                 b = pt.switch(pt.lt(pt.abs(beta), 1e-4), 1e-4, beta)
-                fx = pt.expm1(b * logx) / b
+                lx = self._log_number(logx, inputs, f, n_sub)
+                fx = pt.expm1(b * lx) / b
                 F_x = (fx - fx[:, :1]) / (fx[:, -1:] - fx[:, :1])
-                p_x = pt.exp((beta - 1) * logx) if self.number_decoding_prior == 'efficient' \
+                p_x = pt.exp((beta - 1) * lx) if self.number_decoding_prior == 'efficient' \
                     else pt.ones((n_sub, N))
                 F_xs.append(F_x)
                 x_hats.append(self._decoder(F_x, p_x, sigma_per[f][:, None] / 100.))          # (S, M)
