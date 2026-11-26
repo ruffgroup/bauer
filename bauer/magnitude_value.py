@@ -506,7 +506,7 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
 
     def __init__(self, *args, grid_resolution=601, n_nodes=48, n_cells=40, answer_precision_bins=False,
                  group_sd_factor=1.0, rounding_mixture=False, default_format=None, motor_noise=True, centered=False,
-                 **kwargs):
+                 inverse_table=None, **kwargs):
         self.n_nodes, self.n_cells = int(n_nodes), int(n_cells)
         # Hierarchical fits: sample every subject's value directly (centred) instead of as mu + sd * offset, for the
         # subjects that have data on that parameter (number-stage parameters: subjects seen in that format). Each
@@ -519,6 +519,11 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
         # A number instead: response noise with this FIXED SD (% of range), not a free parameter.
         self.motor_fixed = None if isinstance(motor_noise, bool) else float(motor_noise)
         self.motor_noise = bool(motor_noise) and self.motor_fixed is None
+        # How the decoded estimate's CDF is evaluated at the response-noise window: through an inverse of each
+        # subject x condition decoder tabulated on the grid (cheap: one table, interpolated per trial), or by inverting
+        # each trial's own decoder row exactly (T x edges x grid comparisons: exact at the range edges, which matters
+        # without response noise, but much slower). Default: the table only with fitted response noise.
+        self.inverse_table = self.motor_noise if inverse_table is None else bool(inverse_table)
         # Rounding as a mixture over precision levels with FIXED per-participant x format weights: the share of that
         # participant's answers typed at that precision (the coarsest lattice they lie on). An answer's probability sums over every level whose
         # lattice it lies on (a '35' could be typed exactly, as a whole number or as a multiple of 5). Replaces rho.
@@ -715,13 +720,13 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
                 x_hat = x_u[:, None]
             v_in = _interp_uniform(tb['G'], (s1, c1), x_hat, N)
             e = _interp_uniform(tb['F_v'], (s1, c1), v_in, N)                             # (T, K) value codes
-            if self.motor_noise:
+            if self.inverse_table:
                 inv = _inverse_table(tb['v_hat'], N)                                      # (S, C, N)
             else:   # two edges per trial: invert each trial's own decoder row exactly
                 v_rows = tb['v_hat'][s_ix, c_ix]                                          # (T, N)
 
             def H_at(edges):
-                c = (_interp_uniform(inv, (s1, c1), edges, N) if self.motor_noise
+                c = (_interp_uniform(inv, (s1, c1), edges, N) if self.inverse_table
                      else _invert_rows(v_rows, edges))                                    # (T, L+1)
                 return _trunc_cdf(c[:, None, :], e[:, :, None], s_r[:, None, None])
         elif self.perception:
@@ -737,13 +742,13 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
             comp = (1 - ww) * pt.take_along_axis(pt.broadcast_to(Gt, (S, Fn, C, N)), pt.broadcast_to(ii, (S, Fn, C, N)), axis=-1) \
                 + ww * pt.take_along_axis(pt.broadcast_to(Gt, (S, Fn, C, N)), pt.broadcast_to(ii + 1, (S, Fn, C, N)), axis=-1)
             wk = pt.ones((x_u.shape[0], 1))
-            if self.motor_noise:
+            if self.inverse_table:
                 inv = _inverse_table(comp, N)                                             # (S, F, C, N)
             else:
                 comp_rows = comp[s_ix, f_ix, c_ix]                                        # (T, N)
 
             def H_at(edges):
-                c = (_interp_uniform(inv, (s1, f1, c1), edges, N) if self.motor_noise
+                c = (_interp_uniform(inv, (s1, f1, c1), edges, N) if self.inverse_table
                      else _invert_rows(comp_rows, edges))
                 return _trunc_cdf(c[:, None, :], F0[:, None, None], s_p[:, None, None])
         else:
