@@ -28,7 +28,8 @@ Priors have few parameters, so that the data can pin them down:
   ``number_decoding_prior`` = 'efficient' (the prior this code is efficient for, p(x) ~ x^(beta - 1)) or 'objective'
   (uniform, as the numbers are drawn). x is shifted by max(0, 1 - lo) so that x = 0 stays finite.
 * value prior: the objective prior (uniform numbers pushed through the true mapping, which piles values up where the
-  curve is flat), mixed with a uniform prior over values with weight w. ``value_prior`` = 'objective' (w = 0),
+  curve is flat), mixed with a uniform prior over values with weight w. 'internal': the same construction through the
+  participant's own (shrunk) mapping instead of the taught one, so value code and mapping agree. ``value_prior`` = 'objective' (w = 0),
   'uniform' (w = 1) or 'mixture' (w fitted).
 
 Each stage codes efficiently for its own prior (the code is the prior's CDF) and decodes with it.
@@ -77,7 +78,7 @@ TOTAL_NOISE_PRIOR = {'mu_intercept': 4.0, 'sigma_intercept': 3.0, 'cauchy_sigma_
 SHARE_PRIOR = {'mu_intercept': 0.0, 'sigma_intercept': 1.0, 'cauchy_sigma_intercept': 1.0, 'transform': 'logistic'}
 NUMBER_ENCODINGS = ('linear', 'log', 'power')
 NUMBER_DECODING_PRIORS = ('efficient', 'objective')
-VALUE_PRIORS = ('objective', 'uniform', 'mixture')
+VALUE_PRIORS = ('objective', 'uniform', 'mixture', 'internal')
 
 
 def mapping_curve_np(u, mapping, curvature):
@@ -248,6 +249,18 @@ class MagnitudeValueModel(EstimationBaseModel):
         cum = pt.concatenate([pt.zeros_like(p[..., :1]), cum], axis=-1)
         return cum / cum[..., -1:]
 
+    def _internal_value_prior(self, G):
+        """Density on the value grid of G(U), U uniform, for the mapping rows G (S, C, N) actually used: the CDF of
+        the values is the inverse mapping, F_v(v) = G^-1(v) (exact for the piecewise-linear rows), and its slope is
+        the density."""
+        N, du = self.grid_resolution, self.du
+        rows = G.reshape((-1, N))
+        y = pt.as_tensor_variable(self.u_grid)[None, :] * pt.ones_like(rows)
+        F = _invert_rows(rows, y).reshape(G.shape)
+        d = (F[..., 1:] - F[..., :-1]) / du
+        p = pt.concatenate([d[..., :1], (d[..., 1:] + d[..., :-1]) / 2, d[..., -1:]], axis=-1)
+        return pt.maximum(p, 1e-6)
+
     def _kernel(self, F, sigma):
         """p(code cell | F): F (..., N) code positions, sigma broadcastable to F[..., None], in % of range.
         Returns (..., N, N_code), rows sum to 1."""
@@ -278,7 +291,9 @@ class MagnitudeValueModel(EstimationBaseModel):
         # Value stage (or the exact mapping): from the number that reaches it to the value, (S, C, N, N_value)
         if self.valuation:
             p_v = pt.as_tensor_variable(self.p_value_objective)[None]                   # (1, C, N)
-            if self.value_prior == 'uniform':
+            if self.value_prior == 'internal':
+                p_v = self._internal_value_prior(G)
+            elif self.value_prior == 'uniform':
                 p_v = pt.ones_like(p_v)
             elif self.value_prior == 'mixture':
                 w = pt.specify_shape(inputs['value_prior_uniform'], (n_sub,))[:, None, None]
@@ -571,7 +586,9 @@ class MagnitudeValueLocalModel(MagnitudeValueModel):
         out = dict(G=G, sigma_per=sigma_per, sigma_rep=sigma_rep)
         if self.valuation:
             p_v = pt.as_tensor_variable(self.p_value_objective)[None]
-            if self.value_prior == 'uniform':
+            if self.value_prior == 'internal':
+                p_v = self._internal_value_prior(G)
+            elif self.value_prior == 'uniform':
                 p_v = pt.ones_like(p_v)
             elif self.value_prior == 'mixture':
                 w = pt.specify_shape(inputs['value_prior_uniform'], (n_sub,))[:, None, None]
